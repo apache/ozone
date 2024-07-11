@@ -30,7 +30,7 @@ ${S3G_ENDPOINT_URL}     http://s3g:9878
 Create Tenant Success with Cluster Admin
     Run Keyword         Kinit test user     testuser     testuser.keytab
     ${output} =         Execute          ozone tenant --verbose create tenantone
-                        Should contain   ${output}         "tenantId": "tenantone"
+                        Should contain   ${output}         "tenantId" : "tenantone"
 
 Assign User Success with Cluster Admin
     ${output} =         Execute          ozone tenant --verbose user assign testuser --tenant=tenantone
@@ -66,12 +66,17 @@ Verify Bucket 1 Owner
     ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.owner'
                         Should Be Equal  ${result}       testuser
 
-Put, get and delete a key in the tenant bucket
+Put a key in the tenant bucket
                         Execute                 echo "Randomtext" > /tmp/testfile
                         Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object --bucket bucket-test1 --key mykey --body /tmp/testfile  0
+
+Verify Object Owner
+    ${result} =         Execute          ozone sh key info /tenantone/bucket-test1/mykey | jq -r '.owner'
+                        Should Be Equal  ${result}       testuser
+
+Get and delete a key in the tenant bucket
                         Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} head-object --bucket bucket-test1 --key mykey  0
                         Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket bucket-test1 --key mykey  0
-
 
 SetSecret Success with Cluster Admin
     ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1

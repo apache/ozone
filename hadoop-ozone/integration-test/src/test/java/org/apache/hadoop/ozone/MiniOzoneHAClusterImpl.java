@@ -437,6 +437,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
+      prepareForNextBuild();
       return cluster;
     }
 
@@ -660,7 +661,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(scmHttpAddrKey, localhostWithFreePort());
         conf.set(scmHttpsAddrKey, localhostWithFreePort());
         conf.set(scmSecurityAddrKey, localhostWithFreePort());
-        conf.set("ozone.scm.update.service.port", "0");
 
         int ratisPort = getFreePort();
         conf.setInt(scmRatisPortKey, ratisPort);

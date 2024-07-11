@@ -102,6 +102,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
@@ -115,6 +116,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import org.apache.ratis.statemachine.StateMachine;
@@ -274,6 +276,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetSmallFile(request, kvContainer);
     case GetCommittedBlockLength:
       return handler.handleGetCommittedBlockLength(request, kvContainer);
+    case Echo:
+      return handler.handleEcho(request, kvContainer);
     default:
       return null;
     }
@@ -562,6 +566,20 @@ public class KeyValueHandler extends Handler {
     return putBlockResponseSuccess(request, blockDataProto);
   }
 
+  ContainerCommandResponseProto handleEcho(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    return getEchoResponse(request);
+  }
+
+  /**
+   * Checks if a replicaIndex needs to be checked based on the client version for a request.
+   * @param request ContainerCommandRequest object.
+   * @return true if the validation is required for the client version else false.
+   */
+  private boolean replicaIndexCheckRequired(ContainerCommandRequestProto request) {
+    return request.hasVersion() && request.getVersion() >= EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue();
+  }
+
   /**
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
@@ -580,8 +598,10 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      responseData = blockManager.getBlock(kvContainer, blockID)
-          .getProtoBufMessage();
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
+      responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 
@@ -683,7 +703,6 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleReadChunk(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
-
     if (!request.hasReadChunk()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Read Chunk request. trace ID: {}",
@@ -691,7 +710,6 @@ public class KeyValueHandler extends Handler {
       }
       return malformedRequest(request);
     }
-
     ChunkBuffer data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
@@ -699,8 +717,11 @@ public class KeyValueHandler extends Handler {
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
-
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
       BlockUtils.verifyBCSId(kvContainer, blockID);
+
       if (dispatcherContext == null) {
         dispatcherContext = DispatcherContext.getHandleReadChunk();
       }
@@ -722,6 +743,8 @@ public class KeyValueHandler extends Handler {
       //  For client reads, the client is expected to validate.
       if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
+        metrics.incBytesReadStateMachine(chunkInfo.getLen());
+        metrics.incNumReadStateMachine();
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
@@ -754,7 +777,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data, info.getChecksumData(), 0);
+        Checksum.verifyChecksum(data.duplicate(data.position(), data.limit()), info.getChecksumData(), 0);
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }
@@ -855,9 +878,9 @@ public class KeyValueHandler extends Handler {
 
       // chunks will be committed as a part of handling putSmallFile
       // here. There is no need to maintain this info in openContainerBlockMap.
+      validateChunkChecksumData(data, chunkInfo);
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      validateChunkChecksumData(data, chunkInfo);
       chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();

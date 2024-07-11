@@ -20,13 +20,17 @@ package org.apache.hadoop.hdds.scm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -84,27 +88,27 @@ public class TestXceiverClientGrpc {
 
   @Test
   @Timeout(5)
-  public void testRandomFirstNodeIsCommandTarget() throws IOException {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+  public void testLeaderNodeIsCommandTarget() throws IOException {
+    final Set<DatanodeDetails> seenDN = new HashSet<>();
     conf.setBoolean(
             OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
-    // Using a new Xceiver Client, call it repeatedly until all DNs in the
-    // pipeline have been the target of the command, indicating it is shuffling
-    // the DNs on each call with a new client. This test will timeout if this
-    // is not happening.
-    while (allDNs.size() > 0) {
+    // Using a new Xceiver Client, make 100 calls and ensure leader node is used
+    // each time. The logic should always use the leader node, so we can check
+    // only a single DN is ever seen after 100 calls.
+    for (int i = 0; i < 100; i++) {
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
             DatanodeDetails dn) {
-          allDNs.remove(dn);
+          seenDN.add(dn);
           return buildValidResponse();
         }
       }) {
         invokeXceiverClientGetBlock(client);
       }
     }
+    assertEquals(1, seenDN.size());
   }
 
   @Test
@@ -175,6 +179,39 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
+  public void testPrimaryReadFromNormalDatanode()
+      throws IOException {
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      Pipeline randomPipeline = MockPipeline.createRatisPipeline();
+      int nodeCount = randomPipeline.getNodes().size();
+      assertThat(nodeCount).isGreaterThan(1);
+      randomPipeline.getNodes().forEach(
+          node -> assertEquals(NodeOperationalState.IN_SERVICE, node.getPersistedOpState()));
+
+      randomPipeline.getNodes().get(
+          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+      randomPipeline.getNodes().get(
+          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+      try (XceiverClientGrpc client = new XceiverClientGrpc(randomPipeline, conf) {
+        @Override
+        public XceiverClientReply sendCommandAsync(
+            ContainerProtos.ContainerCommandRequestProto request,
+            DatanodeDetails dn) {
+          seenDNs.add(dn);
+          return buildValidResponse();
+        }
+      }) {
+        invokeXceiverClientGetBlock(client);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      // Always the IN_SERVICE datanode will be read first
+      assertEquals(NodeOperationalState.IN_SERVICE, seenDNs.get(0).getPersistedOpState());
+    }
+  }
+
+  @Test
   public void testConnectionReusedAfterGetBlock() throws IOException {
     // With a new Client, make 100 calls. On each call, ensure that only one
     // DN is seen, indicating the same DN connection is reused.
@@ -201,11 +238,11 @@ public class TestXceiverClientGrpc {
   private void invokeXceiverClientGetBlock(XceiverClientSpi client)
       throws IOException {
     ContainerProtocolCalls.getBlock(client,
-        ContainerProtos.DatanodeBlockID.newBuilder()
+        BlockID.getFromProtobuf(ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build(), null);
+            .build()), null, client.getPipeline().getReplicaIndexes());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -222,7 +259,7 @@ public class TestXceiverClientGrpc {
             .setLen(-1)
             .setOffset(0)
             .build(),
-        bid,
+        bid.getDatanodeBlockIDProtobuf(),
         null, null);
   }
 

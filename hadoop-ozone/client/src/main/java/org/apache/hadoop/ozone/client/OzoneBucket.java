@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -54,7 +55,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +62,7 @@ import java.util.Stack;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -154,7 +155,7 @@ public class OzoneBucket extends WithMetadata {
   private String owner;
 
   protected OzoneBucket(Builder builder) {
-    setMetadata(builder.metadata);
+    super(builder);
     this.proxy = builder.proxy;
     this.volumeName = builder.volumeName;
     this.name = builder.name;  // bucket name
@@ -430,7 +431,7 @@ public class OzoneBucket extends WithMetadata {
   public OzoneOutputStream createKey(String key, long size)
       throws IOException {
     return createKey(key, size, defaultReplication,
-        new HashMap<>());
+        Collections.emptyMap());
   }
 
   /**
@@ -458,6 +459,7 @@ public class OzoneBucket extends WithMetadata {
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
    * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
@@ -465,8 +467,49 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata)
       throws IOException {
+    return this.createKey(key, size, replicationConfig, keyMetadata, Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
+   * @param tags              Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      Map<String, String> tags)
+      throws IOException {
     return proxy
-        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata);
+        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags);
+  }
+
+  /**
+   * This API allows to atomically update an existing key. The key read before invoking this API
+   * should remain unchanged for this key to be written. This is controlled by the generation
+   * field in the existing Key param. If the key is replaced or updated the generation will change. If the
+   * generation has changed since the existing Key was read, either the initial key create will fail,
+   * or the key will fail to commit after the data has been written as the checks are carried out
+   * both at key open and commit time.
+   *
+   * @param keyName Existing key to rewrite. This must exist in the bucket.
+   * @param size The size of the new key
+   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   *                              and commit time.
+   * @param replicationConfig The replication configuration for the key to be rewritten.
+   * @param metadata custom key value metadata
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
+      ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
+    return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
   }
 
   /**
@@ -490,6 +533,7 @@ public class OzoneBucket extends WithMetadata {
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
    * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
    * @return OzoneDataStreamOutput to which the data has to be written.
    * @throws IOException
    */
@@ -499,8 +543,28 @@ public class OzoneBucket extends WithMetadata {
     if (replicationConfig == null) {
       replicationConfig = defaultReplication;
     }
+    return this.createStreamKey(key, size, replicationConfig, keyMetadata,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
     return proxy.createStreamKey(volumeName, name, key, size,
-        replicationConfig, keyMetadata);
+        replicationConfig, keyMetadata, tags);
   }
 
   /**
@@ -635,6 +699,16 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Deletes the given list of keys from the bucket.
+   * @param keyList List of the key name to be deleted.
+   * @param quiet flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    return proxy.deleteKeys(volumeName, name, keyList, quiet);
+  }
+
+  /**
    * Rename the keyname from fromKeyName to toKeyName.
    * @param fromKeyName The original key name.
    * @param toKeyName New key name.
@@ -658,11 +732,12 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Initiate multipart upload for a specified key.
-   * @param keyName
-   * @param type
-   * @param factor
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param type Replication type to be used.
+   * @param factor Replication factor of the key.
    * @return OmMultipartInfo
    * @throws IOException
+   * @deprecated Use {@link OzoneBucket#initiateMultipartUpload(String, ReplicationConfig)} instead.
    */
   @Deprecated
   public OmMultipartInfo initiateMultipartUpload(String keyName,
@@ -675,11 +750,45 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @return OmMultipartInfo
+   * @throws IOException
    */
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config);
+    return initiateMultipartUpload(keyName, config, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @param metadata Custom key metadata.
+   * @return OmMultipartInfo
+   * @throws IOException
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata)
+      throws IOException {
+    return initiateMultipartUpload(keyName, config, metadata, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @param metadata Custom key metadata.
+   * @param tags Tags used for S3 object tags.
+   * @return OmMultipartInfo
+   * @throws IOException
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata,
+      Map<String, String> tags)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags);
   }
 
   /**
@@ -954,8 +1063,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Inner builder for OzoneBucket.
    */
-  public static class Builder {
-    private Map<String, String> metadata;
+  public static class Builder extends WithMetadata.Builder {
     private ConfigurationSource conf;
     private ClientProtocol proxy;
     private String volumeName;
@@ -983,8 +1091,9 @@ public class OzoneBucket extends WithMetadata {
       this.proxy = proxy;
     }
 
+    @Override
     public Builder setMetadata(Map<String, String> metadata) {
-      this.metadata = metadata;
+      super.setMetadata(metadata);
       return this;
     }
 
@@ -1276,23 +1385,33 @@ public class OzoneBucket extends WithMetadata {
     protected List<OzoneKey> buildKeysWithKeyPrefix(
         List<OzoneFileStatusLight> statuses) {
       return statuses.stream()
-          .map(status -> {
-            BasicOmKeyInfo keyInfo = status.getKeyInfo();
-            String keyName = keyInfo.getKeyName();
-            if (status.isDirectory()) {
-              // add trailing slash to represent directory
-              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-            }
-            return new OzoneKey(keyInfo.getVolumeName(),
-                keyInfo.getBucketName(), keyName,
-                keyInfo.getDataSize(), keyInfo.getCreationTime(),
-                keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig(), keyInfo.isFile());
-          })
+          .map(OzoneBucket::toOzoneKey)
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
     }
 
+  }
+
+  private static OzoneKey toOzoneKey(OzoneFileStatusLight status) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    String keyName = keyInfo.getKeyName();
+    final Map<String, String> metadata;
+    if (status.isDirectory()) {
+      // add trailing slash to represent directory
+      keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+      metadata = Collections.emptyMap();
+    } else {
+      metadata = Collections.singletonMap(ETAG, keyInfo.getETag());
+    }
+    return new OzoneKey(keyInfo.getVolumeName(),
+        keyInfo.getBucketName(), keyName,
+        keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(),
+        keyInfo.getReplicationConfig(),
+        metadata,
+        keyInfo.isFile(),
+        keyInfo.getOwnerName(),
+        Collections.emptyMap());
   }
 
 
@@ -1662,21 +1781,7 @@ public class OzoneBucket extends WithMetadata {
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatusLight status = statuses.get(indx);
         BasicOmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-
-        OzoneKey ozoneKey;
-        // Add dir to the dirList
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-        }
-        ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
-            keyInfo.getBucketName(), keyName,
-            keyInfo.getDataSize(), keyInfo.getCreationTime(),
-            keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
-
+        OzoneKey ozoneKey = toOzoneKey(status);
         keysResultList.add(ozoneKey);
 
         if (status.isDirectory()) {
@@ -1779,7 +1884,7 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
+            keyInfo.isFile(), keyInfo.getOwnerName());
         keysResultList.add(ozoneKey);
       }
     }

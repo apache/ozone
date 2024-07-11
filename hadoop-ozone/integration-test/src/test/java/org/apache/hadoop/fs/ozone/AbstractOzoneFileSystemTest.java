@@ -83,6 +83,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -110,6 +111,7 @@ import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPE
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -171,6 +173,10 @@ abstract class AbstractOzoneFileSystemTest {
   private String bucketName;
   private Trash trash;
   private OMMetrics omMetrics;
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void init() throws Exception {
@@ -216,6 +222,10 @@ abstract class AbstractOzoneFileSystemTest {
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
+
+    userO3fs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<OzoneFileSystem>)()
+            -> (OzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterAll
@@ -255,6 +265,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(fsRoot + "user/" + USER1),
+        userO3fs.getHomeDirectory());
   }
 
   @Test
@@ -424,6 +440,19 @@ abstract class AbstractOzoneFileSystemTest {
     // List status on the parent should show the child file
     assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
     assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
+  }
+
+  @Test
+  public void testCreateKeyWithECReplicationConfig() throws Exception {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path testKeyPath = new Path(root, "testKey");
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
   }
 
   @Test
@@ -610,6 +639,100 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testObjectOwner() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1 create file /file1
+      // user2 create directory /dir1
+      // user3 create file /dir1/file2
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[] {"user1"});
+      UserGroupInformation user2 = UserGroupInformation
+          .createUserForTesting("user2", new String[] {"user2"});
+      UserGroupInformation user3 = UserGroupInformation
+          .createUserForTesting("user3", new String[] {"user3"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      assertEquals(user2.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      assertEquals(user3.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
+  public void testObjectProxyUser() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1ProxyUser create file /file1
+      // user2ProxyUser create directory /dir1
+      // user3ProxyUser create file /dir1/file2
+      String proxyUserName = "proxyuser";
+      UserGroupInformation proxyuser = UserGroupInformation
+          .createUserForTesting(proxyUserName, new String[] {"user1"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+
+      UserGroupInformation user1ProxyUser =
+          UserGroupInformation.createProxyUser("user1", proxyuser);
+      UserGroupInformation user2ProxyUser =
+          UserGroupInformation.createProxyUser("user2", proxyuser);
+      UserGroupInformation user3ProxyUser =
+          UserGroupInformation.createProxyUser("user3", proxyuser);
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1ProxyUser.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      assertEquals(user2ProxyUser.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      assertEquals(user3ProxyUser.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
   public void testListStatusWithIntermediateDir() throws Exception {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
@@ -621,6 +744,7 @@ abstract class AbstractOzoneFileSystemTest {
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
         .build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);
@@ -657,6 +781,8 @@ abstract class AbstractOzoneFileSystemTest {
             .setAcls(Collections.emptyList())
             .setReplicationConfig(new ECReplicationConfig(3, 2))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
@@ -2140,4 +2266,26 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(value, statistics.getLong(key).longValue());
   }
 
+  @Test
+  void testSnapshotRead() throws Exception {
+    // Init data
+    Path snapPath1 = fs.createSnapshot(new Path("/"), "snap1");
+
+    Path file1 = new Path("/key1");
+    Path file2 = new Path("/key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snapPath2 = fs.createSnapshot(new Path("/"), "snap2");
+
+    Path file3 = new Path("/key3");
+    ContractTestUtils.touch(fs, file3);
+    Path snapPath3 = fs.createSnapshot(new Path("/"), "snap3");
+
+    FileStatus[] f1 = fs.listStatus(snapPath1);
+    FileStatus[] f2 = fs.listStatus(snapPath2);
+    FileStatus[] f3 = fs.listStatus(snapPath3);
+    assertEquals(0, f1.length);
+    assertEquals(2, f2.length);
+    assertEquals(3, f3.length);
+  }
 }

@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -430,16 +429,6 @@ public class SequenceIdGenerator {
         }
       }
 
-      try (TableIterator<BigInteger,
-          ? extends KeyValue<BigInteger, CertInfo>> iterator =
-               scmMetadataStore.getRevokedCertsV2Table().iterator()) {
-        while (iterator.hasNext()) {
-          X509Certificate cert =
-              iterator.next().getValue().getX509Certificate();
-          largestCertId = Long.max(
-              cert.getSerialNumber().longValueExact(), largestCertId);
-        }
-      }
       sequenceIdTable.put(CERTIFICATE_ID, largestCertId);
       LOG.info("upgrade {} to {}", CERTIFICATE_ID,
           sequenceIdTable.get(CERTIFICATE_ID));

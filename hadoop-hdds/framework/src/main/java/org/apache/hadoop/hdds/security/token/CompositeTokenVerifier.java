@@ -36,11 +36,11 @@ public class CompositeTokenVerifier implements TokenVerifier {
   }
 
   @Override
-  public void verify(String user, Token<?> token,
+  public void verify(Token<?> token,
       ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
 
     for (TokenVerifier verifier : delegates) {
-      verifier.verify(user, token, cmd);
+      verifier.verify(token, cmd);
     }
   }
 

@@ -43,6 +43,12 @@ public class OzoneKeyDetails extends OzoneKey {
   private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
 
   /**
+   * The generation of an existing key. This can be used with atomic commits, to
+   * ensure the key has not changed since the key details were read.
+   */
+  private final Long generation;
+
+  /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
    */
   @SuppressWarnings("parameternumber")
@@ -53,12 +59,30 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
-      boolean isFile) {
+      boolean isFile, String owner, Map<String, String> tags, Long generation) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile);
+        modificationTime, replicationConfig, metadata, isFile, owner, tags);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
+    this.generation = generation;
+  }
+
+  /**
+   * Constructs OzoneKeyDetails from OmKeyInfo.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
+                         long size, long creationTime, long modificationTime,
+                         List<OzoneKeyLocation> ozoneKeyLocations,
+                         ReplicationConfig replicationConfig,
+                         Map<String, String> metadata,
+                         FileEncryptionInfo feInfo,
+                         CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
+                         boolean isFile, String owner, Map<String, String> tags) {
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, ozoneKeyLocations, replicationConfig, metadata, feInfo, contentSupplier,
+        isFile, owner, tags, null);
   }
 
   /**
@@ -70,6 +94,10 @@ public class OzoneKeyDetails extends OzoneKey {
 
   public FileEncryptionInfo getFileEncryptionInfo() {
     return feInfo;
+  }
+
+  public Long getGeneration() {
+    return generation;
   }
 
   /**

@@ -18,11 +18,18 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -45,4 +52,28 @@ public final class RocksDBUtils {
     }
     return cfs;
   }
+
+  public static ColumnFamilyHandle getColumnFamilyHandle(String columnFamilyName, List<ColumnFamilyHandle> cfHandleList)
+      throws RocksDBException {
+    byte[] nameBytes = columnFamilyName.getBytes(StandardCharsets.UTF_8);
+
+    for (ColumnFamilyHandle cf : cfHandleList) {
+      if (Arrays.equals(cf.getName(), nameBytes)) {
+        return cf;
+      }
+    }
+
+    return null;
+  }
+
+  public static <T> T getValue(ManagedRocksDB db,
+                               ColumnFamilyHandle columnFamilyHandle, String key,
+                               Codec<T> codec)
+      throws IOException, RocksDBException {
+    byte[] bytes = db.get().get(columnFamilyHandle,
+        StringCodec.get().toPersistedFormat(key));
+    return bytes != null ? codec.fromPersistedFormat(bytes) : null;
+  }
+
+
 }

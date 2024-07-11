@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
+import java.io.IOException;
 import java.util.function.Function;
 
 /**
@@ -48,8 +50,9 @@ public interface BlockInputStreamFactory {
    */
   BlockExtendedInputStream create(ReplicationConfig repConfig,
       BlockLocationInfo blockInfo, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token,
        XceiverClientFactory xceiverFactory,
-       Function<BlockID, BlockLocationInfo> refreshFunction);
+       Function<BlockID, BlockLocationInfo> refreshFunction,
+       OzoneClientConfig config) throws IOException;
 
 }

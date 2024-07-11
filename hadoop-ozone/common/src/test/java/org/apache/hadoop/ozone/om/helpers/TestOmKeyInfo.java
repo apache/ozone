@@ -67,6 +67,7 @@ public class TestOmKeyInfo {
     assertFalse(key.isHsync());
     key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
     assertTrue(key.isHsync());
+    assertEquals(5678L, key.getExpectedDataGeneration());
   }
 
   @Test
@@ -123,6 +124,7 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .setExpectedDataGeneration(5678L)
         .build();
   }
 
@@ -182,7 +184,7 @@ public class TestOmKeyInfo {
 
     key.setAcls(Arrays.asList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE, ACCESS)));
+        ACCESS, IAccessAuthorizer.ACLType.WRITE)));
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -33,51 +34,66 @@ import java.util.List;
 public final class DatanodeMetadata {
 
   @XmlElement(name = "uuid")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String uuid;
 
   @XmlElement(name = "hostname")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String hostname;
 
   @XmlElement(name = "state")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeState state;
 
   @XmlElement(name = "opState")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeOperationalState opState;
 
   @XmlElement(name = "lastHeartbeat")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long lastHeartbeat;
 
   @XmlElement(name = "storageReport")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private DatanodeStorageReport datanodeStorageReport;
 
   @XmlElement(name = "pipelines")
   private List<DatanodePipeline> pipelines;
 
   @XmlElement(name = "containers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int containers;
 
   @XmlElement(name = "openContainers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int openContainers;
 
   @XmlElement(name = "leaderCount")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int leaderCount;
 
   @XmlElement(name = "version")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String version;
 
   @XmlElement(name = "setupTime")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long setupTime;
 
   @XmlElement(name = "revision")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String revision;
 
   @XmlElement(name = "buildDate")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String buildDate;
 
   @XmlElement(name = "layoutVersion")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int layoutVersion;
 
   @XmlElement(name = "networkLocation")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String networkLocation;
 
   private DatanodeMetadata(Builder builder) {

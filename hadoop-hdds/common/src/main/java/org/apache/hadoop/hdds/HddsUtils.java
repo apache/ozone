@@ -437,6 +437,9 @@ public final class HddsUtils {
     case PutSmallFile:
     case StreamInit:
     case StreamWrite:
+      return false;
+    case Echo:
+      return proto.getEcho().hasReadOnly() && proto.getEcho().getReadOnly();
     default:
       return false;
     }
@@ -800,7 +803,7 @@ public final class HddsUtils {
   }
 
   @Nonnull
-  public static String threadNamePrefix(@Nullable String id) {
+  public static String threadNamePrefix(@Nullable Object id) {
     return id != null && !"".equals(id)
         ? id + "-"
         : "";

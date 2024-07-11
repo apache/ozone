@@ -67,7 +67,7 @@ public final class IOUtils {
    * Close each argument, catching exceptions and logging them as error.
    */
   public static void close(Logger logger,
-      Collection<AutoCloseable> closeables) {
+      Collection<? extends AutoCloseable> closeables) {
     if (closeables == null) {
       return;
     }
@@ -94,7 +94,7 @@ public final class IOUtils {
   /**
    * Close each argument, swallowing exceptions.
    */
-  public static void closeQuietly(Collection<AutoCloseable> closeables) {
+  public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
   }
 }

@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.api.types.RemoveDataNodesResponseWrapper;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
@@ -101,6 +102,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -115,6 +117,7 @@ import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -141,8 +144,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -169,25 +175,36 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
   private DatanodeDetails datanodeDetails2;
+  private DatanodeDetails datanodeDetails3;
+  private DatanodeDetails datanodeDetails4;
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
+  private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto3;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
+  private static final String HOST3 = "host3.datanode";
+  private static final String HOST4 = "host4.datanode";
   private static final String IP1 = "1.1.1.1";
   private static final String IP2 = "2.2.2.2";
+  private static final String IP3 = "3.3.3.3";
+  private static final String IP4 = "4.4.4.4";
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+  private StorageContainerLocationProtocol mockScmClient;
 
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private CommonUtils commonUtils;
   private PipelineManager pipelineManager;
   private ReconPipelineManager reconPipelineManager;
+  private List<HddsProtos.Node> nodes = getNodeDetails(2);
+  private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
+  private ArrayList<String> metrics = getMetrics();
 
   public TestEndpoints() {
     super();
@@ -200,10 +217,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
+    datanodeDetails3 = randomDatanodeDetails();
+    datanodeDetails4 = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
     datanodeDetails.setIpAddress(IP1);
     datanodeDetails2.setHostName(HOST2);
     datanodeDetails2.setIpAddress(IP2);
+    datanodeDetails3.setHostName(HOST3);
+    datanodeDetails3.setIpAddress(IP3);
+    datanodeDetails4.setHostName(HOST4);
+    datanodeDetails4.setIpAddress(IP4);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -219,8 +242,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
-    StorageContainerLocationProtocol mockScmClient = mock(
-        StorageContainerLocationProtocol.class);
+    mockScmClient = mock(
+        StorageContainerLocationProtocol.class, Mockito.RETURNS_DEEP_STUBS);
     StorageContainerServiceProvider mockScmServiceProvider = mock(
         StorageContainerServiceProviderImpl.class);
     when(mockScmServiceProvider.getPipeline(
@@ -296,7 +319,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, globalStatsDao,
-            containerHealthSchemaManager);
+            containerHealthSchemaManager, mock(OzoneConfiguration.class));
     containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
@@ -407,12 +430,48 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
+    DatanodeDetailsProto datanodeDetailsProto3 =
+        DatanodeDetailsProto.newBuilder()
+            .setHostName(HOST3)
+            .setUuid(datanodeDetails3.getUuid().toString())
+            .setIpAddress(IP3)
+            .build();
+    extendedDatanodeDetailsProto3 =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto3)
+            .setVersion("0.6.0")
+            .setSetupTime(1596347628802L)
+            .setBuildDate("2020-08-01T08:50Z")
+            .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
+            .build();
+    StorageReportProto storageReportProto5 =
+        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
+            .setCapacity(50000)
+            .setStorageUuid(UUID.randomUUID().toString())
+            .setFailed(false).build();
+    StorageReportProto storageReportProto6 =
+        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
+            .setCapacity(80000)
+            .setStorageUuid(UUID.randomUUID().toString())
+            .setFailed(false).build();
+    NodeReportProto nodeReportProto3 =
+        NodeReportProto.newBuilder()
+            .addStorageReport(storageReportProto5)
+            .addStorageReport(storageReportProto6).build();
+
     assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
+              ContainerReportsProto.newBuilder().build(),
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
+      reconScm.getDatanodeProtocolServer()
+          .register(extendedDatanodeDetailsProto3, nodeReportProto3,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
               defaultLayoutVersionProto());
@@ -435,14 +494,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.WRITE,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.READ,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
             ))
             .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
@@ -453,8 +510,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.WRITE,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(OzoneConsts.MB)
@@ -477,8 +533,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.READ,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(100 * OzoneConsts.MB)
@@ -564,6 +619,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(0, datanodeMetadata.getPipelines().size());
       assertEquals(0, datanodeMetadata.getLeaderCount());
       break;
+    case HOST3:
+      assertEquals(130000,
+          datanodeMetadata.getDatanodeStorageReport().getCapacity());
+      assertEquals(17800,
+          datanodeMetadata.getDatanodeStorageReport().getRemaining());
+      assertEquals(80000,
+          datanodeMetadata.getDatanodeStorageReport().getUsed());
+
+      assertEquals(0, datanodeMetadata.getPipelines().size());
+      assertEquals(0, datanodeMetadata.getLeaderCount());
+      break;
     default:
       fail(String.format("Datanode %s not registered",
           hostname));
@@ -577,8 +643,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
         (DatanodesResponse) response.getEntity();
-    assertEquals(2, datanodesResponse.getTotalCount());
-    assertEquals(2, datanodesResponse.getDatanodes().size());
+    assertEquals(3, datanodesResponse.getTotalCount());
+    assertEquals(3, datanodesResponse.getDatanodes().size());
 
     datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
       try {
@@ -713,8 +779,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(0, clusterStateResponse.getVolumes());
     assertEquals(0, clusterStateResponse.getBuckets());
     assertEquals(0, clusterStateResponse.getKeys());
-    assertEquals(2, clusterStateResponse.getTotalDatanodes());
-    assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    assertEquals(3, clusterStateResponse.getTotalDatanodes());
+    assertEquals(3, clusterStateResponse.getHealthyDatanodes());
     assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
@@ -1180,5 +1246,221 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  @Test
+  public void testExplicitRemovalOfDecommissionedNode() throws Exception {
+    Response response = nodeEndpoint.getDatanodes();
+
+    DatanodesResponse datanodesResponse =
+        (DatanodesResponse) response.getEntity();
+    assertEquals(3, datanodesResponse.getTotalCount());
+    assertEquals(3, datanodesResponse.getDatanodes().size());
+
+    // Change Node3 OperationalState with NodeManager to NodeOperationalState.DECOMMISSIONED
+    final NodeManager nodeManager = reconScm.getScmNodeManager();
+    final DatanodeDetails dnDetailsInternal =
+        nodeManager.getNodeByUuid(datanodeDetails3.getUuidString());
+    // Backup existing state and sanity check
+    final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
+    final NodeOperationalState backupOpState =
+        dnDetailsInternal.getPersistedOpState();
+    final long backupOpStateExpiry =
+        dnDetailsInternal.getPersistedOpStateExpiryEpochSec();
+    assertEquals(backupOpState, nStatus.getOperationalState());
+    assertEquals(backupOpStateExpiry, nStatus.getOpStateExpiryEpochSeconds());
+
+    dnDetailsInternal.setPersistedOpState(NodeOperationalState.DECOMMISSIONED);
+    dnDetailsInternal.setPersistedOpStateExpiryEpochSec(666L);
+    nodeManager.setNodeOperationalState(dnDetailsInternal,
+        NodeOperationalState.DECOMMISSIONED, 666L);
+
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(datanodeDetails3.getUuid().toString()));
+
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("failedDatanodes");
+    DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("removedDatanodes");
+
+    assertEquals(1, errorDataNodes.getTotalCount());
+    assertNull(removedNodes);
+    errorDataNodes.getDatanodes().forEach(datanodeMetadata -> {
+      assertEquals("host3.datanode", datanodeMetadata.getHostname());
+    });
+  }
+
+  @Test
+  public void testExplicitRemovalOfInvalidStateNode() {
+    String dnUUID = datanodeDetails2.getUuid().toString();
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    Map<String, DatanodesResponse> datanodesResponseMap = removeDataNodesResponseWrapper.getDatanodesResponseMap();
+    assertFalse(datanodesResponseMap.isEmpty());
+    DatanodesResponse failedDatanodes = datanodesResponseMap.get("failedDatanodes");
+    Map<String, String> failedNodeErrorResponseMap = failedDatanodes.getFailedNodeErrorResponseMap();
+    assertFalse(failedNodeErrorResponseMap.isEmpty());
+    String nodeError = failedNodeErrorResponseMap.get(dnUUID);
+    assertNotNull(nodeError);
+    assertEquals("DataNode should be in DEAD node status.", nodeError);
+    assertEquals(Response.Status.OK.getStatusCode(), removedDNResponse.getStatus());
+  }
+
+  @Test
+  public void testExplicitRemovalOfNonExistingNode() {
+    String dnUUID = datanodeDetails4.getUuid().toString();
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    DatanodesResponse notFoundDatanodes = removeDataNodesResponseWrapper.getDatanodesResponseMap()
+        .get("notFoundDatanodes");
+    assertEquals(1, notFoundDatanodes.getTotalCount());
+    Collection<DatanodeMetadata> datanodes = notFoundDatanodes.getDatanodes();
+    assertEquals(1, datanodes.size());
+    DatanodeMetadata datanodeMetadata = datanodes.stream().findFirst().get();
+    assertEquals(dnUUID, datanodeMetadata.getUuid());
+  }
+
+  @Test
+  public void testSuccessWhenDecommissionStatus() throws IOException {
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        nodes); // 2 nodes decommissioning
+    when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
+    Response datanodesDecommissionInfo = nodeEndpoint.getDatanodesDecommissionInfo();
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
+    DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> dnMetrics = (Map<String, Object>) dnDecommissionInfo.get(0).get("metrics");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
+    assertNotNull(datanode);
+    assertNotNull(dnMetrics);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertFalse(((String) dnMetrics.get("decommissionStartTime")).isEmpty());
+    assertEquals(1, dnMetrics.get("numOfUnclosedPipelines"));
+    assertEquals(3.0, dnMetrics.get("numOfUnderReplicatedContainers"));
+    assertEquals(3.0, dnMetrics.get("numOfUnclosedContainers"));
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  @Test
+  public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
+    when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    Response datanodesDecommissionInfo =
+        nodeEndpoint.getDecommissionInfoForDatanode("654c4b89-04ef-4015-8a3b-50d0fb0e1684", "");
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
+    DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
+    assertNotNull(datanode);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertEquals("654c4b89-04ef-4015-8a3b-50d0fb0e1684", datanode.getUuidString());
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  private List<HddsProtos.Node> getNodeDetailsForUuid(String uuid) {
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
+
+    HddsProtos.DatanodeDetailsProto.Builder dnd =
+        HddsProtos.DatanodeDetailsProto.newBuilder();
+    dnd.setHostName("hostName");
+    dnd.setIpAddress("1.2.3.5");
+    dnd.setNetworkLocation("/default");
+    dnd.setNetworkName("hostName");
+    dnd.addPorts(HddsProtos.Port.newBuilder()
+        .setName("ratis").setValue(5678).build());
+    dnd.setUuid(uuid);
+
+    HddsProtos.Node.Builder builder = HddsProtos.Node.newBuilder();
+    builder.addNodeOperationalStates(
+        HddsProtos.NodeOperationalState.DECOMMISSIONING);
+    builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
+    builder.setNodeID(dnd.build());
+    nodesList.add(builder.build());
+    return nodesList;
+  }
+
+  private List<HddsProtos.Node> getNodeDetails(int n) {
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
+
+    for (int i = 0; i < n; i++) {
+      HddsProtos.DatanodeDetailsProto.Builder dnd =
+          HddsProtos.DatanodeDetailsProto.newBuilder();
+      dnd.setHostName("host" + i);
+      dnd.setIpAddress("1.2.3." + i + 1);
+      dnd.setNetworkLocation("/default");
+      dnd.setNetworkName("host" + i);
+      dnd.addPorts(HddsProtos.Port.newBuilder()
+          .setName("ratis").setValue(5678).build());
+      dnd.setUuid(UUID.randomUUID().toString());
+
+      HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();
+      builder.addNodeOperationalStates(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING);
+      builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
+      builder.setNodeID(dnd.build());
+      nodesList.add(builder.build());
+    }
+    return nodesList;
+  }
+
+  private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
+    Map<String, List<ContainerID>> containerMap = new HashMap<>();
+    List<ContainerID> underReplicated = new ArrayList<>();
+    underReplicated.add(new ContainerID(1L));
+    underReplicated.add(new ContainerID(2L));
+    underReplicated.add(new ContainerID(3L));
+    containerMap.put("UnderReplicated", underReplicated);
+    List<ContainerID> unclosed = new ArrayList<>();
+    unclosed.add(new ContainerID(10L));
+    unclosed.add(new ContainerID(11L));
+    unclosed.add(new ContainerID(12L));
+    containerMap.put("UnClosed", unclosed);
+    return containerMap;
+  }
+
+  private ArrayList<String> getMetrics() {
+    ArrayList<String> result = new ArrayList<>();
+    // no nodes decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 0,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 0,    " +
+        "\"ContainersUnderReplicatedTotal\" : 0,    \"ContainersUnClosedTotal\" : 0,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}");
+    // 2 nodes in decommisioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 2,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 2,    " +
+        "\"ContainersUnderReplicatedTotal\" : 6,    \"ContainersUnclosedTotal\" : 6,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",    \"tag.Hostname.1\" : \"host0\",    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,    \"UnderReplicatedDN.1\" : 3,    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 111211,    " +
+        "\"tag.datanode.2\" : \"host1\",    \"tag.Hostname.2\" : \"host1\",    " +
+        "\"PipelinesWaitingToCloseDN.2\" : 1,    \"UnderReplicatedDN.2\" : 3,    " +
+        "\"SufficientlyReplicatedDN.2\" : 0,    \"UnclosedContainersDN.2\" : 3,    \"StartTimeDN.2\" : 221221} ]}");
+    // only host 1 decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 1,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 1,    " +
+        "\"ContainersUnderReplicatedTotal\" : 3,    \"ContainersUnclosedTotal\" : 3,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",\n    \"tag.Hostname.1\" : \"host0\",\n    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,\n    \"UnderReplicatedDN.1\" : 3,\n    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,\n    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 221221} ]}");
+    return result;
   }
 }

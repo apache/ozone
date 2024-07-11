@@ -29,12 +29,22 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -54,19 +64,31 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import jakarta.annotation.Nonnull;
+import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -79,8 +101,10 @@ public class ReconUtils {
   public ReconUtils() {
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
+
+  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -121,7 +145,7 @@ public class ReconUtils {
       return metadataDir;
     }
 
-    LOG.warn("{} is not configured. We recommend adding this setting. " +
+    log.warn("{} is not configured. We recommend adding this setting. " +
             "Falling back to {} instead.",
         dirConfigKey, HddsConfigKeys.OZONE_METADATA_DIRS);
     return getOzoneMetaDirPath(conf);
@@ -156,7 +180,7 @@ public class ReconUtils {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
         org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
       } catch (Exception e) {
-        LOG.error("Exception encountered when closing " +
+        log.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
       }
     }
@@ -221,7 +245,7 @@ public class ReconUtils {
           if (entry.isDirectory()) {
             boolean success = f.mkdirs();
             if (!success) {
-              LOG.error("Unable to create directory found in tar.");
+              log.error("Unable to create directory found in tar.");
             }
           } else {
             //Write contents of file in archive to a new file.
@@ -244,25 +268,103 @@ public class ReconUtils {
     }
   }
 
+
+  /**
+   * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param omKeyInfo The OmKeyInfo object for the key
+   * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
+   *         the path cannot be constructed at this time.
+   * @throws IOException
+   */
+  public static String constructFullPath(OmKeyInfo omKeyInfo,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                         ReconOMMetadataManager omMetadataManager)
+      throws IOException {
+
+    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
+    long parentId = omKeyInfo.getParentObjectID();
+    boolean isDirectoryPresent = false;
+
+    while (parentId != 0) {
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      if (nsSummary == null) {
+        log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
+            "deletion, returning empty string for path construction.");
+        return "";
+      }
+      if (nsSummary.getParentId() == -1) {
+        if (rebuildTriggered.compareAndSet(false, true)) {
+          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+        }
+        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        return "";
+      }
+      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+
+      // Move to the parent ID of the current directory
+      parentId = nsSummary.getParentId();
+      isDirectoryPresent = true;
+    }
+
+    // Prepend the volume and bucket to the constructed path
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    if (isDirectoryPresent) {
+      return OmUtils.normalizeKey(fullPath.toString(), true);
+    }
+    return fullPath.toString();
+  }
+
+  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager omMetadataManager) {
+    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+      Thread t = new Thread(r);
+      t.setName("RebuildNSSummaryThread");
+      return t;
+    });
+
+    executor.submit(() -> {
+      long startTime = System.currentTimeMillis();
+      log.info("Rebuilding NSSummary tree...");
+      try {
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+      } finally {
+        long endTime = System.currentTimeMillis();
+        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+      }
+    });
+    executor.shutdown();
+  }
+
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.
+   *
    * @param connectionFactory URLConnectionFactory to use.
-   * @param url url to call
-   * @param isSpnego is SPNEGO enabled
+   * @param url               url to call
+   * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
    * @throws IOException, AuthenticationException While reading the response.
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
-                                  String url, boolean isSpnego)
+                                        String url, boolean isSpnego)
       throws IOException, AuthenticationException {
     HttpURLConnection urlConnection = (HttpURLConnection)
-          connectionFactory.openConnection(new URL(url), isSpnego);
+        connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
     return urlConnection;
   }
 
   /**
    * Load last known DB in Recon.
+   *
    * @param reconDbDir
    * @param fileNamePrefix
    * @return
@@ -287,7 +389,7 @@ public class ReconUtils {
               lastKnownSnapshotFileName = fileName;
             }
           } catch (NumberFormatException nfEx) {
-            LOG.warn("Unknown file found in Recon DB dir : {}", fileName);
+            log.warn("Unknown file found in Recon DB dir : {}", fileName);
           }
         }
       }
@@ -320,6 +422,59 @@ public class ReconUtils {
     } else {
       globalStatsDao.update(newRecord);
     }
+  }
+
+  /**
+   * Converts Unix numeric permissions into a symbolic representation.
+   * @param numericPermissions The numeric string, e.g., "750".
+   * @return The symbolic representation, e.g., "rwxr-x---".
+   */
+  public static String convertNumericToSymbolic(String numericPermissions) {
+    int owner = Character.getNumericValue(numericPermissions.charAt(0));
+    int group = Character.getNumericValue(numericPermissions.charAt(1));
+    int others = Character.getNumericValue(numericPermissions.charAt(2));
+
+    return String.format("%s%s%s",
+        convertToSymbolicPermission(owner),
+        convertToSymbolicPermission(group),
+        convertToSymbolicPermission(others));
+  }
+
+  /**
+   * Converts a single digit Unix permission into a symbolic representation.
+   * @param permission The permission digit.
+   * @return The symbolic representation for the digit.
+   */
+  public static String convertToSymbolicPermission(int permission) {
+    String[] symbols = {"---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+    return symbols[permission];
+  }
+
+  /**
+   * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
+   * returns the top N records as specified by the limit.
+   *
+   * This method is optimized for large datasets and utilizes parallel processing to efficiently
+   * sort and retrieve the top N largest records by size. It's especially useful for reducing
+   * processing time and memory usage when only a subset of sorted records is needed.
+   *
+   * Advantages of this approach include:
+   * - Efficient handling of large datasets by leveraging multi-core processors.
+   * - Reduction in memory usage and improvement in processing time by limiting the
+   *   number of returned records.
+   * - Scalability and easy integration with existing systems.
+   *
+   * @param diskUsageList the list of DiskUsage objects to be sorted.
+   * @param limit the maximum number of DiskUsage objects to return.
+   * @return a list of the top N DiskUsage objects sorted in descending order by size,
+   *  where N is the specified limit.
+   */
+  public static List<DUResponse.DiskUsage> sortDiskUsageDescendingWithLimit(
+      List<DUResponse.DiskUsage> diskUsageList, int limit) {
+    return diskUsageList.parallelStream()
+        .sorted((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()))
+        .limit(limit)
+        .collect(Collectors.toList());
   }
 
   public static long getFileSizeUpperBound(long fileSize) {
@@ -384,5 +539,108 @@ public class ReconUtils {
     builder.setDatanodeProtocolServerAddress(
         HddsServerUtil.getReconDataNodeBindAddress(conf));
     return builder.build();
+  }
+
+  @VisibleForTesting
+  public static void setLogger(Logger logger) {
+    log = logger;
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return if tables are initialized
+   */
+  public static boolean isInitializationComplete(ReconOMMetadataManager omMetadataManager) {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null
+        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
+  }
+
+  /**
+   * Converts string date in a provided format to server timezone's epoch milllioseconds.
+   *
+   * @param dateString
+   * @param dateFormat
+   * @param timeZone
+   * @return the epoch milliseconds representation of the date.
+   * @throws ParseException
+   */
+  public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    String localDateFormat = dateFormat;
+    try {
+      if (StringUtils.isEmpty(dateString)) {
+        return Instant.now().toEpochMilli();
+      }
+      if (StringUtils.isEmpty(dateFormat)) {
+        localDateFormat = "MM-dd-yyyy HH:mm:ss";
+      }
+      if (null == timeZone) {
+        timeZone = TimeZone.getDefault();
+      }
+      SimpleDateFormat sdf = new SimpleDateFormat(localDateFormat);
+      sdf.setTimeZone(timeZone); // Set server's timezone
+      Date date = sdf.parse(dateString);
+      return date.getTime(); // Convert to epoch milliseconds
+    } catch (ParseException parseException) {
+      log.error("Date parse exception for date: {} in format: {} -> {}", dateString, localDateFormat, parseException);
+      return Instant.now().toEpochMilli();
+    } catch (Exception exception) {
+      log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
+      return Instant.now().toEpochMilli();
+    }
+  }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public static Response validateNames(String resName)
+      throws IllegalArgumentException {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
+  }
+
+  /**
+   * Constructs an object path with the given IDs.
+   *
+   * @param ids The IDs to construct the object path with.
+   * @return The constructed object path.
+   */
+  public static String constructObjectPathWithPrefix(long... ids) {
+    StringBuilder pathBuilder = new StringBuilder();
+    for (long id : ids) {
+      pathBuilder.append(OM_KEY_PREFIX).append(id);
+    }
+    return pathBuilder.toString();
   }
 }

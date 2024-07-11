@@ -1466,7 +1466,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               CertificateException.ErrorCode.ROLLBACK_ERROR) {
             if (shutdownCallback != null) {
               getLogger().error("Failed to rollback key and cert after an " +
-                  " unsuccessful renew try.", e);
+                  "unsuccessful renew try.", e);
               shutdownCallback.run();
             }
           }

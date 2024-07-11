@@ -38,8 +38,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,8 +67,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -202,7 +202,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after full snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
@@ -220,7 +220,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
         taskStatusResponse,
@@ -260,7 +260,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
   }
 
   // This test simulates the mis-match in sequence number between Recon OM
@@ -314,7 +314,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after incremental delta snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     String volume = "vol15";
     String bucket = "bucket15";
@@ -356,7 +356,7 @@ public class TestReconWithOzoneManager {
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
             .getLatestSequenceNumber();
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
@@ -381,16 +381,23 @@ public class TestReconWithOzoneManager {
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
                                              String taskName,
-                                             String entityAttribute) {
-    ArrayList<LinkedTreeMap> taskStatusList = new Gson()
-        .fromJson(taskStatusResponse, ArrayList.class);
-    Optional<LinkedTreeMap> taskEntity =
-        taskStatusList
-            .stream()
-            .filter(task -> task.get("taskName").equals(taskName))
-            .findFirst();
-    assertTrue(taskEntity.isPresent());
-    return (long) (double) taskEntity.get().get(entityAttribute);
+                                             String entityAttribute)
+      throws IOException {
+    List<Map<String, Object>> taskStatusList =
+        JsonTestUtils.readTreeAsListOfMaps(taskStatusResponse);
+
+    // Stream through the list to find the task entity matching the taskName
+    Optional<Map<String, Object>> taskEntity = taskStatusList.stream()
+        .filter(task -> taskName.equals(task.get("taskName")))
+        .findFirst();
+
+    if (taskEntity.isPresent()) {
+      Number number = (Number) taskEntity.get().get(entityAttribute);
+      return number.longValue();
+    } else {
+      throw new IOException(
+          "Task entity for task name " + taskName + " not found");
+    }
   }
 
   /**

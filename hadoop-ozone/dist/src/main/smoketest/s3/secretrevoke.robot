@@ -38,12 +38,14 @@ S3 Gateway Revoke Secret
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username
+    [Tags]    robot:skip    # TODO: Enable after HDDS-11041 is done.
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret -u testuser ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username For Other User
+    [Tags]    robot:skip    # TODO: Enable after HDDS-11041 is done.
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2

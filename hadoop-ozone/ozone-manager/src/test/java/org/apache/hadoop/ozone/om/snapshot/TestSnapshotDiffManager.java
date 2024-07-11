@@ -64,6 +64,7 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
@@ -364,7 +365,7 @@ public class TestSnapshotDiffManager {
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(omSnapshotManager.isSnapshotStatus(any(), any())).thenReturn(true);
-    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10);
+    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0);
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
         .thenAnswer(invocationOnMock -> {
@@ -390,14 +391,9 @@ public class TestSnapshotDiffManager {
 
   @AfterEach
   public void tearDown() {
-    if (columnFamilyHandles != null) {
-      columnFamilyHandles.forEach(IOUtils::closeQuietly);
-    }
-
-    IOUtils.closeQuietly(db);
-    IOUtils.closeQuietly(dbOptions);
-    IOUtils.closeQuietly(columnFamilyOptions);
     IOUtils.closeQuietly(snapshotDiffManager);
+    IOUtils.closeQuietly(columnFamilyHandles);
+    IOUtils.closeQuietly(db, dbOptions, columnFamilyOptions);
   }
 
   private OmSnapshot getMockedOmSnapshot(UUID snapshotId) {
@@ -405,6 +401,7 @@ public class TestSnapshotDiffManager {
     when(omSnapshot.getName()).thenReturn(snapshotId.toString());
     when(omSnapshot.getMetadataManager()).thenReturn(omMetadataManager);
     when(omMetadataManager.getStore()).thenReturn(dbStore);
+    when(omSnapshot.getSnapshotID()).thenReturn(snapshotId);
     return omSnapshot;
   }
 
@@ -674,8 +671,6 @@ public class TestSnapshotDiffManager {
       Table<String, ? extends WithParentObjectId> fromSnapshotTable =
           getMockedTable(fromSnapshotTableMap, snapshotTableName);
 
-      snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
-          snapDiffJobTable, snapDiffReportTable, columnFamilyOptions, codecRegistry);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
 
       doAnswer(invocation -> {
@@ -822,7 +817,7 @@ public class TestSnapshotDiffManager {
         when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
         when(keyInfo.isKeyInfoSame(any(OmKeyInfo.class),
             eq(false), eq(false),
-            eq(false), eq(false)))
+            eq(false), eq(false), eq(true)))
             .thenAnswer(k -> {
               int keyVal = Integer.parseInt(((String)i.getArgument(0))
                   .substring(3));
@@ -1280,6 +1275,7 @@ public class TestSnapshotDiffManager {
    * startup.
    */
   @Test
+  @Flaky("HDDS-10490")
   public void testLoadJobsOnStartUp() throws Exception {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

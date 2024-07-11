@@ -819,8 +819,7 @@ public class BasicRootedOzoneClientAdapterImpl
     String group = getGroupName(ugi);
     List<FileStatusAdapter> res = new ArrayList<>();
 
-    Iterator<? extends OzoneSnapshot> snapshotIter =
-        objectStore.listSnapshot(volumeName, bucketName, null, null);
+    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, null);
 
     while (snapshotIter.hasNext()) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();
@@ -882,9 +881,9 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
-      String startBucket = ofsStartPath.getBucketName();
+      String startBucketPath = ofsStartPath.getNonKeyPath();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucket, numEntries, uri, workingDir, username);
+          recursive, startBucketPath, numEntries, uri, workingDir, username);
     }
 
     if (ofsPath.isSnapshotPath()) {
@@ -1004,7 +1003,7 @@ public class BasicRootedOzoneClientAdapterImpl
         keyInfo.getModificationTime(),
         keyInfo.getModificationTime(),
         status.isDirectory() ? (short) 00777 : (short) 00666,
-        owner,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
         owner,
         null,
         getBlockLocations(status),
@@ -1317,10 +1316,10 @@ public class BasicRootedOzoneClientAdapterImpl
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot) {
-        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, volume, bucket);
       }
       if (takeTemporaryFromSnapshot) {
-        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, volume, bucket);
       }
     }
   }

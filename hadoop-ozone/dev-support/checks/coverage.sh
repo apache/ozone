@@ -26,11 +26,11 @@ REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
-JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout)
+JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout -Dscan=false)
 
 #Install jacoco cli
-mvn --non-recursive --no-transfer-progress \
-  org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy \
+mvn --non-recursive --no-transfer-progress -Dscan=false \
+  org.apache.maven.plugins:maven-dependency-plugin:copy \
   -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
 jacoco() {
@@ -49,10 +49,8 @@ find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'oz
     xargs -n1 unzip -o -q -d target/coverage-classes
 
 #Exclude some classes from the coverage
-find target/coverage-classes -name proto -type d | xargs rm -rf
-find target/coverage-classes -name generated -type d | xargs rm -rf
-find target/coverage-classes -name v1 -type d | xargs rm -rf
-find target/coverage-classes -name freon -type d | xargs rm -rf
+find target/coverage-classes -type d \( -name proto -or -name proto3 -or -name generated -or -name v1 -or -name freon \) \
+  | xargs rm -rf
 
 #generate the reports
 jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"

@@ -455,7 +455,7 @@ public final class OzoneConfigKeys {
       "hdds.datanode.replication.work.dir";
 
 
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
@@ -671,6 +671,20 @@ public final class OzoneConfigKeys {
       "hdds.scmclient.max.retry.timeout";
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
+
+
+  public static final String OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.xceiver.client.metrics.percentiles.intervals.seconds";
+
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION =
+      "ozone.om.network.topology.refresh.duration";
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
+
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
+      "ozone.security.crypto.compliance.mode";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
 
   /**

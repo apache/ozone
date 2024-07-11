@@ -184,14 +184,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       StateContext context, ConfigurationSource conf, Parameters parameters)
       throws IOException {
     this.conf = conf;
-    Objects.requireNonNull(dd, "id == null");
+    Objects.requireNonNull(dd, "DatanodeDetails == null");
     datanodeDetails = dd;
     ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
     this.streamEnable = conf.getBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
-    RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -202,6 +201,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     shouldDeleteRatisLogDirectory =
         ratisServerConfig.shouldDeleteRatisLogDirectory();
 
+    RaftProperties serverProperties = newRaftProperties();
     this.server =
         RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
@@ -372,12 +372,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setRatisLeaderElectionTimeout(RaftProperties properties) {
-    long duration;
     TimeUnit leaderElectionMinTimeoutUnit =
         OzoneConfigKeys.
             HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
             .getUnit();
-    duration = conf.getTimeDuration(
+    long duration = conf.getTimeDuration(
         OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         OzoneConfigKeys.
             HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
@@ -393,12 +392,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setTimeoutForRetryCache(RaftProperties properties) {
-    TimeUnit timeUnit;
-    long duration;
-    timeUnit =
+    TimeUnit timeUnit =
         OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
             .getUnit();
-    duration = conf.getTimeDuration(
+    long duration = conf.getTimeDuration(
         OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY,
         OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
             .getDuration(), timeUnit);
@@ -515,7 +512,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setPendingRequestsLimits(RaftProperties properties) {
-
     long pendingRequestsBytesLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
@@ -819,17 +815,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
   }
 
-  @VisibleForTesting
-  public List<PipelineID> getPipelineIds() {
-    Iterable<RaftGroupId> gids = server.getGroupIds();
-    List<PipelineID> pipelineIDs = new ArrayList<>();
-    for (RaftGroupId groupId : gids) {
-      pipelineIDs.add(PipelineID.valueOf(groupId.getUuid()));
-      LOG.info("pipeline id {}", PipelineID.valueOf(groupId.getUuid()));
-    }
-    return pipelineIDs;
-  }
-
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
       List<DatanodeDetails> peers) throws IOException {
@@ -939,10 +924,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   public long getMinReplicatedIndex(PipelineID pipelineID) throws IOException {
-    Long minIndex;
     GroupInfoReply reply = getServer()
         .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
-    minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
+    Long minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
     return minIndex == null ? -1 : minIndex;
   }
 

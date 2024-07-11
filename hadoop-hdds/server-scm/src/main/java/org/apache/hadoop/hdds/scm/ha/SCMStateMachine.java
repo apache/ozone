@@ -233,8 +233,8 @@ public class SCMStateMachine extends BaseStateMachine {
     String leaderAddress = roleInfoProto.getFollowerInfo()
         .getLeaderInfo().getId().getAddress();
     Optional<SCMNodeDetails> leaderDetails =
-        scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
-            p -> p.getRatisHostPortStr().equals(leaderAddress))
+        scm.getSCMHANodeDetails().getPeerNodeDetails().stream()
+            .filter(p -> p.getRatisHostPortStr().equals(leaderAddress))
             .findFirst();
     Preconditions.checkState(leaderDetails.isPresent());
     final String leaderNodeId = leaderDetails.get().getNodeId();
@@ -354,15 +354,6 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (currentLeaderTerm.get() == term) {
-      // On leader SCM once after it is ready, notify SCM services and also set
-      // leader ready  in SCMContext.
-      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
-          .isLeaderReady()) {
-        scm.getScmContext().setLeaderReady();
-        scm.getSCMServiceManager().notifyStatusChanged();
-        scm.getFinalizationManager().onLeaderReady();
-      }
-
       // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
       // Perform
@@ -376,6 +367,18 @@ public class SCMStateMachine extends BaseStateMachine {
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  @Override
+  public void notifyLeaderReady() {
+    if (!isInitialized) {
+      return;
+    }
+    // On leader SCM once after it is ready, notify SCM services and also set
+    // leader ready  in SCMContext.
+    scm.getScmContext().setLeaderReady();
+    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getFinalizationManager().onLeaderReady();
   }
 
   @Override
@@ -440,7 +443,7 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.close();
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
-    } else {
+    } else if (!scm.isStopped()) {
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
   }

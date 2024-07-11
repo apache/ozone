@@ -65,7 +65,7 @@ public final class SCMHAUtils {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHAUtils.class);
 
-  private static final List<Class<? extends Exception>>
+  private static final ImmutableList<Class<? extends Exception>>
       RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(LeaderNotReadyException.class)
@@ -74,7 +74,7 @@ public final class SCMHAUtils {
           .add(ResourceUnavailableException.class)
           .build();
 
-  private static final List<Class<? extends Exception>>
+  private static final ImmutableList<Class<? extends Exception>>
       NON_RETRIABLE_EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(SCMException.class)
@@ -316,7 +316,7 @@ public final class SCMHAUtils {
     return null;
   }
 
-  public static List<Class<? extends
+  private static List<Class<? extends
       Exception>> getRetriableWithNoFailoverExceptionList() {
     return RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST;
   }

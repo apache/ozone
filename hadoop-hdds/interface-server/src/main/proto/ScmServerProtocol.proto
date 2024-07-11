@@ -30,7 +30,6 @@ package hadoop.hdds.block;
 
 import "hdds.proto";
 
-
 // SCM Block protocol
 
 enum Type {
@@ -39,6 +38,7 @@ enum Type {
   GetScmInfo         = 13;
   SortDatanodes      = 14;
   AddScm             = 15;
+  GetClusterTree     = 16;
 }
 
 message SCMBlockLocationRequest {
@@ -56,6 +56,7 @@ message SCMBlockLocationRequest {
   optional hadoop.hdds.GetScmInfoRequestProto getScmInfoRequest         = 13;
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
   optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
+  optional GetClusterTreeRequestProto         getClusterTreeRequest     = 16;
 }
 
 message SCMBlockLocationResponse {
@@ -80,6 +81,7 @@ message SCMBlockLocationResponse {
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
   optional SortDatanodesResponseProto          sortDatanodesResponse      = 14;
   optional hadoop.hdds.AddScmResponseProto     addScmResponse        = 15;
+  optional GetClusterTreeResponseProto         getClusterTreeResponse     = 16;
 }
 
 /**
@@ -123,12 +125,15 @@ enum Status {
   FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY = 30;
   FAILED_TO_INIT_LEADER_CHOOSE_POLICY = 31;
   SCM_NOT_LEADER = 32;
+  // not used anymore
   FAILED_TO_REVOKE_CERTIFICATES = 33;
   PIPELINE_NOT_FOUND = 34;
   UNKNOWN_PIPELINE_STATE = 35;
   CONTAINER_NOT_FOUND = 36;
   CONTAINER_REPLICA_NOT_FOUND = 37;
+  // not used anymore
   FAILED_TO_CONNECT_TO_CRL_SERVICE = 38;
+  //not used anymore
   FAILED_TO_ADD_CRL_CLIENT = 39;
   INVALID_PIPELINE_STATE = 40;
   DUPLICATED_PIPELINE_ID = 41;
@@ -228,6 +233,13 @@ message SortDatanodesRequestProto{
 
 message SortDatanodesResponseProto{
   repeated DatanodeDetailsProto node = 1;
+}
+
+message GetClusterTreeRequestProto {
+}
+
+message GetClusterTreeResponseProto {
+  required InnerNode clusterTree = 1;
 }
 
 /**

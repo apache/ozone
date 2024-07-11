@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -60,7 +61,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final int ecChunkSize;
   private final long stripeSize;
   private final BlockInputStreamFactory streamFactory;
-  private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
@@ -75,7 +75,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private long position = 0;
   private boolean closed = false;
   private boolean seeked = false;
-
+  private OzoneClientConfig config;
   protected ECReplicationConfig getRepConfig() {
     return repConfig;
   }
@@ -108,13 +108,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
-      BlockInputStreamFactory streamFactory) {
+      BlockInputStreamFactory streamFactory,
+      OzoneClientConfig config) {
     this.repConfig = repConfig;
     this.ecChunkSize = repConfig.getEcChunkSize();
-    this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
     this.streamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -123,6 +123,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     this.dataLocations = new DatanodeDetails[repConfig.getRequiredNodes()];
     this.blockStreams =
         new BlockExtendedInputStream[repConfig.getRequiredNodes()];
+    this.config = config;
 
     this.stripeSize = (long)ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
@@ -163,7 +164,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) {
+  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) throws IOException {
     BlockExtendedInputStream stream = blockStreams[locationIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
@@ -175,8 +176,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
           .setNodes(Arrays.asList(dataLocation))
-          .setId(PipelineID.valueOf(dataLocation.getUuid())).setReplicaIndexes(
-              ImmutableMap.of(dataLocation, locationIndex + 1))
+          .setId(PipelineID.valueOf(dataLocation.getUuid()))
+          .setReplicaIndexes(ImmutableMap.of(dataLocation, locationIndex + 1))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
@@ -191,8 +192,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE),
           blkInfo, pipeline,
-          blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
-          ecPipelineRefreshFunction(locationIndex + 1, refreshFunction));
+          blockInfo.getToken(), xceiverClientFactory,
+          ecPipelineRefreshFunction(locationIndex + 1, refreshFunction),
+          config);
       blockStreams[locationIndex] = stream;
       LOG.debug("{}: created stream [{}]: {}", this, locationIndex, stream);
     }
@@ -226,6 +228,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
                   HddsProtos.ReplicationFactor.ONE))
           .setNodes(Collections.singletonList(curIndexNode))
           .setId(PipelineID.randomId())
+          .setReplicaIndexes(Collections.singletonMap(curIndexNode, replicaIndex))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
       blockLocationInfo.setPipeline(pipeline);
