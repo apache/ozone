@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
-public class TestMultiSyncer {
+public class TestHsyncGenerator {
   private static MiniOzoneCluster cluster = null;
 
   private static void startCluster(OzoneConfiguration conf) throws Exception {
@@ -82,8 +82,8 @@ public class TestMultiSyncer {
 
   @Test
   public void test() throws IOException {
-    MultiSyncer randomKeyGenerator =
-        new MultiSyncer(cluster.getConf());
+    HsyncGenerator randomKeyGenerator =
+        new HsyncGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
 
     String volumeName = "vol1";
@@ -106,11 +106,10 @@ public class TestMultiSyncer {
       // each file is 1MB (--file-length)
       int exitCode = cmd.execute(
           "--path", rootPath,
-          "--size", "1048576",
           "--bytes-per-write", "1024",
-          "--syncer-per-writer", "5",
+          "--number-of-files", "2",
           "-t", "5",
-          "-n", "10");
+          "-n", "100");
       assertEquals(0, exitCode);
     }
   }

@@ -75,7 +75,7 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
         DatanodeSimulator.class,
         OmMetadataGenerator.class,
         DNRPCLoadGenerator.class,
-        MultiSyncer.class
+        HsyncGenerator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
