@@ -40,7 +40,7 @@ public class TestOmPrefixInfo {
   private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
       String aclString) {
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
-    ByteString rights = ByteString.copyFrom(oacl.getAclByteArray());
+    final ByteString rights = oacl.getAclByteString();
     return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
         .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
         .setName(oacl.getName())

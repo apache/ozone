@@ -78,8 +78,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_D
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_PROVIDER;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CRL_NAME;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CRL_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME;
@@ -126,7 +124,6 @@ public class SecurityConfig {
   private final Duration defaultCertDuration;
   private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
-  private final String crlName;
   private final boolean grpcTlsUseTestCert;
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
@@ -151,8 +148,8 @@ public class SecurityConfig {
     this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
     this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
-    this.providerString = configuration.get(HDDS_SECURITY_PROVIDER,
-        HDDS_DEFAULT_SECURITY_PROVIDER);
+    initSecurityProvider(configuration);
+    this.providerString = configuration.get(HDDS_SECURITY_PROVIDER, HDDS_DEFAULT_SECURITY_PROVIDER);
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
@@ -263,21 +260,26 @@ public class SecurityConfig {
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
 
-    this.crlName = configuration.get(HDDS_X509_CRL_NAME,
-        HDDS_X509_CRL_NAME_DEFAULT);
-
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
             HDDS_GRPC_TLS_PROVIDER_DEFAULT));
+  }
 
+  public static synchronized void initSecurityProvider(ConfigurationSource configuration) {
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
-      synchronized (SecurityConfig.class) {
-        provider = Security.getProvider(this.providerString);
+      String providerString = configuration.get(HDDS_SECURITY_PROVIDER, HDDS_DEFAULT_SECURITY_PROVIDER);
+      provider = Security.getProvider(providerString);
+      if (SecurityConfig.provider == null) {
+        // Provider not found, let us try to Dynamically initialize the
+        // provider.
+        if ("BC".equals(providerString)) {
+          Security.addProvider(new BouncyCastleProvider());
+          provider = Security.getProvider(providerString);
+        }
         if (SecurityConfig.provider == null) {
-          // Provider not found, let us try to Dynamically initialize the
-          // provider.
-          provider = initSecurityProvider(this.providerString);
+          LOG.error("Security Provider:{} is unknown", provider);
+          throw new SecurityException("Unknown security provider:" + provider);
         }
       }
     }
@@ -355,15 +357,6 @@ public class SecurityConfig {
           " should be greater than maximum block/container token lifetime " +
           HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
     }
-  }
-
-  /**
-   * Returns the CRL Name.
-   *
-   * @return String.
-   */
-  public String getCrlName() {
-    return crlName;
   }
 
   /**
@@ -601,20 +594,6 @@ public class SecurityConfig {
    */
   public boolean useTestCert() {
     return grpcTlsUseTestCert;
-  }
-
-  /**
-   * Adds a security provider dynamically if it is not loaded already.
-   *
-   * @param providerName - name of the provider.
-   */
-  private Provider initSecurityProvider(String providerName) {
-    if ("BC".equals(providerName)) {
-      Security.addProvider(new BouncyCastleProvider());
-      return Security.getProvider(providerName);
-    }
-    LOG.error("Security Provider:{} is unknown", provider);
-    throw new SecurityException("Unknown security provider:" + provider);
   }
 
   public boolean isTokenEnabled() {

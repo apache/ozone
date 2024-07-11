@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -706,6 +707,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setDataSize(1000L)
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);

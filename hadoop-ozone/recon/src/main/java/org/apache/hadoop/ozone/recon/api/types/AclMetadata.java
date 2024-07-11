@@ -130,9 +130,7 @@ public final class AclMetadata {
     return builder.withType(ozoneAcl.getType().toString().toUpperCase())
         .withName(ozoneAcl.getName())
         .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
-        .withAclList(ozoneAcl.getAclList().stream().map(Enum::toString)
-            .map(String::toUpperCase)
-            .collect(Collectors.toList()))
+        .withAclList(ozoneAcl.getAclStringList())
         .build();
   }
 }

@@ -355,7 +355,7 @@ public class TestBlockInputStream {
   }
 
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
-      ChunkInputStream stream) {
+      ChunkInputStream stream) throws IOException {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,

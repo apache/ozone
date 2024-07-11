@@ -682,6 +682,11 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getContainers(uuid);
   }
 
+  public int getContainerCount(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getContainerCount(uuid);
+  }
+
   /**
    * Move Stale or Dead node to healthy if we got a heartbeat from them.
    * Move healthy nodes to stale nodes if it is needed.
@@ -738,7 +743,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
-      List<DatanodeInfo> nodes = nodeStateMap.filterNodes(null, HEALTHY);
+      List<DatanodeInfo> nodes = nodeStateMap.getDatanodeInfos(null, HEALTHY);
       for (DatanodeInfo node : nodes) {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
@@ -1032,5 +1037,9 @@ public class NodeStateManager implements Runnable, Closeable {
     }
 
     return healthCheckFuture;
+  }
+
+  protected void removeNode(DatanodeDetails datanodeDetails) {
+    nodeStateMap.removeNode(datanodeDetails);
   }
 }

@@ -93,6 +93,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -316,6 +317,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
+  private final OMPerformanceMetrics perfMetrics;
   private final S3Batcher s3Batcher = new S3SecretBatcher();
 
   /**
@@ -327,7 +329,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
+    this(conf, ozoneManager, null);
+  }
+
+  public OmMetadataManagerImpl(OzoneConfiguration conf,
+                               OzoneManager ozoneManager,
+                               OMPerformanceMetrics perfMetrics)
+      throws IOException {
     this.ozoneManager = ozoneManager;
+    this.perfMetrics = perfMetrics;
     this.lock = new OzoneManagerLock(conf);
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
@@ -349,6 +359,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = 0;
+    perfMetrics = null;
   }
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
@@ -383,6 +394,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    perfMetrics = null;
   }
 
 
@@ -420,6 +432,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       stop();
       throw e;
     }
+    perfMetrics = null;
   }
 
   @Override
@@ -1162,7 +1175,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public ListKeysResult listKeys(String volumeName, String bucketName,
                                  String startKey, String keyPrefix, int maxKeys)
       throws IOException {
-
+    long startNanos = Time.monotonicNowNanos();
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
       return new ListKeysResult(result, false);
@@ -1231,11 +1244,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
-
+    long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
-
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
+      readFromRDbStartNs = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -1258,10 +1271,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           break;
         }
       }
+      readFromRDbStopNs = Time.monotonicNowNanos();
     }
 
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
 
+    if (perfMetrics != null) {
+      long keyCount;
+      if (isTruncated) {
+        keyCount = maxKeys;
+      } else {
+        keyCount = cacheKeyMap.size();
+      }
+      perfMetrics.setListKeysAveragePagination(keyCount);
+      float opsPerSec =
+              keyCount / ((Time.monotonicNowNanos() - startNanos) / 1000000000.0f);
+      perfMetrics.setListKeysOpsPerSec(opsPerSec);
+      perfMetrics.addListKeysReadFromRocksDbLatencyNs(readFromRDbStopNs - readFromRDbStartNs);
+    }
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
     currentCount = 0;
@@ -1314,7 +1341,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<SnapshotInfo> listSnapshot(
+  public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -1327,8 +1354,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
     if (getBucketTable().get(bucketNameBytes) == null) {
-      throw new OMException("Bucket " + bucketName + " not found.",
-          BUCKET_NOT_FOUND);
+      throw new OMException("Bucket " + bucketName + " not found.", BUCKET_NOT_FOUND);
     }
 
     String prefix;
@@ -1345,30 +1371,30 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seek = getOzoneKey(volumeName, bucketName,
-          StringUtil.isNotBlank(
-              snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
+          StringUtil.isNotBlank(snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
     List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
+    String lastSnapshot = null;
     try (ListIterator.MinHeapIterator snapshotIterator =
-        new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
-            bucketName, snapshotInfoTable)) {
-      try {
-        while (snapshotIterator.hasNext() && maxListResult > 0) {
-          SnapshotInfo snapshotInfo =
-              (SnapshotInfo) snapshotIterator.next().getValue();
-          if (!snapshotInfo.getName().equals(prevSnapshot)) {
-            snapshotInfos.add(snapshotInfo);
-            maxListResult--;
-          }
+             new ListIterator.MinHeapIterator(this, prefix, seek, volumeName, bucketName, snapshotInfoTable)) {
+      SnapshotInfo snapshotInfo = null;
+      while (snapshotIterator.hasNext() && maxListResult > 0) {
+        snapshotInfo = (SnapshotInfo) snapshotIterator.next().getValue();
+        if (!Objects.equals(snapshotInfo.getName(), prevSnapshot)) {
+          snapshotInfos.add(snapshotInfo);
+          maxListResult--;
         }
-      } catch (NoSuchElementException e) {
-        throw new IOException(e);
-      } catch (UncheckedIOException e) {
-        throw e.getCause();
       }
+      if (snapshotIterator.hasNext() && maxListResult == 0 && snapshotInfo != null) {
+        lastSnapshot = snapshotInfo.getName();
+      }
+    } catch (NoSuchElementException e) {
+      throw new IOException(e);
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
     }
-    return snapshotInfos;
+    return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
   @Override

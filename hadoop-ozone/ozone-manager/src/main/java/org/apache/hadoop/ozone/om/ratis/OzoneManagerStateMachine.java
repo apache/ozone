@@ -187,7 +187,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
     // Index is notified or getting notified matching lastSkippedIndex
     if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
-        && lastApplied.getIndex() >= lastSkippedIndex) {
+        && newTermIndex.getIndex() >= lastSkippedIndex) {
       newTermIndex = getLastNotifiedTermIndex();
     }
     return super.updateLastAppliedTermIndex(newTermIndex);

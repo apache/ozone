@@ -91,7 +91,7 @@ public class PipelineSyncTask extends ReconScmTask {
       List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
       reconPipelineManager.initializePipelines(pipelinesFromScm);
       syncOperationalStateOnDeadNodes();
-      LOG.info("Pipeline sync Thread took {} milliseconds.",
+      LOG.debug("Pipeline sync Thread took {} milliseconds.",
           Time.monotonicNow() - start);
       recordSingleRunCompletion();
     } finally {

@@ -61,6 +61,7 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
+import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -242,6 +243,12 @@ public final class RatisHelper {
       ConfigurationSource conf) {
     return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
+  }
+
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClientNoRetry(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
+        RetryPolicies.noRetry(), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,

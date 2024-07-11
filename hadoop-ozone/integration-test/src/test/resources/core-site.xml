@@ -20,5 +20,16 @@
 <!-- Put site-specific property overrides in this file. -->
 
 <configuration>
-
+  <property>
+    <name>hadoop.proxyuser.proxyuser.users</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.proxyuser.groups</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.proxyuser.hosts</name>
+    <value>*</value>
+  </property>
 </configuration>

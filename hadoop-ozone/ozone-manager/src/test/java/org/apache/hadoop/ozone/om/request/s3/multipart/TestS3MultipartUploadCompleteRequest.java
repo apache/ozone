@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -72,13 +74,30 @@ public class TestS3MultipartUploadCompleteRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
+
     String uploadId = checkValidateAndUpdateCacheSuccess(
-        volumeName, bucketName, keyName);
+        volumeName, bucketName, keyName, customMetadata, tags);
     checkDeleteTableCount(volumeName, bucketName, keyName, 0, uploadId);
+
+    customMetadata.remove("custom-key1");
+    customMetadata.remove("custom-key2");
+    customMetadata.put("custom-key3", "custom-value3");
+
+    tags.remove("tag-key1");
+    tags.remove("tag-key2");
+    tags.put("tag-key3", "tag-value3");
 
     // Do it twice to test overwrite
     uploadId = checkValidateAndUpdateCacheSuccess(volumeName, bucketName,
-        keyName);
+        keyName, customMetadata, tags);
     // After overwrite, one entry must be in delete table
     checkDeleteTableCount(volumeName, bucketName, keyName, 1, uploadId);
   }
@@ -106,10 +125,10 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   private String checkValidateAndUpdateCacheSuccess(String volumeName,
-      String bucketName, String keyName) throws Exception {
+      String bucketName, String keyName, Map<String, String> metadata, Map<String, String> tags) throws Exception {
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, metadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(initiateMPURequest);
@@ -175,6 +194,12 @@ public class TestS3MultipartUploadCompleteRequest
     assertNotNull(multipartKeyInfo.getLatestVersionLocations());
     assertTrue(multipartKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
+    if (metadata != null) {
+      assertThat(multipartKeyInfo.getMetadata()).containsAllEntriesOf(metadata);
+    }
+    if (tags != null) {
+      assertThat(multipartKeyInfo.getTags()).containsAllEntriesOf(tags);
+    }
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
         .getCacheValue(new CacheKey<>(

@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.om.protocolPB;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.Proto2Utils;
 import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.SafeModeAction;
@@ -41,6 +43,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -222,6 +225,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -239,16 +243,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_IN_SAFE_MODE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -697,6 +691,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName());
 
+    // When rewriting a key, the owner does not need to be passed, as it is inherited
+    // from the existing key. Hence it can be null.
+    if (args.getOwner() != null) {
+      keyArgs.setOwnerName(args.getOwner());
+    }
+
     if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
@@ -722,6 +722,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()));
     }
 
+    if (args.getTags() != null && args.getTags().size() > 0) {
+      keyArgs.addAllTags(KeyValueUtil.toProtobuf(args.getTags()));
+    }
+
     if (args.getMultipartUploadID() != null) {
       keyArgs.setMultipartUploadID(args.getMultipartUploadID());
     }
@@ -733,6 +737,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     keyArgs.setIsMultipartKey(args.getIsMultipartKey());
 
     keyArgs.setSortDatanodes(args.getSortDatanodes());
+
+    if (args.getExpectedDataGeneration() != null) {
+      keyArgs.setExpectedDataGeneration(args.getExpectedDataGeneration());
+    }
 
     req.setKeyArgs(keyArgs.build());
 
@@ -957,6 +965,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    deleteKeys(deleteKeys, false);
+  }
+
+  @Override
+  public Map<String, ErrorInfo> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
+      throws IOException {
     DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
     DeleteKeyArgs deletedKeys = DeleteKeyArgs.newBuilder()
         .setBucketName(deleteKeys.getBucket())
@@ -966,9 +980,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.DeleteKeys)
         .setDeleteKeysRequest(req)
         .build();
+    OMResponse omResponse = submitRequest(omRequest);
 
-    handleError(submitRequest(omRequest));
-
+    Map<String, ErrorInfo> keyToErrors = new HashMap<>();
+    if (quiet) {
+      List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
+          omResponse.getDeleteKeysResponse().getErrorsList();
+      for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
+        keyToErrors.put(deleteKeyError.getKey(),
+            new ErrorInfo(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
+      }
+    } else {
+      handleError(omResponse);
+    }
+    return keyToErrors;
   }
 
   /**
@@ -1324,7 +1349,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotInfo> listSnapshot(
+  public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
@@ -1347,11 +1372,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    List<SnapshotInfo> snapshotInfos = omResponse.getListSnapshotResponse()
+    OzoneManagerProtocolProtos.ListSnapshotResponse response = omResponse.getListSnapshotResponse();
+    List<SnapshotInfo> snapshotInfos = response
         .getSnapshotInfoList().stream()
         .map(snapshotInfo -> SnapshotInfo.getFromProtobuf(snapshotInfo))
         .collect(Collectors.toList());
-    return snapshotInfos;
+
+    String lastSnapshot = null;
+
+    if (response.hasLastSnapshot()) {
+      lastSnapshot = response.getLastSnapshot();
+    } else if (snapshotInfos.size() == maxListResult) {
+      // This is to make sure that the change (HDDS-9983) is forward compatibility.
+      // Set lastSnapshot only when current list size is equal to maxListResult
+      // and there is possibility of more entries.
+      lastSnapshot = snapshotInfos.get(maxListResult - 1).getName();
+    }
+
+    return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
   /**
@@ -1605,8 +1643,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
         .setKeyName(omKeyArgs.getKeyName())
+        .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
+        .setOwnerName(omKeyArgs.getOwner())
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
+        .addAllTags(KeyValueUtil.toProtobuf(omKeyArgs.getTags()));
 
     setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 
@@ -1680,6 +1721,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(omKeyArgs.getKeyName())
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
+        .setOwnerName(omKeyArgs.getOwner())
         .setMultipartUploadID(omKeyArgs.getMultipartUploadID());
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
@@ -2060,6 +2102,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .addAllAcls(args.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
+        .setOwnerName(args.getOwner())
         .build();
     CreateDirectoryRequest request = CreateDirectoryRequest.newBuilder()
         .setKeyArgs(keyArgs)
@@ -2225,7 +2268,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
         .addAllAcls(args.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
+        .setOwnerName(args.getOwner());
     if (args.getReplicationConfig() != null) {
       if (args.getReplicationConfig() instanceof ECReplicationConfig) {
         keyArgsBuilder.setEcReplicationConfig(
@@ -2491,12 +2535,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeRespBytes,
                                     boolean writeToRatis) throws IOException {
     EchoRPCRequest echoRPCRequest =
             EchoRPCRequest.newBuilder()
-                    .setPayloadReq(ByteString.copyFrom(payloadReq))
-                    .setPayloadSizeResp(payloadSizeResp)
+                    .setPayloadReq(Proto2Utils.unsafeByteString(payloadReq))
+                    .setPayloadSizeResp(payloadSizeRespBytes)
                     .setReadOnly(!writeToRatis)
                     .build();
 

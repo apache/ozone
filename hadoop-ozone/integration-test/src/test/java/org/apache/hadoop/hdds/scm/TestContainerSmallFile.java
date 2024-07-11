@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -186,6 +188,23 @@ public class TestContainerSmallFile {
     String readData = response.getData().getDataBuffers().getBuffersList()
         .get(0).toStringUtf8();
     assertEquals("data123", readData);
+    xceiverClientManager.releaseClient(client, false);
+  }
+
+  @Test
+  public void testEcho() throws Exception {
+    ContainerWithPipeline container =
+        storageContainerLocationClient.allocateContainer(
+            SCMTestUtils.getReplicationType(ozoneConfig),
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+    XceiverClientSpi client = xceiverClientManager
+        .acquireClient(container.getPipeline());
+    ContainerProtocolCalls.createContainer(client,
+        container.getContainerInfo().getContainerID(), null);
+    ByteString byteString = UnsafeByteOperations.unsafeWrap(new byte[0]);
+    ContainerProtos.EchoResponseProto response =
+        ContainerProtocolCalls.echo(client, "", container.getContainerInfo().getContainerID(), byteString, 1, 0, true);
+    assertEquals(1, response.getPayload().size());
     xceiverClientManager.releaseClient(client, false);
   }
 }

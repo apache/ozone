@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import com.google.protobuf.ByteString;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 
-import java.util.Arrays;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.IntStream;
@@ -39,16 +40,14 @@ public class ECReconstructionCommandInfo {
   private final SortedMap<Integer, DatanodeDetails> targetNodeMap;
   private final long containerID;
   private final ECReplicationConfig ecReplicationConfig;
-  private final byte[] missingContainerIndexes;
+  private final ByteString missingContainerIndexes;
   private final long deadlineMsSinceEpoch;
   private final long term;
 
   public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
     this.containerID = cmd.getContainerID();
     this.ecReplicationConfig = cmd.getEcReplicationConfig();
-    this.missingContainerIndexes =
-        Arrays.copyOf(cmd.getMissingContainerIndexes(),
-            cmd.getMissingContainerIndexes().length);
+    this.missingContainerIndexes = cmd.getMissingContainerIndexes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
     this.term = cmd.getTerm();
 
@@ -60,7 +59,7 @@ public class ECReconstructionCommandInfo {
     targetNodeMap = IntStream.range(0, cmd.getTargetDatanodes().size())
         .boxed()
         .collect(toMap(
-            i -> (int) missingContainerIndexes[i],
+            i -> (int) missingContainerIndexes.byteAt(i),
             i -> cmd.getTargetDatanodes().get(i),
             (v1, v2) -> v1, TreeMap::new));
   }
@@ -90,7 +89,7 @@ public class ECReconstructionCommandInfo {
     return reconstructECContainersCommand
         + ": containerID=" + containerID
         + ", replication=" + ecReplicationConfig.getReplication()
-        + ", missingIndexes=" + Arrays.toString(missingContainerIndexes)
+        + ", missingIndexes=" + StringUtils.bytes2String(missingContainerIndexes.asReadOnlyByteBuffer())
         + ", sources=" + sourceNodeMap
         + ", targets=" + targetNodeMap;
   }
