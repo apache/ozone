@@ -104,6 +104,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
           () -> resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager, ACLType.DELETE));
   }
+
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
@@ -204,6 +205,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
+
     // Performing audit logging outside of the lock.
     auditLog(auditLogger,
         buildAuditMessage(OMAction.DELETE_KEY, auditMap, exception, userInfo));
