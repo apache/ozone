@@ -437,15 +437,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
         }
 
-      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.requiredNodes && summaryResponse.objectInfo.replicationConfig.requiredNodes !== -1) {
-        keys.push('Replication Required Nodes');
-        values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
-      }
+        if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.requiredNodes && summaryResponse.objectInfo.replicationConfig.requiredNodes !== -1) {
+          keys.push('Replication Required Nodes');
+          values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
+        }
 
-      if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
-        keys.push('Source Bucket');
-        values.push(summaryResponse.objectInfo.sourceBucket);
-      }
+        if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
+          keys.push('Source Bucket');
+          values.push(summaryResponse.objectInfo.sourceBucket);
+        }
 
         if (summaryResponse.objectInfo.sourceVolume && summaryResponse.objectInfo.sourceVolume !== -1) {
           keys.push('Source Volume');
