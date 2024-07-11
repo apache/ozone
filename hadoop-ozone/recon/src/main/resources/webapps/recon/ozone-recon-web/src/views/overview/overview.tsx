@@ -327,8 +327,6 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
               <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
             </Col>
           }
-        </Row>
-        <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount.toString()} icon='hourglass'
               linkToUrl='/Datanodes' />
