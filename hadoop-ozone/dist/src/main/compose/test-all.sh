@@ -36,8 +36,8 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
    export OZONE_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*"
 fi
 
-tests=$(find_tests)
 cd "$SCRIPT_DIR"
+tests=$(find_tests)
 
 RESULT=0
 run_test_scripts ${tests} || RESULT=$?
