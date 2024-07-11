@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.repair.RecoverSCMCertificate;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -81,12 +82,13 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private ExecutorService executorService;
   private boolean isPrimarySCM = false;
   private Consumer<String> saveCertIdCallback;
+  private String scmDbPath;
 
   @SuppressWarnings("parameternumber")
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String scmId, String clusterId, String scmCertId, String hostname,
-      boolean isPrimarySCM, Consumer<String> saveCertId) {
+      boolean isPrimarySCM, Consumer<String> saveCertId,String scmDbPath) {
     super(securityConfig, scmClient, LOG, scmCertId, COMPONENT_NAME,
         HddsUtils.threadNamePrefix(scmId), saveCertId, null);
     this.scmId = scmId;
@@ -94,6 +96,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     this.scmHostname = hostname;
     this.isPrimarySCM = isPrimarySCM;
     this.saveCertIdCallback = saveCertId;
+    this.scmDbPath = scmDbPath;
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
@@ -130,6 +133,10 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       String component) {
     this(securityConfig, scmClient, scmId, null, certSerialId, null,
         component);
+  }
+
+  public String getScmDbPath() {
+    return scmDbPath;
   }
 
   /**
@@ -283,15 +290,28 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   protected void recoverStateIfNeeded(InitResponse state) throws IOException {
     LOG.info("Init response: {}", state);
+    // make this check based on a config?
+    boolean checkDB = false;
     switch (state) {
     case SUCCESS:
       LOG.info("Initialization successful.");
       break;
     case GETCERT:
-      if (!isPrimarySCM) {
-        getRootCASignedSCMCert();
-      } else {
-        getPrimarySCMSelfSignedCert();
+      boolean checkDbSuccess = false;
+      if (checkDB) {
+        try {
+          checkDbSuccess = RecoverSCMCertificate.getAndStoreCerts(getSecurityConfig(), getScmDbPath());
+        } catch (Exception e) {
+          LOG.error("Couldn't retrieve certs from DB");
+          throw new IOException(e.getMessage());
+        }
+      }
+      if (!checkDbSuccess) {
+        if (!isPrimarySCM) {
+          getRootCASignedSCMCert();
+        } else {
+          getPrimarySCMSelfSignedCert();
+        }
       }
       LOG.info("Successfully stored SCM signed certificate.");
       break;
