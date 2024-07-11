@@ -103,7 +103,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
-  private AtomicBoolean readonlyMode = new AtomicBoolean(false);
+  private final AtomicBoolean readonlyMode = new AtomicBoolean(false);
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
@@ -260,6 +260,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext startTransaction(
       RaftClientRequest raftClientRequest) throws IOException {
+    if (readonlyMode.get()) {
+      TransactionContext ctxt = TransactionContext.newBuilder()
+          .setClientRequest(raftClientRequest)
+          .setStateMachine(this)
+          .setServerRole(RaftProtos.RaftPeerRole.LEADER)
+          .build();
+      ctxt.setException(new OMException("OM is running in readonly mode",
+          OMException.ResultCodes.READONLY_MODE));
+      return ctxt;
+    }
+
     ByteString messageContent = raftClientRequest.getMessage().getContent();
     OMRequest omRequest = OMRatisHelper.convertByteStringToOMRequest(
         messageContent);
@@ -268,11 +279,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         raftGroupId));
     try {
       handler.validateRequest(omRequest);
-
-      if (readonlyMode.get()) {
-        throw new OMException("OM is running in readonly mode",
-            OMException.ResultCodes.READONLY_MODE);
-      }
     } catch (IOException ioe) {
       TransactionContext ctxt = TransactionContext.newBuilder()
           .setClientRequest(raftClientRequest)
@@ -299,8 +305,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
     if (readonlyMode.get()) {
-      throw new OMException("OM is running in readonly mode",
-          OMException.ResultCodes.READONLY_MODE);
+      throw new StateMachineException("", new OMException("OM is running in readonly mode",
+          OMException.ResultCodes.READONLY_MODE), false);
     }
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
@@ -370,9 +376,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
       if (readonlyMode.get()) {
-        // block the state machine thread to avoid processing further raft log due to previous error.
-        // after fix, need restart the om to re-execute raft log to avoid any incorrect result
-        blockTransactionAcquiringAll();
+        // return failure without updating transaction index as double buffer is stopped
+        return CompletableFuture.supplyAsync(() -> createErrorResponse(request,
+            new OMException("OM is running in readonly mode",
+            OMException.ResultCodes.READONLY_MODE), termIndex)).thenApply(this::processResponse);
       }
 
       return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
@@ -444,6 +451,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
+    if (readonlyMode.get()) {
+      return;
+    }
     LOG.info("OzoneManagerStateMachine is un-pausing");
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
@@ -577,9 +587,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
       if (onFailureReadonlyEnable) {
         LOG.error("Failed to write, moving to readonly mode, Exception occurred ", e);
-        readonlyMode.set(true);
-        // Block the thread to avoid execution of any in-progress transaction in executor queue
-        blockTransactionAcquiringAll();
+        if (readonlyMode.compareAndSet(false, true)) {
+          // update readonly mode, flush existing transaction and pause state machine
+          readonlyMode.set(true);
+          try {
+            awaitDoubleBufferFlush();
+          } catch (InterruptedException ex) {
+            Thread.interrupted();
+          }
+          pause();
+        }
+        return createErrorResponse(request, new OMException("Exception occurred and moving to readonly mode",
+            e, OMException.ResultCodes.READONLY_MODE), termIndex);
       }
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
@@ -669,18 +688,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return ozoneManagerDoubleBuffer;
   }
 
-  private void blockTransactionAcquiringAll() {
-    int maxUnFlushTx = ozoneManager.getConfiguration()
-        .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT,
-            OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
-    try {
-      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(maxUnFlushTx + 1);
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-    }
-  }
-
   public boolean isReadOnly() {
     return readonlyMode.get();
+  }
+
+  @VisibleForTesting
+  public void setReadOnly(boolean flag) {
+    readonlyMode.set(flag);
   }
 }

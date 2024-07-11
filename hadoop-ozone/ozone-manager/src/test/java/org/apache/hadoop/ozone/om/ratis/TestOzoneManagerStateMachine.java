@@ -58,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -73,12 +74,13 @@ public class TestOzoneManagerStateMachine {
   private OzoneManagerStateMachine ozoneManagerStateMachine;
   private OzoneManagerPrepareState prepareState;
   private AuditLogger auditLogger;
+  private OzoneManager ozoneManager;
 
   @BeforeEach
   public void setup() throws Exception {
     OzoneManagerRatisServer ozoneManagerRatisServer =
         mock(OzoneManagerRatisServer.class);
-    OzoneManager ozoneManager = mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     // Allow testing of prepare pre-append gate.
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
@@ -260,6 +262,36 @@ public class TestOzoneManagerStateMachine {
     }
   }
 
+  @Test
+  public void testReadonlyModeStatemachine() throws Exception {
+    ozoneManagerStateMachine.setReadOnly(true);
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY, true);
+    OMRequest createVolRequest = OMRequest.newBuilder()
+        .setDeleteVolumeRequest(OzoneManagerProtocolProtos.DeleteVolumeRequest.newBuilder().setVolumeName("test"))
+        .setCmdType(Type.DeleteVolume).setClientId("123")
+        .setUserInfo(UserInfo.newBuilder().setUserName("user").setHostName("localhost").setRemoteAddress("127.0.0.1"))
+        .build();
+
+    // test preAppend transaction for exception in readonlymode
+    TransactionContext submittedTrx = mockTransactionContext(createVolRequest);
+    try {
+      ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
+    } catch (StateMachineException ex) {
+      assertTrue(ex.getCause().getMessage().contains("OM is running in readonly mode"));
+    }
+
+    // test applyTransaction blocking
+    Message msg = ozoneManagerStateMachine.applyTransaction(submittedTrx).get();
+    assertTrue(msg.getContent().toString().contains("OM is running in readonly mode"));
+    assertTrue(ozoneManagerStateMachine.isReadOnly());
+
+    // test runcommand moving to readonly mode
+    ozoneManagerStateMachine.setReadOnly(false);
+    msg = ozoneManagerStateMachine.applyTransaction(submittedTrx).get();
+    assertTrue(msg.getContent().toString().contains("Exception occurred and moving to"));
+    assertTrue(ozoneManagerStateMachine.isReadOnly());
+  }
+
   private TransactionContext mockTransactionContext(OMRequest request) {
     RaftProtos.StateMachineLogEntryProto logEntry =
         RaftProtos.StateMachineLogEntryProto.newBuilder()
@@ -271,7 +303,6 @@ public class TestOzoneManagerStateMachine {
     when(mockTrx.getStateMachineContext()).thenReturn(request);
     RaftProtos.LogEntryProto logEntryProto = LogProtoUtils.toLogEntryProto(10, 10, 10);
     when(mockTrx.getLogEntry()).thenReturn(logEntryProto);
-
     return mockTrx;
   }
 }
