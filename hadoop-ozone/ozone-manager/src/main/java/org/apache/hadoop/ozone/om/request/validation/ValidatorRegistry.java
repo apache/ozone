@@ -20,7 +20,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
+import org.reflections.scanners.Scanners;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 
@@ -80,7 +80,7 @@ public class ValidatorRegistry {
   ValidatorRegistry(Collection<URL> searchUrls) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
-        .setScanners(new MethodAnnotationsScanner())
+        .setScanners(Scanners.MethodsAnnotated)
         .setParallel(true)
     );
 
@@ -223,7 +223,7 @@ public class ValidatorRegistry {
       for (ValidationCondition condition : descriptor.conditions()) {
         EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
             requestTypeMap = getAndInitialize(
-            condition, this::newTypeMap, validators);
+                condition, this::newTypeMap, validators);
         EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
             requestType, this::newPhaseMap, requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
@@ -251,8 +251,8 @@ public class ValidatorRegistry {
     return new EnumMap<>(RequestProcessingPhase.class);
   }
 
-  private <K, V> V getAndInitialize(K key, Supplier<V> defaultValue, Map<K, V> from) {
-    return from.compute(key, (k, v) -> v == null ? defaultValue.get() : v);
+  private <K, V> V getAndInitialize(K key, Supplier<V> defaultSupplier, Map<K, V> from) {
+    return from.computeIfAbsent(key, k -> defaultSupplier.get());
   }
 
   private boolean isPreProcessValidator(RequestFeatureValidator descriptor) {

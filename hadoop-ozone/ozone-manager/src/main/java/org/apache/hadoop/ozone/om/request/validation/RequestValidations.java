@@ -65,7 +65,7 @@ public class RequestValidations {
     List<Method> validations = registry.validationsFor(
         conditions(request), request.getCmdType(), PRE_PROCESS, request.getVersion());
 
-    OMRequest validatedRequest = request.toBuilder().build();
+    OMRequest validatedRequest = request;
     try {
       for (Method m : validations) {
         LOG.debug("Running the {} request pre-process validation from {}.{}",
@@ -90,7 +90,7 @@ public class RequestValidations {
     List<Method> validations = registry.validationsFor(
         conditions(request), request.getCmdType(), POST_PROCESS, request.getVersion());
 
-    OMResponse validatedResponse = response.toBuilder().build();
+    OMResponse validatedResponse = response;
     try {
       for (Method m : validations) {
         LOG.debug("Running the {} request post-process validation from {}.{}",
