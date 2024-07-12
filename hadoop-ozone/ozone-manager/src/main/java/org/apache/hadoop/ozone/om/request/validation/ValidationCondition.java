@@ -44,6 +44,7 @@ public enum ValidationCondition {
    * Classifies validations that has to run, when the client uses an older
    * protocol version than the server.
    */
+  @Deprecated
   OLDER_CLIENT_REQUESTS {
     @Override
     public boolean shouldApply(OMRequest req, ValidationContext ctx) {

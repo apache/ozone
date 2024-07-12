@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -73,7 +74,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
@@ -629,9 +629,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupKey
+      requestType = Type.LookupKey,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowLookupKeyResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -656,9 +657,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupKey
+      requestType = Type.LookupKey,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowLookupKeyWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -743,9 +745,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListKeys
+      requestType = Type.ListKeys,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowListKeysResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -770,9 +773,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListKeys
+      requestType = Type.ListKeys,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowListKeysWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -831,9 +835,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListTrash
+      requestType = Type.ListTrash,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowListTrashWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -861,9 +866,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListTrash
+      requestType = Type.ListTrash,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowListTrashWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1048,9 +1054,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.GetFileStatus
+      requestType = Type.GetFileStatus,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowGetFileStatusWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1078,9 +1085,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.GetFileStatus
+      requestType = Type.GetFileStatus,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowGetFileStatusWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1127,9 +1135,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupFile
+      requestType = Type.LookupFile,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowLookupFileWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1155,9 +1164,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupFile
+      requestType = Type.LookupFile,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowLookupFileWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1237,9 +1247,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListStatus
+      requestType = Type.ListStatus,
+      maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
   )
   public static OMResponse disallowListStatusResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1265,9 +1276,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListStatus
+      requestType = Type.ListStatus,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowListStatusResponseWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)

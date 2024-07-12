@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
@@ -233,9 +233,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.DeleteKey
+      requestType = Type.DeleteKey,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockDeleteKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

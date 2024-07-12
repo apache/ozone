@@ -28,6 +28,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ExecutableType;
@@ -56,8 +57,8 @@ import java.util.Set;
 public class RequestFeatureValidatorProcessor extends AbstractProcessor {
 
   public static final String ERROR_CONDITION_IS_EMPTY =
-      "RequestFeatureValidator has an empty condition list. Please define the"
-          + " ValidationCondition in which the validator has to be applied.";
+      "RequestFeatureValidator has both an empty condition list & undefined max client version. Please define either"
+          + " ValidationCondition or max client version in which the validator has to be applied.";
   public static final String ERROR_ANNOTATED_ELEMENT_IS_NOT_A_METHOD =
       "RequestFeatureValidator annotation is not applied to a method.";
   public static final String ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC =
@@ -94,11 +95,14 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
   public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =
       "processingPhase";
+  public static final String ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME = "maxClientVersion";
 
   public static final String PROCESSING_PHASE_PRE_PROCESS = "PRE_PROCESS";
   public static final String PROCESSING_PHASE_POST_PROCESS = "POST_PROCESS";
   public static final String ERROR_NO_PROCESSING_PHASE_DEFINED =
       "RequestFeatureValidator has an invalid ProcessingPhase defined.";
+
+  public static final String MAX_CLIENT_VERSION_FUTURE_VERSION = "FUTURE_VERSION";
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -199,16 +203,22 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   private boolean checkAndEvaluateAnnotation(
       AnnotationMirror methodAnnotation) {
     boolean isPreprocessor = false;
+    boolean hasInvalidConditions = false;
+    boolean hasValidMaxClientVersions = false;
     for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
         entry : methodAnnotation.getElementValues().entrySet()) {
-      
-      if (hasInvalidValidationCondition(entry)) {
-        emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
-      }
+
+      hasInvalidConditions = hasInvalidConditions || hasInvalidValidationCondition(entry);
+
       if (isProcessingPhaseValue(entry)) {
         isPreprocessor = evaluateProcessingPhase(entry);
       }
+      hasValidMaxClientVersions = hasValidMaxClientVersions || hasValidMaxClientVersion(entry);
     }
+    if (!hasValidMaxClientVersions && hasInvalidConditions) {
+      emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
+    }
+
     return isPreprocessor;
   }
 
@@ -223,9 +233,23 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     return false;
   }
 
+  private boolean hasValidMaxClientVersion(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    if (isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME)) {
+      Name maxClientVersion = visit(entry, new MaxClientVersionVisitor());
+      return !maxClientVersion.contentEquals(MAX_CLIENT_VERSION_FUTURE_VERSION);
+    }
+    return false;
+  }
+
   private boolean isProcessingPhaseValue(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
     return isPropertyNamedAs(entry, ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME);
+  }
+
+  private boolean isMaxClientVersionValue(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    return isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME);
   }
 
   private boolean hasInvalidValidationCondition(
@@ -262,6 +286,18 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       return Boolean.TRUE;
     }
 
+  }
+
+  private static class MaxClientVersionVisitor
+      extends SimpleAnnotationValueVisitor8<Name, Void> {
+
+    MaxClientVersionVisitor() {
+    }
+
+    @Override
+    public Name visitEnumConstant(VariableElement c, Void unused) {
+      return c.getSimpleName();
+    }
   }
 
   private static class ProcessingPhaseVisitor

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -289,9 +290,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AbortMultiPartUpload
+      requestType = Type.AbortMultiPartUpload,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockMPUAbortWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -34,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -281,9 +281,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.DeleteBucket
+      requestType = Type.DeleteBucket,
+      maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

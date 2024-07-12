@@ -460,9 +460,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * they do not understand.
    */
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
+      requestType = Type.CreateBucket,
+      maxClientVersion =  ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {

@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import java.lang.annotation.ElementType;
@@ -95,5 +96,16 @@ public @interface RequestFeatureValidator {
    * @return the requestType to whihc the validator shoudl be applied
    */
   Type requestType();
+
+
+  /**
+   * The max client version for which the validator would run. This condition happens in parallel with the specified
+   * validation conditions. The validator would run either one of the specified conditions apply or the request
+   * client version is equal to or older than the specified version. The value defaults to FUTURE_VERSION so the
+   * validator would never run for any of the clients, the validator could still run based on the specified
+   * conditions though.
+   * @returns the max required client version for which the validator runs for older clients.
+   */
+  ClientVersion maxClientVersion() default ClientVersion.FUTURE_VERSION;
 
 }

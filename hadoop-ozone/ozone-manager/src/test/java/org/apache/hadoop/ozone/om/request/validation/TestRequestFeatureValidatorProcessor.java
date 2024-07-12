@@ -18,15 +18,21 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.annotations.RequestFeatureValidatorProcessor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
@@ -332,17 +338,27 @@ public class TestRequestFeatureValidatorProcessor {
     assertThat(compile(source)).failed();
   }
 
-  @Test
-  public void testMultipleErrorMessages() {
+  private static List<Arguments> getClientVersions() {
+    List<Arguments> clientVersions =
+        Arrays.stream(ClientVersion.values()).map(Arguments::of).collect(Collectors.toList());
+    clientVersions.add(null);
+    return clientVersions;
+  }
+
+  @ParameterizedTest
+  @MethodSource("getClientVersions")
+  public void testMultipleErrorMessages(ClientVersion clientVersion) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(emptyConditions(), postProcess(), aReqType()),
+        annotationOf(emptyConditions(), postProcess(), aReqType(), clientVersion),
         modifiers(),
         returnValue("String"),
         parameters("String rq", "int rp", "String ctx"),
         exceptions());
 
     Compilation compilation = compile(source);
-    assertThat(compilation).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
+    if (ClientVersion.FUTURE_VERSION.equals(clientVersion)) {
+      assertThat(compilation).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
+    }
     assertThat(compilation)
         .hadErrorContaining(ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC);
     assertThat(compilation)
@@ -365,7 +381,7 @@ public class TestRequestFeatureValidatorProcessor {
 
   private ValidationCondition[] someConditions() {
     return
-        new ValidationCondition[] {ValidationCondition.OLDER_CLIENT_REQUESTS};
+        new ValidationCondition[] {ValidationCondition.CLUSTER_NEEDS_FINALIZATION};
   }
 
   private ValidationCondition[] emptyConditions() {
@@ -428,13 +444,29 @@ public class TestRequestFeatureValidatorProcessor {
       ValidationCondition[] conditions,
       RequestProcessingPhase phase,
       Type reqType) {
-    return annotationOf(conditions, phase.name(), reqType);
+    return annotationOf(conditions, phase.name(), reqType, null);
+  }
+
+  private String annotationOf(
+      ValidationCondition[] conditions,
+      RequestProcessingPhase phase,
+      Type reqType,
+      ClientVersion clientVersion) {
+    return annotationOf(conditions, phase.name(), reqType, clientVersion);
   }
 
   private String annotationOf(
       ValidationCondition[] conditions,
       String phase,
       Type reqType) {
+    return annotationOf(conditions, phase, reqType, null);
+  }
+
+  private String annotationOf(
+      ValidationCondition[] conditions,
+      String phase,
+      Type reqType,
+      ClientVersion clientVersion) {
     StringBuilder annotation = new StringBuilder();
     annotation.append("@RequestFeatureValidator(");
     StringBuilder conditionsArray = new StringBuilder();
@@ -451,6 +483,9 @@ public class TestRequestFeatureValidatorProcessor {
     annotation.append(" }");
     annotation.append(", processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
+    if (clientVersion != null) {
+      annotation.append(", maxClientVersion = ").append(clientVersion.name());
+    }
     annotation.append(" )");
     return annotation.toString();
   }
@@ -477,6 +512,9 @@ public class TestRequestFeatureValidatorProcessor {
     for (Type reqType : Type.values()) {
       imports.add("import static org.apache.hadoop.ozone.protocol.proto"
           + ".OzoneManagerProtocolProtos.Type." + reqType.name() + ";");
+    }
+    for (ClientVersion clientVersion : ClientVersion.values()) {
+      imports.add("import static org.apache.hadoop.ozone.ClientVersion." + clientVersion.name() + ";");
     }
     return imports;
   }

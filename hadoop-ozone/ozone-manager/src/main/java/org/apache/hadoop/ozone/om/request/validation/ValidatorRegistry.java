@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -28,10 +30,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
@@ -45,6 +52,9 @@ public class ValidatorRegistry {
   private final EnumMap<ValidationCondition,
       EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
+  private final Map<Pair<Type, RequestProcessingPhase>, Pair<List<Method>, TreeMap<Integer, Integer>>>
+      maxAllowedVersionValidatorMap = new HashMap<>(Type.values().length * RequestProcessingPhase.values().length,
+      1.0f);
 
   /**
    * Creates a {@link ValidatorRegistry} instance that discovers validation
@@ -87,15 +97,60 @@ public class ValidatorRegistry {
    * @param conditions conditions that are present for the request
    * @param requestType the type of the protocol message
    * @param phase the request processing phase
+   * @param requestClientVersion the client version of the protocol message.
    * @return the list of validation methods that has to run.
    */
-  List<Method> validationsFor(
+  List<Method> validationsFor(List<ValidationCondition> conditions,
+                              Type requestType,
+                              RequestProcessingPhase phase,
+                              int requestClientVersion) {
+    Set<Method> methodsToRun = new HashSet<>(validationsFor(conditions, requestType, phase));
+    methodsToRun.addAll(validationsFor(requestType, phase, requestClientVersion));
+    return new ArrayList<>(methodsToRun);
+  }
+
+  /**
+   * Get the validators that has to run
+   * that require {@Link ClientVersion}. minimum client version newer than the request client version, for the given
+   * requestType and {@link RequestProcessingPhase}.
+   *
+   * @param requestType the type of the protocol message
+   * @param phase the request processing phase
+   * @param requestClientVersion the client version of the protocol message.
+   * @return the list of validation methods that has to run.
+   */
+  private List<Method> validationsFor(Type requestType,
+                                      RequestProcessingPhase phase,
+                                      int requestClientVersion) {
+    Pair<Type, RequestProcessingPhase> key = Pair.of(requestType, phase);
+    if (this.maxAllowedVersionValidatorMap.containsKey(key)) {
+      Pair<List<Method>, TreeMap<Integer, Integer>> value = this.maxAllowedVersionValidatorMap.get(key);
+      return Optional.ofNullable(value.getRight().ceilingEntry(requestClientVersion))
+          .map(Map.Entry::getValue)
+          .map(startIndex -> value.getKey().subList(startIndex, value.getKey().size()))
+          .orElse(Collections.emptyList());
+    }
+    return Collections.emptyList();
+  }
+
+
+  /**
+   * Get the validators that has to be run in the given list of
+   * {@link ValidationCondition}s, for the given requestType and
+   * {@link RequestProcessingPhase}.
+   *
+   * @param conditions conditions that are present for the request
+   * @param requestType the type of the protocol message
+   * @param phase the request processing phase
+   * @return the list of validation methods that has to run.
+   */
+  private Set<Method> validationsFor(
       List<ValidationCondition> conditions,
       Type requestType,
       RequestProcessingPhase phase) {
 
     if (conditions.isEmpty() || validators.isEmpty()) {
-      return Collections.emptyList();
+      return Collections.emptySet();
     }
 
     Set<Method> returnValue = new HashSet<>();
@@ -103,7 +158,7 @@ public class ValidatorRegistry {
     for (ValidationCondition condition: conditions) {
       returnValue.addAll(validationsFor(condition, requestType, phase));
     }
-    return new ArrayList<>(returnValue);
+    return returnValue;
   }
 
   /**
@@ -138,6 +193,13 @@ public class ValidatorRegistry {
     return validatorsForPhase;
   }
 
+  private int getMaxAllowedClientVersion(Method method) {
+    RequestFeatureValidator descriptor = method.getAnnotation(RequestFeatureValidator.class);
+    ClientVersion maxAllowedClientVersion = descriptor.maxClientVersion();
+    return maxAllowedClientVersion == null ? (ClientVersion.DEFAULT_VERSION.toProtoValue() - 1) :
+        maxAllowedClientVersion.toProtoValue();
+  }
+
   /**
    * Initializes the internal request validator store.
    * The requests are stored in the following structure:
@@ -149,23 +211,34 @@ public class ValidatorRegistry {
    * @param describedValidators collection of the annotated methods to process.
    */
   void initMaps(Collection<Method> describedValidators) {
-    for (Method m : describedValidators) {
-      RequestFeatureValidator descriptor =
-          m.getAnnotation(RequestFeatureValidator.class);
+    List<Method> sortedMethodsByMaxVersion = describedValidators.stream()
+        .sorted((method1, method2) -> Integer.compare(getMaxAllowedClientVersion(method1),
+            getMaxAllowedClientVersion(method2)))
+        .collect(Collectors.toList());
+    for (Method m : sortedMethodsByMaxVersion) {
+      RequestFeatureValidator descriptor = m.getAnnotation(RequestFeatureValidator.class);
       m.setAccessible(true);
+      Type requestType = descriptor.requestType();
 
       for (ValidationCondition condition : descriptor.conditions()) {
         EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
             requestTypeMap = getAndInitialize(
-                condition, newTypeMap(), validators);
+            condition, this::newTypeMap, validators);
         EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
-            descriptor.requestType(), newPhaseMap(), requestTypeMap);
+            requestType, this::newPhaseMap, requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
-          getAndInitialize(PRE_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(PRE_PROCESS, ArrayList::new, phases).add(m);
         } else if (isPostProcessValidator(descriptor)) {
-          getAndInitialize(POST_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(POST_PROCESS, ArrayList::new, phases).add(m);
         }
       }
+      Pair<Type, RequestProcessingPhase> indexKey = Pair.of(descriptor.requestType(), descriptor.processingPhase());
+      int maxAllowedClientVersion = this.getMaxAllowedClientVersion(m);
+      Pair<List<Method>, TreeMap<Integer, Integer>> value =
+          getAndInitialize(indexKey, () -> Pair.of(new ArrayList<>(), new TreeMap<>()), maxAllowedVersionValidatorMap);
+      List<Method> methods = value.getKey();
+      value.getRight().putIfAbsent(maxAllowedClientVersion, methods.size());
+      methods.add(m);
     }
   }
 
@@ -178,13 +251,8 @@ public class ValidatorRegistry {
     return new EnumMap<>(RequestProcessingPhase.class);
   }
 
-  private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
-    V inMapValue = from.get(key);
-    if (inMapValue == null || !from.containsKey(key)) {
-      from.put(key, defaultValue);
-      return defaultValue;
-    }
-    return inMapValue;
+  private <K, V> V getAndInitialize(K key, Supplier<V> defaultValue, Map<K, V> from) {
+    return from.compute(key, (k, v) -> v == null ? defaultValue.get() : v);
   }
 
   private boolean isPreProcessValidator(RequestFeatureValidator descriptor) {

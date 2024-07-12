@@ -63,7 +63,7 @@ public class RequestValidations {
   public OMRequest validateRequest(OMRequest request)
       throws Exception {
     List<Method> validations = registry.validationsFor(
-        conditions(request), request.getCmdType(), PRE_PROCESS);
+        conditions(request), request.getCmdType(), PRE_PROCESS, request.getVersion());
 
     OMRequest validatedRequest = request.toBuilder().build();
     try {
@@ -88,7 +88,7 @@ public class RequestValidations {
   public OMResponse validateResponse(OMRequest request, OMResponse response)
       throws ServiceException {
     List<Method> validations = registry.validationsFor(
-        conditions(request), request.getCmdType(), POST_PROCESS);
+        conditions(request), request.getCmdType(), POST_PROCESS, request.getVersion());
 
     OMResponse validatedResponse = response.toBuilder().build();
     try {

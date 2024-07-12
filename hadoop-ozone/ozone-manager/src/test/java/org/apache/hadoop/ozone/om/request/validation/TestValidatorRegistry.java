@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +36,6 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
@@ -72,8 +73,8 @@ public class TestValidatorRegistry {
   @Test
   public void testNoValidatorsReturnedForEmptyConditionList() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
-    List<Method> validators =
-        registry.validationsFor(emptyList(), CreateKey, PRE_PROCESS);
+    List<Method> validators = registry.validationsFor(emptyList(), CreateKey, PRE_PROCESS,
+        ClientVersion.CURRENT_VERSION);
 
     assertTrue(validators.isEmpty());
   }
@@ -82,8 +83,8 @@ public class TestValidatorRegistry {
   public void testRegistryHasThePreFinalizePreProcessCreateKeyValidator() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
-        registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, PRE_PROCESS);
+        registry.validationsFor(asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, PRE_PROCESS,
+            ClientVersion.CURRENT_VERSION);
 
     assertEquals(1, validators.size());
     String expectedMethodName = "preFinalizePreProcessCreateKeyValidator";
@@ -95,7 +96,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, POST_PROCESS);
+            asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, POST_PROCESS, ClientVersion.CURRENT_VERSION);
 
     assertEquals(1, validators.size());
     String expectedMethodName = "preFinalizePostProcessCreateKeyValidator";
@@ -107,7 +108,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS);
+            Collections.emptyList(), CreateKey, PRE_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue());
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -119,9 +120,8 @@ public class TestValidatorRegistry {
   @Test
   public void testRegistryHasTheOldClientPostProcessCreateKeyValidator() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
-    List<Method> validators =
-        registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateKey, POST_PROCESS);
+    List<Method> validators = registry.validationsFor(Collections.emptyList(), CreateKey, POST_PROCESS,
+        ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue());
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -135,10 +135,10 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> preFinalizeValidators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, PRE_PROCESS);
+            asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, PRE_PROCESS, ClientVersion.CURRENT_VERSION);
     List<Method> newClientValidators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateVolume, PRE_PROCESS);
+            Collections.emptyList(), CreateVolume, PRE_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue());
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, newClientValidators.size());
@@ -152,10 +152,10 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> preFinalizeValidators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, POST_PROCESS);
+            asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, POST_PROCESS, ClientVersion.CURRENT_VERSION);
     List<Method> oldClientValidators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateVolume, POST_PROCESS);
+            Collections.emptyList(), CreateVolume, POST_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue());
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
@@ -169,8 +169,8 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS),
-            CreateKey, POST_PROCESS);
+            asList(CLUSTER_NEEDS_FINALIZATION),
+            CreateKey, POST_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue());
 
     assertEquals(3, validators.size());
     List<String> methodNames =
@@ -183,9 +183,8 @@ public class TestValidatorRegistry {
   @Test
   public void testNoValidatorForRequestsAtAllReturnsEmptyList() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE_WO_VALIDATORS);
-
-    assertTrue(registry.validationsFor(
-        asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS).isEmpty());
+    assertTrue(registry.validationsFor(Collections.emptyList(), CreateKey, PRE_PROCESS,
+        ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()).isEmpty());
   }
 
   @Test
@@ -199,7 +198,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(urlsToUse);
 
     assertTrue(registry.validationsFor(
-        asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, PRE_PROCESS).isEmpty());
+        asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, PRE_PROCESS, ClientVersion.CURRENT_VERSION).isEmpty());
   }
 
   @Test
@@ -207,7 +206,8 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
 
     assertTrue(registry.validationsFor(
-        asList(OLDER_CLIENT_REQUESTS), CreateDirectory, null).isEmpty());
+        Collections.emptyList(), CreateDirectory, null, ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue())
+        .isEmpty());
   }
 
 }
