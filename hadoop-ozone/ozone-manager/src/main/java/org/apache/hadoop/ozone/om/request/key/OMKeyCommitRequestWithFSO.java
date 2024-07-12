@@ -148,7 +148,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           action = "hsync";
         }
         throw new OMException("Failed to " + action + " key, as " +
-                dbOpenFileKey + "entry is not found in the OpenKey table",
+                dbOpenFileKey + " entry is not found in the OpenKey table",
                 KEY_NOT_FOUND);
       }
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
@@ -176,6 +176,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+
+      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
+      // not persisted in the key table.
+      omKeyInfo.setExpectedDataGeneration(null);
+
       if (null != keyToDelete) {
         final String clientIdString
             = String.valueOf(commitKeyRequest.getClientID());

@@ -124,6 +124,7 @@ OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=HTTP/recon@EXAMPLE.COM
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 CORE-SITE.XML_hadoop.http.authentication.simple.anonymous.allowed=false
 CORE-SITE.XML_hadoop.http.authentication.signature.secret.file=/etc/security/http_secret

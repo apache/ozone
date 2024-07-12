@@ -374,9 +374,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
 
     if (blockID != null) {
+      if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNLeaderIndex = datanodeList.indexOf(pipeline.getLeaderNode());
+        if (getBlockDNLeaderIndex > 0) {
+          // Pull the leader DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNLeaderIndex);
+        }
+      }
       // Check if the DN to which the GetBlock command was sent has been cached.
       DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
+      if (cachedDN != null && !topologyAwareRead) {
         datanodeList = pipeline.getNodes();
         int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
         if (getBlockDNCacheIndex > 0) {

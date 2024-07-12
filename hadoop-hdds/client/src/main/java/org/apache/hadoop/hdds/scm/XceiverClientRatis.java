@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -54,8 +56,10 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.retry.RetryPolicy;
@@ -105,6 +109,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private final XceiverClientMetrics metrics
       = XceiverClientManager.getXceiverClientMetrics();
+  private final RaftProtos.ReplicationLevel watchType;
+  private final int majority;
 
   /**
    * Constructs a client.
@@ -114,28 +120,46 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ConfigurationSource configuration) {
     super();
     this.pipeline = pipeline;
+    this.majority = (pipeline.getReplicationConfig().getRequiredNodes() / 2) + 1;
     this.rpcType = rpcType;
     this.retryPolicy = retryPolicy;
     commitInfoMap = new ConcurrentHashMap<>();
     this.tlsConfig = tlsConfig;
     this.ozoneConfiguration = configuration;
+    try {
+      this.watchType = RaftProtos.ReplicationLevel.valueOf(
+          configuration.getObject(RatisClientConfig.class).getWatchType());
+    } catch (Exception e) {
+      throw new IllegalArgumentException(configuration.getObject(RatisClientConfig.class).getWatchType() +
+          " is not supported. Currently only ALL_COMMITTED or MAJORITY_COMMITTED are supported");
+    }
 
+    if (watchType != ReplicationLevel.ALL_COMMITTED && watchType != ReplicationLevel.MAJORITY_COMMITTED) {
+      throw new IllegalArgumentException(watchType + " is not supported. " +
+          "Currently only ALL_COMMITTED or MAJORITY_COMMITTED are supported");
+    }
+    LOG.info("WatchType {}. Majority {}, ", this.watchType, this.majority);
     if (LOG.isTraceEnabled()) {
       LOG.trace("new XceiverClientRatis for pipeline " + pipeline.getId(),
           new Throwable("TRACE"));
     }
   }
 
-  private long updateCommitInfosMap(RaftClientReply reply) {
+  private long updateCommitInfosMap(RaftClientReply reply, RaftProtos.ReplicationLevel level) {
     return Optional.ofNullable(reply)
         .filter(RaftClientReply::isSuccess)
         .map(RaftClientReply::getCommitInfos)
-        .map(this::updateCommitInfosMap)
+        .map(v -> updateCommitInfosMap(v, level))
         .orElse(0L);
   }
 
   public long updateCommitInfosMap(
       Collection<RaftProtos.CommitInfoProto> commitInfoProtos) {
+    return updateCommitInfosMap(commitInfoProtos, watchType);
+  }
+
+  public long updateCommitInfosMap(
+      Collection<RaftProtos.CommitInfoProto> commitInfoProtos, RaftProtos.ReplicationLevel level) {
     // if the commitInfo map is empty, just update the commit indexes for each
     // of the servers
     final Stream<Long> stream;
@@ -152,7 +176,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
               (address, index) -> proto.getCommitIndex()))
           .filter(Objects::nonNull);
     }
-    return stream.mapToLong(Long::longValue).min().orElse(0);
+    if (level == ReplicationLevel.ALL_COMMITTED) {
+      return stream.mapToLong(Long::longValue).min().orElse(0);
+    } else {
+      // if majority committed, then find the second large index
+      return stream.sorted(Comparator.reverseOrder()).limit(majority).skip(majority - 1).findFirst().orElse(0L);
+    }
   }
 
   private long putCommitInfo(RaftProtos.CommitInfoProto proto) {
@@ -275,40 +304,57 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }
 
     try {
-      CompletableFuture<RaftClientReply> replyFuture = getClient().async()
-          .watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
+      CompletableFuture<RaftClientReply> replyFuture = getClient().async().watch(index, watchType);
       final RaftClientReply reply = replyFuture.get();
-      final long updated = updateCommitInfosMap(reply);
-      Preconditions.checkState(updated >= index);
-      return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
+      final long updated = updateCommitInfosMap(reply, watchType);
+      Preconditions.checkState(updated >= index, "Returned index " + updated + " is smaller than expected " + index);
+      return newWatchReply(index, watchType, updated);
     } catch (Exception e) {
-      LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
+      LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);
       Throwable t =
           HddsClientUtils.containsException(e, GroupMismatchException.class);
       if (t != null) {
         throw e;
       }
-      final RaftClientReply reply = getClient().async()
-          .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-          .get();
-      final XceiverClientReply clientReply = newWatchReply(
-          index, ReplicationLevel.MAJORITY_COMMITTED, index);
-      reply.getCommitInfos().stream()
-          .filter(i -> i.getCommitIndex() < index)
-          .forEach(proto -> {
-            UUID address = RatisHelper.toDatanodeId(proto.getServer());
-            addDatanodetoReply(address, clientReply);
-            // since 3 way commit has failed, the updated map from now on  will
-            // only store entries for those datanodes which have had successful
-            // replication.
-            commitInfoMap.remove(address);
-            LOG.info(
-                "Could not commit index {} on pipeline {} to all the nodes. " +
-                "Server {} has failed. Committed by majority.",
-                index, pipeline, address);
-          });
-      return clientReply;
+      if (watchType == ReplicationLevel.ALL_COMMITTED) {
+        Throwable nre =
+            HddsClientUtils.containsException(e, NotReplicatedException.class);
+        Collection<CommitInfoProto> commitInfoProtoList;
+        if (nre instanceof NotReplicatedException) {
+          // If NotReplicatedException is thrown from the Datanode leader
+          // we can save one watch request round trip by using the CommitInfoProto
+          // in the NotReplicatedException
+          commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
+        } else {
+          final RaftClientReply reply = getClient().async()
+              .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
+              .get();
+          commitInfoProtoList = reply.getCommitInfos();
+        }
+        return handleFailedAllCommit(index, commitInfoProtoList);
+      }
+      throw e;
     }
+  }
+
+  private XceiverClientReply handleFailedAllCommit(long index, Collection<CommitInfoProto> commitInfoProtoList) {
+    final XceiverClientReply clientReply = newWatchReply(
+        index, ReplicationLevel.MAJORITY_COMMITTED, index);
+    commitInfoProtoList.stream()
+        .filter(i -> i.getCommitIndex() < index)
+        .forEach(proto -> {
+          UUID address = RatisHelper.toDatanodeId(proto.getServer());
+          addDatanodetoReply(address, clientReply);
+          // since 3 way commit has failed, the updated map from now on  will
+          // only store entries for those datanodes which have had successful
+          // replication.
+          commitInfoMap.remove(address);
+          LOG.info(
+              "Could not commit index {} on pipeline {} to all the nodes. " +
+                  "Server {} has failed. Committed by majority.",
+              index, pipeline, address);
+        });
+    return clientReply;
   }
 
   /**
@@ -360,7 +406,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
                     .parseFrom(reply.getMessage().getContent());
             UUID serverId = RatisHelper.toDatanodeId(reply.getReplierId());
             if (response.getResult() == ContainerProtos.Result.SUCCESS) {
-              updateCommitInfosMap(reply.getCommitInfos());
+              updateCommitInfosMap(reply.getCommitInfos(), watchType);
             }
             asyncReply.setLogIndex(reply.getLogIndex());
             addDatanodetoReply(serverId, asyncReply);

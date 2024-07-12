@@ -356,6 +356,29 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * This API allows to atomically update an existing key. The key read before invoking this API
+   * should remain unchanged for this key to be written. This is controlled by the generation
+   * field in the existing Key param. If the key is replaced or updated the generation will change. If the
+   * generation has changed since the existing Key was read, either the initial key create will fail,
+   * or the key will fail to commit after the data has been written as the checks are carried out
+   * both at key open and commit time.
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Existing key to rewrite. This must exist in the bucket.
+   * @param size The size of the new key
+   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   *                              and commit time.
+   * @param replicationConfig The replication configuration for the key to be rewritten.
+   * @param metadata custom key value metadata
+   * @return {@link OzoneOutputStream}
+   * @throws IOException
+   */
+  OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
+      long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
+       Map<String, String> metadata) throws IOException;
+
+  /**
    * Writes a key in an existing bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

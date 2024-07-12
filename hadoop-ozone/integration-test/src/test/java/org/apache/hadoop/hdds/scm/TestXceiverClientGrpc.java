@@ -88,27 +88,27 @@ public class TestXceiverClientGrpc {
 
   @Test
   @Timeout(5)
-  public void testRandomFirstNodeIsCommandTarget() throws IOException {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+  public void testLeaderNodeIsCommandTarget() throws IOException {
+    final Set<DatanodeDetails> seenDN = new HashSet<>();
     conf.setBoolean(
             OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
-    // Using a new Xceiver Client, call it repeatedly until all DNs in the
-    // pipeline have been the target of the command, indicating it is shuffling
-    // the DNs on each call with a new client. This test will timeout if this
-    // is not happening.
-    while (allDNs.size() > 0) {
+    // Using a new Xceiver Client, make 100 calls and ensure leader node is used
+    // each time. The logic should always use the leader node, so we can check
+    // only a single DN is ever seen after 100 calls.
+    for (int i = 0; i < 100; i++) {
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
             DatanodeDetails dn) {
-          allDNs.remove(dn);
+          seenDN.add(dn);
           return buildValidResponse();
         }
       }) {
         invokeXceiverClientGetBlock(client);
       }
     }
+    assertEquals(1, seenDN.size());
   }
 
   @Test
@@ -238,11 +238,11 @@ public class TestXceiverClientGrpc {
   private void invokeXceiverClientGetBlock(XceiverClientSpi client)
       throws IOException {
     ContainerProtocolCalls.getBlock(client,
-        ContainerProtos.DatanodeBlockID.newBuilder()
+        BlockID.getFromProtobuf(ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build(), null);
+            .build()), null, client.getPipeline().getReplicaIndexes());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -259,7 +259,7 @@ public class TestXceiverClientGrpc {
             .setLen(-1)
             .setOffset(0)
             .build(),
-        bid,
+        bid.getDatanodeBlockIDProtobuf(),
         null, null);
   }
 

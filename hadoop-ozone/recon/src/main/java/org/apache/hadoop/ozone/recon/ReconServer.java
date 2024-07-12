@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -102,7 +101,7 @@ public class ReconServer extends GenericCli {
         .toArray(new String[0]);
 
     configuration = createOzoneConfiguration();
-    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+    HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 

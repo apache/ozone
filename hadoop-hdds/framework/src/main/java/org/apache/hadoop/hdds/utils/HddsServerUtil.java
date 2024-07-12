@@ -25,8 +25,10 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -39,8 +41,10 @@ import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -58,6 +62,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -98,6 +103,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,6 +115,8 @@ public final class HddsServerUtil {
 
   private HddsServerUtil() {
   }
+
+  private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
@@ -451,6 +459,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       ConfigurationSource conf) throws IOException {
+    SecurityConfig.initSecurityProvider(conf);
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
@@ -463,6 +472,7 @@ public final class HddsServerUtil {
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    SecurityConfig.initSecurityProvider(configuration);
     SCMClientConfig scmClientConfig =
         conf.getObject(SCMClientConfig.class);
     int retryCount = Integer.MAX_VALUE;
@@ -482,6 +492,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
+    SecurityConfig.initSecurityProvider(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
@@ -674,4 +685,68 @@ public final class HddsServerUtil {
   public static void addSuppressedLoggingExceptions(RPC.Server server) {
     server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
   }
+
+  public static void startupShutdownMessage(VersionInfo versionInfo,
+      Class<?> clazz, String[] args, Logger log, OzoneConfiguration conf) {
+    final String hostname = NetUtils.getHostname();
+    final String className = clazz.getSimpleName();
+
+    if (log.isInfoEnabled()) {
+      log.info(createStartupShutdownMessage(versionInfo, className, hostname,
+          args, HddsUtils.processForLogging(conf)));
+    }
+
+    if (SystemUtils.IS_OS_UNIX) {
+      try {
+        SignalLogger.INSTANCE.register(log);
+      } catch (Throwable t) {
+        log.warn("failed to register any UNIX signal loggers: ", t);
+      }
+    }
+    ShutdownHookManager.get().addShutdownHook(
+        () -> log.info(toStartupShutdownString("SHUTDOWN_MSG: ",
+            "Shutting down " + className + " at " + hostname)),
+        SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  /**
+   * Return a message for logging.
+   * @param prefix prefix keyword for the message
+   * @param msg content of the message
+   * @return a message for logging
+   */
+  public static String toStartupShutdownString(String prefix, String... msg) {
+    StringBuilder b = new StringBuilder(prefix);
+    b.append("\n/************************************************************");
+    for (String s : msg) {
+      b.append("\n").append(prefix).append(s);
+    }
+    b.append("\n************************************************************/");
+    return b.toString();
+  }
+
+  /**
+   * Generate the text for the startup/shutdown message of processes.
+   * @param className short name of the class
+   * @param hostname hostname
+   * @param args Command arguments
+   * @return a string to log.
+   */
+  public static String createStartupShutdownMessage(VersionInfo versionInfo,
+      String className, String hostname, String[] args,
+      Map<String, String> conf) {
+    return toStartupShutdownString("STARTUP_MSG: ",
+        "Starting " + className,
+        "  host = " + hostname,
+        "  args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
+        "  version = " + versionInfo.getVersion(),
+        "  classpath = " + System.getProperty("java.class.path"),
+        "  build = " + versionInfo.getUrl() + "/"
+            + versionInfo.getRevision()
+            + " ; compiled by '" + versionInfo.getUser()
+            + "' on " + versionInfo.getDate(),
+        "  java = " + System.getProperty("java.version"),
+        "  conf = " + conf);
+  }
+
 }

@@ -64,6 +64,7 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
@@ -1274,6 +1275,7 @@ public class TestSnapshotDiffManager {
    * startup.
    */
   @Test
+  @Flaky("HDDS-10490")
   public void testLoadJobsOnStartUp() throws Exception {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),
