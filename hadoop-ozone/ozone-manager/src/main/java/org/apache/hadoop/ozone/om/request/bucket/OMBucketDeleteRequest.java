@@ -281,7 +281,6 @@ public class OMBucketDeleteRequest extends OMClientRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.DeleteBucket,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT

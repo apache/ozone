@@ -179,6 +179,18 @@ public class TestRequestFeatureValidatorProcessor {
   }
 
   @Test
+  public void testNullValidationConditionListDoesNotCompile() {
+    List<String> source = generateSourceOfValidatorMethodWith(
+        annotationOf(nullConditions(), preProcess(), aReqType()),
+        modifiers("public", "static"),
+        returnValue("OMRequest"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
+        exceptions());
+
+    assertThat(compile(source)).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
+  }
+
+  @Test
   public void testNotEnoughParametersForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(someConditions(), preProcess(), aReqType()),
@@ -388,6 +400,10 @@ public class TestRequestFeatureValidatorProcessor {
     return new ValidationCondition[] {};
   }
 
+  private ValidationCondition[] nullConditions() {
+    return null;
+  }
+
   private RequestProcessingPhase preProcess() {
     return RequestProcessingPhase.PRE_PROCESS;
   }
@@ -470,18 +486,20 @@ public class TestRequestFeatureValidatorProcessor {
     StringBuilder annotation = new StringBuilder();
     annotation.append("@RequestFeatureValidator(");
     StringBuilder conditionsArray = new StringBuilder();
-    conditionsArray.append("conditions = { ");
-    if (conditions.length > 0) {
-      for (ValidationCondition condition : conditions) {
-        conditionsArray.append(condition.name()).append(", ");
+    if (conditions != null) {
+      conditionsArray.append("conditions = { ");
+      if (conditions.length > 0) {
+        for (ValidationCondition condition : conditions) {
+          conditionsArray.append(condition.name()).append(", ");
+        }
+        annotation
+            .append(conditionsArray.substring(0, conditionsArray.length() - 2));
+      } else {
+        annotation.append(conditionsArray);
       }
-      annotation
-          .append(conditionsArray.substring(0, conditionsArray.length() - 2));
-    } else {
-      annotation.append(conditionsArray);
+      annotation.append(" }, ");
     }
-    annotation.append(" }");
-    annotation.append(", processingPhase = ").append(phase);
+    annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
     if (clientVersion != null) {
       annotation.append(", maxClientVersion = ").append(clientVersion.name());

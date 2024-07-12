@@ -89,7 +89,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { CLUSTER_NEEDS_FINALIZATION },
+      conditions = CLUSTER_NEEDS_FINALIZATION,
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest preFinalizePreProcessCreateKeyValidator(
@@ -99,7 +99,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { CLUSTER_NEEDS_FINALIZATION },
+      conditions = CLUSTER_NEEDS_FINALIZATION,
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse preFinalizePostProcessCreateKeyValidator(
@@ -109,7 +109,6 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
@@ -120,7 +119,6 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
@@ -131,7 +129,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { CLUSTER_NEEDS_FINALIZATION },
+      conditions = CLUSTER_NEEDS_FINALIZATION,
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
@@ -142,7 +140,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { CLUSTER_NEEDS_FINALIZATION },
+      conditions = CLUSTER_NEEDS_FINALIZATION,
       processingPhase = POST_PROCESS,
       requestType = CreateVolume,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
@@ -153,7 +151,6 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
@@ -164,7 +161,6 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = PRE_PROCESS,
       requestType = DeleteKeys,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
@@ -179,7 +175,6 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = POST_PROCESS,
       requestType = DeleteKeys,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT

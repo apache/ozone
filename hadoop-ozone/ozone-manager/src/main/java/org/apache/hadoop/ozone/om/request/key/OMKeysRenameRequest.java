@@ -297,7 +297,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.RenameKeys,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT

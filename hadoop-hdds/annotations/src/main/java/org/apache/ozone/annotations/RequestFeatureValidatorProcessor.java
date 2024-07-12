@@ -203,19 +203,19 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   private boolean checkAndEvaluateAnnotation(
       AnnotationMirror methodAnnotation) {
     boolean isPreprocessor = false;
-    boolean hasInvalidConditions = false;
+    boolean hasValidConditions = false;
     boolean hasValidMaxClientVersions = false;
     for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
         entry : methodAnnotation.getElementValues().entrySet()) {
 
-      hasInvalidConditions = hasInvalidConditions || hasInvalidValidationCondition(entry);
+      hasValidConditions = hasValidConditions || hasValidValidationCondition(entry);
 
       if (isProcessingPhaseValue(entry)) {
         isPreprocessor = evaluateProcessingPhase(entry);
       }
       hasValidMaxClientVersions = hasValidMaxClientVersions || hasValidMaxClientVersion(entry);
     }
-    if (!hasValidMaxClientVersions && hasInvalidConditions) {
+    if (!hasValidMaxClientVersions && !hasValidConditions) {
       emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
     }
 
@@ -252,10 +252,10 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     return isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME);
   }
 
-  private boolean hasInvalidValidationCondition(
+  private boolean hasValidValidationCondition(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
     return isPropertyNamedAs(entry, ANNOTATION_CONDITIONS_PROPERTY_NAME)
-        && !visit(entry, new ConditionValidator());
+        && visit(entry, new ConditionValidator());
   }
 
   private boolean isPropertyNamedAs(
@@ -274,7 +274,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       extends SimpleAnnotationValueVisitor8<Boolean, Void> {
 
     ConditionValidator() {
-      super(Boolean.TRUE);
+      super(Boolean.FALSE);
     }
 
     @Override

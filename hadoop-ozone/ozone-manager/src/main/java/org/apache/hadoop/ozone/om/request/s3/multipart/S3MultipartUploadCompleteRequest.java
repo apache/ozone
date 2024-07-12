@@ -743,7 +743,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CompleteMultiPartUpload,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT

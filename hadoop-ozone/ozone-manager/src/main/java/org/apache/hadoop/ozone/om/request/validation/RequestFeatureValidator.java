@@ -82,7 +82,7 @@ public @interface RequestFeatureValidator {
    * Runtime conditions in which a validator should run.
    * @return a list of conditions when the validator should be applied
    */
-  ValidationCondition[] conditions();
+  ValidationCondition[] conditions() default {};
 
   /**
    * Defines if the validation has to run before or after the general request

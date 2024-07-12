@@ -629,7 +629,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupKey,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -657,7 +656,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupKey,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
@@ -745,7 +743,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -773,7 +770,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
@@ -835,7 +831,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -866,7 +861,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
@@ -1054,7 +1048,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -1085,7 +1078,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
@@ -1135,7 +1127,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -1164,7 +1155,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
@@ -1247,7 +1237,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus,
       maxClientVersion = ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS
@@ -1276,7 +1265,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT

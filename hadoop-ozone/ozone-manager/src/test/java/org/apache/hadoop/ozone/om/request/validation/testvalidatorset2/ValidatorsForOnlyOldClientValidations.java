@@ -33,7 +33,6 @@ public final class ValidatorsForOnlyOldClientValidations {
   private ValidatorsForOnlyOldClientValidations() { }
 
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
       maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)

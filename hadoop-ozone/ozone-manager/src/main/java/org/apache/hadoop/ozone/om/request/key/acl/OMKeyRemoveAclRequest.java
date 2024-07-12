@@ -166,7 +166,6 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.RemoveAcl,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT

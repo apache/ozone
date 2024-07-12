@@ -426,7 +426,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = {},
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateFile,
       maxClientVersion = ClientVersion.ERASURE_CODING_SUPPORT
