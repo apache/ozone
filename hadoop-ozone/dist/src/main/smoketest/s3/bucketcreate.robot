@@ -58,7 +58,7 @@ Test buckets named like web endpoints
     [tags]    aws-skip
     ${path} =    Create Random File KB    64
 
-    FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    stacks    static
+    FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    secret    stacks    static
         Create bucket with name    ${name}
         Put object to bucket    bucket=${name}    key=testkey    path=${path}
     END
