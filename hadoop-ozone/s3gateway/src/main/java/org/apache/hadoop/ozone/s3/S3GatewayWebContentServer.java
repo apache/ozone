@@ -110,8 +110,6 @@ class S3GatewayWebContentServer extends BaseHttpServer {
     }
   }
 
-  // FIXME make configurable
-
   @Override
   protected String getHttpAddressKey() {
     return OZONE_S3G_CONTENT_HTTP_ADDRESS_KEY;
