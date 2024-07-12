@@ -38,6 +38,7 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon

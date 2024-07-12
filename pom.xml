@@ -637,27 +637,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jersey-core</artifactId>
         <version>${jersey.version}</version>
       </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-servlet</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-json</artifactId>
-        <version>${jersey.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>stax</groupId>
-            <artifactId>stax-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-server</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
 
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -685,11 +664,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.jolbox</groupId>
         <artifactId>bonecp</artifactId>
         <version>${bonecp.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey.contribs</groupId>
-        <artifactId>jersey-guice</artifactId>
-        <version>${jersey.version}</version>
       </dependency>
 
       <dependency>
@@ -1554,6 +1528,27 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <bannedImport>org.checkerframework.checker.nullness.qual.Nullable</bannedImport>
                       <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
                       <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-annotations</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <restrictImports>
+                    <reason>Annotation processing is disabled by default.  Override this ban in modules where processing is enabled.</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
+                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                      <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>

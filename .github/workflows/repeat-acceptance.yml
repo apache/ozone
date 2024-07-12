@@ -108,7 +108,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests

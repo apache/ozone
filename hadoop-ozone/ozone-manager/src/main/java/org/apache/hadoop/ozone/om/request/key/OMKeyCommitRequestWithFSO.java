@@ -237,6 +237,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
+
+      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
+      // not persisted in the key table.
+      omKeyInfo.setExpectedDataGeneration(null);
+
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace shouldn't check and increase.
       if (keyToDelete != null && isSameHsyncKey) {

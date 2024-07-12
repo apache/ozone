@@ -342,6 +342,7 @@ public final class OzoneConsts {
   public static final String BUCKET_LAYOUT = "bucketLayout";
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
+  public static final String REWRITE_GENERATION = "rewriteGeneration";
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";

@@ -97,7 +97,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
         <exclusion>
           <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-json</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.kerby</groupId>
@@ -168,6 +168,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>compile</scope>
       <exclusions>
         <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop.thirdparty</groupId>
           <artifactId>hadoop-shaded-guava</artifactId>
         </exclusion>
@@ -206,4 +210,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>snappy-java</artifactId>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

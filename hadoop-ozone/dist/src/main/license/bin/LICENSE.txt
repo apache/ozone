@@ -251,9 +251,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
-   com.sun.jersey:jersey-json
-   com.sun.jersey:jersey-server
-   com.sun.jersey:jersey-servlet
    javax.annotation:javax.annotation-api
    javax.el:javax.el-api
    javax.interceptor:javax.interceptor-api
