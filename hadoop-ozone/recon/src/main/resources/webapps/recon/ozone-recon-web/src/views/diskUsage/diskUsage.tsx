@@ -37,7 +37,7 @@ import {
 
 import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
 import { EChart } from '@/components/eChart/eChart';
-import { byteToSize, showDataFetchError } from '@/utils/common';
+import { byteToSize, showDataFetchError, showDatInfoWarning } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
@@ -314,9 +314,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
-      // If status is INITIALIZING, we cannot add entities for metadata as it will cause null failures
-      // Hence we only add Entities if the status is not INITIALIZING
-      if (summaryResponse.status !== 'INITIALIZING') {
+      // If status is INITIALIZING, we cannot add entities for metadata as it will cause null failures and showing Warning message
+      // Hence we only add Entities if the status is not INITIALIZING 
+      if (summaryResponse.status ===  'INITIALIZING')
+      {
+        showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
+        return;
+      }
+
+      if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {
         if (summaryResponse.countStats.type === 'KEY') {
           const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
@@ -565,12 +571,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       </Menu>
     )
 
-    console.log(plotData);
-    console.log(plotData.map((value) => {
-      return {
-        name: value.name
-      }
-    }))
     const eChartsOptions = {
       title: {
         text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,

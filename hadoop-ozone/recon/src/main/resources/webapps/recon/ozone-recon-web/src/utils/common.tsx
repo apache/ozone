@@ -33,10 +33,25 @@ const showErrorNotification = (title: string, description: string) => {
   notification.error(args);
 };
 
+const showInfoNotification = (title: string, description: string) => {
+  const args = {
+    message: title,
+    description,
+    duration: 15
+  };
+  notification.info(args);
+};
+
 export const showDataFetchError = (error: string) => {
-  const title = 'Error while fetching data';
+  let title = '';
+  title = 'Error while fetching data';
   if (error.includes('CanceledError')) {
     error = 'Previous request cancelled because context changed'
+  }
+  if (error.includes('metadata')) {
+    title = 'Metadata Initialization:';
+    showInfoNotification(title, error);
+    return;
   }
   showErrorNotification(title, error);
 };

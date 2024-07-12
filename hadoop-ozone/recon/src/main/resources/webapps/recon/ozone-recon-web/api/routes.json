@@ -4,7 +4,7 @@
   "/utilization/fileCount": "/fileSizeCounts",
   "/utilization/containerCount": "/containerCount",
   "/namespace/du?path=/&files=true&sortSubpaths=true": "/root",
-  "/namespace/du?path=/vol:id&files=true&sortSubpaths=true": "/volume",
+  "/namespace/du?path=/vol:id&files=true&sortSubPaths=true": "/volume",
   "/namespace/du?path=/vol:id/&files=true&sortSubPaths=true": "/volume",
   "/namespace/du?path=/dummyVolume&files=true&sortSubPaths=true": "/volume",
   "/namespace/du?path=/vol:id/bucket:id&files=true&sortSubPaths=true": "/bucket",
