@@ -56,7 +56,7 @@ Create new bucket and check no group ACL
 
 Test buckets named like web endpoints
     [tags]    aws-skip
-    ${path} =    Create Random File
+    ${path} =    Create Random File KB    64
 
     FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    stacks    static
         Create bucket with name    ${name}
