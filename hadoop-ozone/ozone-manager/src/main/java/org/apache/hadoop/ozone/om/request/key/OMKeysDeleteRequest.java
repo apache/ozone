@@ -130,8 +130,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     boolean deleteStatus = true;
     long startNanos = Time.monotonicNowNanos();
-    String finalVolumeName = volumeName;
-    String finalBucketName = bucketName;
     try {
       long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
