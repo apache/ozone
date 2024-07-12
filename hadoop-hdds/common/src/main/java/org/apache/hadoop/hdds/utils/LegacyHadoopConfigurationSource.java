@@ -19,10 +19,16 @@ package org.apache.hadoop.hdds.utils;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DelegatingProperties;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Configuration source to wrap Hadoop Configuration object.
@@ -32,9 +38,55 @@ public class LegacyHadoopConfigurationSource
 
   private Configuration configuration;
 
-  public LegacyHadoopConfigurationSource(
-      Configuration configuration) {
-    this.configuration = configuration;
+  public LegacyHadoopConfigurationSource(Configuration configuration) {
+    this.configuration = new Configuration(configuration) {
+      private Properties delegatingProps;
+
+      @Override
+      public synchronized void reloadConfiguration() {
+        super.reloadConfiguration();
+        delegatingProps = null;
+      }
+
+      @Override
+      protected synchronized Properties getProps() {
+        if (delegatingProps == null) {
+          String complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+                  OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+          Properties cryptoProperties = getCryptoProperties();
+          delegatingProps = new DelegatingProperties(super.getProps(), complianceMode, cryptoProperties);
+        }
+        return delegatingProps;
+      }
+
+      /**
+       * Get a property value without the compliance check. It's needed to get the compliance mode.
+       *
+       * @param key property name
+       * @param defaultValue default value
+       * @return property value, without compliance check
+       */
+      private String getPropertyUnsafe(String key, String defaultValue) {
+        return super.getProps().getProperty(key, defaultValue);
+      }
+
+      private Properties getCryptoProperties() {
+        try {
+          return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+        } catch (NoSuchMethodError e) {
+          // We need to handle NoSuchMethodError, because in Hadoop 2 we don't have the
+          // getAllPropertiesByTag method. We won't be supporting the compliance mode with
+          // that version, so we are safe to catch the exception and return a new Properties object.
+          return new Properties();
+        }
+      }
+
+      @Override
+      public Iterator<Map.Entry<String, String>> iterator() {
+        DelegatingProperties props = (DelegatingProperties) getProps();
+        return props.iterator();
+      }
+    };
   }
 
   @Override
