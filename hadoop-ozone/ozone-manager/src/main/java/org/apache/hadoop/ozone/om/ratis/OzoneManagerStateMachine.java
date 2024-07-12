@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
@@ -117,6 +118,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private OzoneManagerStateMachineMetrics metrics;
 
 
+  private final NettyMetrics nettyMetrics;
+
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.omRatisServer = ratisServer;
@@ -142,6 +145,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
     this.metrics = OzoneManagerStateMachineMetrics.create();
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   /**
@@ -761,6 +765,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    if (this.nettyMetrics != null) {
+      this.nettyMetrics.unregister();
+    }
     LOG.info("applyTransactionMap size {} ", applyTransactionMap.size());
     if (LOG.isDebugEnabled()) {
       LOG.debug("applyTransactionMap {}",
