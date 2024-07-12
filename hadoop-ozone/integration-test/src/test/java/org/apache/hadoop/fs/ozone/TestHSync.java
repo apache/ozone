@@ -726,23 +726,28 @@ public class TestHSync {
 
   public static Stream<Arguments> concurrentWriteHSync() {
     return Stream.of(
-        Arguments.of(1, 1),
-        Arguments.of(2, 1),
-        Arguments.of(4, 1),
-        Arguments.of(6, 2),
-        Arguments.of(8, 2),
-        Arguments.of(8, 3),
-        // this may fail.
-        Arguments.of(8, 4),
-        Arguments.of(8, 8),
-        Arguments.of(8, 16)
+        Arguments.of(1, 1, true),
+        Arguments.of(2, 1, true),
+        Arguments.of(4, 1, true),
+        Arguments.of(6, 2, true),
+        Arguments.of(8, 2, true),
+        Arguments.of(8, 3, true),
+        Arguments.of(8, 4, true),
+        Arguments.of(8, 8, true),
+        Arguments.of(8, 16, true),
+
+        Arguments.of(1, 1, false),
+        Arguments.of(8, 2, false),
+        Arguments.of(8, 16, false)
     );
   }
 
   @ParameterizedTest
   @MethodSource("concurrentWriteHSync")
-  public void testConcurrentWriteHSync(int writeSampleSize, int syncThreadsCount) throws Exception {
+  public void testConcurrentWriteHSync(int writeSampleSize, int syncThreadsCount,
+      boolean piggybackingEnabled) throws Exception {
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.setBoolean("ozone.client.stream.putblock.piggybacking", piggybackingEnabled);
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER + bucket.getName();
