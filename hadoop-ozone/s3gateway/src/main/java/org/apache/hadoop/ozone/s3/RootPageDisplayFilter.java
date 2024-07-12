@@ -46,12 +46,15 @@ public class RootPageDisplayFilter implements Filter {
     String httpMethod = httpRequest.getMethod();
     String uri = httpRequest.getRequestURI();
     String authorizationHeader = httpRequest.getHeader("Authorization");
-    if (httpMethod.equalsIgnoreCase("GET") && authorizationHeader == null && uri
-        .equals("/")) {
+    if (httpMethod.equalsIgnoreCase("GET") && !containsAWSAuth(authorizationHeader) && uri.equals("/")) {
       ((HttpServletResponse) servletResponse).sendRedirect("/static/");
     } else {
       filterChain.doFilter(httpRequest, servletResponse);
     }
+  }
+
+  private boolean containsAWSAuth(String authorizationHeader) {
+    return authorizationHeader != null && authorizationHeader.startsWith("AWS");
   }
 
   @Override
