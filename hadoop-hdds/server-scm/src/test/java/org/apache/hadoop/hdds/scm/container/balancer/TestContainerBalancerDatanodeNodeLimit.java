@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -287,6 +288,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
+  @Flaky("HDDS-11093")
   public void testMetrics(@Nonnull MockedSCM mockedSCM) throws IOException, NodeNotFoundException {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("hdds.datanode.du.refresh.period", "1ms");

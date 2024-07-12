@@ -72,10 +72,6 @@ public class OzoneKey {
    */
   private final boolean isFile;
 
-  /**
-   * Constructs OzoneKey from OmKeyInfo.
-   *
-   */
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
@@ -219,6 +215,10 @@ public class OzoneKey {
     return isFile;
   }
 
+  /**
+   * Constructs OzoneKey from OmKeyInfo.
+   *
+   */
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),

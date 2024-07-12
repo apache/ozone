@@ -100,7 +100,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <failIfNoTests>false</failIfNoTests>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.54.v20240208</jetty.version>
+    <jetty.version>9.4.55.v20240627</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <curator.version>4.2.0</curator.version>
@@ -145,6 +145,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
+    <jnr-posix.version>3.1.19</jnr-posix.version>
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
@@ -229,7 +230,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
-    <javac.version>1.8</javac.version>
+    <javac.version>8</javac.version>
 
     <!-- The java version enforced by the maven enforcer -->
     <!-- more complex patterns can be used here, such as
@@ -258,12 +259,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
-    <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+    <maven-javadoc-plugin.version>3.7.0</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <maven-deploy-plugin.version>3.1.2</maven-deploy-plugin.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
-    <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
+    <maven-dependency-plugin.version>3.7.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <docker-maven-plugin.version>0.44.0</docker-maven-plugin.version>
     <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
@@ -480,6 +481,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-validator.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-posix</artifactId>
+        <version>${jnr-posix.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.github.luben</groupId>
         <artifactId>zstd-jni</artifactId>
         <version>${zstd-jni.version}</version>
@@ -631,27 +637,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jersey-core</artifactId>
         <version>${jersey.version}</version>
       </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-servlet</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-json</artifactId>
-        <version>${jersey.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>stax</groupId>
-            <artifactId>stax-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-server</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
 
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -679,11 +664,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.jolbox</groupId>
         <artifactId>bonecp</artifactId>
         <version>${bonecp.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey.contribs</groupId>
-        <artifactId>jersey-guice</artifactId>
-        <version>${jersey.version}</version>
       </dependency>
 
       <dependency>
@@ -1316,8 +1296,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
-            <source>${javac.version}</source>
-            <target>${javac.version}</target>
             <useIncrementalCompilation>false</useIncrementalCompilation>
           </configuration>
         </plugin>
@@ -1962,6 +1940,28 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </plugins>
       </build>
     </profile>
+
+    <!-- Profiles for specific JDK versions -->
+    <profile>
+      <id>java8</id>
+      <activation>
+        <jdk>[,8]</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.source>${javac.version}</maven.compiler.source>
+        <maven.compiler.target>${javac.version}</maven.compiler.target>
+      </properties>
+    </profile>
+    <profile>
+      <id>java9-or-later</id>
+      <activation>
+        <jdk>[9,]</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.release>${javac.version}</maven.compiler.release> <!-- supported since Java 9 -->
+      </properties>
+    </profile>
+
     <profile>
       <id>go-offline</id>
       <properties>

@@ -129,13 +129,6 @@ Create bucket with name
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
 
-Create bucket with layout
-    [Arguments]          ${layout}
-    ${postfix} =         Generate Ozone String
-    ${bucket} =          Set Variable    bucket-${postfix}
-    ${result} =          Execute         ozone sh bucket create --layout ${layout} s3v/${bucket}
-    [Return]             ${bucket}
-
 Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}
     Run Keyword        Generate random prefix
@@ -156,7 +149,7 @@ Setup links for S3 tests
 
 Create generated bucket
     [Arguments]          ${layout}=OBJECT_STORE
-    ${BUCKET} =          Create bucket with layout    ${layout}
+    ${BUCKET} =          Create bucket with layout    s3v    ${layout}
     Set Global Variable   ${BUCKET}
 
 Create encrypted bucket

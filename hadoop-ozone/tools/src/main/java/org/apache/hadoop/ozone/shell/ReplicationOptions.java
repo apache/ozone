@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import picocli.CommandLine;
 
 import java.util.Optional;
 
@@ -34,6 +33,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
  * Ozone Shell and Freon commands.
  */
 public abstract class ReplicationOptions {
+
+  protected static final String REPLICATION_DESCRIPTION =
+      "Replication definition. Valid values are replication"
+          + " type-specific.  For RATIS: ONE or THREE."
+          + " In case of EC, pass CODEC-DATA-PARITY-CHUNKSIZE, "
+          + " e.g. rs-3-2-1024k, rs-6-3-1024k, rs-10-4-1024k";
+  protected static final String TYPE_DESCRIPTION =
+      "Replication type. Supported types are: RATIS, EC";
 
   private ReplicationType type;
   private String replication;
@@ -71,17 +78,13 @@ public abstract class ReplicationOptions {
             .orElse(null));
   }
 
-  @CommandLine.Option(names = {"--replication", "-r"},
-      description = "Replication definition. Valid values are replication"
-          + " type-specific.  For RATIS: ONE or THREE."
-          + " In case of EC, pass CODEC-DATA-PARITY-CHUNKSIZE, "
-          + " e.g. rs-3-2-1024k, rs-6-3-1024k, rs-10-4-1024k")
-  public void setReplication(String replication) {
+  // Option is defined in subclasses
+  protected void setReplication(String replication) {
     this.replication = replication;
   }
 
   // Option is defined in subclasses
-  public void setType(String type) {
+  protected void setType(String type) {
     try {
       ReplicationType replicationType = ReplicationType.valueOf(type);
       if (replicationType == ReplicationType.CHAINED

@@ -20,6 +20,9 @@ Resource            ../commonlib.robot
 Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
+*** Variables ***
+${LIST_FILE}    ${TEMP_DIR}/datanode.list
+
 *** Keywords ***
 Assert Output
     [arguments]    ${output}    ${expected}    ${uuid}
@@ -31,57 +34,57 @@ Assert Output
 
 *** Test Cases ***
 List datanodes
-                        Execute      ozone admin datanode list > datanode.list
-    ${output} =         Get File     datanode.list
+                        Execute      ozone admin datanode list > ${LIST_FILE}
+    ${output} =         Get File     ${LIST_FILE}
                         Should contain   ${output}   Datanode:
                         Should contain   ${output}   Related pipelines:
 
 Filter list by UUID
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
     ${output} =         Execute      ozone admin datanode list --id "${uuid}"
     Assert Output       ${output}    1    ${uuid}
 
 Filter list by Ip address
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
-    ${ip} =             Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$3 }'
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
+    ${ip} =             Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$3 }'
     ${output} =         Execute      ozone admin datanode list --ip "${ip}"
     Assert Output       ${output}    1    ${uuid}
 
 Filter list by Hostname
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
-    ${hostname} =       Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
+    ${hostname} =       Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
     ${output} =         Execute      ozone admin datanode list --hostname "${hostname}"
     Assert Output       ${output}    1    ${uuid}
 
 Filter list by NodeOperationalState
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
-    ${expected} =       Execute      grep -c 'Operational State: IN_SERVICE' datanode.list
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
+    ${expected} =       Execute      grep -c 'Operational State: IN_SERVICE' ${LIST_FILE}
     ${output} =         Execute      ozone admin datanode list --operational-state IN_SERVICE
     Assert Output       ${output}    ${expected}    ${uuid}
 
 Filter list by NodeState
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
-    ${expected} =       Execute      grep -c 'Health State: HEALTHY' datanode.list
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
+    ${expected} =       Execute      grep -c 'Health State: HEALTHY' ${LIST_FILE}
     ${output} =         Execute      ozone admin datanode list --node-state HEALTHY
     Assert Output       ${output}    ${expected}    ${uuid}
 
 Get usage info by UUID
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
     ${output} =         Execute      ozone admin datanode usageinfo --uuid "${uuid}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info by Ip address
-    ${ip} =             Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$3 }'
+    ${ip} =             Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$3 }'
     ${output} =         Execute      ozone admin datanode usageinfo --address "${ip}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info by Hostname
-    ${hostname} =       Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
+    ${hostname} =       Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
     ${output} =         Execute      ozone admin datanode usageinfo --address "${hostname}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info with invalid address
-    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
+    ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
     ${output} =         Execute      ozone admin datanode usageinfo --address "${uuid}"
     Should contain      ${output}    Usage Information (0 Datanodes)
 

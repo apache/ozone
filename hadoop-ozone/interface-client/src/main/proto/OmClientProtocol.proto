@@ -1029,6 +1029,14 @@ message KeyArgs {
 
     // S3 object tags support
     repeated hadoop.hdds.KeyValue tags = 22;
+
+    // expectedDataGeneration, when used in key creation indicates that a
+    // key with the same keyName should exist with the given generation.
+    // For a key commit to succeed, the original key should still be present with the
+    // generation unchanged.
+    // This allows a key to be created an committed atomically if the original has not
+    // been modified.
+    optional uint64 expectedDataGeneration = 23;
 }
 
 message KeyLocation {
@@ -1113,6 +1121,13 @@ message KeyInfo {
     optional bool isFile = 19;
     optional string ownerName = 20;
     repeated hadoop.hdds.KeyValue tags = 21;
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+    optional uint64 expectedDataGeneration = 22;
 }
 
 message BasicKeyInfo {
