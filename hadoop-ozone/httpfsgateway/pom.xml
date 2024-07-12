@@ -194,6 +194,13 @@
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+      <plugin>
         <!-- workaround for filtered/unfiltered resources in same directory -->
         <!-- remove when maven-eclipse-plugin 2.9 is available -->
         <groupId>org.apache.maven.plugins</groupId>
