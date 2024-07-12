@@ -39,12 +39,12 @@ import picocli.CommandLine.Option;
  *
  * Example usage:
  *
- * To generate hsync load with 10 threads on a single file:
- *    ozone freon hsync-generator -t 10 --bytes-per-write=1024
+ * To generate 1000 hsync calls with 10 threads on a single file:
+ *    ozone freon hsync-generator -t 10 --bytes-per-write=1024 -n 1000
  *
- * To generate hsync load with 10 threads on 3 files simultaneously:
+ * To generate 1000 hsync calls with 10 threads on 3 files simultaneously:
  *
- *    ozone freon hsync-generator -t 10 --bytes-per-write=1024 --number-of-files=3
+ *    ozone freon hsync-generator -t 10 --bytes-per-write=1024 --number-of-files=3 -n 1000
  *
  */
 @Command(name = "hg",
@@ -116,6 +116,7 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
       for (FSDataOutputStream outputStream : outputStreams) {
         outputStream.close();
       }
+      fileSystem.close();
     }
 
     return null;

@@ -39,7 +39,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Tests Freon, with MiniOzoneCluster and validate data.
+ * Tests Freon HsyncGenerator with MiniOzoneCluster and validate data.
  */
 public class TestHsyncGenerator {
   private static MiniOzoneCluster cluster = null;
@@ -94,16 +94,10 @@ public class TestHsyncGenerator {
       OzoneVolume volume = store.getVolume(volumeName);
       volume.createBucket(bucketName);
 
-      //String rootPath = "o3fs://" + bucketName + "." + volumeName;
       String rootPath = String.format("%s://%s/%s/%s/",
           OZONE_OFS_URI_SCHEME, cluster.getConf().get(OZONE_OM_ADDRESS_KEY),
           volumeName, bucketName);
 
-      // open 10 files to write (-n)
-      // 5 parallel writer threads (-t)
-      // each writer is associated with a thread pool of 5 syncers (--syncer-per-writer)
-      // each writer writes 1kb into the file (--bytes-per-write)
-      // each file is 1MB (--file-length)
       int exitCode = cmd.execute(
           "--path", rootPath,
           "--bytes-per-write", "1024",
