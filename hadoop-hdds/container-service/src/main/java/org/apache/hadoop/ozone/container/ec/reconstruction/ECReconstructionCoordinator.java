@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.*;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
@@ -95,11 +96,12 @@ import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.en
  * -    PutBlock
  * - Close RECOVERING containers in TargetDNs
  */
-public class ECReconstructionCoordinator implements Closeable {
+public class ECReconstructionCoordinator implements Closeable, Auditor {
 
   static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinator.class);
-
+  private static final AuditLogger AUDIT =
+      new AuditLogger(AuditLoggerType.DNLOGGER);
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
   private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 5;
@@ -274,6 +276,8 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] emptyBlockStreams =
           new ECBlockOutputStream[notReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
+      Map<String, String> ecAuditLogMap = new HashMap<>();
+      ecAuditLogMap.put("blockLocationInfo", blockLocationInfo.toString());
       try {
         // Create streams and buffers for all indexes that need reconstructed
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
@@ -341,6 +345,10 @@ public class ECReconstructionCoordinator implements Closeable {
           targetStream.executePutBlock(true, true, blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream, targetStream.getCurrentPutBlkResponseFuture());
         }
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(DNAction.RECOVER_EC_BLOCK, ecAuditLogMap));
+      } catch (Exception e) {
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(DNAction.RECOVER_EC_BLOCK, ecAuditLogMap, e));
+        throw e;
       } finally {
         for (ByteBuffer buf : bufs) {
           byteBufferPool.putBuffer(buf);
@@ -606,5 +614,26 @@ public class ECReconstructionCoordinator implements Closeable {
         60, TimeUnit.SECONDS, new SynchronousQueue<>(),
         new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build(),
         new ThreadPoolExecutor.CallerRunsPolicy());
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForSuccess(
+      AuditAction op, Map<String, String> auditMap) {
+    return new AuditMessage.Builder()
+        .forOperation(op)
+        .withParams(auditMap)
+        .withResult(AuditEventStatus.SUCCESS)
+        .build();
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForFailure(
+      AuditAction op, Map<String, String> auditMap, Throwable throwable) {
+    return new AuditMessage.Builder()
+        .forOperation(op)
+        .withParams(auditMap)
+        .withResult(AuditEventStatus.FAILURE)
+        .withException(throwable)
+        .build();
   }
 }
