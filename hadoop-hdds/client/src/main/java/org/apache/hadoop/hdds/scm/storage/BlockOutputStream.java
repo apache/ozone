@@ -149,7 +149,7 @@ public class BlockOutputStream extends OutputStream {
   private final ContainerClientMetrics clientMetrics;
   private boolean allowPutBlockPiggybacking;
 
-  private volatile CompletableFuture<Void> lastFlushFuture;
+  private CompletableFuture<Void> lastFlushFuture;
 
   /**
    * Creates a new BlockOutputStream.
