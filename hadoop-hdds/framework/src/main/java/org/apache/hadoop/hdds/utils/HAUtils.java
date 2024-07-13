@@ -428,51 +428,45 @@ public final class HAUtils {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
     if (certClient != null) {
-      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        return generateCAList(certClient);
-      } else {
-        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+      //There can't be more than 1 SCM without HA enabled
+      if (scmNodes.size() > 1) {
+        // First check if cert client has ca list initialized.
+        // This is being done, when this method is called multiple times we
+        // don't make call to SCM, we return from in-memory.
+        List<String> caCertPemList = certClient.getCAList();
         int expectedCount = scmNodes.size() + 1;
-        if (scmNodes.size() > 1) {
-          // First check if cert client has ca list initialized.
-          // This is being done, when this method is called multiple times we
-          // don't make call to SCM, we return from in-memory.
-          List<String> caCertPemList = certClient.getCAList();
-          if (caCertPemList != null && caCertPemList.size() == expectedCount) {
-            return OzoneSecurityUtil.convertToX509(caCertPemList);
-          }
-          return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() ->
-                  waitForCACerts(certClient::updateCAList, expectedCount),
-              waitDuration));
-        } else {
-          return generateCAList(certClient);
+        if (caCertPemList != null && caCertPemList.size() == expectedCount) {
+          return OzoneSecurityUtil.convertToX509(caCertPemList);
         }
+        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() ->
+                waitForCACerts(certClient::updateCAList, expectedCount),
+            waitDuration));
       }
+      return generateCAList(certClient);
+    }
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
+        HddsServerUtil.getScmSecurityClient(conf);
+    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+      List<String> caCertPemList = new ArrayList<>();
+      SCMGetCertResponseProto scmGetCertResponseProto =
+          scmSecurityProtocolClient.getCACert();
+      if (scmGetCertResponseProto.hasX509Certificate()) {
+        caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
+      }
+      if (scmGetCertResponseProto.hasX509RootCACertificate()) {
+        caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
+      }
+      return OzoneSecurityUtil.convertToX509(caCertPemList);
     } else {
-      SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(conf);
-      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        List<String> caCertPemList = new ArrayList<>();
-        SCMGetCertResponseProto scmGetCertResponseProto =
-            scmSecurityProtocolClient.getCACert();
-        if (scmGetCertResponseProto.hasX509Certificate()) {
-          caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
-        }
-        if (scmGetCertResponseProto.hasX509RootCACertificate()) {
-          caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
-        }
-        return OzoneSecurityUtil.convertToX509(caCertPemList);
+      int expectedCount = scmNodes.size() + 1;
+      if (scmNodes.size() > 1) {
+        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
+            scmSecurityProtocolClient::listCACertificate,
+            expectedCount), waitDuration));
       } else {
-        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
-        int expectedCount = scmNodes.size() + 1;
-        if (scmNodes.size() > 1) {
-          return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
-              scmSecurityProtocolClient::listCACertificate,
-              expectedCount), waitDuration));
-        } else {
-          return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
-        }
+        return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
       }
     }
   }
