@@ -179,7 +179,7 @@ public abstract class XceiverClientSpi implements Closeable {
    *         servers in case of a failure
    */
   public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
-    return null;
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
