@@ -113,10 +113,10 @@ public class BlockOutputStream extends OutputStream {
   private final ExecutorService responseExecutor;
 
   // the effective length of data sent to datanodes (via writeChunk).
-  private long totalSyncedDataLength;
+  private long totalWriteChunkLength;
 
   // The effective length of data flushed to datanodes (via putBlock).
-  private long totalFlushedDataLength;
+  private long totalPutBlockLength;
 
   // effective data write attempted so far for the block
   private long writtenDataLength;
@@ -213,8 +213,8 @@ public class BlockOutputStream extends OutputStream {
 
     this.responseExecutor = blockOutputStreamResourceProvider.get();
     bufferList = null;
-    totalSyncedDataLength = 0;
-    totalFlushedDataLength = 0;
+    totalWriteChunkLength = 0;
+    totalPutBlockLength = 0;
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
@@ -268,7 +268,7 @@ public class BlockOutputStream extends OutputStream {
 
   @VisibleForTesting
   public long getTotalDataFlushedLength() {
-    return totalFlushedDataLength;
+    return totalPutBlockLength;
   }
 
   @VisibleForTesting
@@ -313,7 +313,7 @@ public class BlockOutputStream extends OutputStream {
     if (currentBufferRemaining == 0) {
       LOG.debug("WriteChunk from write(), buffer = {}", currentBuffer);
       writeChunk(currentBuffer);
-      updateSyncedLength();
+      updateWriteChunkLength();
     }
   }
 
@@ -345,14 +345,14 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  public synchronized void updateWrittenDataLength(int writeLen) {
+  protected synchronized void updateWrittenDataLength(int writeLen) {
     writtenDataLength += writeLen;
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
-        updateFlushedLength();
+        updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
         this.lastFlushFuture = watchForCommitAsync(putBlockFuture);
       }
@@ -376,12 +376,12 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void updateSyncedLength() {
-    totalSyncedDataLength = writtenDataLength;
+  private void updateWriteChunkLength() {
+    totalWriteChunkLength = writtenDataLength;
   }
 
-  private void updateFlushedLength() {
-    totalFlushedDataLength = totalSyncedDataLength;
+  private void updatePutBlockLength() {
+    totalPutBlockLength = totalWriteChunkLength;
   }
 
   /**
@@ -392,42 +392,40 @@ public class BlockOutputStream extends OutputStream {
    */
 
   // In this case, the data is already cached in the currentBuffer.
-  public void writeOnRetry(long len) throws IOException {
+  public synchronized void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Retrying write length {} for blockID {}", len, blockID);
     }
-    synchronized (this) {
-      Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
-      int count = 0;
-      List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
-      while (len > 0) {
-        ChunkBuffer buffer = allocatedBuffers.get(count);
-        long writeLen = Math.min(buffer.position(), len);
-        if (!buffer.hasRemaining()) {
-          writeChunk(buffer);
-        }
-        len -= writeLen;
-        count++;
-        writtenDataLength += writeLen;
-        // we should not call isBufferFull/shouldFlush here.
-        // The buffer might already be full as whole data is already cached in
-        // the buffer. We should just validate
-        // if we wrote data of size streamBufferMaxSize/streamBufferFlushSize to
-        // call for handling full buffer/flush buffer condition.
-        if (writtenDataLength % streamBufferArgs.getStreamBufferFlushSize() == 0) {
-          // reset the position to zero as now we will be reading the
-          // next buffer in the list
-          updateSyncedLength();
-          updateFlushedLength();
-          CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
-          lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
-        }
-        if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
-          handleFullBuffer();
-        }
+    Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
+    int count = 0;
+    List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
+    while (len > 0) {
+      ChunkBuffer buffer = allocatedBuffers.get(count);
+      long writeLen = Math.min(buffer.position(), len);
+      if (!buffer.hasRemaining()) {
+        writeChunk(buffer);
+      }
+      len -= writeLen;
+      count++;
+      writtenDataLength += writeLen;
+      // we should not call isBufferFull/shouldFlush here.
+      // The buffer might already be full as whole data is already cached in
+      // the buffer. We should just validate
+      // if we wrote data of size streamBufferMaxSize/streamBufferFlushSize to
+      // call for handling full buffer/flush buffer condition.
+      if (writtenDataLength % streamBufferArgs.getStreamBufferFlushSize() == 0) {
+        // reset the position to zero as now we will be reading the
+        // next buffer in the list
+        updateWriteChunkLength();
+        updatePutBlockLength();
+        CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
+        lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+      }
+      if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
+        handleFullBuffer();
       }
     }
   }
@@ -502,7 +500,7 @@ public class BlockOutputStream extends OutputStream {
   CompletableFuture<PutBlockResult> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
-    long flushPos = totalSyncedDataLength;
+    long flushPos = totalWriteChunkLength;
     final List<ChunkBuffer> byteBufferList;
     if (!force) {
       Preconditions.checkNotNull(bufferList);
@@ -570,7 +568,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private synchronized long unflushedLength() {
-    return writtenDataLength - totalFlushedDataLength;
+    return writtenDataLength - totalPutBlockLength;
   }
 
   private void writeChunkCommon(ChunkBuffer buffer)
@@ -623,19 +621,19 @@ public class BlockOutputStream extends OutputStream {
   private void handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
-    LOG.debug("Start flushing close={}", close);
+    LOG.debug("Start handleFlushInternal close={}", close);
     CompletableFuture<Void> toWaitFor;
     synchronized (this) {
       CompletableFuture<PutBlockResult> putBlockResultFuture = null;
       // flush the last chunk data residing on the currentBuffer
-      if (totalSyncedDataLength < writtenDataLength) {
+      if (totalWriteChunkLength < writtenDataLength) {
         Preconditions.checkArgument(currentBuffer.position() > 0);
 
         // This can be a partially filled chunk. Since we are flushing the buffer
         // here, we just limit this buffer to the current position. So that next
         // write will happen in new buffer
-        updateSyncedLength();
-        updateFlushedLength();
+        updateWriteChunkLength();
+        updatePutBlockLength();
         if (currentBuffer.hasRemaining()) {
           if (allowPutBlockPiggybacking) {
             putBlockResultFuture = writeChunkAndPutBlock(currentBuffer, close);
@@ -652,14 +650,14 @@ public class BlockOutputStream extends OutputStream {
           putBlockResultFuture = executePutBlock(close, false);
           // set lastFuture.
         }
-      } else if (totalFlushedDataLength < totalSyncedDataLength) {
+      } else if (totalPutBlockLength < totalWriteChunkLength) {
         // There're no pending written data, but there're uncommitted data.
-        updateFlushedLength();
+        updatePutBlockLength();
         putBlockResultFuture = executePutBlock(close, false);
       } else if (close) {
         // forcing an "empty" putBlock if stream is being closed without new
         // data since latest flush - we need to send the "EOF" flag
-        updateFlushedLength();
+        updatePutBlockLength();
         putBlockResultFuture = executePutBlock(true, true);
       } else {
         LOG.debug("Flushing without data");
@@ -822,7 +820,7 @@ public class BlockOutputStream extends OutputStream {
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
 
-    long flushPos = totalSyncedDataLength;
+    long flushPos = totalWriteChunkLength;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
@@ -922,7 +920,7 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug(
           "Adding index " + asyncReply.getLogIndex() + " flushLength "
               + flushPos + " numBuffers " + byteBufferList.size()
-              + " blockID " + blockID + " bufferPool size" + bufferPool
+              + " blockID " + blockID + " bufferPool size " + bufferPool
               .getSize());
     }
     // for standalone protocol, logIndex will always be 0.

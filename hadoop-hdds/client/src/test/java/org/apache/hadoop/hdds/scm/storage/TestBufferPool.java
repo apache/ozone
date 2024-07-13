@@ -72,19 +72,28 @@ class TestBufferPool {
 
     LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.LOG);
     AtomicReference<ChunkBuffer> allocated = new AtomicReference<>();
+    AtomicBoolean allocatorStarted = new AtomicBoolean();
     Thread allocator = new Thread(() -> {
       try {
+        allocatorStarted.set(true);
         allocated.set(pool.allocateBuffer(0));
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
     });
     ChunkBuffer toRelease = buffers.removeFirst();
-    Thread releaser = new Thread(() -> {
-      pool.releaseBuffer(toRelease);
-    });
+    Thread releaser = new Thread(() -> pool.releaseBuffer(toRelease));
+
     allocator.start();
-    Thread.sleep(100);
+    // ensure allocator has already started.
+    while (!allocatorStarted.get()) {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
     releaser.start();
     allocator.join();
     assertEquals(toRelease, allocated.get());
@@ -96,16 +105,29 @@ class TestBufferPool {
     assertFull(pool);
 
     LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.LOG);
+    AtomicBoolean allocatorStarted = new AtomicBoolean();
     AtomicBoolean interrupted = new AtomicBoolean(false);
     Thread allocator = new Thread(() -> {
       try {
+        allocatorStarted.set(true);
         pool.allocateBuffer(0);
       } catch (InterruptedException e) {
         interrupted.set(true);
       }
     });
+
     allocator.start();
-    Thread.sleep(100);
+    // ensure allocator has already started.
+    while (!allocatorStarted.get()) {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    // Now the allocator is stuck because pool is full and no one releases.
+    // And it can be interrupted.
     allocator.interrupt();
     allocator.join();
     assertTrue(interrupted.get());

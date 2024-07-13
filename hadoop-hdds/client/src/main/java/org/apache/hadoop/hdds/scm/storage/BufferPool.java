@@ -28,6 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
@@ -150,6 +151,7 @@ public class BufferPool {
    * Wait until one buffer is available.
    * @throws InterruptedException
    */
+  @VisibleForTesting
   public void waitUntilAvailable() throws InterruptedException {
     lock.lockInterruptibly();
     try {
