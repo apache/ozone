@@ -246,8 +246,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       if (async) {
         XceiverClientReply xceiverClientReply =
             xceiverClientSpi.sendCommandAsync(request);
-        xceiverClientSpi
-            .watchForCommit(xceiverClientReply.getLogIndex());
+        xceiverClientSpi.watchForCommit(xceiverClientReply.getLogIndex()).get();
 
       } else {
         xceiverClientSpi.sendCommand(request);
