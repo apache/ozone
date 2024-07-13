@@ -432,16 +432,6 @@ public final class HAUtils {
   public static List<X509Certificate> buildCAX509List(
       CertificateClient certClient,
       ConfigurationSource conf) throws IOException {
-    if (certClient != null) {
-      // Do this here to avoid extra conversion of X509 to pem and again to
-      // X509 by buildCAList.
-      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        List<X509Certificate> x509Certificates = new ArrayList<>();
-        x509Certificates.addAll(certClient.getAllCaCerts());
-        x509Certificates.addAll(certClient.getAllRootCaCerts());
-        return x509Certificates;
-      }
-    }
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
