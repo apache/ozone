@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -373,15 +372,9 @@ public final class HAUtils {
     return sstList;
   }
 
-  private static List<String> generateCAList(CertificateClient certClient)
-      throws IOException {
-    List<String> caCertPemList = new ArrayList<>();
-    for (X509Certificate cert : certClient.getAllRootCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
-    }
-    for (X509Certificate cert : certClient.getAllCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
-    }
+  private static List<X509Certificate> generateCAList(CertificateClient certClient) {
+    List<X509Certificate> caCertPemList = new ArrayList<>(certClient.getAllRootCaCerts());
+    caCertPemList.addAll(certClient.getAllCaCerts());
     return caCertPemList;
   }
 
@@ -437,7 +430,7 @@ public final class HAUtils {
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     if (certClient != null) {
       if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        return OzoneSecurityUtil.convertToX509(generateCAList(certClient));
+        return generateCAList(certClient);
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
         int expectedCount = scmNodes.size() + 1;
@@ -453,7 +446,7 @@ public final class HAUtils {
                   waitForCACerts(certClient::updateCAList, expectedCount),
               waitDuration));
         } else {
-          return OzoneSecurityUtil.convertToX509(generateCAList(certClient));
+          return generateCAList(certClient);
         }
       }
     } else {
