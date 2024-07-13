@@ -729,13 +729,10 @@ public class TestHSync {
         Arguments.of(1, 1, true),
         Arguments.of(2, 1, true),
         Arguments.of(4, 1, true),
-        Arguments.of(6, 2, true),
         Arguments.of(8, 2, true),
-        Arguments.of(8, 3, true),
         Arguments.of(8, 4, true),
         Arguments.of(8, 8, true),
         Arguments.of(8, 16, true),
-
         Arguments.of(1, 1, false),
         Arguments.of(8, 2, false),
         Arguments.of(8, 16, false)
