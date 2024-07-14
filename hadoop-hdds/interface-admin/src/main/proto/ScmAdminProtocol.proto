@@ -621,7 +621,7 @@ message ContainerBalancerStatusInfoResponseProto {
 message ContainerBalancerStatusInfo {
   optional uint64 startedAt = 1;
   optional ContainerBalancerConfigurationProto configuration = 2;
-  optional ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
+  repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
 }
 
 message ContainerBalancerTaskIterationStatusInfo {
