@@ -49,8 +49,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
           description = "Verbose output. Show current iteration info.")
   private boolean verbose;
 
-  @CommandLine.Option(names = {"-vh", "--verbose-with-history"},
-      description = "More verbose output. Show current and history iteration info.")
+  @CommandLine.Option(names = {"-h", "--history"},
+      description = "Verbose output with history. Show current and history iteration info. Works only with -v.")
   private boolean verboseWithHistory;
 
   @Override
@@ -63,12 +63,12 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
           LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
 
-      if (verbose || verboseWithHistory) {
+      if (verbose) {
         System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
         List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
-        if (verbose) {
+        if (!verboseWithHistory) {
           System.out.println("Current iteration info:");
           System.out.println(
               getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))

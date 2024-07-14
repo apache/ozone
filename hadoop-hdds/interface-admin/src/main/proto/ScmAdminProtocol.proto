@@ -615,31 +615,31 @@ message ContainerBalancerStatusInfoRequestProto {
 }
 
 message ContainerBalancerStatusInfoResponseProto {
-  required bool isRunning = 1;
+  optional bool isRunning = 1;
   optional ContainerBalancerStatusInfo containerBalancerStatusInfo = 2;
 }
 message ContainerBalancerStatusInfo {
-  required uint64 startedAt = 1;
-  required ContainerBalancerConfigurationProto configuration = 2;
-  repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
+  optional uint64 startedAt = 1;
+  optional ContainerBalancerConfigurationProto configuration = 2;
+  optional ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
 }
 
 message ContainerBalancerTaskIterationStatusInfo {
-    required int32 iterationNumber = 1;
-    optional string iterationResult = 2;
-    required int64 sizeScheduledForMove = 3;
-    required int64 dataSizeMovedGB = 4;
-    required int64 containerMovesScheduled = 5;
-    required int64 containerMovesCompleted = 6;
-    required int64 containerMovesFailed = 7;
-    required int64 containerMovesTimeout = 8;
-    repeated NodeTransferInfo sizeEnteringNodes = 9;
-    repeated NodeTransferInfo sizeLeavingNodes = 10;
+  optional int32 iterationNumber = 1;
+  optional string iterationResult = 2;
+  optional int64 sizeScheduledForMove = 3;
+  optional int64 dataSizeMovedGB = 4;
+  optional int64 containerMovesScheduled = 5;
+  optional int64 containerMovesCompleted = 6;
+  optional int64 containerMovesFailed = 7;
+  optional int64 containerMovesTimeout = 8;
+  repeated NodeTransferInfo sizeEnteringNodes = 9;
+  repeated NodeTransferInfo sizeLeavingNodes = 10;
 }
 
 message NodeTransferInfo {
- required string uuid = 1;
- required int64 dataVolume = 2;
+  optional string uuid = 1;
+  optional int64 dataVolume = 2;
 }
 
 message DecommissionScmRequestProto {
