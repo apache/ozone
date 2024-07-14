@@ -71,8 +71,7 @@ Run Container Balancer
                             Should Contain                  ${verboseStatusResult}             Iteration number                                   1
                             Should Contain                  ${verboseStatusResult}             Iteration result                                   IN_PROGRESS
                             Should Contain                  ${verboseStatusResult}             Scheduled to move containers                       3
-    ${statusHistoryResult} =
-                            Execute                         ozone admin containerbalancer status -v -h
+    ${statusHistoryResult} =    Execute                         ozone admin containerbalancer status -v -h
                             Should Contain                  ${statusHistoryResult}             ContainerBalancer is Running.
                             Should Contain                  ${statusHistoryResult}             Started at:
                             Should Contain                  ${statusHistoryResult}             Container Balancer Configuration values:
