@@ -377,10 +377,12 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void updateWriteChunkLength() {
+    Preconditions.checkState(Thread.holdsLock(this));
     totalWriteChunkLength = writtenDataLength;
   }
 
   private void updatePutBlockLength() {
+    Preconditions.checkState(Thread.holdsLock(this));
     totalPutBlockLength = totalWriteChunkLength;
   }
 
