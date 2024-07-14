@@ -513,8 +513,8 @@ public class BlockOutputStream extends OutputStream {
       byteBufferList = null;
     }
 
-    CompletableFuture<ContainerCommandResponseProto> flushFuture = null;
-    XceiverClientReply asyncReply;
+    final CompletableFuture<ContainerCommandResponseProto> flushFuture;
+    final XceiverClientReply asyncReply;
     try {
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {}", blockData);
@@ -624,52 +624,7 @@ public class BlockOutputStream extends OutputStream {
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     LOG.debug("Start handleFlushInternal close={}", close);
-    CompletableFuture<Void> toWaitFor;
-    synchronized (this) {
-      CompletableFuture<PutBlockResult> putBlockResultFuture = null;
-      // flush the last chunk data residing on the currentBuffer
-      if (totalWriteChunkLength < writtenDataLength) {
-        Preconditions.checkArgument(currentBuffer.position() > 0);
-
-        // This can be a partially filled chunk. Since we are flushing the buffer
-        // here, we just limit this buffer to the current position. So that next
-        // write will happen in new buffer
-        updateWriteChunkLength();
-        updatePutBlockLength();
-        if (currentBuffer.hasRemaining()) {
-          if (allowPutBlockPiggybacking) {
-            putBlockResultFuture = writeChunkAndPutBlock(currentBuffer, close);
-          } else {
-            writeChunk(currentBuffer);
-            putBlockResultFuture = executePutBlock(close, false);
-          }
-          if (!close) {
-            // reset current buffer.
-            currentBuffer = null;
-            currentBufferRemaining = 0;
-          }
-        } else {
-          putBlockResultFuture = executePutBlock(close, false);
-          // set lastFuture.
-        }
-      } else if (totalPutBlockLength < totalWriteChunkLength) {
-        // There're no pending written data, but there're uncommitted data.
-        updatePutBlockLength();
-        putBlockResultFuture = executePutBlock(close, false);
-      } else if (close) {
-        // forcing an "empty" putBlock if stream is being closed without new
-        // data since latest flush - we need to send the "EOF" flag
-        updatePutBlockLength();
-        putBlockResultFuture = executePutBlock(true, true);
-      } else {
-        LOG.debug("Flushing without data");
-      }
-
-      if (putBlockResultFuture != null) {
-        this.lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
-      }
-      toWaitFor = this.lastFlushFuture;
-    } // End of synchronized block.
+    CompletableFuture<Void> toWaitFor = handleFlushInternalSynchronized(close);
 
     if (toWaitFor != null) {
       LOG.debug("Waiting for flush");
@@ -682,8 +637,52 @@ public class BlockOutputStream extends OutputStream {
           throw ex;
         }
       }
+      LOG.debug("Flush done.");
     }
-    LOG.debug("Flush done.");
+  }
+
+  private synchronized CompletableFuture<Void> handleFlushInternalSynchronized(boolean close) throws IOException {
+    CompletableFuture<PutBlockResult> putBlockResultFuture = null;
+    // flush the last chunk data residing on the currentBuffer
+    if (totalWriteChunkLength < writtenDataLength) {
+      Preconditions.checkArgument(currentBuffer.position() > 0);
+
+      // This can be a partially filled chunk. Since we are flushing the buffer
+      // here, we just limit this buffer to the current position. So that next
+      // write will happen in new buffer
+      updateWriteChunkLength();
+      updatePutBlockLength();
+      if (currentBuffer.hasRemaining()) {
+        if (allowPutBlockPiggybacking) {
+          putBlockResultFuture = writeChunkAndPutBlock(currentBuffer, close);
+        } else {
+          writeChunk(currentBuffer);
+          putBlockResultFuture = executePutBlock(close, false);
+        }
+        if (!close) {
+          // reset current buffer so that thenext write will allocate a new one..
+          currentBuffer = null;
+          currentBufferRemaining = 0;
+        }
+      } else {
+        putBlockResultFuture = executePutBlock(close, false);
+        // set lastFuture.
+      }
+    } else if (totalPutBlockLength < totalWriteChunkLength) {
+      // There're no pending written data, but there're uncommitted data.
+      updatePutBlockLength();
+      putBlockResultFuture = executePutBlock(close, false);
+    } else if (close) {
+      // forcing an "empty" putBlock if stream is being closed without new
+      // data since latest flush - we need to send the "EOF" flag
+      updatePutBlockLength();
+      putBlockResultFuture = executePutBlock(true, true);
+    } else {
+      LOG.debug("Flushing without data");
+      return null;
+    }
+    lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+    return lastFlushFuture;
   }
 
   private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
@@ -1118,7 +1117,7 @@ public class BlockOutputStream extends OutputStream {
     throw getIoException();
   }
 
-  protected CompletableFuture<Void> getLastFlushFuture() {
+  protected synchronized CompletableFuture<Void> getLastFlushFuture() {
     return lastFlushFuture;
   }
 
