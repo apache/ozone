@@ -207,7 +207,7 @@ class TestBufferPool {
   }
 
   private static void assertRelease(BufferPool pool, Deque<ChunkBuffer> buffers) {
-    // assert that allcated buffers can be released in any order.
+    // assert that allocated buffers can be released in any order.
     final int capacity = pool.getCapacity();
     boolean pickFirst = false;
     for (int i = capacity - 1; i >= 0; i--) {

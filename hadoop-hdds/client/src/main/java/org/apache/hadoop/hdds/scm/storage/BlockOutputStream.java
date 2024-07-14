@@ -660,7 +660,7 @@ public class BlockOutputStream extends OutputStream {
           putBlockResultFuture = executePutBlock(close, false);
         }
         if (!close) {
-          // reset current buffer so that thenext write will allocate a new one..
+          // reset current buffer so that the next write will allocate a new one.
           currentBuffer = null;
           currentBufferRemaining = 0;
         }
