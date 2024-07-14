@@ -679,9 +679,10 @@ public class BlockOutputStream extends OutputStream {
       putBlockResultFuture = executePutBlock(true, true);
     } else {
       LOG.debug("Flushing without data");
-      return null;
     }
-    lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+    if (putBlockResultFuture != null) {
+      this.lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+    }
     return lastFlushFuture;
   }
 
