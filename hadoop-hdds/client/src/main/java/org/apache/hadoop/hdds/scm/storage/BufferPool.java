@@ -20,11 +20,8 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -55,7 +52,7 @@ public class BufferPool {
   private final int capacity;
   private final Function<ByteBuffer, ByteString> byteStringConversion;
 
-  private final Set<ChunkBuffer> allocated = Collections.newSetFromMap(new IdentityHashMap<>());
+  private final LinkedList<ChunkBuffer> allocated = new LinkedList<>();
   private final LinkedList<ChunkBuffer> released = new LinkedList<>();
   private ChunkBuffer currentBuffer = null;
   private final Lock lock = new ReentrantLock();
@@ -118,7 +115,7 @@ public class BufferPool {
     LOG.debug("Releasing buffer {}", buffer);
     lock.lock();
     try {
-      Preconditions.assertTrue(allocated.remove(buffer), "Releasing unknown buffer");
+      Preconditions.assertTrue(removeByIdentity(allocated, buffer), "Releasing unknown buffer");
       buffer.clear();
       released.add(buffer);
       if (buffer == currentBuffer) {
@@ -128,6 +125,26 @@ public class BufferPool {
     } finally {
       lock.unlock();
     }
+  }
+
+  /**
+   * Remove an item from a list by identity.
+   * @return true if the item is found and removed from the list, otherwise false.
+   */
+  private static <T> boolean removeByIdentity(List<T> list, T toRemove) {
+    int i = 0;
+    for (T item : list) {
+      if (item == toRemove) {
+        break;
+      } else {
+        i++;
+      }
+    }
+    if (i < list.size()) {
+      list.remove(i);
+      return true;
+    }
+    return false;
   }
 
   /**
