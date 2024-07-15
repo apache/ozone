@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -44,6 +45,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -153,7 +155,7 @@ public class TestHSync {
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
   private static final int CHUNK_SIZE = 4 << 12;
-  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int FLUSH_SIZE = 3 * CHUNK_SIZE;
   private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
   private static final int SERVICE_INTERVAL = 100;
@@ -208,6 +210,8 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+
+    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
 
     openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
@@ -627,45 +631,58 @@ public class TestHSync {
     out.writeAndHsync(data);
 
     final byte[] buffer = new byte[4 << 10];
-    int offset = 0;
-    try (FSDataInputStream in = fs.open(file)) {
-      final long skipped = in.skip(length);
-      assertEquals(length, skipped);
+    AtomicInteger attempted = new AtomicInteger();
 
-      for (; ;) {
-        final int n = in.read(buffer, 0, buffer.length);
-        if (n <= 0) {
-          break;
+    // hsync returns when all datanodes acknowledge they have received the PutBlock request. Yet, the PutBlock
+    // may not been applied to their database. So, an immediate read right after hsync may not see the synced data
+    // yet. This does not violate hsync guarantee: it ensures all current pending data becomes persistent.
+    GenericTestUtils.waitFor(() -> {
+      attempted.addAndGet(1);
+      int offset = 0;
+      try (FSDataInputStream in = fs.open(file)) {
+        final long skipped = in.skip(length);
+        assertEquals(length, skipped);
+
+        for (; ;) {
+          final int n = in.read(buffer, 0, buffer.length);
+          if (n <= 0) {
+            break;
+          }
+          for (int i = 0; i < n; i++) {
+            assertEquals(data[offset + i], buffer[i], "expected at offset " + offset + " i=" + i);
+          }
+          offset += n;
         }
-        for (int i = 0; i < n; i++) {
-          assertEquals(data[offset + i], buffer[i],
-              "expected at offset " + offset + " i=" + i);
+        if (offset != data.length) {
+          LOG.error("Read attempt #{} failed. offset {}, expected data.length {}", attempted, offset, data.length);
+          return false;
+        } else {
+          LOG.debug("Read attempt #{} succeeded. offset {}, expected data.length {}", attempted, offset, data.length);
+          return true;
         }
-        offset += n;
+      } catch (IOException e) {
+        LOG.error("Exception is thrown during read", e);
+        return false;
       }
-    }
-    assertEquals(data.length, offset);
+    }, 500, 3000);
   }
 
-  private void runConcurrentWriteHSync(Path file,
-      final FSDataOutputStream out, int initialDataSize)
-      throws InterruptedException, IOException {
-    final byte[] data = new byte[initialDataSize];
-    ThreadLocalRandom.current().nextBytes(data);
+  private int runConcurrentWriteHSync(Path file,
+      final FSDataOutputStream out, byte[] data, int syncThreadsCount) throws Exception {
 
-    AtomicReference<IOException> writerException = new AtomicReference<>();
-    AtomicReference<IOException> syncerException = new AtomicReference<>();
+    AtomicReference<Exception> writerException = new AtomicReference<>();
+    AtomicReference<Exception> syncerException = new AtomicReference<>();
 
-    LOG.info("runConcurrentWriteHSync {} with size {}",
-        file, initialDataSize);
-
+    LOG.info("runConcurrentWriteHSync {} with size {}", file, data.length);
+    AtomicInteger writes = new AtomicInteger();
     final long start = Time.monotonicNow();
     // two threads: write and hsync
     Runnable writer = () -> {
       while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.write(data);
-        } catch (IOException e) {
+          writes.incrementAndGet();
+        } catch (Exception e) {
           writerException.set(e);
           throw new RuntimeException(e);
         }
@@ -676,7 +693,7 @@ public class TestHSync {
       while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.hsync();
-        } catch (IOException e) {
+        } catch (Exception e) {
           syncerException.set(e);
           throw new RuntimeException(e);
         }
@@ -684,11 +701,19 @@ public class TestHSync {
     };
 
     Thread writerThread = new Thread(writer);
+    writerThread.setName("Writer");
     writerThread.start();
-    Thread syncThread = new Thread(syncer);
-    syncThread.start();
+    Thread[] syncThreads = new Thread[syncThreadsCount];
+    for (int i = 0; i < syncThreadsCount; i++) {
+      syncThreads[i] = new Thread(syncer);
+      syncThreads[i].setName("Syncer-" + i);
+      syncThreads[i].start();
+    }
+
     writerThread.join();
-    syncThread.join();
+    for (Thread sync : syncThreads) {
+      sync.join();
+    }
 
     if (writerException.get() != null) {
       throw writerException.get();
@@ -696,29 +721,54 @@ public class TestHSync {
     if (syncerException.get() != null) {
       throw syncerException.get();
     }
+    return writes.get();
   }
 
-  @Test
-  public void testConcurrentWriteHSync()
-      throws IOException, InterruptedException {
-    final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+  public static Stream<Arguments> concurrentWriteHSync() {
+    return Stream.of(
+        Arguments.of(1, 1, true),
+        Arguments.of(2, 1, true),
+        Arguments.of(8, 2, true),
+        Arguments.of(8, 8, true),
+        Arguments.of(8, 16, true),
+        Arguments.of(1, 1, false),
+        Arguments.of(8, 2, false),
+        Arguments.of(8, 16, false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("concurrentWriteHSync")
+  public void testConcurrentWriteHSync(int writeSampleSize, int syncThreadsCount,
+      boolean piggybackingEnabled) throws Exception {
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.setBoolean("ozone.client.stream.putblock.piggybacking", piggybackingEnabled);
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
-    final String dir = OZONE_ROOT + bucket.getVolumeName()
-        + OZONE_URI_DELIMITER + bucket.getName();
+    final String dir = OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 5; i++) {
-        final Path file = new Path(dir, "file" + i);
-        try (FSDataOutputStream out =
-            fs.create(file, true)) {
-          int initialDataSize = 1 << i;
-          runConcurrentWriteHSync(file, out, initialDataSize);
-        }
-
-        fs.delete(file, false);
+      final Path file = new Path(dir, "file" + writeSampleSize);
+      byte[] data = new byte[writeSampleSize];
+      ThreadLocalRandom.current().nextBytes(data);
+      int writes;
+      try (FSDataOutputStream out = fs.create(file, true)) {
+        writes = runConcurrentWriteHSync(file, out, data, syncThreadsCount);
       }
+      validateWrittenFile(file, fs, data, writes);
+      fs.delete(file, false);
+    }
+  }
+
+  private void validateWrittenFile(Path file, FileSystem fs, byte[] expected, int times) throws IOException {
+    try (FSDataInputStream is = fs.open(file)) {
+      byte[] actual = new byte[expected.length];
+      for (int i = 0; i < times; i++) {
+        assertEquals(expected.length, is.read(actual));
+        assertArrayEquals(expected, actual);
+      }
+      // ensure nothing more can be read.
+      assertEquals(-1, is.read(expected));
     }
   }
 

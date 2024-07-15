@@ -90,7 +90,7 @@ public class KeyOutputStream extends OutputStream
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -195,7 +195,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -208,8 +208,10 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    synchronized (this) {
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -361,7 +363,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  private void markStreamClosed() {
+  private synchronized void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
   }
@@ -435,7 +437,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -446,7 +448,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -460,11 +462,12 @@ public class KeyOutputStream extends OutputStream
 
     handleFlushOrClose(StreamAction.HSYNC);
 
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-
-    MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
-        () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
+    synchronized (this) {
+      Preconditions.checkState(offset >= hsyncPos,
+          "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
+          () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
+    }
   }
 
   /**
@@ -729,7 +732,7 @@ public class KeyOutputStream extends OutputStream
    * the last state of the volatile {@link #closed} field.
    * @throws IOException if the connection is closed.
    */
-  private void checkNotClosed() throws IOException {
+  private synchronized void checkNotClosed() throws IOException {
     if (closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "

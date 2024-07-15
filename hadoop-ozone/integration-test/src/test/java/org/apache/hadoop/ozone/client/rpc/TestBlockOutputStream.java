@@ -235,7 +235,6 @@ class TestBlockOutputStream {
       // in the buffer, with only one buffer being allocated in the buffer pool
 
       assertEquals(1, bufferPool.getSize());
-      assertEquals(0, bufferPool.getBuffer(0).position());
       assertEquals(totalWriteLength, blockOutputStream.getWrittenDataLength());
       assertEquals(totalWriteLength,
           blockOutputStream.getTotalDataFlushedLength());
@@ -587,20 +586,23 @@ class TestBlockOutputStream {
       byte[] data1 = RandomUtils.nextBytes(dataLength);
       key.write(data1);
 
-      // since its hitting the full bufferCondition, it will call watchForCommit
-      // and completes atleast putBlock for first flushSize worth of data
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      RatisBlockOutputStream blockOutputStream =
+          assertInstanceOf(RatisBlockOutputStream.class,
+              keyOutputStream.getStreamEntries().get(0).getOutputStream());
+      BufferPool bufferPool = blockOutputStream.getBufferPool();
+      // since it's hitting the full bufferCondition, it will call watchForCommit
+      // however, the outputstream will not wait for watchForCommit, but the next call to
+      // write() will need to wait for at least one watchForCommit, indirectly when asking for new buffer allocation.
+      bufferPool.waitUntilAvailable();
+
       assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
           .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
       assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
           .isLessThanOrEqualTo(pendingPutBlockCount + 1);
-      KeyOutputStream keyOutputStream =
-          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
 
       assertEquals(1, keyOutputStream.getStreamEntries().size());
-      RatisBlockOutputStream blockOutputStream =
-          assertInstanceOf(RatisBlockOutputStream.class,
-              keyOutputStream.getStreamEntries().get(0).getOutputStream());
-
 
       assertEquals(4, blockOutputStream.getBufferPool().getSize());
       // writtenDataLength as well flushedDataLength will be updated here
