@@ -325,7 +325,8 @@ public class BlockOutputStream extends OutputStream {
     }
     if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
         || ((off + len) < 0)) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException("Offset=" + off + " and len="
+          + len + " don't match the array length of " + b.length);
     }
     if (len == 0) {
       return;
