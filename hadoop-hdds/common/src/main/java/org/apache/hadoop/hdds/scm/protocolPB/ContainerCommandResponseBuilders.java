@@ -335,6 +335,17 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getReadContainerMerkleTreeResponse(
+      ContainerCommandRequestProto request, byte[] checksumBytes) {
+
+    ContainerProtos.ReadContainerMerkleTreeResponseProto.Builder containerMerkleTree =
+        ContainerProtos.ReadContainerMerkleTreeResponseProto.newBuilder()
+            .setContainerID(request.getContainerID())
+            .setContainerMerkleTree(ByteString.copyFrom(checksumBytes));
+    return getSuccessResponseBuilder(request)
+        .setReadContainerMerkleTree(containerMerkleTree).build();
+  }
+
   private ContainerCommandResponseBuilders() {
     throw new UnsupportedOperationException("no instances");
   }

@@ -71,7 +71,7 @@ public class TestHandler {
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
               containerSet, volumeSet, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
+              TestHddsDispatcher.NO_OP_ICR_SENDER, null));
     }
     this.dispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, null, metrics, null);

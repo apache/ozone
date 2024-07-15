@@ -809,8 +809,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+            metrics, c -> { }, null);
     // set timeout value as 1ns to trigger timeout behavior
     long timeout  = 1;
     OzoneContainer ozoneContainer =

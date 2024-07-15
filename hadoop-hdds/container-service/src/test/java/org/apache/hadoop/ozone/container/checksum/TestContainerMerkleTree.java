@@ -38,7 +38,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TestContainerMerkleTree {
+/**
+ * Class to test Container Merkle Tree.
+ */
+public class TestContainerMerkleTree {
   private static final long CHUNK_SIZE = (long) new OzoneConfiguration().getStorageSize(
       ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
   private static final int BYTES_PER_CHECKSUM = new OzoneClientConfig().getBytesPerChecksum();

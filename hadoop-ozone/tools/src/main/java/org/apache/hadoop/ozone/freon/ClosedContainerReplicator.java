@@ -192,8 +192,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               containerSet,
               volumeSet,
               metrics,
-              containerReplicaProto -> {
-              });
+              containerReplicaProto -> { },
+              null);
       handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);
     }

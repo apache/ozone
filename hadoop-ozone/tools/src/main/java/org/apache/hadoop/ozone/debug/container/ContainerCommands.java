@@ -150,8 +150,8 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
               containerSet,
               volumeSet,
               metrics,
-              containerReplicaProto -> {
-              });
+              containerReplicaProto -> { },
+              null);
       handler.setClusterID(clusterId);
       handlers.put(containerType, handler);
     }

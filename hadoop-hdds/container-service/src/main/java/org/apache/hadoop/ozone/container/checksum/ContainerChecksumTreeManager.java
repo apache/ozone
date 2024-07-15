@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.SortedSet;
@@ -154,6 +156,28 @@ public class ContainerChecksumTreeManager {
       checksumInfo.writeTo(outStream);
     } finally {
       writeLock.unlock();
+    }
+  }
+
+  public byte[] readChecksumFileAsBytes(KeyValueContainerData data)  {
+    long containerID = data.getContainerID();
+    Lock readLock = getReadLock(containerID);
+    readLock.lock();
+    try {
+      File checksumFile = getContainerChecksumFile(data);
+
+      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+        return IOUtils.toByteArray(inStream);
+      } catch (FileNotFoundException ex) {
+        LOG.info("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
+            containerID, checksumFile, ex);
+      } catch (IOException ex) {
+        LOG.info("Error occured when reading checksum file for container {} at the path {}. " +
+                "Returning an empty instance.", containerID, checksumFile, ex);
+      }
+      return null;
+    } finally {
+      readLock.unlock();
     }
   }
 

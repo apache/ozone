@@ -723,6 +723,34 @@ public final class ContainerProtocolCalls  {
     return response.getEcho();
   }
 
+  public static ContainerProtos.ReadContainerMerkleTreeResponseProto readContainerMerkleTree(
+      XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
+    ContainerProtos.ReadContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
+        ContainerProtos.ReadContainerMerkleTreeRequestProto
+            .newBuilder()
+            .setContainerID(containerID)
+            .build();
+    String id = client.getPipeline().getClosestNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(Type.ReadContainerMerkleTree)
+        .setContainerID(containerID)
+        .setDatanodeUuid(id)
+        .setReadContainerMerkleTree(containerMerkleTreeRequestProto);
+    if (encodedContainerID != null) {
+      builder.setEncodedToken(encodedContainerID);
+    }
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        client.sendCommand(request, getValidatorList());
+    return response.getReadContainerMerkleTree();
+  }
+
   /**
    * Validates a response from a container protocol call.  Any non-successful
    * return code is mapped to a corresponding exception and thrown.
