@@ -74,14 +74,14 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
   private String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--depth"},
-      description = "The level till which the value-schema should be shown (1-10 are the values allowed)",
+      description = "The level till which the value-schema should be shown. Values in the range [0-10] are allowed)",
       defaultValue = "10")
   private int depth;
 
   @Override
   public Void call() throws Exception {
-    if (depth < 1 || depth > 10) {
-      throw new IOException("depth should be specified in the range [1, 10]");
+    if (depth < 0 || depth > 10) {
+      throw new IOException("depth should be specified in the range [0, 10]");
     }
 
     boolean success = true;
