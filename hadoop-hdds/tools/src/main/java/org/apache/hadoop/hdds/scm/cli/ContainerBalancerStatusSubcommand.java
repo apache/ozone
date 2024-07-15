@@ -50,7 +50,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   private boolean verbose;
 
   @CommandLine.Option(names = {"-h", "--history"},
-      description = "Verbose output with history. Show current and history iteration info. Works only with -v.")
+      description = "Verbose output with history. Show current iteration info and history of iterations. " +
+          "Works only with -v.")
   private boolean verboseWithHistory;
 
   @Override
