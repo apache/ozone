@@ -74,8 +74,6 @@ public class TestContainerCommandReconciliation {
   private static ObjectStore store;
   private static OzoneConfiguration conf;
   private static File testDir;
-  private static OzoneBucket bucket;
-  private static OzoneVolume volume;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -113,9 +111,9 @@ public class TestContainerCommandReconciliation {
     final String keyName = UUID.randomUUID().toString();
     byte[] data = "Test content".getBytes(UTF_8);
     store.createVolume(volumeName);
-    volume = store.getVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
-    bucket = volume.getBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
     // Write Key
     try (OzoneOutputStream os = bucket.createKey(keyName, data.length)) {
       IOUtils.write(data, os);
@@ -170,7 +168,7 @@ public class TestContainerCommandReconciliation {
           .getContainerInfo(container.getContainerID());
       return containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED;
     } catch (IOException e) {
-      LOG.error("Container is in state :" + containerInfo.getState());
+      LOG.error("Error when getting the container info", e);
     }
     return false;
   }
