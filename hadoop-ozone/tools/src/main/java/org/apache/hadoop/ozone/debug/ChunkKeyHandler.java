@@ -111,7 +111,7 @@ public class ChunkKeyHandler extends KeyHandler implements
             keyPipeline.getReplicationConfig().getReplicationType() ==
                 HddsProtos.ReplicationType.EC;
         Pipeline pipeline;
-        if (keyPipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
+        if (!isECKey && keyPipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
           pipeline = Pipeline.newBuilder(keyPipeline)
               .setReplicationConfig(StandaloneReplicationConfig
                   .getInstance(ONE)).build();
