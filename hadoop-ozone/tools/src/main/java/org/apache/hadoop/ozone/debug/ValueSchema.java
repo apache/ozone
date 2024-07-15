@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -73,12 +74,15 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
   private String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--depth"},
-      description = "The level till which the value-schema should be shown, negative value shows full depth schema",
-      defaultValue = "-1")
+      description = "The level till which the value-schema should be shown (1-10 are the values allowed)",
+      defaultValue = "10")
   private int depth;
 
   @Override
   public Void call() throws Exception {
+    if (depth < 1 || depth > 10) {
+      throw new IOException("depth should be specified in the range [1, 10]");
+    }
 
     boolean success = true;
 
@@ -145,6 +149,8 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
   }
 
   private List<Field> getAllFields(Class clazz) {
+    // NOTE: Schema of interface type, like ReplicationConfig, cannot be fetched.
+    //       An empty list "[]" will be shown for such types of fields.
     if (clazz == null) {
       return Collections.emptyList();
     }
