@@ -31,6 +31,17 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import java.util.Set;
 
+/**
+ * This class is an annotation processor that is hooked into the java compiler
+ * and is used to validate the RegisterValidator annotations in the
+ * codebase, to ensure that the annotated classes have the proper methods returning appropriate object types.
+ *
+ * The module is compiled in a different execution via Maven before anything
+ * else is compiled, and then javac picks this class up as an annotation
+ * processor from the classpath via a ServiceLoader, based on the
+ * META-INF/services/javax.annotation.processing.Processor file in the module's
+ * resources folder.
+ */
 @SupportedAnnotationTypes("org.apache.hadoop.ozone.om.request.validation.RegisterValidator")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class RegisterValidatorProcessor extends AbstractProcessor {

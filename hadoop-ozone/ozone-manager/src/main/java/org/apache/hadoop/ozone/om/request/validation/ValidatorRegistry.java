@@ -88,8 +88,8 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
         new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(""))
             .setScanners(Scanners.TypesAnnotated)
             .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream()
-            .filter(annotationClass ->
-                getReturnTypeOfAnnotationMethod((Class<? extends Annotation>) annotationClass, RegisterValidator.REQUEST_TYPE_METHOD_NAME)
+            .filter(annotationClass -> getReturnTypeOfAnnotationMethod((Class<? extends Annotation>) annotationClass,
+                RegisterValidator.REQUEST_TYPE_METHOD_NAME)
                 .equals(requestType))
             .filter(annotationClass -> allowedVersionTypes.contains(getReturnTypeOfAnnotationMethod(
                 (Class<? extends Annotation>) annotationClass,
@@ -243,11 +243,11 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     return from.computeIfAbsent(key, k -> defaultSupplier.get());
   }
 
-  class IndexedItems<T, IDX extends Comparable<IDX>> {
+  static final class IndexedItems<T, IDX extends Comparable<IDX>> {
     private final List<T> items;
     private final TreeMap<IDX, Integer> indexMap;
 
-    public IndexedItems() {
+    private IndexedItems() {
       this.items = new ArrayList<>();
       this.indexMap = new TreeMap<>();
     }
@@ -271,7 +271,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     public List<T> getItemsGreaterThanIdx(IDX indexValue) {
       return Optional.ofNullable(indexMap.higherEntry(indexValue))
           .map(Map.Entry::getValue)
-          .map(startIndex -> items.subList(startIndex , items.size())).orElse(Collections.emptyList());
+          .map(startIndex -> items.subList(startIndex, items.size())).orElse(Collections.emptyList());
     }
 
   }

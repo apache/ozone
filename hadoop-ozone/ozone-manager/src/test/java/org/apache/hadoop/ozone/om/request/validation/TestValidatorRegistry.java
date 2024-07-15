@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.common.collect.Sets;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Version;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.AfterEach;
@@ -38,10 +37,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.VersionExtractor.LAYOUT_VERSION_EXTRACTOR;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
@@ -108,7 +105,8 @@ public class TestValidatorRegistry {
 
   @Test
   public void testRegistryHasThePreFinalizePostProcessCreateKeyValidator() {
-    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
+    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
+        new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
         Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators = registry.validationsFor(CreateKey, POST_PROCESS,
@@ -121,7 +119,8 @@ public class TestValidatorRegistry {
 
   @Test
   public void testRegistryHasTheOldClientPreProcessCreateKeyValidator() {
-    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
+    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
+        new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
         Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators =
@@ -136,7 +135,8 @@ public class TestValidatorRegistry {
 
   @Test
   public void testRegistryHasTheOldClientPostProcessCreateKeyValidator() {
-    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
+    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
+        new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
         Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators = registry.validationsFor(CreateKey, POST_PROCESS,
@@ -151,7 +151,8 @@ public class TestValidatorRegistry {
 
   @Test
   public void testRegistryHasTheMultiPurposePreProcessCreateVolumeValidator() {
-    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
+    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
+        new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
         Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> preFinalizeValidators =

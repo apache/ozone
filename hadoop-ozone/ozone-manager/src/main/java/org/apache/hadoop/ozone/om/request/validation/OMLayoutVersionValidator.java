@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 

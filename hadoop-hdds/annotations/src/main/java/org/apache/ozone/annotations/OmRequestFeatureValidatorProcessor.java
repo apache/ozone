@@ -16,7 +16,6 @@
  */
 package org.apache.ozone.annotations;
 
-import jdk.nashorn.internal.ir.annotations.Immutable;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -38,7 +37,6 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.tools.Diagnostic;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;

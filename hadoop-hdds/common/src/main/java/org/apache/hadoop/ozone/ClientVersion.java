@@ -59,7 +59,7 @@ public enum ClientVersion implements ComponentVersion {
           .collect(toMap(ClientVersion::toProtoValue, identity()));
 
   private final int version;
-  public final String description;
+  private final String description;
 
   ClientVersion(int version, String description) {
     this.version = version;
