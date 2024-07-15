@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.shell;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,6 +48,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -86,7 +90,7 @@ public class TestOzoneDebugShell {
   protected static void startCluster() throws Exception {
     // Init HA cluster
     omServiceId = "om-service-test1";
-    final int numDNs = 3;
+    final int numDNs = 5;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDNs)
         .build();
@@ -112,13 +116,14 @@ public class TestOzoneDebugShell {
     startCluster();
   }
 
-  @Test
-  public void testChunkInfoCmdBeforeAfterCloseContainer() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, isEcKey);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
@@ -134,7 +139,7 @@ public class TestOzoneDebugShell {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, false);
     int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
   }
@@ -150,7 +155,7 @@ public class TestOzoneDebugShell {
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, false);
 
     String snapshotName =
         client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
@@ -176,15 +181,22 @@ public class TestOzoneDebugShell {
         OM_DB_NAME + checkPointDir;
   }
 
-
   private static void writeKey(String volumeName, String bucketName,
-      String keyName) throws IOException {
+      String keyName, boolean isEcKey) throws IOException {
+    ReplicationConfig repConfig;
+    if (isEcKey) {
+      repConfig = new ECReplicationConfig(3, 2);
+    } else {
+      repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+          ReplicationFactor.THREE);
+    }
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       // see HDDS-10091 for making this work with FILE_SYSTEM_OPTIMIZED layout
-      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
-          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");
+          keyName, repConfig, "test");
     }
   }
 

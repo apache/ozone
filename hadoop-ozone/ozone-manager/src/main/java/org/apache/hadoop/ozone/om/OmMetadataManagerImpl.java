@@ -37,7 +37,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -297,11 +296,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
-  // Table-level locks that protects table read/write access. Note:
-  // Don't use this lock for tables other than deletedTable and deletedDirTable.
-  // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
-  private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
-
   private OzoneManager ozoneManager;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
@@ -433,11 +427,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw e;
     }
     perfMetrics = null;
-  }
-
-  @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return tableLockMap.get(tableName);
   }
 
   public OzoneManager getOzoneManager() {
@@ -692,7 +681,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
-    tableLockMap.put(DELETED_TABLE, new ReentrantReadWriteLock(true));
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
@@ -730,7 +718,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
         OmKeyInfo.class);
     checkTableStatus(deletedDirTable, DELETED_DIR_TABLE, addCacheMetrics);
-    tableLockMap.put(DELETED_DIR_TABLE, new ReentrantReadWriteLock(true));
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
