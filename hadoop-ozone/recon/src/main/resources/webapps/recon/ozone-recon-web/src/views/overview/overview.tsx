@@ -194,12 +194,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
-        openSummarytotalUnrepSize: openResponse.value.data && openResponse.value.data.totalUnreplicatedDataSize,
-        openSummarytotalRepSize: openResponse.value.data && openResponse.value.data.totalReplicatedDataSize,
-        openSummarytotalOpenKeys: openResponse.value.data && openResponse.value.data.totalOpenKeys,
-        deletePendingSummarytotalUnrepSize: deletePendingResponse.value.data && deletePendingResponse.value.data.totalUnreplicatedDataSize,
-        deletePendingSummarytotalRepSize: deletePendingResponse.value.data && deletePendingResponse.value.data.totalReplicatedDataSize,
-        deletePendingSummarytotalDeletedKeys: deletePendingResponse.value.data && deletePendingResponse.value.data.totalDeletedKeys,
+        openSummarytotalUnrepSize: openResponse.value?.data?.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse.value?.data?.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse.value?.data?.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse.value?.data?.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse.value?.data?.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse.value?.data?.totalDeletedKeys,
         scmServiceId: clusterState.scmServiceId,
         omServiceId: clusterState.omServiceId
       });
