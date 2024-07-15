@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CanceledError } from 'axios';
 import moment from 'moment';
 import filesize from 'filesize';
 import { Row, Col, Tooltip } from 'antd';
@@ -28,7 +28,7 @@ import OverviewCard from '@/components/overviewCard/overviewCard';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { showDataFetchError, byteToSize } from '@/utils/common';
-import { AxiosAllGetHelper, AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import './overview.less';
 
@@ -127,7 +127,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       cancelOverviewSignal
     ]);
 
-    const { requests, controller } = AxiosAllGetHelper([
+    const { requests, controller } = PromiseAllSettledGetHelper([
       '/api/v1/clusterState',
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
@@ -135,10 +135,46 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     ], cancelOverviewSignal);
     cancelOverviewSignal = controller;
 
-    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
-
-      const clusterState: IClusterStateResponse = clusterStateResponse.data;
-      const taskStatus = taskstatusResponse.data;
+    requests.then(axios.spread((
+      clusterStateResponse: Awaited<Promise<any>>,
+      taskstatusResponse: Awaited<Promise<any>>,
+      openResponse: Awaited<Promise<any>>,
+      deletePendingResponse: Awaited<Promise<any>>
+    ) => {
+      if ([
+        clusterStateResponse,
+        taskstatusResponse,
+        openResponse,
+        deletePendingResponse].some(
+          (resp) =>
+            resp.status === 'rejected' && resp.reason.toString().includes('CanceledError')
+      )) {
+        throw new CanceledError('canceled', "ERR_CANCELED",)
+      }
+      const clusterState: IClusterStateResponse = clusterStateResponse.value?.data ?? {
+        missingContainers: '??',
+        totalDatanodes: '??',
+        healthyDatanodes: '??',
+        pipelines: '??',
+        storageReport: {
+          capacity: 0,
+          used: 0,
+          remaining: 0,
+          committed: 0
+        },
+        containers: '??',
+        volumes: '??',
+        buckets: '??',
+        keys: '??',
+        openContainers: '??',
+        deletedContainers: '??',
+        keysPendingDeletion: '??',
+        scmServiceId: '??',
+        omServiceId: '??'
+      };
+      const taskStatus = taskstatusResponse.value?.data ?? [{
+        taskName: '??', lastUpdatedTimestamp: 0, lastUpdatedSeqNumber: 0
+      }];
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
@@ -158,12 +194,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
-        openSummarytotalUnrepSize: openResponse.data && openResponse.data.totalUnreplicatedDataSize,
-        openSummarytotalRepSize: openResponse.data && openResponse.data.totalReplicatedDataSize,
-        openSummarytotalOpenKeys: openResponse.data && openResponse.data.totalOpenKeys,
-        deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.totalUnreplicatedDataSize,
-        deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.totalReplicatedDataSize,
-        deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.totalDeletedKeys,
+        openSummarytotalUnrepSize: openResponse.value.data && openResponse.value.data.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse.value.data && openResponse.value.data.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse.value.data && openResponse.value.data.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse.value.data && deletePendingResponse.value.data.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse.value.data && deletePendingResponse.value.data.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse.value.data && deletePendingResponse.value.data.totalDeletedKeys,
         scmServiceId: clusterState.scmServiceId,
         omServiceId: clusterState.omServiceId
       });

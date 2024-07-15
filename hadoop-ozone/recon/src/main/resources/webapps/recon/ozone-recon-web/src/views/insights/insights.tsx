@@ -17,17 +17,17 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CanceledError } from 'axios';
 import filesize from 'filesize';
 import { Row, Col, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
-import { format, type EChartsOption } from 'echarts';
+import { type EChartsOption } from 'echarts';
 
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
-import { AxiosAllGetHelper } from '@/utils/axiosRequestHelper';
+import { PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import './insights.less';
 
@@ -261,15 +261,34 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.setState({
       isLoading: true
     });
-    const { requests, controller } = AxiosAllGetHelper([
+    const { requests, controller } = PromiseAllSettledGetHelper([
       '/api/v1/utilization/fileCount',
       '/api/v1/utilization/containerCount'
     ], cancelInsightSignal);
 
     cancelInsightSignal = controller;
-    requests.then(axios.spread((fileCountresponse, containerCountresponse) => {
-      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
-      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
+    requests.then(axios.spread((
+      fileCountresponse: Awaited<Promise<any>>,
+      containerCountresponse: Awaited<Promise<any>>
+    ) => {
+      if ([
+        fileCountresponse,
+        containerCountresponse].some(
+          (resp) =>
+            resp.status === 'rejected' && resp.reason.toString().includes('CanceledError')
+      )) {
+        throw new CanceledError('canceled', "ERR_CANCELED",)
+      }
+      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? {
+          volume: '0',
+          bucket: '0',
+          fileSize: '0',
+          count: 0
+      };
+      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.value?.data ?? {
+        containerSize: 0,
+        count: 0
+      };
       // Construct volume -> bucket[] map for populating filters
       // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
       const volumeBucketMap: Map<string, Set<string>> = fileCountsResponse.reduce(
@@ -280,7 +299,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             const buckets = Array.from(map.get(volume)!);
             map.set(volume, new Set([...buckets, bucket]));
           } else {
-            map.set(volume, new Set().add(bucket));
+            map.set(volume, new Set<string>().add(bucket));
           }
 
           return map;
