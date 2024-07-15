@@ -35,18 +35,18 @@ import './overview.less';
 const size = filesize.partial({ round: 1 });
 
 interface IClusterStateResponse {
-  missingContainers: number;
-  totalDatanodes: number;
-  healthyDatanodes: number;
-  pipelines: number;
+  missingContainers: number | string;
+  totalDatanodes: number | string;
+  healthyDatanodes: number | string;
+  pipelines: number | string;
   storageReport: IStorageReport;
-  containers: number;
-  volumes: number;
-  buckets: number;
-  keys: number;
-  openContainers: number;
-  deletedContainers: number;
-  keysPendingDeletion: number;
+  containers: number | string;
+  volumes: number | string;
+  buckets: number | string;
+  keys: number | string;
+  openContainers: number | string;
+  deletedContainers: number | string;
+  keysPendingDeletion: number | string;
   scmServiceId: string;
   omServiceId: string;
 }
@@ -54,25 +54,25 @@ interface IClusterStateResponse {
 interface IOverviewState {
   loading: boolean;
   datanodes: string;
-  pipelines: number;
+  pipelines: number | string;
   storageReport: IStorageReport;
-  containers: number;
-  volumes: number;
-  buckets: number;
-  keys: number;
-  missingContainersCount: number;
-  lastRefreshed: number;
-  lastUpdatedOMDBDelta: number;
-  lastUpdatedOMDBFull: number;
+  containers: number | string;
+  volumes: number | string;
+  buckets: number | string;
+  keys: number | string;
+  missingContainersCount: number | string;
+  lastRefreshed: number | string;
+  lastUpdatedOMDBDelta: number | string;
+  lastUpdatedOMDBFull: number | string;
   omStatus: string;
-  openContainers: number;
-  deletedContainers: number;
-  openSummarytotalUnrepSize: number;
-  openSummarytotalRepSize: number;
-  openSummarytotalOpenKeys: number;
-  deletePendingSummarytotalUnrepSize: number;
-  deletePendingSummarytotalRepSize: number;
-  deletePendingSummarytotalDeletedKeys: number;
+  openContainers: number | string;
+  deletedContainers: number | string;
+  openSummarytotalUnrepSize: number | string;
+  openSummarytotalRepSize: number | string;
+  openSummarytotalOpenKeys: number | string;
+  deletePendingSummarytotalUnrepSize: number | string;
+  deletePendingSummarytotalRepSize: number | string;
+  deletePendingSummarytotalDeletedKeys: number | string;
   scmServiceId: string;
   omServiceId: string;
 }
@@ -148,32 +148,32 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         deletePendingResponse].some(
           (resp) =>
             resp.status === 'rejected' && resp.reason.toString().includes('CanceledError')
-      )) {
+        )) {
         throw new CanceledError('canceled', "ERR_CANCELED",)
       }
       const clusterState: IClusterStateResponse = clusterStateResponse.value?.data ?? {
-        missingContainers: '??',
-        totalDatanodes: '??',
-        healthyDatanodes: '??',
-        pipelines: '??',
+        missingContainers: 'N/A',
+        totalDatanodes: 'N/A',
+        healthyDatanodes: 'N/A',
+        pipelines: 'N/A',
         storageReport: {
           capacity: 0,
           used: 0,
           remaining: 0,
           committed: 0
         },
-        containers: '??',
-        volumes: '??',
-        buckets: '??',
-        keys: '??',
-        openContainers: '??',
-        deletedContainers: '??',
-        keysPendingDeletion: '??',
-        scmServiceId: '??',
-        omServiceId: '??'
+        containers: 'N/A',
+        volumes: 'N/A',
+        buckets: 'N/A',
+        keys: 'N/A',
+        openContainers: 'N/A',
+        deletedContainers: 'N/A',
+        keysPendingDeletion: 'N/A',
+        scmServiceId: 'N/A',
+        omServiceId: 'N/A',
       };
       const taskStatus = taskstatusResponse.value?.data ?? [{
-        taskName: '??', lastUpdatedTimestamp: 0, lastUpdatedSeqNumber: 0
+        taskName: 'N/A', lastUpdatedTimestamp: 0, lastUpdatedSeqNumber: 0
       }];
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
@@ -181,7 +181,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
       this.setState({
         loading: false,
-        datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
+        datanodes: clusterState.healthyDatanodes !== 'N/A'
+          ? `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`
+          : `N/A`,
         storageReport: clusterState.storageReport,
         pipelines: clusterState.pipelines,
         containers: clusterState.containers,
@@ -257,11 +259,24 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
       omStatus, openContainers, deletedContainers, scmServiceId, omServiceId } = this.state;
 
-    const datanodesElement = (
-      <span>
-        <CheckCircleFilled className='icon-success icon-small' /> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
-      </span>
-    );
+    console.log(datanodes);
+    const datanodesElement = datanodes !== 'N/A'
+      ? (
+        <span>
+          <CheckCircleFilled className='icon-success icon-small' /> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
+        </span>
+      )
+      : (
+        <span>
+          <Tooltip
+            placement='bottom'
+            title={'Failed to fetch Datanodes count'}>
+            <ExclamationCircleFilled className='icon-failure icon-small' />
+            <span className='padded-text'>{datanodes}</span>
+            <span className='ant-card-meta-description meta padded-text'>UNHEALTHY</span>
+          </Tooltip>
+        </span>
+      )
     const openSummaryData = (
       <div>
         {openSummarytotalRepSize !== undefined ? byteToSize(openSummarytotalRepSize, 1) : '0'}   <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
@@ -277,23 +292,38 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       </div>
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
-    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
+    const containersLink = missingContainersCount as number > 0 ? '/MissingContainers' : '/Containers';
     const volumesLink = '/Volumes';
     const bucketsLink = '/Buckets';
-    const containersElement = missingContainersCount > 0 ? (
-      <span>
-        <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
-          <ExclamationCircleFilled className='icon-failure icon-small' />
-        </Tooltip>
-        <span className='padded-text'>{containers - missingContainersCount}/{containers}</span>
-      </span>
-    ) :
-      <div>
-        <span>{containers.toString()}   </span>
-        <Tooltip placement='bottom' title='Number of open containers'>
-          <span>({openContainers})</span>
-        </Tooltip>
-      </div>
+    const containersElement = missingContainersCount !== 'N/A'
+      ? missingContainersCount as number > 0
+        ? (<span>
+          <Tooltip
+            placement='bottom'
+            title={
+              missingContainersCount as number > 1000
+                ? `1000+ Containers are missing. For more information, go to the Containers page.`
+                : `${missingContainersCount} ${containersTooltip}`}>
+            <ExclamationCircleFilled className='icon-failure icon-small' />
+          </Tooltip>
+          <span className='padded-text'>{(containers as number) - (missingContainersCount as number)}/{containers}</span>
+        </span>
+        )
+        :
+        (<div>
+          <span>{containers.toString()}   </span>
+          <Tooltip placement='bottom' title='Number of open containers'>
+            <span>({openContainers})</span>
+          </Tooltip>
+        </div>)
+      : (
+        <span>
+          <Tooltip placement='bottom' title={`Failed to fetch Container Count`}>
+            <ExclamationCircleFilled className='icon-failure icon-small' />
+            <span className='padded-text'>{missingContainersCount}</span>
+          </Tooltip>
+        </span>
+      )
     const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
     return (
       <div className='overview-content'>
@@ -308,6 +338,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard
               hoverable loading={loading} title='Datanodes'
               data={datanodesElement} icon='cluster'
+              error={datanodes === 'N/A'}
               linkToUrl='/Datanodes' />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
@@ -326,7 +357,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard
               loading={loading} title='Containers' data={containersElement}
               icon='container'
-              error={missingContainersCount > 0} linkToUrl={containersLink} />
+              error={missingContainersCount as number > 0 || missingContainersCount === 'N/A'} linkToUrl={containersLink} />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={volumesLink} />
