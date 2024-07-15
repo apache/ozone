@@ -20,7 +20,7 @@ import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ozone.annotations.RequestFeatureValidatorProcessor;
+import org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -36,31 +36,30 @@ import java.util.stream.Collectors;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_CONDITION_IS_EMPTY;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_UNEXPECTED_PARAMETER_COUNT;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_UNEXPECTED_PARAMETER_COUNT;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST;
+import static org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Compile tests against the annotation processor for the
- * {@link RequestFeatureValidator} annotation.
+ * {@link OMClientVersionValidator} annotation.
  *
  * The processor should ensure the method signatures and return values, based
  * on annotation arguments provided.
  */
-public class TestRequestFeatureValidatorProcessor {
+public class TestOMClientVersionValidatorProcessor {
 
   private static final String CLASSNAME = "Validation";
 
   @Test
   public void testAnnotationCanOnlyBeAppliedOnMethods() {
-    Class<RequestFeatureValidator> c = RequestFeatureValidator.class;
+    Class<OMClientVersionValidator> c = OMClientVersionValidator.class;
     for (Annotation a : c.getAnnotations()) {
       if (a instanceof Target) {
         assertEquals(1, ((Target) a).value().length);
@@ -72,7 +71,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testACorrectAnnotationSetupForPreProcessCompiles() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -84,7 +83,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testACorrectAnnotationSetupForPostProcessCompiles() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
@@ -96,7 +95,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testValidatorDoesNotNecessarilyThrowsExceptions() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -108,7 +107,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testNonStaticValidatorDoesNotCompile() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -121,7 +120,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testValidatorMethodCanBeFinal() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static", "final"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -133,7 +132,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testValidatorMethodCanBePrivate() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("private", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -145,7 +144,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testValidatorMethodCanBeDefaultVisible() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -157,7 +156,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testValidatorMethodCanBeProtected() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("protected", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -169,31 +168,27 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testEmptyValidationConditionListDoesNotCompile() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(emptyConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
-
-    assertThat(compile(source)).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
   }
 
   @Test
   public void testNullValidationConditionListDoesNotCompile() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(nullConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
-
-    assertThat(compile(source)).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
   }
 
   @Test
   public void testNotEnoughParametersForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq"),
@@ -207,7 +202,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testTooManyParametersForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
@@ -221,7 +216,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testNotEnoughParametersForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp"),
@@ -235,7 +230,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testTooManyParametersForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
@@ -250,7 +245,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongReturnValueForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("String"),
         parameters("OMRequest rq", "ValidationContext ctx"),
@@ -263,7 +258,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongReturnValueForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("String"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
@@ -276,7 +271,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongFirstArgumentForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("String rq", "ValidationContext ctx"),
@@ -289,7 +284,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongFirstArgumentForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("String rq", "OMResponse rp", "ValidationContext ctx"),
@@ -302,7 +297,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongSecondArgumentForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "String ctx"),
@@ -315,7 +310,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongSecondArgumentForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "String rp", "ValidationContext ctx"),
@@ -328,7 +323,7 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testWrongThirdArgumentForPostProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "String ctx"),
@@ -341,7 +336,19 @@ public class TestRequestFeatureValidatorProcessor {
   @Test
   public void testInvalidProcessingPhase() {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), "INVALID", aReqType()),
+        annotationOf("INVALID", aReqType(), ClientVersion.CURRENT),
+        modifiers("public", "static"),
+        returnValue("OMResponse"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
+        exceptions("ServiceException"));
+
+    assertThat(compile(source)).failed();
+  }
+
+  @Test
+  public void testInvalidClientVersion() {
+    List<String> source = generateSourceOfValidatorMethodWith(
+        annotationOf(RequestProcessingPhase.PRE_PROCESS, aReqType(), null),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
@@ -353,7 +360,6 @@ public class TestRequestFeatureValidatorProcessor {
   private static List<Arguments> getClientVersions() {
     List<Arguments> clientVersions =
         Arrays.stream(ClientVersion.values()).map(Arguments::of).collect(Collectors.toList());
-    clientVersions.add(null);
     return clientVersions;
   }
 
@@ -361,16 +367,13 @@ public class TestRequestFeatureValidatorProcessor {
   @MethodSource("getClientVersions")
   public void testMultipleErrorMessages(ClientVersion clientVersion) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(emptyConditions(), postProcess(), aReqType(), clientVersion),
+        annotationOf(postProcess(), aReqType(), clientVersion),
         modifiers(),
         returnValue("String"),
         parameters("String rq", "int rp", "String ctx"),
         exceptions());
 
     Compilation compilation = compile(source);
-    if (ClientVersion.FUTURE_VERSION.equals(clientVersion)) {
-      assertThat(compilation).hadErrorContaining(ERROR_CONDITION_IS_EMPTY);
-    }
     assertThat(compilation)
         .hadErrorContaining(ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC);
     assertThat(compilation)
@@ -385,23 +388,10 @@ public class TestRequestFeatureValidatorProcessor {
 
   private Compilation compile(List<String> source) {
     Compilation c = javac()
-        .withProcessors(new RequestFeatureValidatorProcessor())
+        .withProcessors(new OmRequestFeatureValidatorProcessor())
         .compile(JavaFileObjects.forSourceLines(CLASSNAME, source));
     c.diagnostics().forEach(System.out::println);
     return c;
-  }
-
-  private ValidationCondition[] someConditions() {
-    return
-        new ValidationCondition[] {ValidationCondition.CLUSTER_NEEDS_FINALIZATION};
-  }
-
-  private ValidationCondition[] emptyConditions() {
-    return new ValidationCondition[] {};
-  }
-
-  private ValidationCondition[] nullConditions() {
-    return null;
   }
 
   private RequestProcessingPhase preProcess() {
@@ -457,52 +447,28 @@ public class TestRequestFeatureValidatorProcessor {
   }
 
   private String annotationOf(
-      ValidationCondition[] conditions,
       RequestProcessingPhase phase,
       Type reqType) {
-    return annotationOf(conditions, phase.name(), reqType, null);
+    return annotationOf(phase.name(), reqType, ClientVersion.CURRENT);
   }
 
   private String annotationOf(
-      ValidationCondition[] conditions,
       RequestProcessingPhase phase,
       Type reqType,
       ClientVersion clientVersion) {
-    return annotationOf(conditions, phase.name(), reqType, clientVersion);
+    return annotationOf(phase.name(), reqType, clientVersion);
   }
 
   private String annotationOf(
-      ValidationCondition[] conditions,
-      String phase,
-      Type reqType) {
-    return annotationOf(conditions, phase, reqType, null);
-  }
-
-  private String annotationOf(
-      ValidationCondition[] conditions,
       String phase,
       Type reqType,
       ClientVersion clientVersion) {
     StringBuilder annotation = new StringBuilder();
-    annotation.append("@RequestFeatureValidator(");
-    StringBuilder conditionsArray = new StringBuilder();
-    if (conditions != null) {
-      conditionsArray.append("conditions = { ");
-      if (conditions.length > 0) {
-        for (ValidationCondition condition : conditions) {
-          conditionsArray.append(condition.name()).append(", ");
-        }
-        annotation
-            .append(conditionsArray.substring(0, conditionsArray.length() - 2));
-      } else {
-        annotation.append(conditionsArray);
-      }
-      annotation.append(" }, ");
-    }
+    annotation.append("@OMClientVersionValidator(");
     annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
     if (clientVersion != null) {
-      annotation.append(", maxClientVersion = ").append(clientVersion.name());
+      annotation.append(", maxVersion = ").append(clientVersion.name());
     }
     annotation.append(" )");
     return annotation.toString();
@@ -511,7 +477,7 @@ public class TestRequestFeatureValidatorProcessor {
   private List<String> allImports() {
     List<String> imports = new ArrayList<>();
     imports.add("import org.apache.hadoop.ozone.om.request.validation"
-        + ".RequestFeatureValidator;");
+        + ".OMClientVersionValidator;");
     imports.add("import org.apache.hadoop.ozone.protocol.proto"
         + ".OzoneManagerProtocolProtos.OMRequest;");
     imports.add("import org.apache.hadoop.ozone.protocol.proto"
@@ -519,10 +485,6 @@ public class TestRequestFeatureValidatorProcessor {
     imports.add("import org.apache.hadoop.ozone.om.request.validation"
         + ".ValidationContext;");
     imports.add("import com.google.protobuf.ServiceException;");
-    for (ValidationCondition condition : ValidationCondition.values()) {
-      imports.add("import static org.apache.hadoop.ozone.om.request.validation"
-          + ".ValidationCondition." + condition.name() + ";");
-    }
     for (RequestProcessingPhase phase : RequestProcessingPhase.values()) {
       imports.add("import static org.apache.hadoop.ozone.om.request.validation"
           + ".RequestProcessingPhase." + phase.name() + ";");

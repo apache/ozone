@@ -16,6 +16,8 @@
  */
 package org.apache.ozone.annotations;
 
+import jdk.nashorn.internal.ir.annotations.Immutable;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -35,6 +37,8 @@ import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.tools.Diagnostic;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -51,14 +55,11 @@ import java.util.Set;
  * META-INF/services/javax.annotation.processing.Processor file in the module's
  * resources folder.
  */
-@SupportedAnnotationTypes(
-    "org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator")
+@SupportedAnnotationTypes({
+    "org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator",
+    "org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class RequestFeatureValidatorProcessor extends AbstractProcessor {
-
-  public static final String ERROR_CONDITION_IS_EMPTY =
-      "RequestFeatureValidator has both an empty condition list & undefined max client version. Please define either"
-          + " ValidationCondition or max client version in which the validator has to be applied.";
+public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String ERROR_ANNOTATED_ELEMENT_IS_NOT_A_METHOD =
       "RequestFeatureValidator annotation is not applied to a method.";
   public static final String ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC =
@@ -91,7 +92,9 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String VALIDATION_CONTEXT_CLASS_NAME =
       "org.apache.hadoop.ozone.om.request.validation.ValidationContext";
 
-  public static final String ANNOTATION_SIMPLE_NAME = "RequestFeatureValidator";
+
+  public static final List<String> ANNOTATION_SIMPLE_NAMES = Arrays.asList("OMClientVersionValidator",
+      "OMLayoutVersionValidator");
   public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
   public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =
       "processingPhase";
@@ -108,7 +111,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public boolean process(Set<? extends TypeElement> annotations,
       RoundEnvironment roundEnv) {
     for (TypeElement annotation : annotations) {
-      if (!annotation.getSimpleName().contentEquals(ANNOTATION_SIMPLE_NAME)) {
+      if (!ANNOTATION_SIMPLE_NAMES.contains(annotation.getSimpleName().toString())) {
         continue;
       }
       processElements(roundEnv.getElementsAnnotatedWith(annotation));
@@ -176,7 +179,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       ExecutableElement elem, boolean isPreprocessor) {
     if (!isPreprocessor && !elem.getReturnType().toString()
         .equals(OM_RESPONSE_CLASS_NAME)) {
-      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE);
+      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE + " " + elem.getSimpleName());
     }
   }
 
@@ -203,20 +206,12 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   private boolean checkAndEvaluateAnnotation(
       AnnotationMirror methodAnnotation) {
     boolean isPreprocessor = false;
-    boolean hasValidConditions = false;
-    boolean hasValidMaxClientVersions = false;
     for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
         entry : methodAnnotation.getElementValues().entrySet()) {
-
-      hasValidConditions = hasValidConditions || hasValidValidationCondition(entry);
 
       if (isProcessingPhaseValue(entry)) {
         isPreprocessor = evaluateProcessingPhase(entry);
       }
-      hasValidMaxClientVersions = hasValidMaxClientVersions || hasValidMaxClientVersion(entry);
-    }
-    if (!hasValidMaxClientVersions && !hasValidConditions) {
-      emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
     }
 
     return isPreprocessor;

@@ -49,6 +49,8 @@ public enum ClientVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
 
+  public static final String ERASURE_CODING_SUPPORT_NAME = ERASURE_CODING_SUPPORT.name();
+
   public static final ClientVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
 
@@ -57,7 +59,7 @@ public enum ClientVersion implements ComponentVersion {
           .collect(toMap(ClientVersion::toProtoValue, identity()));
 
   private final int version;
-  private final String description;
+  public final String description;
 
   ClientVersion(int version, String description) {
     this.version = version;

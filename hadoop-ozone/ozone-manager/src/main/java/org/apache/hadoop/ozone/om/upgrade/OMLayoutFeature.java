@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  * List of OM Layout features / versions.
  */
 public enum OMLayoutFeature implements LayoutFeature {
+
+
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
 

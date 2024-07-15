@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation.testvalidatorset2;
 
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
@@ -32,10 +32,10 @@ public final class ValidatorsForOnlyOldClientValidations {
 
   private ValidatorsForOnlyOldClientValidations() { }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   public static OMRequest oldClientPreProcessCreateKeyValidator2(
       OMRequest req, ValidationContext ctx) {
     return req;

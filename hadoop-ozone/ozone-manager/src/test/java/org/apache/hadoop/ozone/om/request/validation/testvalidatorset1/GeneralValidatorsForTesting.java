@@ -17,9 +17,11 @@
 package org.apache.hadoop.ozone.om.request.validation.testvalidatorset1;
 
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.TestRequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -29,7 +31,7 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
+import static org.apache.hadoop.ozone.om.request.validation.VersionExtractor.LAYOUT_VERSION_EXTRACTOR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
@@ -88,8 +90,8 @@ public final class GeneralValidatorsForTesting {
     listeners.forEach(l -> l.validationCalled(calledMethodName));
   }
 
-  @RequestFeatureValidator(
-      conditions = CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
+      maxVersion = OMLayoutFeature.QUOTA,
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest preFinalizePreProcessCreateKeyValidator(
@@ -98,8 +100,8 @@ public final class GeneralValidatorsForTesting {
     return req;
   }
 
-  @RequestFeatureValidator(
-      conditions = CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
+      maxVersion = OMLayoutFeature.QUOTA,
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse preFinalizePostProcessCreateKeyValidator(
@@ -108,62 +110,66 @@ public final class GeneralValidatorsForTesting {
     return resp;
   }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   public static OMRequest oldClientPreProcessCreateKeyValidator(
       OMRequest req, ValidationContext ctx) {
     fireValidationEvent("oldClientPreProcessCreateKeyValidator");
     return req;
   }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   public static OMResponse oldClientPostProcessCreateKeyValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator");
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = CLUSTER_NEEDS_FINALIZATION,
+  @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+  @OMLayoutVersionValidator(processingPhase = PRE_PROCESS,
+      requestType = CreateVolume,
+      maxVersion = OMLayoutFeature.QUOTA)
   public static OMRequest multiPurposePreProcessCreateVolumeValidator(
       OMRequest req, ValidationContext ctx) {
     fireValidationEvent("multiPurposePreProcessCreateVolumeValidator");
     return req;
   }
 
-  @RequestFeatureValidator(
-      conditions = CLUSTER_NEEDS_FINALIZATION,
+  @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateVolume,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+  @OMLayoutVersionValidator(processingPhase = POST_PROCESS,
+      requestType = CreateVolume,
+      maxVersion = OMLayoutFeature.QUOTA)
   public static OMResponse multiPurposePostProcessCreateVolumeValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("multiPurposePostProcessCreateVolumeValidator");
     return resp;
   }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      maxVersion = ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST)
   public static OMResponse oldClientPostProcessCreateKeyValidator2(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator2");
     return resp;
   }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = DeleteKeys,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest throwingPreProcessValidator(
       OMRequest req, ValidationContext ctx) throws IOException {
@@ -174,10 +180,10 @@ public final class GeneralValidatorsForTesting {
     return req;
   }
 
-  @RequestFeatureValidator(
+  @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = DeleteKeys,
-      maxClientVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMResponse throwingPostProcessValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx)

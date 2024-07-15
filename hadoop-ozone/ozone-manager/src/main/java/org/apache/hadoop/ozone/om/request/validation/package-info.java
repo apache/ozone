@@ -31,19 +31,19 @@
  * - the code can handle certain checks that have to run all the time, but at
  *   first we do not see a general use case that we would pull in immediately.
  * These are the current
- * {@link org.apache.hadoop.ozone.om.request.validation.ValidationCondition}s
+ * {@link org.apache.hadoop.ozone.om.request.validation.VersionExtractor}s
  * but this list might be extended later on if we see other use cases.
  *
  * The system uses a reflection based discovery to find methods that are
  * annotated with the
- * {@link org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator}
+ * {@link org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator}
  * annotation.
  * This annotation is used to specify the condition in which a certain validator
  * has to be used, the request type to which the validation should be applied,
  * and the request processing phase in which we apply the validation.
  *
  * One validator can be applied in multiple
- * {@link org.apache.hadoop.ozone.om.request.validation.ValidationCondition}
+ * {@link org.apache.hadoop.ozone.om.request.validation.VersionExtractor}
  * but a validator has to handle strictly just one
  * {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type
  * }.

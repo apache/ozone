@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import java.lang.annotation.ElementType;
@@ -31,7 +32,7 @@ import java.lang.annotation.Target;
  * {@link ValidatorRegistry} class during the initialization of the server.
  *
  * The conditions specify the specific use case in which the validator should be
- * applied to the request. See {@link ValidationCondition} for more details
+ * applied to the request. See {@link VersionExtractor} for more details
  * on the specific conditions.
  * The validator method should be applied to just one specific request type
  * to help keep these methods simple and straightforward. If you want to use
@@ -76,13 +77,8 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface RequestFeatureValidator {
-
-  /**
-   * Runtime conditions in which a validator should run.
-   * @return a list of conditions when the validator should be applied
-   */
-  ValidationCondition[] conditions() default {};
+@RegisterValidator
+public @interface OMLayoutVersionValidator {
 
   /**
    * Defines if the validation has to run before or after the general request
@@ -97,15 +93,11 @@ public @interface RequestFeatureValidator {
    */
   Type requestType();
 
-
   /**
-   * The max client version for which the validator would run. This condition happens in parallel with the specified
-   * validation conditions. The validator would run either one of the specified conditions apply or the request
-   * client version is equal to or older than the specified version. The value defaults to FUTURE_VERSION so the
-   * validator would never run for any of the clients, the validator could still run based on the specified
-   * conditions though.
-   * @returns the max required client version for which the validator runs for older clients.
+   * The max version for which the validator would run. The validator would run for the request
+   * where the version is older than the excluding of the specified version.
+   * @returns the max required client version for which the validator runs for older version.
    */
-  ClientVersion maxClientVersion() default ClientVersion.FUTURE_VERSION;
+  OMLayoutFeature maxVersion();
 
 }
