@@ -41,7 +41,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doThrow;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
@@ -104,7 +103,7 @@ public class TestOzoneManagerReadonlyMode {
     // mock PerfMetrics to throw exception when executing request
     for (OzoneManager om : ((MiniOzoneHAClusterImpl) cluster).getOzoneManagersList()) {
       OMPerformanceMetrics pf1 = Mockito.spy(om.getPerfMetrics());
-      doThrow(new IllegalArgumentException("test throw")).when(pf1).getValidateAndUpdateCacheLatencyNs();
+      Mockito.when(pf1.getValidateAndUpdateCacheLatencyNs()).thenThrow(new IllegalArgumentException("test throw"));
       om.setPerfMetrics(pf1);
     }
 

@@ -4430,11 +4430,12 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.onfailure.readonly.enable</name>
-    <value>false</value>
+    <name>ozone.om.readonly.on.failure</name>
+    <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
-      enable readonly mode when om state machine failure is observed.
+      put the Ozone Manager in readonly mode instead of shutting down when there is a fatal error
+      while handling a write request.
     </description>
   </property>
 </configuration>

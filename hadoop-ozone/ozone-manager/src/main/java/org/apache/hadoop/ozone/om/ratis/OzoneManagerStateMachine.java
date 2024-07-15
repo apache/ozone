@@ -266,7 +266,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           .setStateMachine(this)
           .setServerRole(RaftProtos.RaftPeerRole.LEADER)
           .build();
-      ctxt.setException(new OMException("OM is running in readonly mode",
+      ctxt.setException(new OMException("OM is running in readonly mode due to internal error",
           OMException.ResultCodes.READONLY_MODE));
       return ctxt;
     }
@@ -305,7 +305,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
     if (readonlyMode.get()) {
-      throw new StateMachineException("", new OMException("OM is running in readonly mode",
+      throw new StateMachineException("", new OMException("OM is running in readonly mode due to internal error",
           OMException.ResultCodes.READONLY_MODE), false);
     }
 
@@ -378,7 +378,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (readonlyMode.get()) {
         // return failure without updating transaction index as double buffer is stopped
         return CompletableFuture.supplyAsync(() -> createErrorResponse(request,
-            new OMException("OM is running in readonly mode",
+            new OMException("OM is running in readonly mode due to internal error",
             OMException.ResultCodes.READONLY_MODE), termIndex)).thenApply(this::processResponse);
       }
 
@@ -395,7 +395,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // In such cases, OM must be terminated instead of completing the future exceptionally,
       // Otherwise, OM may continue applying transactions which leads to an inconsistent state.
       if (omResponse.getStatus() == INTERNAL_ERROR) {
-        terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+        final boolean onFailureReadonlyEnable = ozoneManager.getConfiguration()
+            .getBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY,
+                OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
+        if (!onFailureReadonlyEnable) {
+          terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+        }
       } else if (omResponse.getStatus() == METADATA_ERROR) {
         terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
       }
@@ -581,7 +586,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
-      // For any Runtime exceptions, terminate OM.
+      // For any Runtime exceptions, move to readonly mode or terminate OM based on configuration.
       final boolean onFailureReadonlyEnable = ozoneManager.getConfiguration()
           .getBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY,
               OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
