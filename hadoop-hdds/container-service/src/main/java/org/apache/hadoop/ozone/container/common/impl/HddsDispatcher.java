@@ -210,7 +210,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
-    Map<String, String> params = getAuditParams(msg);
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
     ContainerType containerType;
@@ -270,7 +269,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           "ContainerID " + containerID
               + " has been lost and cannot be recreated on this DataNode",
           ContainerProtos.Result.CONTAINER_MISSING);
-      audit(action, eventType, params, AuditEventStatus.FAILURE, sce);
+      audit(action, eventType, msg, AuditEventStatus.FAILURE, sce);
       return ContainerUtils.logAndReturnError(LOG, sce, msg);
     }
 
@@ -297,7 +296,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           StorageContainerException sce = new StorageContainerException(
               "ContainerID " + containerID + " creation failed",
               responseProto.getResult());
-          audit(action, eventType, params, AuditEventStatus.FAILURE, sce);
+          audit(action, eventType, msg, AuditEventStatus.FAILURE, sce);
           return ContainerUtils.logAndReturnError(LOG, sce, msg);
         }
         Preconditions.checkArgument(isWriteStage && container2BCSIDMap != null
@@ -316,13 +315,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         StorageContainerException sce = new StorageContainerException(
             "ContainerID " + containerID + " does not exist",
             ContainerProtos.Result.CONTAINER_NOT_FOUND);
-        audit(action, eventType, params, AuditEventStatus.FAILURE, sce);
+        audit(action, eventType, msg, AuditEventStatus.FAILURE, sce);
         return ContainerUtils.logAndReturnError(LOG, sce, msg);
       }
       containerType = getContainerType(container);
     } else {
       if (!msg.hasCreateContainer()) {
-        audit(action, eventType, params, AuditEventStatus.FAILURE,
+        audit(action, eventType, msg, AuditEventStatus.FAILURE,
             new Exception("MALFORMED_REQUEST"));
         return malformedRequest(msg);
       }
@@ -339,7 +338,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           "ContainerType " + containerType,
           ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       // log failure
-      audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
+      audit(action, eventType, msg, AuditEventStatus.FAILURE, ex);
       return ContainerUtils.logAndReturnError(LOG, ex, msg);
     }
     perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
@@ -408,7 +407,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       }
       if (result == Result.SUCCESS) {
         updateBCSID(container, dispatcherContext, cmdType);
-        audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
+        audit(action, eventType, msg, AuditEventStatus.SUCCESS, null);
       } else {
         //TODO HDDS-7096:
         // This is a too general place for on demand scanning.
@@ -416,16 +415,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
         OnDemandContainerDataScanner.scanContainer(container);
-        audit(action, eventType, params, AuditEventStatus.FAILURE,
+        audit(action, eventType, msg, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
       perf.appendOpLatencyMs(oPLatencyMS);
-      performanceAudit(action, params, perf, oPLatencyMS);
+      performanceAudit(action, msg, perf, oPLatencyMS);
 
       return responseProto;
     } else {
       // log failure
-      audit(action, eventType, params, AuditEventStatus.FAILURE,
+      audit(action, eventType, msg, AuditEventStatus.FAILURE,
           new Exception("UNSUPPORTED_REQUEST"));
       return unsupportedRequest(msg);
     }
@@ -533,13 +532,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Type cmdType = msg.getCmdType();
     AuditAction action = getAuditAction(cmdType);
     EventType eventType = getEventType(msg);
-    Map<String, String> params = getAuditParams(msg);
     Handler handler = getHandler(containerType);
     if (handler == null) {
       StorageContainerException ex = new StorageContainerException(
           "Invalid ContainerType " + containerType,
           ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
-      audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
+      audit(action, eventType, msg, AuditEventStatus.FAILURE, ex);
       throw ex;
     }
 
@@ -559,12 +557,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // if the container is not open/recovering, no updates can happen. Just
         // throw an exception
         ContainerNotOpenException cex = new ContainerNotOpenException(log);
-        audit(action, eventType, params, AuditEventStatus.FAILURE, cex);
+        audit(action, eventType, msg, AuditEventStatus.FAILURE, cex);
         throw cex;
       }
     } else if (HddsUtils.isReadOnly(msg) && containerState == State.INVALID) {
       InvalidContainerStateException iex = new InvalidContainerStateException(log);
-      audit(action, eventType, params, AuditEventStatus.FAILURE, iex);
+      audit(action, eventType, msg, AuditEventStatus.FAILURE, iex);
       throw iex;
     }
   }
@@ -670,12 +668,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void audit(AuditAction action, EventType eventType,
-      Map<String, String> params, AuditEventStatus result,
+      ContainerCommandRequestProto msg, AuditEventStatus result,
       Throwable exception) {
+    Map<String, String> params;
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
       if (isAllowed(action.getAction())) {
+        params = getAuditParams(msg);
         if (eventType == EventType.READ &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
@@ -689,6 +689,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       break;
 
     case FAILURE:
+      params = getAuditParams(msg);
       if (eventType == EventType.READ &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.READ.getMarker())) {
         amsg = buildAuditMessageForFailure(action, params, exception);
@@ -707,12 +708,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  private void performanceAudit(AuditAction action, Map<String, String> params,
+  private void performanceAudit(AuditAction action, ContainerCommandRequestProto msg,
       PerformanceStringBuilder performance, long opLatencyMs) {
     if (isOperationSlow(opLatencyMs)) {
-      AuditMessage msg =
+      Map<String, String> params = getAuditParams(msg);
+      AuditMessage auditMessage =
           buildAuditMessageForPerformance(action, params, performance);
-      AUDIT.logPerformance(msg);
+      AUDIT.logPerformance(auditMessage);
     }
   }
 
