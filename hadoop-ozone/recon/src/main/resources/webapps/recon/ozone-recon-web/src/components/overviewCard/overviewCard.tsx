@@ -139,9 +139,7 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
 
   render() {
     let { icon, data, title, loading, hoverable, storageReport, linkToUrl, error } = this.props;
-    console.log(title);
-    console.log(data);
-    console.log(typeof data)
+
     let meta = <Meta title={data} description={title} />;
     let errorClass = error ? 'card-error' : '';
     if (typeof data === 'string' && data === 'N/A'){
