@@ -18,15 +18,16 @@
 
 import React from 'react';
 
-import { Layout } from 'antd';
-import './app.less';
+import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
-import { routes } from './routes';
-import { MakeRouteWithSubRoutes } from './makeRouteWithSubRoutes';
+import { routes } from '@/routes';
+import { routesV2 } from '@/v2/routes-v2';
+import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
+import './app.less';
 
 const {
   Header, Content, Footer
@@ -50,14 +51,22 @@ class App extends React.Component<Record<string, object>, IAppState> {
     const { collapsed } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
+
     return (
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
           <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
           <Layout className={layoutClass}>
             <Header>
-              <div style={{ margin: '16px 0' }}>
+              <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
+                <AntDSwitch
+                  checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                  onChange={(checked: boolean) => {
+                    this.setState({
+                      newUI: checked
+                    });
+                  }} />
               </div>
             </Header>
             <Content style={{ margin: '0 16px 0', overflow: 'initial' }}>
@@ -66,9 +75,13 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {
-                  routes.map(
-                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                  )
+                  (this.state.newUI)
+                    ? routesV2.map(
+                      (route, idx) => <MakeRouteWithSubRoutes key={idx} {...route} />
+                    )
+                    : routes.map(
+                      (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                    )
                 }
               </Switch>
             </Content>
