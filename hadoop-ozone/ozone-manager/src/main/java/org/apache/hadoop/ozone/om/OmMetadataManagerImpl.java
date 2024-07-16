@@ -573,7 +573,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
-    return loadDB(configuration, metaDir,Optional.empty());
+    return loadDB(configuration, metaDir, Optional.empty());
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, Optional<Integer> maxOpenFiles)
