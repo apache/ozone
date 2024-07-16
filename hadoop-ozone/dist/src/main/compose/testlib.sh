@@ -37,8 +37,6 @@ create_results_dir() {
   #delete previous results
   [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
-  #Should be writeable from the docker containers where user is different.
-  chmod ogu+w "$RESULT_DIR"
 }
 
 ## @description find all the test*.sh scripts in the immediate child dirs
@@ -400,6 +398,8 @@ run_rebot() {
   shift 2
 
   local tempdir="$(mktemp -d --suffix rebot)"
+  #Should be writeable from the docker containers where user is different.
+  chmod ogu+w "${tempdir}"
   docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
     $(get_runner_image_spec) \
     bash -c "rebot --nostatusrc -d /rebot-output $@"
