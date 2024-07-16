@@ -61,6 +61,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
               <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
                 <AntDSwitch
+                  disabled={true}
                   checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
                   onChange={(checked: boolean) => {
                     this.setState({
