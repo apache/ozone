@@ -45,6 +45,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.LogProtoUtils;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,7 +53,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import org.mockito.Mockito;
 
-import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -247,7 +247,7 @@ public class TestOzoneManagerStateMachine {
     Mockito.doAnswer((i) -> {
       if (!((AuditMessage) i.getArgument(0)).getFormattedMessage().contains("Transaction=10") ||
           !((AuditMessage) i.getArgument(0)).getFormattedMessage().contains("Command=CreateVolume")) {
-        fail("transaction and command not found");
+        Assertions.fail("transaction and command not found");
       }
       // throw another exception to change to new exception to avoid terminate call
       throw new OMException("test", OMException.ResultCodes.VOLUME_IS_REFERENCED);
