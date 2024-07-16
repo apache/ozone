@@ -166,7 +166,7 @@ public class VolumeUsage {
     /**
      * If 'hdds.datanode.volume.min.free.space' is defined,
      * it will be honored first. If it is not defined and
-     * 'hdds.datanode.volume.min.free.space.' is defined,it will honor this
+     * 'hdds.datanode.volume.min.free.space' is defined, it will honor this
      * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
      */
     public long get(long capacity) {
