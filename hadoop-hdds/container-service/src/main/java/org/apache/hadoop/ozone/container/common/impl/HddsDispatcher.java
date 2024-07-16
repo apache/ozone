@@ -214,7 +214,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
-    long startTime = Time.monotonicNow();
+    long startTime = Time.monotonicNowNanos();
     Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
@@ -290,7 +290,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         responseProto = createContainer(msg);
         metrics.incContainerOpsMetrics(Type.CreateContainer);
         metrics.incContainerOpsLatencies(Type.CreateContainer,
-                Time.monotonicNow() - startTime);
+                Time.monotonicNowNanos() - startTime);
 
         if (responseProto.getResult() != Result.SUCCESS) {
           StorageContainerException sce = new StorageContainerException(
@@ -343,9 +343,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
     perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
     responseProto = handler.handle(msg, container, dispatcherContext);
-    long oPLatencyMS = Time.monotonicNow() - startTime;
+    long opLatencyNs = Time.monotonicNowNanos() - startTime;
     if (responseProto != null) {
-      metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
+      metrics.incContainerOpsLatencies(cmdType, opLatencyNs);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
@@ -418,8 +418,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         audit(action, eventType, msg, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
-      perf.appendOpLatencyMs(oPLatencyMS);
-      performanceAudit(action, msg, perf, oPLatencyMS);
+      perf.appendOpLatencyMs(opLatencyNs);
+      performanceAudit(action, msg, perf, opLatencyNs);
 
       return responseProto;
     } else {
