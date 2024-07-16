@@ -33,71 +33,13 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 
 /**
  * Interface for Container Operations.
  */
 public interface Container<CONTAINERDATA extends ContainerData> {
-  /**
-   * Encapsulates the result of a container scan.
-   */
-  class ScanResult {
-    /**
-     * Represents the reason a container scan failed and a container should
-     * be marked unhealthy.
-     */
-    public enum FailureType {
-      MISSING_CONTAINER_DIR,
-      MISSING_METADATA_DIR,
-      MISSING_CONTAINER_FILE,
-      MISSING_CHUNKS_DIR,
-      MISSING_CHUNK_FILE,
-      CORRUPT_CONTAINER_FILE,
-      CORRUPT_CHUNK,
-      INCONSISTENT_CHUNK_LENGTH,
-      INACCESSIBLE_DB,
-      WRITE_FAILURE,
-      DELETED_CONTAINER
-    }
-
-    private final boolean healthy;
-    private final File unhealthyFile;
-    private final FailureType failureType;
-    private final Throwable exception;
-
-    private ScanResult(boolean healthy, FailureType failureType,
-        File unhealthyFile, Throwable exception) {
-      this.healthy = healthy;
-      this.unhealthyFile = unhealthyFile;
-      this.failureType = failureType;
-      this.exception = exception;
-    }
-
-    public static ScanResult healthy() {
-      return new ScanResult(true, null, null, null);
-    }
-
-    public static ScanResult unhealthy(FailureType type, File failingFile,
-        Throwable exception) {
-      return new ScanResult(false, type, failingFile, exception);
-    }
-
-    public boolean isHealthy() {
-      return healthy;
-    }
-
-    public File getUnhealthyFile() {
-      return unhealthyFile;
-    }
-
-    public FailureType getFailureType() {
-      return failureType;
-    }
-
-    public Throwable getException() {
-      return exception;
-    }
-  }
 
   /**
    * Creates a container.
@@ -230,7 +172,7 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    * @return true if the integrity checks pass
    * Scan the container metadata to detect corruption.
    */
-  ScanResult scanMetaData() throws InterruptedException;
+  MetadataScanResult scanMetaData() throws InterruptedException;
 
   /**
    * Return if the container data should be checksum verified to detect
@@ -243,15 +185,16 @@ public interface Container<CONTAINERDATA extends ContainerData> {
   /**
    * Perform checksum verification for the container data.
    *
-   * @param throttler A reference of {@link DataTransferThrottler} used to
-   *                  perform I/O bandwidth throttling
-   * @param canceler  A reference of {@link Canceler} used to cancel the
-   *                  I/O bandwidth throttling (e.g. for shutdown purpose).
+   * @param throttler       A reference of {@link DataTransferThrottler} used to
+   *                        perform I/O bandwidth throttling
+   * @param canceler        A reference of {@link Canceler} used to cancel the
+   *                        I/O bandwidth throttling (e.g. for shutdown purpose).
+   * @param checksumManager
    * @return true if the checksum verification succeeds
-   *         false otherwise
+   * false otherwise
    * @throws InterruptedException if the scan is interrupted.
    */
-  ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+  DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
 
   /** Acquire read lock. */

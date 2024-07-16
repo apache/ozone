@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 /**
  * Utility class defining methods to write to the datanode container log.

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -58,7 +59,7 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(KeyValueContainerData data, ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -77,7 +78,7 @@ public class ContainerChecksumTreeManager {
    * All other content of the file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void markBlocksAsDeleted(KeyValueContainerData data, SortedSet<Long> deletedBlockIDs) throws IOException {
+  public void markBlocksAsDeleted(ContainerData data, SortedSet<Long> deletedBlockIDs) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -122,7 +123,7 @@ public class ContainerChecksumTreeManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -146,7 +147,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private void write(KeyValueContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
+  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
       throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();

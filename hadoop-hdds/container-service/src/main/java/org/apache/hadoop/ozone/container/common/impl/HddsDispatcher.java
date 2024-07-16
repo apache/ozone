@@ -79,7 +79,8 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it

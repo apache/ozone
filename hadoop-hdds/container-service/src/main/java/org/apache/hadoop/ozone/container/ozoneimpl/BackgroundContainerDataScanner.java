@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -32,8 +33,8 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import static org.apache.hadoop.ozone.container.common.interfaces.ScanResult.FailureType.DELETED_CONTAINER;
 
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
@@ -53,10 +54,11 @@ public class BackgroundContainerDataScanner extends
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
   private final long minScanGap;
+  private final ContainerChecksumTreeManager checksumManager;
 
   public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
                                         ContainerController controller,
-                                        HddsVolume volume) {
+                                        HddsVolume volume, ContainerChecksumTreeManager checksumManager) {
     super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval());
     this.controller = controller;
     this.volume = volume;
@@ -64,6 +66,7 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.minScanGap = conf.getContainerScanMinGap();
+    this.checksumManager = checksumManager;
   }
 
   private boolean shouldScan(Container<?> container) {
@@ -87,7 +90,7 @@ public class BackgroundContainerDataScanner extends
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData);
-    ScanResult result = c.scanData(throttler, canceler);
+    DataScanResult result = c.scanData(throttler, canceler);
 
     // Metrics for skipped containers should not be updated.
     if (result.getFailureType() == DELETED_CONTAINER) {
@@ -104,6 +107,7 @@ public class BackgroundContainerDataScanner extends
       }
     }
 
+    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
     metrics.incNumContainersScanned();
     Instant now = Instant.now();
     logScanCompleted(containerData, now);

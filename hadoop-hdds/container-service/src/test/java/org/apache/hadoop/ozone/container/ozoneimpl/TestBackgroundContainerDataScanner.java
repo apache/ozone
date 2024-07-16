@@ -23,7 +23,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +70,7 @@ public class TestBackgroundContainerDataScanner extends
   public void testRecentlyScannedContainerIsSkipped() throws Exception {
     setScannedTimestampRecent(healthy);
     scanner.runIteration();
-    verify(healthy, never()).scanData(any(), any());
+    verify(healthy, never()).scanData(any(), any(), );
   }
 
   @Test
@@ -80,7 +80,7 @@ public class TestBackgroundContainerDataScanner extends
     // should be scanned.
     setScannedTimestampOld(healthy);
     scanner.runIteration();
-    verify(healthy, atLeastOnce()).scanData(any(), any());
+    verify(healthy, atLeastOnce()).scanData(any(), any(), );
   }
 
   @Test
@@ -90,7 +90,7 @@ public class TestBackgroundContainerDataScanner extends
     when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
     scanner.runIteration();
-    verify(healthy, atLeastOnce()).scanData(any(), any());
+    verify(healthy, atLeastOnce()).scanData(any(), any(), );
   }
 
   @Test
@@ -158,9 +158,8 @@ public class TestBackgroundContainerDataScanner extends
     Container<?> unhealthy = mockKeyValueContainer();
     when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
     when(unhealthy.scanData(any(DataTransferThrottler.class),
-        any(Canceler.class))).thenReturn(getUnhealthyScanResult());
-    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
-        any())).thenReturn(true);
+        any(Canceler.class), )).thenReturn(getUnhealthyScanResult());
+
     setContainers(unhealthy, healthy);
 
     // First iteration should find the unhealthy container.
@@ -213,10 +212,10 @@ public class TestBackgroundContainerDataScanner extends
     assertEquals(0, metrics.getNumUnHealthyContainers());
     // All containers were on the unhealthy volume, so they should not have
     // been scanned.
-    verify(healthy, never()).scanData(any(), any());
-    verify(openContainer, never()).scanData(any(), any());
-    verify(corruptData, never()).scanData(any(), any());
-    verify(openCorruptMetadata, never()).scanData(any(), any());
+    verify(healthy, never()).scanData(any(), any(), );
+    verify(openContainer, never()).scanData(any(), any(), );
+    verify(corruptData, never()).scanData(any(), any(), );
+    verify(openCorruptMetadata, never()).scanData(any(), any(), );
   }
 
 
@@ -226,7 +225,7 @@ public class TestBackgroundContainerDataScanner extends
     CountDownLatch latch = new CountDownLatch(1);
 
     // Make the data scan block until interrupt.
-    when(healthy.scanData(any(), any())).then(i -> {
+    when(healthy.scanData(any(), any(), )).then(i -> {
       latch.countDown();
       Thread.sleep(Duration.ofDays(1).toMillis());
       return null;

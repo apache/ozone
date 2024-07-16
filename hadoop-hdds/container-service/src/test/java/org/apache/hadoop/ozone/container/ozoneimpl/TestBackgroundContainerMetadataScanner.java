@@ -23,7 +23,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,7 +134,7 @@ public class TestBackgroundContainerMetadataScanner extends
     Container<?> unhealthy = mockKeyValueContainer();
     when(unhealthy.scanMetaData()).thenReturn(getUnhealthyScanResult());
     when(unhealthy.scanData(
-        any(DataTransferThrottler.class), any(Canceler.class)))
+        any(DataTransferThrottler.class), any(Canceler.class), ))
         .thenReturn(ScanResult.healthy());
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(true);

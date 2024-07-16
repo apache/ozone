@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -217,7 +217,7 @@ public final class ContainerTestUtils {
     when(c.getContainerData().getVolume()).thenReturn(vol);
 
     try {
-      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class), ))
           .thenReturn(dataScanResult);
       Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
     } catch (InterruptedException ex) {

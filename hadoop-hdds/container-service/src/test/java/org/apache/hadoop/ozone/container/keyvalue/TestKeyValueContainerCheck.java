@@ -26,8 +26,8 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration
 import java.io.File;
 import java.io.RandomAccessFile;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
+import static org.apache.hadoop.ozone.container.common.interfaces.ScanResult.FailureType.DELETED_CONTAINER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -219,7 +219,7 @@ public class TestKeyValueContainerCheck
         sc.getBandwidthPerVolume());
     Canceler canceler = null;
 
-    Container.ScanResult result = kvCheck.scanContainer(throttler, canceler);
+    ScanResult result = kvCheck.scanContainer(throttler, canceler);
 
     assertFalse(result.isHealthy());
     assertEquals(DELETED_CONTAINER, result.getFailureType());
