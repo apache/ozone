@@ -111,6 +111,10 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
+      // Initialize table-specific event map if it does not exist
+      omdbLatestUpdateEvents.putIfAbsent(tableName, new HashMap<>());
+      Map<Object, OMDBUpdateEvent> tableEventsMap = omdbLatestUpdateEvents.get(tableName);
+
       // Handle the event based on its type:
       // - PUT with a new key: Insert the new value.
       // - PUT with an existing key: Update the existing value.
@@ -118,8 +122,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - DELETE with a non-existing key: No action, log a warning if
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
-      Map<Object, OMDBUpdateEvent> tableEventsMap =
-          omdbLatestUpdateEvents.computeIfAbsent(tableName, k -> new HashMap<>());
 
       OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
