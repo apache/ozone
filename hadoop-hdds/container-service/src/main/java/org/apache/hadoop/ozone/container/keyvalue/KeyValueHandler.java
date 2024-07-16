@@ -122,6 +122,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -882,6 +883,7 @@ public class KeyValueHandler extends Handler {
 
       final boolean isCommit = dispatcherContext.getStage().isCommit();
       if (isCommit && writeChunk.hasBlock()) {
+        long startTime = Time.monotonicNowNanos();
         metrics.incContainerOpsMetrics(Type.PutBlock);
         BlockData blockData = BlockData.getFromProtoBuf(
             writeChunk.getBlock().getBlockData());
@@ -898,6 +900,7 @@ public class KeyValueHandler extends Handler {
         blockDataProto = blockData.getProtoBufMessage();
         final long numBytes = blockDataProto.getSerializedSize();
         metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+        metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
       }
 
       // We should increment stats after writeChunk

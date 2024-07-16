@@ -78,13 +78,13 @@ public class ContainerMetrics {
           "num" + type, "number of " + type + " ops", (long) 0));
       opsBytesArray.put(type, registry.newCounter(
           "bytes" + type, "bytes used by " + type + "op", (long) 0));
-      opsLatency.put(type, registry.newRate("latency" + type, type + " op"));
+      opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
 
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
         latQuantiles[j] = registry.newQuantiles(quantileName,
-            "latency of Container ops", "ops", "latency", interval);
+            "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
     }
@@ -111,10 +111,10 @@ public class ContainerMetrics {
   }
 
   public void incContainerOpsLatencies(ContainerProtos.Type type,
-                                       long latencyMillis) {
-    opsLatency.get(type).add(latencyMillis);
+                                       long latencyNs) {
+    opsLatency.get(type).add(latencyNs);
     for (MutableQuantiles q: opsLatQuantiles.get(type)) {
-      q.add(latencyMillis);
+      q.add(latencyNs);
     }
   }
 
