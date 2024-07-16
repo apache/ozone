@@ -110,8 +110,7 @@ public class ContainerMetrics {
     numOpsArray.get(type).incr();
   }
 
-  public void incContainerOpsLatencies(ContainerProtos.Type type,
-                                       long latencyNs) {
+  public void incContainerOpsLatencies(ContainerProtos.Type type, long latencyNs) {
     opsLatency.get(type).add(latencyNs);
     for (MutableQuantiles q: opsLatQuantiles.get(type)) {
       q.add(latencyNs);
