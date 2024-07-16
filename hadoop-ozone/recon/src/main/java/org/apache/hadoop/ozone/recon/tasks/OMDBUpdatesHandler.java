@@ -48,8 +48,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private Map<Integer, String> tablesNames;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
-      = new HashMap<>();
+  private Map<String, Map<Object, OMDBUpdateEvent>> omdbLatestUpdateEvents = new HashMap<>();
   private OMDBDefinition omdbDefinition;
   private OmUpdateEventValidator omUpdateEventValidator;
 
@@ -119,8 +118,10 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - DELETE with a non-existing key: No action, log a warning if
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
+      Map<Object, OMDBUpdateEvent> tableEventsMap =
+          omdbLatestUpdateEvents.computeIfAbsent(tableName, k -> new HashMap<>());
 
-      OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
+      OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
@@ -184,7 +185,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                 "action = %s", tableName, action));
       }
       omdbUpdateEvents.add(event);
-      omdbLatestUpdateEvents.put(key, event);
+      tableEventsMap.put(key, event);
     } else {
       // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {
