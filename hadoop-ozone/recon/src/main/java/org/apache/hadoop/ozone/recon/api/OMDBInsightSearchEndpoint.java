@@ -105,6 +105,7 @@ public class OMDBInsightSearchEndpoint {
    * @param prevKey     The key to start after for the next set of records.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
+   * @throws IllegalArgumentException If the provided startPrefix or other arguments are invalid.
    */
   @GET
   @Path("/open/search")
@@ -254,6 +255,7 @@ public class OMDBInsightSearchEndpoint {
    * @param prevKeyPrefix The path to be converted.
    * @return The object path as "/volumeID/bucketID/ParentId/" or an empty string if an error occurs.
    * @throws IOException If database access fails.
+   * @throws IllegalArgumentException If the provided path is invalid or cannot be converted.
    */
   public String convertToObjectPath(String prevKeyPrefix) throws IOException {
     try {
