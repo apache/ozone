@@ -399,9 +399,12 @@ run_rebot() {
 
   shift 2
 
-  docker run --rm -v "${input_dir}":/results -v "${output_dir}":/rebot-output -w /rebot-output \
+  local tempdir="$(mktemp -d --suffix rebot)"
+  docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
     $(get_runner_image_spec) \
-    bash -c "rebot --nostatusrc $@"
+    bash -c "rebot --nostatusrc -d /rebot-output $@"
+  mv -v "${tempdir}"/* "${output_dir}"/
+  rmdir "${tempdir}"
 }
 
 ## @description  Generate robot framework reports based on the saved results.
@@ -416,7 +419,7 @@ generate_report(){
       xunit_args="--xunit TEST-ozone.xml"
     fi
 
-    run_rebot "$dir" "$dir" "--reporttitle '${title}' -N '${title}' ${xunit_args} /results/*.xml"
+    run_rebot "$dir" "$dir" "--reporttitle '${title}' -N '${title}' ${xunit_args} *.xml"
 
     if [[ -n "${xunit_args}" ]]; then
       mv -v "${dir}"/TEST-ozone.xml "${xunitdir}"/ || rm -f "${dir}"/TEST-ozone.xml
@@ -445,7 +448,7 @@ copy_results() {
   fi
 
   if [[ -n "$(find "${result_dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
-    run_rebot "${result_dir}" "${all_result_dir}" "-N '${test_name}' -l NONE -r NONE -o '${test_name}.xml' /results/*.xml" \
+    run_rebot "${result_dir}" "${all_result_dir}" "-N '${test_name}' -l NONE -r NONE -o '${test_name}.xml' *.xml" \
       && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
