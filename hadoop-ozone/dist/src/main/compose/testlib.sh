@@ -304,9 +304,10 @@ get_output_name() {
 
 save_container_logs() {
   local output_name=$(get_output_name)
-  local c
-  for c in $(docker-compose ps -a "$@" | cut -f1 -d' ' | tail -n +3); do
-    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
+  local id
+  for i in $(docker-compose ps -a -q "$@"); do
+    local c=$(docker ps -a --filter "id=${i}" --format "{{ .Names }}")
+    docker logs "${i}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
   done
 }
 
