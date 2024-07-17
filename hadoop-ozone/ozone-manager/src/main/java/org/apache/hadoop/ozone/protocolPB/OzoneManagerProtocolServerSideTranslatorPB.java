@@ -218,8 +218,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         requestToSubmit = preExecute(finalOmClientRequest);
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
-        OMAuditLogger.log(omClientRequest.getAuditBuilder());
         if (omClientRequest != null) {
+          OMAuditLogger.log(omClientRequest.getAuditBuilder());
           omClientRequest.handleRequestFailure(ozoneManager);
         }
         return createErrorResponse(request, ex);
