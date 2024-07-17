@@ -171,7 +171,7 @@ public final class HddsClientUtils {
 
     if (isIPv4) {
       throw new IllegalArgumentException(resType +
-          "Bucket or Volume name cannot be an IPv4 address or all numeric");
+          " name cannot be an IPv4 address or all numeric");
     }
   }
 
