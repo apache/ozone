@@ -17,9 +17,9 @@
  */
 
 import React from 'react';
-import axios, { CanceledError } from 'axios';
+import axios, { CanceledError, AxiosError } from 'axios';
 import filesize from 'filesize';
-import { Row, Col, Tabs } from 'antd';
+import { Row, Col, Tabs, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
 import { type EChartsOption } from 'echarts';
@@ -274,7 +274,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
 
       if (responseError.length !== 0) {
         responseError.forEach((err) => {
-          if (err.reason.toString().includes("CanceledError")){
+          if (err.reason.toString().includes("CanceledError")) {
             throw new CanceledError('canceled', "ERR_CANCELED");
           }
           else {
@@ -286,10 +286,10 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       }
 
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? [{
-          volume: '0',
-          bucket: '0',
-          fileSize: '0',
-          count: 0
+        volume: '0',
+        bucket: '0',
+        fileSize: '0',
+        count: 0
       }];
       const containerCountResponse: IContainerCountResponse[] = containerCountresponse.value?.data ?? [{
         containerSize: 0,
