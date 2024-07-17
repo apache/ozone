@@ -100,7 +100,7 @@ public final class OMAuditLogger {
           return OMAction.SET_QUOTA;
         }
       }
-      if (cmdType.equals(Type.SetVolumeProperty)) {
+      if (cmdType.equals(Type.SetBucketProperty)) {
         boolean hasBucketOwner = request.getSetBucketPropertyRequest().getBucketArgs().hasOwnerName();
         if (hasBucketOwner) {
           return OMAction.SET_OWNER;
