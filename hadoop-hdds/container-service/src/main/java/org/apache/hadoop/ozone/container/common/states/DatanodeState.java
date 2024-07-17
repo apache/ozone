@@ -58,6 +58,7 @@ public interface DatanodeState<T> {
   /**
    * Clean up some resources.
    */
-  void clear();
+  @SuppressWarnings("checkstyle:WhitespaceAround")
+  default void clear(){}
 
 }
