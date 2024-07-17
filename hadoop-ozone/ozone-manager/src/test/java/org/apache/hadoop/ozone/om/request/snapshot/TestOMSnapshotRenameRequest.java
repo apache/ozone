@@ -60,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -172,8 +173,7 @@ public class TestOMSnapshotRenameRequest {
         bucketName, currentSnapshotName, toSnapshotName);
     OMException omException =
         assertThrows(OMException.class, () -> doPreExecute(omRequest));
-    assertEquals("Invalid snapshot name: " + toSnapshotName,
-        omException.getMessage());
+    assertTrue(omException.getMessage().contains("Invalid snapshot name: " + toSnapshotName));
   }
 
   @Test

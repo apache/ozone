@@ -453,43 +453,25 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire active DB deletedDirectoryTable write lock to block
-    // DirDeletingTask
-    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
-        .writeLock().lock();
-    // Acquire active DB deletedTable write lock to block KeyDeletingTask
-    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-        .writeLock().lock();
-
     boolean snapshotDirExist = false;
-
-    try {
-      // Create DB checkpoint for snapshot
-      String checkpointPrefix = store.getDbLocation().getName();
-      Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-          checkpointPrefix + snapshotInfo.getCheckpointDir());
-      if (Files.exists(snapshotDirPath)) {
-        snapshotDirExist = true;
-        dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
-      } else {
-        dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
-      }
-
-      // Clean up active DB's deletedTable right after checkpoint is taken,
-      // with table write lock held
-      deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-      // Clean up deletedDirectoryTable as well
-      deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-    } finally {
-      // Release deletedTable write lock
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-          .writeLock().unlock();
-      // Release deletedDirectoryTable write lock
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
-          .writeLock().unlock();
+    // Create DB checkpoint for snapshot
+    String checkpointPrefix = store.getDbLocation().getName();
+    Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
+        checkpointPrefix + snapshotInfo.getCheckpointDir());
+    if (Files.exists(snapshotDirPath)) {
+      snapshotDirExist = true;
+      dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
+    } else {
+      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
+
+    // Clean up active DB's deletedTable right after checkpoint is taken,
+    // There is no need to take any lock as of now, because transactions are flushed sequentially.
+    deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+    // Clean up deletedDirectoryTable as well
+    deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
 
     if (dbCheckpoint != null && snapshotDirExist) {
       LOG.info("Checkpoint : {} for snapshot {} already exists.",
