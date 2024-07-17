@@ -273,14 +273,16 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       ].filter((resp) => resp.status === 'rejected');
 
       if (responseError.length !== 0) {
-        let urls: string[] = [];
-        let errors: string[] = [];
-        responseError.forEach((resp) => {
-          console.log(resp);
-          urls.push(resp.reason.config.url);
-          errors.push(`${resp.reason.name}: ${resp.reason.message}`);
-        });
-        throw new PromiseAllSettledError(urls, errors)
+        responseError.forEach((err) => {
+          if (err.reason.toString().includes("CanceledError")){
+            throw new CanceledError('canceled', "ERR_CANCELED");
+          }
+          else {
+            const reqMethod = err.reason.config.method;
+            const reqURL = err.reason.config.url
+            showDataFetchError(`Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`);
+          }
+        })
       }
 
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? [{
@@ -331,15 +333,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         isLoading: false
       });
-      if (error instanceof PromiseAllSettledError){
-        const messages = error.getResponseErrors();
-        error.getFaultyUrls().forEach((url, idx) => {
-          showDataFetchError(`Request to ${url} failed due to\n${messages[idx]}`)
-        })
-      }
-      else {
-        showDataFetchError(error.toString());
-      }
+      showDataFetchError(error.toString());
     });
   }
 

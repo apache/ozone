@@ -141,15 +141,24 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       openResponse: Awaited<Promise<any>>,
       deletePendingResponse: Awaited<Promise<any>>
     ) => {
-      if ([
+      let responseError = [
         clusterStateResponse,
         taskstatusResponse,
         openResponse,
-        deletePendingResponse].some(
-          (resp) =>
-            resp.status === 'rejected' && resp.reason.toString().includes('CanceledError')
-        )) {
-        throw new CanceledError('canceled', "ERR_CANCELED",)
+        deletePendingResponse
+      ].filter((resp) => resp.status === 'rejected');
+
+      if (responseError.length !== 0) {
+        responseError.forEach((err) => {
+          if (err.reason.toString().includes("CanceledError")){
+            throw new CanceledError('canceled', "ERR_CANCELED");
+          }
+          else {
+            const reqMethod = err.reason.config.method;
+            const reqURL = err.reason.config.url
+            showDataFetchError(`Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`);
+          }
+        })
       }
 
       const clusterState: IClusterStateResponse = clusterStateResponse.value?.data ?? {
