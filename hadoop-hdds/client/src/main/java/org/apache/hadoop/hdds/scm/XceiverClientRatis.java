@@ -64,6 +64,7 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -318,7 +319,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         } else {
           getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
               .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()))
-              .thenAccept(replyFuture::complete);
+              .whenComplete(JavaUtils.asBiConsumer(replyFuture));
         }
       } else {
         replyFuture.completeExceptionally(e);
