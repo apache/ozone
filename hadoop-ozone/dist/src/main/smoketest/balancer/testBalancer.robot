@@ -63,6 +63,8 @@ Datanode Recommission is Finished
 Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
+
+Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
                             Should Contain                  ${result}             ContainerBalancer is Running.
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
@@ -168,6 +170,8 @@ Verify Container Balancer for RATIS containers
     Run Balancer Verbose Status
 
     Run Balancer Verbose History Status
+
+    Wait Finish Of Balancing
 
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
