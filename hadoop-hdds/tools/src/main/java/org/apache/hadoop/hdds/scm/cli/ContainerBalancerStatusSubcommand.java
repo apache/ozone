@@ -49,7 +49,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
           description = "Verbose output. Show current iteration info.")
   private boolean verbose;
 
-  @CommandLine.Option(names = {"-h", "--history"},
+  @CommandLine.Option(names = {"-H", "--history"},
       description = "Verbose output with history. Show current iteration info and history of iterations. " +
           "Works only with -v.")
   private boolean verboseWithHistory;
@@ -69,12 +69,13 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
         List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
-        if (!verboseWithHistory) {
-          System.out.println("Current iteration info:");
-          System.out.println(
-              getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))
-          );
-        } else if (verboseWithHistory) {
+
+        System.out.println("Current iteration info:");
+        System.out.println(
+            getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))
+        );
+
+        if (verboseWithHistory) {
           System.out.println("Iteration history list:");
           System.out.println(
               iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
