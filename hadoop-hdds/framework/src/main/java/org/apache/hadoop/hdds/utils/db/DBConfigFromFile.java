@@ -136,7 +136,7 @@ public final class DBConfigFromFile {
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          toIOException("Unable to find/open Options file.", rdEx);
+          throw toIOException("Unable to find/open Options file.", rdEx);
         }
       }
     }
