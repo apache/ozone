@@ -128,23 +128,6 @@ public interface CertificateClient extends Closeable {
   Set<X509Certificate> getAllCaCerts();
 
   /**
-   * Return the pem encoded CA certificate list.
-   * <p>
-   * If initialized return list of pem encoded CA certificates, else return
-   * null.
-   *
-   * @return list of pem encoded CA certificates.
-   */
-  List<String> getCAList();
-
-  /**
-   * Update and returns the pem encoded CA certificate list.
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> updateCAList() throws IOException;
-
-  /**
    * Verifies a digital Signature, given the signature and the certificate of
    * the signer.
    * @param data - Data in byte array.

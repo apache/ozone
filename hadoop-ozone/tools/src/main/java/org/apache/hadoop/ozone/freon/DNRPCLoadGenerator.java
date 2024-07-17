@@ -23,8 +23,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -150,12 +150,15 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     }
     encodedContainerToken = scmClient.getEncodedContainerToken(containerID);
     XceiverClientFactory xceiverClientManager;
+    OzoneManagerProtocolClientSideTranslatorPB omClient;
     if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, configuration);
+      omClient = createOmClient(configuration, null);
+      CACertificateProvider caCerts = () -> omClient.getServiceInfo().provideCACerts();
       xceiverClientManager = new XceiverClientManager(configuration,
           configuration.getObject(XceiverClientManager.ScmClientConfig.class),
           new ClientTrustManager(caCerts, null));
     } else {
+      omClient = null;
       xceiverClientManager = new XceiverClientManager(configuration);
     }
     clients = new ArrayList<>(numClients);
@@ -170,6 +173,9 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     try {
       runTests(this::sendRPCReq);
     } finally {
+      if (omClient != null) {
+        omClient.close();
+      }
       for (XceiverClientSpi client : clients) {
         xceiverClientManager.releaseClient(client, false);
       }

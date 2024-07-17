@@ -420,32 +420,14 @@ public final class HAUtils {
    * Build CA List in the format of X509Certificate.
    * If certificate client is null, obtain the list of CA using SCM
    * security client, else it uses certificate client.
+   *
    * @return list of CA X509Certificates.
    */
-  public static List<X509Certificate> buildCAX509List(
-      CertificateClient certClient,
-      ConfigurationSource conf) throws IOException {
+  public static List<X509Certificate> buildCAX509List(ConfigurationSource conf) throws IOException {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
-    if (certClient != null) {
-      //There can't be more than 1 SCM without HA enabled
-      if (scmNodes.size() > 1) {
-        // First check if cert client has ca list initialized.
-        // This is being done, when this method is called multiple times we
-        // don't make call to SCM, we return from in-memory.
-        List<String> caCertPemList = certClient.getCAList();
-        int expectedCount = scmNodes.size() + 1;
-        if (caCertPemList != null && caCertPemList.size() == expectedCount) {
-          return OzoneSecurityUtil.convertToX509(caCertPemList);
-        }
-        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() ->
-                waitForCACerts(certClient::updateCAList, expectedCount),
-            waitDuration));
-      }
-      return generateCAList(certClient);
-    }
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
         HddsServerUtil.getScmSecurityClient(conf);
     if (!SCMHAUtils.isSCMHAEnabled(conf)) {

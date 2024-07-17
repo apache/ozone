@@ -986,43 +986,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public List<String> getCAList() {
-    pemEncodedCACertsLock.lock();
-    try {
-      return pemEncodedCACerts;
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  public List<String> listCA() throws IOException {
-    pemEncodedCACertsLock.lock();
-    try {
-      if (pemEncodedCACerts == null) {
-        updateCAList();
-      }
-      return pemEncodedCACerts;
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  @Override
-  public List<String> updateCAList() throws IOException {
-    pemEncodedCACertsLock.lock();
-    try {
-      pemEncodedCACerts = getScmSecureClient().listCACertificate();
-      return pemEncodedCACerts;
-    } catch (Exception e) {
-      getLogger().error("Error during updating CA list", e);
-      throw new CertificateException("Error during updating CA list", e,
-          CERTIFICATE_ERROR);
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  @Override
   public ReloadingX509TrustManager getTrustManager() throws CertificateException {
     try {
       if (trustManager == null) {

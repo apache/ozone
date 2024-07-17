@@ -255,16 +255,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     return rootCerts;
   }
 
-  @Override
-  public List<String> getCAList() {
-    return null;
-  }
-
-  @Override
-  public List<String> updateCAList() throws IOException  {
-    return null;
-  }
-
   public void renewRootCA() throws Exception {
     LocalDateTime start = LocalDateTime.now();
     Duration rootCACertDuration = securityConfig.getMaxCertificateDuration();
