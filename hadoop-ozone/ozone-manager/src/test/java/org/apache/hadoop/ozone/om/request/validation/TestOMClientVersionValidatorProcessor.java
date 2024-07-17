@@ -166,26 +166,6 @@ public class TestOMClientVersionValidatorProcessor {
   }
 
   @Test
-  public void testEmptyValidationConditionListDoesNotCompile() {
-    List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
-        modifiers("public", "static"),
-        returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
-  }
-
-  @Test
-  public void testNullValidationConditionListDoesNotCompile() {
-    List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
-        modifiers("public", "static"),
-        returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
-  }
-
-  @Test
   public void testNotEnoughParametersForPreProcess() {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType()),

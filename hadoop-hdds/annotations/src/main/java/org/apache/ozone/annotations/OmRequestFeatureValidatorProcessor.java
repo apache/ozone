@@ -90,8 +90,7 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String VALIDATION_CONTEXT_CLASS_NAME =
       "org.apache.hadoop.ozone.om.request.validation.ValidationContext";
 
-
-  public static final List<String> ANNOTATION_SIMPLE_NAMES = Arrays.asList("OMClientVersionValidator",
+  private static final List<String> ANNOTATION_SIMPLE_NAMES = Arrays.asList("OMClientVersionValidator",
       "OMLayoutVersionValidator");
   public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
   public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =

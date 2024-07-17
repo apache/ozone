@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.ComponentVersion;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Map;
 
 import static java.util.function.Function.identity;
@@ -48,8 +49,6 @@ public enum ClientVersion implements ComponentVersion {
 
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
-
-  public static final String ERASURE_CODING_SUPPORT_NAME = ERASURE_CODING_SUPPORT.name();
 
   public static final ClientVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
@@ -81,8 +80,8 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   private static ClientVersion latest() {
-    ClientVersion[] versions = ClientVersion.values();
-    return versions[versions.length - 2];
+    return Arrays.stream(ClientVersion.values())
+        .max(Comparator.comparingInt(ComponentVersion::toProtoValue)).orElse(null);
   }
 
 }
