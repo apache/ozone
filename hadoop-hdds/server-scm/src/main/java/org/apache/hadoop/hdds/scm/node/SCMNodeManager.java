@@ -145,6 +145,8 @@ public class SCMNodeManager implements NodeManager {
   private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
   private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
   private static final String TOTALCAPACITY = "CAPACITY";
+  private static final String DNUUID = "UUID";
+  private static final String VERSION = "VERSION";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1134,6 +1136,8 @@ public class SCMNodeManager implements NodeManager {
       String nonScmUsedPerc = storagePercentage[1];
       map.put(USEDSPACEPERCENT,
           "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      map.put(DNUUID, dni.getUuidString());
+      map.put(VERSION, dni.getVersion());
       nodes.put(hostName, map);
     }
     return nodes;

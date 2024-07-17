@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -73,6 +74,8 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getClusterId();
 
   String getScmRatisRoles();
+
+  List<List<String>> getRatisRoles();
 
   /**
    * Primordial node is the node on which scm init operation is performed.
