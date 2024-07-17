@@ -19,6 +19,7 @@ services:
   rm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: rm
+    dns_search: .
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
@@ -37,6 +38,7 @@ services:
   nm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: nm
+    dns_search: .
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
@@ -56,6 +58,7 @@ services:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     container_name: jhs
     hostname: jhs
+    dns_search: .
     volumes:
       - ../..:/opt/ozone
       - ../_keytabs:/etc/security/keytabs
