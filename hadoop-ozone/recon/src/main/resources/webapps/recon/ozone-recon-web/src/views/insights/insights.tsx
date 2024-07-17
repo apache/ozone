@@ -27,7 +27,7 @@ import { type EChartsOption } from 'echarts';
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
-import { PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
+import { PromiseAllSettledGetHelper, PromiseAllSettledError } from '@/utils/axiosRequestHelper';
 
 import './insights.less';
 
@@ -267,14 +267,22 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       fileCountresponse: Awaited<Promise<any>>,
       containerCountresponse: Awaited<Promise<any>>
     ) => {
-      if ([
+      let responseError = [
         fileCountresponse,
-        containerCountresponse].some(
-          (resp) =>
-            resp.status === 'rejected' && resp.reason.toString().includes('CanceledError')
-      )) {
-        throw new CanceledError('canceled', "ERR_CANCELED",)
+        containerCountresponse
+      ].filter((resp) => resp.status === 'rejected');
+
+      if (responseError.length !== 0) {
+        let urls: string[] = [];
+        let errors: string[] = [];
+        responseError.forEach((resp) => {
+          console.log(resp);
+          urls.push(resp.reason.config.url);
+          errors.push(`${resp.reason.name}: ${resp.reason.message}`);
+        });
+        throw new PromiseAllSettledError(urls, errors)
       }
+
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? [{
           volume: '0',
           bucket: '0',
@@ -286,8 +294,6 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         count: 0
       }];
 
-      console.log(fileCountsResponse);
-      console.log(containerCountResponse);
       // Construct volume -> bucket[] map for populating filters
       // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
       const volumeBucketMap: Map<string, Set<string>> = fileCountsResponse.reduce(
@@ -325,7 +331,15 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      if (error instanceof PromiseAllSettledError){
+        const messages = error.getResponseErrors();
+        error.getFaultyUrls().forEach((url, idx) => {
+          showDataFetchError(`Request to ${url} failed due to\n${messages[idx]}`)
+        })
+      }
+      else {
+        showDataFetchError(error.toString());
+      }
     });
   }
 

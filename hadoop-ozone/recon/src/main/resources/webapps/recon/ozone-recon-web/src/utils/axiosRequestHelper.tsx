@@ -69,6 +69,26 @@ export const PromiseAllSettledGetHelper = (
   }
 }
 
+export class PromiseAllSettledError extends Error {
+
+  _urls: string[];
+  _errors: string[];
+
+  constructor(urls: string[], errors: string[], ...opts){
+    super(...opts);
+    this._urls = urls;
+    this._errors = errors;
+  }
+
+  getFaultyUrls() {
+    return this._urls;
+  }
+
+  getResponseErrors() {
+    return this._errors;
+  }
+}
+
 export const cancelRequests = (cancelSignal: AbortController[]) => {
   cancelSignal.forEach((signal) => {
     signal && signal.abort();
