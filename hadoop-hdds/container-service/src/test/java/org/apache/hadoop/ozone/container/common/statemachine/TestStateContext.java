@@ -542,6 +542,11 @@ public class TestStateContext {
                 10000);
             return DatanodeStates.RUNNING;
           }
+
+          @Override
+          public void clear() {
+
+          }
         };
       }
     };
@@ -624,6 +629,11 @@ public class TestStateContext {
           public DatanodeStates await(long time, TimeUnit timeUnit) {
             awaited.incrementAndGet();
             return DatanodeStates.INIT;
+          }
+
+          @Override
+          public void clear() {
+
           }
         };
       }

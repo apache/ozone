@@ -55,4 +55,9 @@ public interface DatanodeState<T> {
   T await(long time, TimeUnit timeUnit)
       throws InterruptedException, ExecutionException, TimeoutException;
 
+  /**
+   * Clean up some resources.
+   */
+  void clear();
+
 }

@@ -31,11 +31,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -54,9 +51,6 @@ public class RunningDatanodeState implements DatanodeState {
   private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
-  /** Cache the end point task per end point per end point state. */
-  private Map<EndpointStateMachine, Map<EndPointStates,
-      Callable<EndPointStates>>> endpointTasks;
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -64,55 +58,6 @@ public class RunningDatanodeState implements DatanodeState {
     this.connectionManager = connectionManager;
     this.conf = conf;
     this.context = context;
-    initEndPointTask();
-  }
-
-  /**
-   * Initialize end point tasks corresponding to each end point,
-   * each end point state.
-   */
-  private void initEndPointTask() {
-    endpointTasks = new HashMap<>();
-    for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      EnumMap<EndPointStates, Callable<EndPointStates>> endpointTaskForState =
-          new EnumMap<>(EndPointStates.class);
-
-      for (EndPointStates state : EndPointStates.values()) {
-        Callable<EndPointStates> endPointTask = null;
-        switch (state) {
-        case GETVERSION:
-          endPointTask = new VersionEndpointTask(endpoint, conf,
-              context.getParent().getContainer());
-          break;
-        case REGISTER:
-          endPointTask = RegisterEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setContext(context)
-              .setDatanodeDetails(context.getParent().getDatanodeDetails())
-              .setOzoneContainer(context.getParent().getContainer())
-              .build();
-          break;
-        case HEARTBEAT:
-          endPointTask = HeartbeatEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setDatanodeDetails(context
-                  .getParent()
-                  .getDatanodeDetails())
-              .setContext(context)
-              .build();
-          break;
-        default:
-          break;
-        }
-
-        if (endPointTask != null) {
-          endpointTaskForState.put(state, endPointTask);
-        }
-      }
-      endpointTasks.put(endpoint, endpointTaskForState);
-    }
   }
 
   /**
@@ -173,11 +118,32 @@ public class RunningDatanodeState implements DatanodeState {
 
   private Callable<EndPointStates> getEndPointTask(
       EndpointStateMachine endpoint) {
-    if (endpointTasks.containsKey(endpoint)) {
-      return endpointTasks.get(endpoint).get(endpoint.getState());
-    } else {
-      throw new IllegalArgumentException("Illegal endpoint: " + endpoint);
+    Callable<EndPointStates> endpointTask = null;
+    for (EndpointStateMachine endpointStateMachine : connectionManager.getValues()) {
+      if (endpointStateMachine.getAddressString().equals(endpoint.getAddressString())) {
+        if (endpoint.getState().getValue() == EndPointStates.GETVERSION.getValue()) {
+          endpointTask = new VersionEndpointTask(endpoint, conf,
+              context.getParent().getContainer());
+        } else if (endpoint.getState().getValue() == EndPointStates.REGISTER.getValue()) {
+          endpointTask = RegisterEndpointTask.newBuilder()
+              .setConfig(conf)
+              .setEndpointStateMachine(endpoint)
+              .setContext(context)
+              .setDatanodeDetails(context.getParent().getDatanodeDetails())
+              .setOzoneContainer(context.getParent().getContainer())
+              .build();
+        } else if (endpoint.getState().getValue() == EndPointStates.HEARTBEAT.getValue()) {
+          endpointTask = HeartbeatEndpointTask.newBuilder()
+              .setConfig(conf)
+              .setEndpointStateMachine(endpoint)
+              .setDatanodeDetails(context.getParent().getDatanodeDetails())
+              .setContext(context)
+              .build();
+        }
+      }
     }
+
+    return endpointTask;
   }
 
   /**
@@ -237,5 +203,10 @@ public class RunningDatanodeState implements DatanodeState {
       timeLeft = durationMS - (Time.monotonicNow() - startTime);
     }
     return computeNextContainerState(results);
+  }
+
+  @Override
+  public void clear() {
+    ecs = null;
   }
 }

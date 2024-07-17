@@ -178,4 +178,9 @@ public class InitDatanodeState implements DatanodeState,
       ExecutionException, TimeoutException {
     return result.get(time, timeUnit);
   }
+
+  @Override
+  public void clear() {
+
+  }
 }
