@@ -251,9 +251,8 @@ public final class HddsClientUtils {
 
   // This will return the underlying expected exception if it exists
   // in an exception trace. Otherwise, returns null.
-  public static Throwable containsException(Exception e,
+  public static Throwable containsException(Throwable t,
             Class<? extends Exception> expectedExceptionClass) {
-    Throwable t = e;
     while (t != null) {
       if (expectedExceptionClass.isInstance(t)) {
         return t;

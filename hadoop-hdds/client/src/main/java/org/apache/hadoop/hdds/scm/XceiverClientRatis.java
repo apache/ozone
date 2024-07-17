@@ -299,37 +299,33 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       return CompletableFuture.completedFuture(newWatchReply(index, "replicatedMin", replicatedMin));
     }
 
-    final CompletableFuture<RaftClientReply> replyFuture;
-    try {
-      replyFuture = getClient().async().watch(index, watchType);
-    } catch (Exception e) {
+    final CompletableFuture<XceiverClientReply> replyFuture = new CompletableFuture<>();
+    getClient().async().watch(index, watchType).thenAccept(reply -> {
+      final long updated = updateCommitInfosMap(reply, watchType);
+      Preconditions.checkState(updated >= index, "Returned index " + updated + " < expected " + index);
+      replyFuture.complete(newWatchReply(index, watchType, updated));
+    }).exceptionally(e -> {
       LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);
-      Throwable t =
-          HddsClientUtils.containsException(e, GroupMismatchException.class);
-      if (t != null) {
-        throw e;
-      }
-      if (watchType == ReplicationLevel.ALL_COMMITTED) {
+      final boolean isGroupMismatch = HddsClientUtils.containsException(e, GroupMismatchException.class) != null;
+      if (!isGroupMismatch && watchType == ReplicationLevel.ALL_COMMITTED) {
         final Throwable nre = HddsClientUtils.containsException(e, NotReplicatedException.class);
         if (nre instanceof NotReplicatedException) {
           // If NotReplicatedException is thrown from the Datanode leader
           // we can save one watch request round trip by using the CommitInfoProto
           // in the NotReplicatedException
           final Collection<CommitInfoProto> commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
-          return CompletableFuture.completedFuture(handleFailedAllCommit(index, commitInfoProtoList));
+          replyFuture.complete(handleFailedAllCommit(index, commitInfoProtoList));
         } else {
-          return getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
-              .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()));
+          getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
+              .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()))
+              .thenAccept(replyFuture::complete);
         }
+      } else {
+        replyFuture.completeExceptionally(e);
       }
-      throw e;
-    }
-
-    return replyFuture.thenApply(reply -> {
-      final long updated = updateCommitInfosMap(reply, watchType);
-      Preconditions.checkState(updated >= index, "Returned index " + updated + " is smaller than expected " + index);
-      return newWatchReply(index, watchType, updated);
+      return null;
     });
+    return replyFuture;
   }
 
   private XceiverClientReply handleFailedAllCommit(long index, Collection<CommitInfoProto> commitInfoProtoList) {
