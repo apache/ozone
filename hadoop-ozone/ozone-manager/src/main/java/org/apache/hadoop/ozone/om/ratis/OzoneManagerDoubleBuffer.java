@@ -572,12 +572,6 @@ public final class OzoneManagerDoubleBuffer {
       return true;
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      if (isRunning.get()) {
-        final String message = "OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Interrupted " +
-            "exception while running";
-        ExitUtils.terminate(1, message, ex, LOG);
-      }
       LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
           + "exit.", Thread.currentThread().getName());
       return false;
