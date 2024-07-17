@@ -125,7 +125,7 @@ Get Datanode Ozone Used Bytes Info
     [return]          ${result}
 
 ** Test Cases ***
-Verify Container Balancer for RATIS containers
+Verify Container Balancer Status Output
     Prepare For Tests
 
     Datanode In Maintenance Mode
