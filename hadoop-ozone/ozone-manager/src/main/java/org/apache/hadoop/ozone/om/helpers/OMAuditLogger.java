@@ -112,6 +112,7 @@ public final class OMAuditLogger {
 
   public static void log(OMAuditLogger.Builder builder) {
     if (builder.isLog.get()) {
+      builder.getMessageBuilder().withParams(builder.getAuditMap());
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
     }
   }
