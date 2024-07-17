@@ -148,7 +148,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Fails",
+      "title": "No. of Failed Key Deletes",
       "type": "timeseries"
     },
     {
@@ -245,7 +245,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Success",
+      "title": "No. of Successful Key Deletes",
       "type": "timeseries"
     },
     {
@@ -972,7 +972,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Fails",
+      "title": "No. of Failed Key Deletes",
       "type": "timeseries"
     },
     {
@@ -1069,7 +1069,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Success",
+      "title": "No. of Successful Key Deletes",
       "type": "timeseries"
     },
     {
@@ -1417,7 +1417,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Fails",
+      "title": "No. of Failed Key Deletes",
       "type": "timeseries"
     },
     {
@@ -1536,7 +1536,7 @@
           "useBackend": false
         }
       ],
-      "title": "No. of Key Delete Success",
+      "title": "No. of Successful Key Deletes",
       "type": "timeseries"
     },
     {
@@ -1763,8 +1763,8 @@
     "list": []
   },
   "time": {
-    "from": "2024-07-15T09:26:22.174Z",
-    "to": "2024-07-15T10:46:26.032Z"
+    "from": "now-6h",
+    "to": "now"
   },
   "timepicker": {},
   "timezone": "",
