@@ -934,18 +934,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean shouldScanMetadata() {
-    boolean shouldScan =
-        getContainerState() != ContainerDataProto.State.UNHEALTHY;
-    if (!shouldScan && LOG.isDebugEnabled()) {
-      LOG.debug("Container {} in state {} should not have its metadata " +
-              "scanned.",
-          containerData.getContainerID(), containerData.getState());
-    }
-    return shouldScan;
-  }
-
-  @Override
   public ScanResult scanMetaData() throws InterruptedException {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
@@ -958,7 +946,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public boolean shouldScanData() {
     boolean shouldScan =
         getContainerState() == ContainerDataProto.State.CLOSED
-        || getContainerState() == ContainerDataProto.State.QUASI_CLOSED;
+        || getContainerState() == ContainerDataProto.State.QUASI_CLOSED
+        || getContainerState() == ContainerDataProto.State.UNHEALTHY;
     if (!shouldScan && LOG.isDebugEnabled()) {
       LOG.debug("Container {} in state {} should not have its data scanned.",
           containerData.getContainerID(), containerData.getState());

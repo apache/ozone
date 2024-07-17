@@ -67,8 +67,9 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          .setDataMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
+      ContainerProtos.ContainerChecksumInfo newChecksumInfo = captureLatencyNs(
+          metrics.getReadContainerMerkleTreeLatencyNS(), () -> read(data)).toBuilder()
+          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
           .build();
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
           () -> write(data, newChecksumInfo));
@@ -91,7 +92,8 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data).toBuilder();
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = captureLatencyNs(
+          metrics.getReadContainerMerkleTreeLatencyNS(), () -> read(data)).toBuilder();
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
@@ -130,7 +132,7 @@ public class ContainerChecksumTreeManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  public ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -146,12 +148,9 @@ public class ContainerChecksumTreeManager {
             .setContainerID(containerID)
             .build();
       }
-      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () ->
-          readFile(checksumFile));
-    } catch (IOException ex) {
-      metrics.incrementMerkleTreeReadFailures();
-      throw new IOException("Error occurred when reading container merkle tree for containerID "
-        + data.getContainerID(), ex);
+      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+      }
     } finally {
       readLock.unlock();
     }
@@ -174,7 +173,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private File getContainerChecksumFile(KeyValueContainerData data) {
+  public File getContainerChecksumFile(KeyValueContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 

@@ -122,7 +122,7 @@ public abstract class TestContainerScannersAbstract {
   public abstract void testShutdownDuringScan() throws Exception;
 
   @Test
-  public abstract void testUnhealthyContainerNotRescanned() throws Exception;
+  public abstract void testUnhealthyContainerRescanned() throws Exception;
 
   // HELPER METHODS
 
@@ -170,8 +170,6 @@ public abstract class TestContainerScannersAbstract {
     // and test it.
     when(unhealthy.shouldScanData()).thenCallRealMethod();
     assertTrue(unhealthy.shouldScanData());
-    when(unhealthy.shouldScanMetadata()).thenCallRealMethod();
-    assertTrue(unhealthy.shouldScanMetadata());
 
     when(unhealthy.getContainerData().getVolume()).thenReturn(vol);
 

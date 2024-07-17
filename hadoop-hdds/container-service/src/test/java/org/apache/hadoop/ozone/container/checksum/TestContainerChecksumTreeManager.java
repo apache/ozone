@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -43,6 +45,7 @@ class TestContainerChecksumTreeManager {
   @TempDir
   private File testDir;
   private KeyValueContainerData container;
+  private File checksumFile;
   private ContainerChecksumTreeManager checksumManager;
   private ContainerMerkleTreeMetrics metrics;
 
@@ -51,6 +54,7 @@ class TestContainerChecksumTreeManager {
     container = mock(KeyValueContainerData.class);
     when(container.getContainerID()).thenReturn(CONTAINER_ID);
     when(container.getMetadataPath()).thenReturn(testDir.getAbsolutePath());
+    checksumFile = new File(testDir, CONTAINER_ID + ".tree");
     checksumManager = new ContainerChecksumTreeManager(new DatanodeConfiguration());
     metrics = checksumManager.getMetrics();
   }
@@ -64,12 +68,12 @@ class TestContainerChecksumTreeManager {
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
 
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -80,12 +84,12 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>());
     assertTrue(metrics.getUpdateContainerMerkleTreeLatencyNS().lastStat().total() > 0);
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -98,7 +102,7 @@ class TestContainerChecksumTreeManager {
     ContainerMerkleTree tree = buildTestTree();
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
@@ -106,7 +110,7 @@ class TestContainerChecksumTreeManager {
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     // TestContainerMerkleTree verifies that going from ContainerMerkleTree to its proto is consistent.
     // Therefore, we can use the proto version of our expected tree to check what was written to the file.
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
   @Test
@@ -117,12 +121,12 @@ class TestContainerChecksumTreeManager {
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
     assertTrue(metrics.getUpdateContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -140,13 +144,13 @@ class TestContainerChecksumTreeManager {
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getUpdateContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
   @Test
@@ -162,13 +166,19 @@ class TestContainerChecksumTreeManager {
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getUpdateContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(container);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
     assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
+  }
+
+  @Test
+  public void testChecksumTreeFilePath() {
+    assertEquals(checksumFile.getAbsolutePath(),
+        checksumManager.getContainerChecksumFile(container).getAbsolutePath());
   }
 
   private ContainerMerkleTree buildTestTree() throws Exception {
@@ -188,5 +198,11 @@ class TestContainerChecksumTreeManager {
     tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
 
     return tree;
+  }
+
+  private ContainerProtos.ContainerChecksumInfo readFile() throws IOException {
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+    }
   }
 }
