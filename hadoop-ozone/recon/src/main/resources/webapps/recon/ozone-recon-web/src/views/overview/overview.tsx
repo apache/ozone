@@ -151,6 +151,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         )) {
         throw new CanceledError('canceled', "ERR_CANCELED",)
       }
+
       const clusterState: IClusterStateResponse = clusterStateResponse.value?.data ?? {
         missingContainers: 'N/A',
         totalDatanodes: 'N/A',
@@ -259,7 +260,25 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
       omStatus, openContainers, deletedContainers, scmServiceId, omServiceId } = this.state;
 
-    console.log(datanodes);
+    let openKeysError: boolean = false;
+    let pendingDeleteKeysError: boolean = false;
+    if ([
+      openSummarytotalRepSize,
+      openSummarytotalUnrepSize,
+      openSummarytotalOpenKeys].some(
+        (data) => data === undefined
+      )) {
+      openKeysError = true;
+    }
+
+    if ([
+      deletePendingSummarytotalRepSize,
+      deletePendingSummarytotalUnrepSize,
+      deletePendingSummarytotalDeletedKeys].some(
+        (data) => data === undefined
+      )) {
+        pendingDeleteKeysError = true;
+      }
     const datanodesElement = datanodes !== 'N/A'
       ? (
         <span>
@@ -279,16 +298,16 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       )
     const openSummaryData = (
       <div>
-        {openSummarytotalRepSize !== undefined ? byteToSize(openSummarytotalRepSize, 1) : '0'}   <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
-        {openSummarytotalUnrepSize !== undefined ? byteToSize(openSummarytotalUnrepSize, 1) : '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
-        {openSummarytotalOpenKeys !== undefined ? openSummarytotalOpenKeys : '0'}  <span className='ant-card-meta-description meta'>Total Open Keys</span>
+        {openSummarytotalRepSize !== undefined ? byteToSize(openSummarytotalRepSize, 1) : 'N/A'}   <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+        {openSummarytotalUnrepSize !== undefined ? byteToSize(openSummarytotalUnrepSize, 1) : 'N/A'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+        {openSummarytotalOpenKeys !== undefined ? openSummarytotalOpenKeys : 'N/A'}  <span className='ant-card-meta-description meta'>Total Open Keys</span>
       </div>
     );
     const deletePendingSummaryData = (
       <div>
-        {deletePendingSummarytotalRepSize !== undefined ? byteToSize(deletePendingSummarytotalRepSize, 1) : '0'}  <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
-        {deletePendingSummarytotalUnrepSize !== undefined ? byteToSize(deletePendingSummarytotalUnrepSize, 1) : '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
-        {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys : '0'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
+        {deletePendingSummarytotalRepSize !== undefined ? byteToSize(deletePendingSummarytotalRepSize, 1) : 'N/A'}  <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+        {deletePendingSummarytotalUnrepSize !== undefined ? byteToSize(deletePendingSummarytotalUnrepSize, 1) : 'N/A'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+        {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys : 'N/A'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
       </div>
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
@@ -372,10 +391,22 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
-            <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' linkToUrl='/Om' />
+            <OverviewCard
+              loading={loading}
+              title='Open Keys Summary'
+              data={openSummaryData}
+              icon='file-text'
+              linkToUrl='/Om'
+              error={openKeysError} />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
-            <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' linkToUrl='/Om' />
+            <OverviewCard
+              loading={loading}
+              title='Pending Deleted Keys Summary'
+              data={deletePendingSummaryData}
+              icon='delete'
+              linkToUrl='/Om'
+              error={pendingDeleteKeysError} />
           </Col>
           {scmServiceId &&
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>

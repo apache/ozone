@@ -63,7 +63,6 @@ export const PromiseAllSettledGetHelper = (
     axiosGetRequests.push(axios.get(url, { signal: controller.signal }))
   });
 
-  console.log(axiosGetRequests);
   return {
     requests: Promise.allSettled(axiosGetRequests),
     controller: controller

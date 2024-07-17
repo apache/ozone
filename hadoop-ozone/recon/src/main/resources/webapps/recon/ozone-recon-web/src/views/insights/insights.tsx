@@ -195,10 +195,6 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return (size(value));
       });
 
-      console.log(xyFileCountMap);
-      console.log(xContainerCountValues);
-      console.log(xyContainerCountMap);
-
       this.setState({
         fileCountData: {
           title: {
@@ -279,16 +275,19 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       )) {
         throw new CanceledError('canceled', "ERR_CANCELED",)
       }
-      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? {
+      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? [{
           volume: '0',
           bucket: '0',
           fileSize: '0',
           count: 0
-      };
-      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.value?.data ?? {
+      }];
+      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.value?.data ?? [{
         containerSize: 0,
         count: 0
-      };
+      }];
+
+      console.log(fileCountsResponse);
+      console.log(containerCountResponse);
       // Construct volume -> bucket[] map for populating filters
       // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
       const volumeBucketMap: Map<string, Set<string>> = fileCountsResponse.reduce(

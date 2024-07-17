@@ -142,9 +142,11 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
 
     let meta = <Meta title={data} description={title} />;
     let errorClass = error ? 'card-error' : '';
+
     if (typeof data === 'string' && data === 'N/A'){
       errorClass = 'card-error';
     }
+
     if (storageReport) {
       meta = (
         <div className='ant-card-percentage'>
