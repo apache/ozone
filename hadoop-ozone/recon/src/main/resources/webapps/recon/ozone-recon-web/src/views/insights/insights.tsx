@@ -22,7 +22,7 @@ import filesize from 'filesize';
 import { Row, Col, Tabs, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
-import { type EChartsOption } from 'echarts';
+import { graphic, type EChartsOption } from 'echarts';
 
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
@@ -58,6 +58,8 @@ interface IInsightsState {
   bucketOptions: IOption[];
   volumeOptions: IOption[];
   isBucketSelectionDisabled: boolean;
+  fileCountError: string | undefined;
+  containerSizeError: string | undefined;
 }
 
 const allVolumesOption: IOption = {
@@ -86,7 +88,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       selectedVolumes: [],
       bucketOptions: [],
       volumeOptions: [],
-      isBucketSelectionDisabled: false
+      isBucketSelectionDisabled: false,
+      fileCountError: undefined,
+      containerSizeError: undefined
     };
   }
 
@@ -195,6 +199,82 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return (size(value));
       });
 
+      let renderFileCountError = (this.state.fileCountError) ? {
+        type: 'group',
+        left: 'center',
+        top: 'middle',
+        z: 100,
+        children: [
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 40
+            },
+            style: {
+              fill: '#FC909B'
+            }
+          },
+          {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            style: {
+              text: `No data available. ${this.state.fileCountError}`,
+              font: '20px sans-serif'
+            }
+          }
+        ]
+      } : undefined
+      let renderContainerSizeError = (this.state.containerSizeError) ? {
+        type: 'group',
+        left: 'center',
+        top: 'middle',
+        z: 100,
+        children: [
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 500
+            },
+            style: {
+              fill: 'rgba(256, 256, 256, 0.5)'
+            }
+          },
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 40
+            },
+            style: {
+              fill: '#FC909B'
+            }
+          },
+          {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            style: {
+              text: `No data available. ${this.state.containerSizeError}`,
+              font: '20px sans-serif'
+            }
+          }
+        ]
+      } : undefined
+
       this.setState({
         fileCountData: {
           title: {
@@ -220,7 +300,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             },
             data: Array.from(xyFileCountMap.values()),
             type: 'bar'
-          }
+          },
+          graphic: renderFileCountError
         },
         containerCountData: {
           title: {
@@ -246,7 +327,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                 name: xContainerCountValues[idx]
               }
             }),
-          }
+          },
+          graphic: renderContainerSizeError
         }
       });
     }
@@ -267,6 +349,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       fileCountresponse: Awaited<Promise<any>>,
       containerCountresponse: Awaited<Promise<any>>
     ) => {
+      let fileAPIError = undefined;
+      let containerAPIError = undefined;
       let responseError = [
         fileCountresponse,
         containerCountresponse
@@ -278,9 +362,12 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             throw new CanceledError('canceled', "ERR_CANCELED");
           }
           else {
-            const reqMethod = err.reason.config.method;
-            const reqURL = err.reason.config.url
-            showDataFetchError(`Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`);
+            if (err.reason.config.url.includes("fileCount")) {
+              fileAPIError = err.reason.toString();
+            }
+            else {
+              containerAPIError = err.reason.toString();
+            }
           }
         })
       }
@@ -323,7 +410,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         volumeBucketMap,
         fileCountsResponse,
         containerCountResponse,
-        volumeOptions
+        volumeOptions,
+        fileCountError: fileAPIError,
+        containerSizeError: containerAPIError
       }, () => {
         this.updatePlotData();
         // Select all volumes by default
@@ -331,7 +420,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
     })).catch(error => {
       this.setState({
-        isLoading: false
+        isLoading: false,
       });
       showDataFetchError(error.toString());
     });
