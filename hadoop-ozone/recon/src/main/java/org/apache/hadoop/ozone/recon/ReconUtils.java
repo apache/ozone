@@ -579,14 +579,15 @@ public class ReconUtils {
    * - Starts from a parent directory identified by parentId.
    * - Looks through all child directories of this parent.
    * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
-   * following our openFileTable format
+   *   following our openFileTable format.
    * - Adds these paths to a list and explores each child further for more subdirectories.
    *
-   * @param parentId The ID of the directory we start exploring from.
-   * @param subPaths A list where we collect paths to all subdirectories.
-   * @param names    An array with at least two elements: the first is volumeID and
-   *                 the second is bucketID. These are used to start each path.
-   * @throws IOException If there are problems accessing directory information.
+   * @param parentId The ID of the parent directory from which to start gathering subdirectories.
+   * @param subPaths The list to which the paths of subdirectories will be added.
+   * @param volumeID The ID of the volume containing the parent directory.
+   * @param bucketID The ID of the bucket containing the parent directory.
+   * @param reconNamespaceSummaryManager The manager used to retrieve NSSummary objects.
+   * @throws IOException If an I/O error occurs while fetching NSSummary objects.
    */
   public static void gatherSubPaths(long parentId, List<String> subPaths,
                               long volumeID, long bucketID,
