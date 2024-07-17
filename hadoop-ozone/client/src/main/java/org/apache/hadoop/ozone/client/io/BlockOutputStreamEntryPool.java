@@ -136,7 +136,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
+  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     // server may return any number of blocks, (0 to any)
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)
@@ -379,7 +379,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * @return the new current open stream to write to
    * @throws IOException if the block allocation failed.
    */
-  BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
+  synchronized BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
       // a stream entry gets closed either by :
