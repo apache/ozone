@@ -356,7 +356,39 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // In case of an exception or an error, we will try to read from the
     // datanodes in the pipeline in a round-robin fashion.
     XceiverClientReply reply = new XceiverClientReply(null);
-    List<DatanodeDetails> datanodeList = getDatanodeList(request);
+    List<DatanodeDetails> datanodeList = null;
+
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    }
+
+    if (blockID != null) {
+      // Check if the DN to which the GetBlock command was sent has been cached.
+      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      if (cachedDN != null) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
+        if (getBlockDNCacheIndex > 0) {
+          // Pull the Cached DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
+        }
+      }
+    }
+    if (datanodeList == null) {
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
+    }
 
     boolean allInService = datanodeList.stream()
         .allMatch(dn -> dn.getPersistedOpState() == NodeOperationalState.IN_SERVICE);
@@ -684,42 +716,5 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   public void setTimeout(long timeout) {
     this.timeout = timeout;
-  }
-
-  private List<DatanodeDetails> getDatanodeList(
-      ContainerCommandRequestProto request) {
-    List<DatanodeDetails> datanodeList = null;
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
-
-    if (blockID != null) {
-      // Check if the DN to which the GetBlock command was sent has been cached.
-      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
-        datanodeList = pipeline.getNodes();
-        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
-        if (getBlockDNCacheIndex > 0) {
-          // Pull the Cached DN to the top of the DN list
-          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
-        }
-      }
-    }
-    if (datanodeList == null) {
-      if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
-      } else {
-        datanodeList = pipeline.getNodes();
-        // Shuffle datanode list so that clients do not read in the same order
-        // every time.
-        Collections.shuffle(datanodeList);
-      }
-    }
-    return datanodeList;
   }
 }
