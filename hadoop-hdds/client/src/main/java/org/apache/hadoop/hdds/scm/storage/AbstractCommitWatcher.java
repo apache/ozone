@@ -139,11 +139,13 @@ abstract class AbstractCommitWatcher<BUFFER> {
     }
 
     try {
+      LOG.info("Proceeding watchForCommit({}) with f = {}", commitIndex, f);
       final XceiverClientReply reply = client.watchForCommit(commitIndex);
       f.complete(reply);
-      final CompletableFuture<XceiverClientReply> removed
-          = replies.remove(commitIndex);
-      Preconditions.checkState(removed == f);
+      final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
+      // The replies can be cleaned up concurrently when the block is full.
+      Preconditions.checkState(removed == f || removed == null,
+          "removed(%s) must be the same as f(%s) for commit %s", removed, f, commitIndex);
 
       final long index = reply != null ? reply.getLogIndex() : 0;
       adjustBuffers(index);
@@ -186,6 +188,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   void cleanup() {
     commitIndexMap.clear();
+    LOG.info("Cleaning up commitWatcher", new Exception());
     replies.clear();
   }
 }
