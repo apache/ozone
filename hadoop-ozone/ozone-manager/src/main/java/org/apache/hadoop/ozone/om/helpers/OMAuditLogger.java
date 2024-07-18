@@ -110,6 +110,17 @@ public final class OMAuditLogger {
     return omAction;
   }
 
+  public static void log(OMAuditLogger.Builder builder, TermIndex termIndex) {
+    if (builder.isLog.get()) {
+      if (null == builder.getAuditMap()) {
+        builder.setAuditMap(new HashMap<>());
+      }
+      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getMessageBuilder().withParams(builder.getAuditMap());
+      builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
+    }
+  }
+
   public static void log(OMAuditLogger.Builder builder) {
     if (builder.isLog.get()) {
       builder.getMessageBuilder().withParams(builder.getAuditMap());

@@ -399,8 +399,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
           () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
               "omClientResponse returned by validateAndUpdateCache cannot be null"));
-      omClientRequest.getAuditBuilder().getAuditMap().put("Transaction", "" + termIndex.getIndex());
-      OMAuditLogger.log(omClientRequest.getAuditBuilder());
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
       return omClientResponse;
     } catch (Throwable th) {
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), termIndex, th);
