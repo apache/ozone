@@ -61,6 +61,7 @@ import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUN
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -465,16 +466,15 @@ public class BlockOutputStream extends OutputStream {
   /**
    * Watch for a specific commit index.
    */
-  XceiverClientReply sendWatchForCommit(long commitIndex)
-      throws IOException {
-    return null;
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long commitIndex) {
+    return CompletableFuture.completedFuture(null);
   }
 
-  private void watchForCommit(long commitIndex) throws IOException {
+  private CompletableFuture<Void> watchForCommit(long commitIndex) throws IOException {
+    LOG.debug("sendWatchForCommit commitIndex = {}", commitIndex);
     checkOpen();
-    try {
-      LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
-      final XceiverClientReply reply = sendWatchForCommit(commitIndex);
+    return sendWatchForCommit(commitIndex).thenAccept(reply -> {
+      LOG.debug("sendWatchForCommit commitIndex = {} returns {}", commitIndex, reply);
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -485,11 +485,7 @@ public class BlockOutputStream extends OutputStream {
           failedServers.addAll(dnList);
         }
       }
-    } catch (IOException ioe) {
-      setIoException(ioe);
-      throw getIoException();
-    }
-    LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+    });
   }
 
   void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
@@ -688,13 +684,16 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    return putBlockResultFuture.thenAccept(x -> {
+    final CompletableFuture<Void> future = new CompletableFuture<>();
+    putBlockResultFuture.thenAccept(x -> {
       try {
-        watchForCommit(x.commitIndex);
+        watchForCommit(x.commitIndex).whenComplete(JavaUtils.asBiConsumer(future));
       } catch (IOException e) {
-        throw new FlushRuntimeException(e);
+        setIoException(e);
+        future.completeExceptionally(getIoException());
       }
     });
+    return future;
   }
 
   @Override
