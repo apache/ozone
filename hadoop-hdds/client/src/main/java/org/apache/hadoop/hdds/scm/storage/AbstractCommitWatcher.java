@@ -188,7 +188,6 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   void cleanup() {
     commitIndexMap.clear();
-    LOG.info("Cleaning up commitWatcher", new Exception());
     replies.clear();
   }
 }
