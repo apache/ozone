@@ -291,7 +291,7 @@ public final class OzoneManagerDoubleBuffer {
    */
   @VisibleForTesting
   void flushTransactions() {
-    while (isRunning.get() && canFlush()) {
+    while (canFlush()) {
       flushCurrentBuffer();
     }
   }
@@ -562,14 +562,14 @@ public final class OzoneManagerDoubleBuffer {
    */
   private synchronized boolean canFlush() {
     try {
-      while (currentBuffer.isEmpty()) {
+      while (currentBuffer.isEmpty() && isRunning.get()) {
         // canFlush() only gets called when the readyBuffer is empty.
         // Since both buffers are empty, notify once for each.
         flushNotifier.notifyFlush();
         flushNotifier.notifyFlush();
         wait(1000L);
       }
-      return true;
+      return isRunning.get();
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
