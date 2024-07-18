@@ -83,8 +83,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager implements C
       List<X509Certificate> trustChain)
       throws GeneralSecurityException, IOException {
     this.type = type;
+    alias = componentName + "_key";
     keyManagerRef = new AtomicReference<>();
-    this.alias = componentName + "_key";
     keyManagerRef.set(init(privateKey, trustChain));
   }
 

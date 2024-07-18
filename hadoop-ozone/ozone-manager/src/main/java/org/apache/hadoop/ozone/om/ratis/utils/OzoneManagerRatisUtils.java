@@ -494,8 +494,7 @@ public final class OzoneManagerRatisUtils {
   public static GrpcTlsConfig createServerTlsConfig(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      return new GrpcTlsConfig(caClient.getKeyManager(),
-          caClient.getTrustManager(), true);
+      return new GrpcTlsConfig(caClient.getKeyManager(), caClient.getTrustManager(), true);
     }
 
     return null;

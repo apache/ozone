@@ -102,9 +102,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.TrustManager;
-
 /**
  * Default Certificate client implementation. It provides certificate
  * operations that needs to be performed by certificate clients in the Ozone
@@ -131,8 +128,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final String threadNamePrefix;
   private List<String> pemEncodedCACerts = null;
   private Lock pemEncodedCACertsLock = new ReentrantLock();
-  private KeyManager keyManager;
-  private TrustManager trustManager;
+  private ReloadingX509KeyManager keyManager;
+  private ReloadingX509TrustManager trustManager;
 
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
@@ -1026,39 +1023,36 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public TrustManager getTrustManager() throws CertificateException {
+  public ReloadingX509TrustManager getTrustManager() throws CertificateException {
     try {
       if (trustManager == null) {
         Set<X509Certificate> newRootCaCerts = rootCaCertificates.isEmpty() ?
             caCertificates : rootCaCertificates;
         trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
-        notificationReceivers.add((ReloadingX509TrustManager) trustManager);
+        notificationReceivers.add(trustManager);
       }
       return trustManager;
     } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init trustManager", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
+      throw new CertificateException("Failed to init trustManager", e, CertificateException.ErrorCode.KEYSTORE_ERROR);
     }
   }
 
   @Override
-  public KeyManager getKeyManager() throws CertificateException {
+  public ReloadingX509KeyManager getKeyManager() throws CertificateException {
     try {
       if (keyManager == null) {
         keyManager = new ReloadingX509KeyManager(
             KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
-        notificationReceivers.add((ReloadingX509KeyManager) keyManager);
+        notificationReceivers.add(keyManager);
       }
       return keyManager;
     } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyManager", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
+      throw new CertificateException("Failed to init keyManager", e, CertificateException.ErrorCode.KEYSTORE_ERROR);
     }
   }
 
   /**
    * Register a receiver that will be called after the certificate renewed.
-   *
    * @param receiver
    */
   @Override

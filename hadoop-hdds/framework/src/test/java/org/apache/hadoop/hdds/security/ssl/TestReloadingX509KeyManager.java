@@ -24,7 +24,6 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import javax.net.ssl.KeyManager;
 import java.security.PrivateKey;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,18 +47,16 @@ public class TestReloadingX509KeyManager {
 
   @Test
   public void testReload() throws Exception {
-    KeyManager km = caClient.getKeyManager();
+    ReloadingX509KeyManager km = caClient.getKeyManager();
     PrivateKey privateKey1 = caClient.getPrivateKey();
-    assertEquals(privateKey1, ((ReloadingX509KeyManager)km).getPrivateKey(
-        caClient.getComponentName() + "_key"));
+    assertEquals(privateKey1, km.getPrivateKey(caClient.getComponentName() + "_key"));
 
     caClient.renewRootCA();
     caClient.renewKey();
     PrivateKey privateKey2 = caClient.getPrivateKey();
     assertNotEquals(privateKey1, privateKey2);
 
-    assertEquals(privateKey2, ((ReloadingX509KeyManager) km).getPrivateKey(
-        caClient.getComponentName() + "_key"));
+    assertEquals(privateKey2, km.getPrivateKey(caClient.getComponentName() + "_key"));
 
     assertThat(reloaderLog.getOutput()).contains("ReloadingX509KeyManager is reloaded");
 

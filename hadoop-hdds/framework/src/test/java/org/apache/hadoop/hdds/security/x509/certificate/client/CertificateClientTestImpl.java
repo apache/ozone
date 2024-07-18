@@ -58,9 +58,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.TrustManager;
-
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
@@ -83,8 +80,8 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   private HDDSKeyGenerator keyGen;
   private DefaultApprover approver;
-  private KeyManager keyManager;
-  private TrustManager trustManager;
+  private ReloadingX509KeyManager keyManager;
+  private ReloadingX509TrustManager trustManager;
   private Map<String, X509Certificate> certificateMap;
   private ScheduledExecutorService executorService;
   private Set<CertificateNotification> notificationReceivers;
@@ -337,28 +334,26 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public KeyManager getKeyManager() throws CertificateException {
+  public ReloadingX509KeyManager getKeyManager() throws CertificateException {
     try {
       if (keyManager == null) {
         keyManager = new ReloadingX509KeyManager(
             KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
-        notificationReceivers.add((ReloadingX509KeyManager) keyManager);
+        notificationReceivers.add(keyManager);
       }
       return keyManager;
     } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyManager", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
+      throw new CertificateException("Failed to init keyManager", e, CertificateException.ErrorCode.KEYSTORE_ERROR);
     }
   }
 
   @Override
-  public TrustManager getTrustManager() throws CertificateException {
+  public ReloadingX509TrustManager getTrustManager() throws CertificateException {
     try {
       if (trustManager == null) {
-        Set<X509Certificate> newRootCaCerts = getAllRootCaCerts().isEmpty() ?
-            getAllCaCerts() : getAllRootCaCerts();
+        Set<X509Certificate> newRootCaCerts = getAllRootCaCerts().isEmpty() ? getAllCaCerts() : getAllRootCaCerts();
         trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
-        notificationReceivers.add((ReloadingX509TrustManager) trustManager);
+        notificationReceivers.add(trustManager);
       }
       return trustManager;
     } catch (IOException | GeneralSecurityException e) {
