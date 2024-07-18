@@ -687,9 +687,8 @@ function ozone_find_confdir
 ## @return       will exit on failure conditions
 function ozone_verify_confdir
 {
-  # Check only log4j.properties by default.
-  # --loglevel does not work without logger settings in log4j.properties.
-  [[ -f "${1:?ozone_verify_confir requires parameter}/log4j.properties" ]]
+  # Check ozone-site.xml by default.
+  [[ -f "${1:?ozone_verify_confir requires parameter}/ozone-site.xml" ]]
 }
 
 ## @description  Import the ozone-env.sh settings

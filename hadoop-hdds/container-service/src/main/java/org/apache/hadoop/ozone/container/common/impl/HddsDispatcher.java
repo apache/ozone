@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
@@ -502,7 +501,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private void validateToken(
       ContainerCommandRequestProto msg) throws IOException {
     tokenVerifier.verify(
-        msg, UserGroupInformation.getCurrentUser().getShortUserName(),
+        msg,
         msg.getEncodedToken()
     );
   }

@@ -23,19 +23,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Future;
 
 /**
@@ -57,13 +51,12 @@ public interface CertificateServer {
   /**
    * Returns the CA Certificate for this CA.
    *
-   * @return X509CertificateHolder - Certificate for this CA.
+   * @return X509Certificate - Certificate for this CA.
    * @throws CertificateException - usually thrown if this CA is not
    *                              initialized.
    * @throws IOException          - on Error.
    */
-  X509CertificateHolder getCACertificate()
-      throws CertificateException, IOException;
+  X509Certificate getCACertificate() throws CertificateException, IOException;
 
   /**
    * Gets the certificate bundle for the CA certificate of this server.
@@ -107,28 +100,16 @@ public interface CertificateServer {
       String certSerialId) throws SCMSecurityException;
 
   /**
-   * Revokes a Certificate issued by this CertificateServer.
-   *
-   * @param serialIDs       - List of serial IDs of Certificates to be revoked.
-   * @param reason          - Reason for revocation.
-   * @param revocationTime  - Revocation time for the certificates.
-   * @return Future that gives a list of certificates that were revoked.
-   */
-  Future<Optional<Long>> revokeCertificates(
-      List<BigInteger> serialIDs,
-      CRLReason reason,
-      Date revocationTime);
-
-  /**
    * List certificates.
-   * @param role            - role: OM/SCM/DN
-   * @param startSerialId   - start certificate serial id
-   * @param count           - max number of certificates returned in a batch
+   *
+   * @param role          - role: OM/SCM/DN
+   * @param startSerialId - start certificate serial id
+   * @param count         - max number of certificates returned in a batch
    * @return List of X509 Certificates.
    * @throws IOException - On Failure
    */
   List<X509Certificate> listCertificate(NodeType role,
-      long startSerialId, int count, boolean isRevoked) throws IOException;
+      long startSerialId, int count) throws IOException;
 
   /**
    * Reinitialise the certificate server withe the SCMMetastore during SCM
@@ -137,17 +118,4 @@ public interface CertificateServer {
    */
   void reinitialize(SCMMetadataStore scmMetadataStore);
 
-  /**
-   * Get the CRLInfo based on the CRL Ids.
-   * @param crlIds - list of crl ids
-   * @return CRLInfo
-   * @throws IOException
-   */
-  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
-
-  /**
-   * Get the latest CRL id.
-   * @return latest CRL id.
-   */
-  long getLatestCrlId();
 }

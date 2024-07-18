@@ -100,7 +100,7 @@ public final class ScmConfigKeys {
       HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
       "hdds.container.ratis.log.appender.queue.num-elements";
   public static final int
-      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1024;
   public static final String HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
       "hdds.container.ratis.log.appender.queue.byte-limit";
   public static final String
@@ -223,7 +223,7 @@ public final class ScmConfigKeys {
       "hdds.datanode.dir.du.reserved";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
       "hdds.datanode.dir.du.reserved.percent";
-  public static final float HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT = 0;
+  public static final float HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT = 0.0001f;
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
   public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =

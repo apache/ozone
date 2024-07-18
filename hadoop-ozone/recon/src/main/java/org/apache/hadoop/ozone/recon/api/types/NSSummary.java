@@ -36,22 +36,25 @@ public class NSSummary {
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
+  private long parentId = 0;
 
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
-         new HashSet<>(), "");
+        new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
                    int[] bucket,
                    Set<Long> childDir,
-                   String dirName) {
+                   String dirName,
+                   long parentId) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
     this.dirName = dirName;
+    this.parentId = parentId;
   }
 
   public int getNumOfFiles() {
@@ -106,5 +109,13 @@ public class NSSummary {
     if (this.childDir.contains(childId)) {
       this.childDir.remove(childId);
     }
+  }
+
+  public long getParentId() {
+    return parentId;
+  }
+
+  public void setParentId(long parentId) {
+    this.parentId = parentId;
   }
 }

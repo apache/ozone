@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -32,8 +35,10 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -48,6 +53,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -55,15 +61,20 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 
 /**
  * Endpoint to fetch details about datanodes.
@@ -78,14 +89,18 @@ public class NodeEndpoint {
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager reconContainerManager;
+  private StorageContainerLocationProtocol scmClient;
+  private String errorMessage = "Error getting pipeline and container metrics for ";
 
   @Inject
-  NodeEndpoint(OzoneStorageContainerManager reconSCM) {
+  NodeEndpoint(OzoneStorageContainerManager reconSCM,
+               StorageContainerLocationProtocol scmClient) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
-    this.reconContainerManager = 
+    this.reconContainerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
+    this.scmClient = scmClient;
   }
 
   /**
@@ -137,9 +152,7 @@ public class NodeEndpoint {
         }
       });
       try {
-        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
-
-        builder.withContainers(allContainers.size());
+        builder.withContainers(nodeManager.getContainerCount(datanode));
         builder.withOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
@@ -267,8 +280,7 @@ public class NodeEndpoint {
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
     try {
       nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
-      boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
-      if (isNodeDecommissioned || nodeStatus.isDead()) {
+      if (nodeStatus.isDead()) {
         checkContainers(nodeByUuid, isContainerOrPipeLineOpen);
         if (isContainerOrPipeLineOpen.get()) {
           failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "Open Containers/Pipelines");
@@ -285,8 +297,7 @@ public class NodeEndpoint {
       LOG.error("Node : {} not found", nodeByUuid);
       return false;
     }
-    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in either DECOMMISSIONED " +
-        "operational state or DEAD node state.");
+    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in DEAD node status.");
     return false;
   }
 
@@ -324,5 +335,113 @@ public class NodeEndpoint {
                 id, cnfe);
           }
         });
+  }
+
+  /**
+   * This GET API provides the information of all datanodes for which decommissioning is initiated.
+   * @return the wrapped  Response output
+   */
+  @GET
+  @Path("/decommission/info")
+  public Response getDatanodesDecommissionInfo() {
+    try {
+      return getDecommissionStatusResponse(null, null);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * This GET API provides the information of a specific datanode for which decommissioning is initiated.
+   * API accepts both uuid or ipAddress, uuid will be given preference if both provided.
+   * @return the wrapped  Response output
+   */
+  @GET
+  @Path("/decommission/info/datanode")
+  public Response getDecommissionInfoForDatanode(@QueryParam("uuid") String uuid,
+                                                 @QueryParam("ipAddress") String ipAddress) {
+    if (StringUtils.isEmpty(uuid)) {
+      Preconditions.checkNotNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
+      Preconditions.checkArgument(!ipAddress.isEmpty(),
+          "Either uuid or ipAddress of a datanode should be provided !!!");
+    }
+    try {
+      return getDecommissionStatusResponse(uuid, ipAddress);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Response getDecommissionStatusResponse(String uuid, String ipAddress) throws IOException {
+    Response.ResponseBuilder builder = Response.status(Response.Status.OK);
+    Map<String, Object> responseMap = new HashMap<>();
+    Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
+        null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT_VERSION).stream();
+    List<HddsProtos.Node> decommissioningNodes =
+        DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
+    String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");
+    int numDecomNodes = -1;
+    JsonNode jsonNode = null;
+    if (metricsJson != null) {
+      jsonNode = DecommissionUtils.getBeansJsonNode(metricsJson);
+      numDecomNodes = DecommissionUtils.getNumDecomNodes(jsonNode);
+    }
+    List<Map<String, Object>> dnDecommissionInfo =
+        getDecommissioningNodesDetails(decommissioningNodes, jsonNode, numDecomNodes);
+    try {
+      responseMap.put("DatanodesDecommissionInfo", dnDecommissionInfo);
+      builder.entity(responseMap);
+      return builder.build();
+    } catch (Exception exception) {
+      LOG.error("Unexpected Error: {}", exception);
+      throw new WebApplicationException(exception, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private List<Map<String, Object>> getDecommissioningNodesDetails(List<HddsProtos.Node> decommissioningNodes,
+                                                                   JsonNode jsonNode,
+                                                                   int numDecomNodes) throws IOException {
+    List<Map<String, Object>> decommissioningNodesDetails = new ArrayList<>();
+
+    for (HddsProtos.Node node : decommissioningNodes) {
+      DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
+          node.getNodeID());
+      Map<String, Object> datanodeMap = new LinkedHashMap<>();
+      datanodeMap.put("datanodeDetails", datanode);
+      datanodeMap.put("metrics", getCounts(datanode, jsonNode, numDecomNodes));
+      datanodeMap.put("containers", getContainers(datanode));
+      decommissioningNodesDetails.add(datanodeMap);
+    }
+    return decommissioningNodesDetails;
+  }
+
+  private Map<String, Object> getCounts(DatanodeDetails datanode, JsonNode counts, int numDecomNodes) {
+    Map<String, Object> countsMap = new LinkedHashMap<>();
+    String errMsg = getErrorMessage() + datanode.getHostName();
+    try {
+      countsMap = DecommissionUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
+      if (countsMap != null) {
+        return countsMap;
+      }
+      LOG.error(errMsg);
+    } catch (IOException e) {
+      LOG.error(errMsg + ": {} ", e);
+    }
+    return countsMap;
+  }
+
+  private Map<String, Object> getContainers(DatanodeDetails datanode)
+      throws IOException {
+    Map<String, List<ContainerID>> containers = scmClient.getContainersOnDecomNode(datanode);
+    return containers.entrySet().stream()
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            entry -> entry.getValue().stream().
+                map(ContainerID::toString).
+                collect(Collectors.toList())));
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
   }
 }

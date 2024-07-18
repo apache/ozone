@@ -28,6 +28,8 @@ import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
+const MAX_DISPLAY_LIMIT = 30;
+const MIN_BLOCK_SIZE = 0.05;
 
 interface IDUSubpath {
   path: string;
@@ -62,6 +64,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
+let valuesWithMinBlockSize: number[] = [];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -129,7 +132,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
-    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
+    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`;
     const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
     cancelPieSignal = controller;
     request.then(response => {
@@ -144,23 +147,27 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-      subpaths.sort((a, b) => (a.size < b.size) ? 1 : -1);
-
-      // Only show top n blocks with the most DU,
-      // other blocks are merged as a single block
-      if (subpaths.length > limit) {
+      // We need to calculate the size of "Other objects" in two cases: 
+      // 1) If we have more subpaths listed, than the limit.  
+      // 2) If the limit is set to the maximum limit (30) and we have any number of subpaths. In this case we won't
+      // necessarily have "Other objects", but later we check if the other objects's size is more than zero (we will have
+      // other objects if there are more than 30 subpaths, but we can't check on that, as the response will always have 
+      // 30 subpaths, but from the total size and the subpaths size we can calculate it).
+       
+      if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
-        for (let i = 0; i < limit; ++i) {
+        for (let i = 0; i < subpaths.length; ++i) {
           topSize += subpaths[i].size;
         }
-
         const otherSize = dataSize - topSize;
-        const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
-        subpaths.push(other);
+        if (otherSize > 0) {
+          const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
+          subpaths.push(other);
+        }
       }
 
-      let pathLabels, values, percentage, sizeStr, pieces, subpathName;
+      let pathLabels, values: number[] = [], percentage, sizeStr, pieces, subpathName;
 
       if (duResponse.subPathCount === 0 || subpaths === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
@@ -180,9 +187,17 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
 
-        values = subpaths.map(subpath => {
-          return subpath.size / dataSize;
-        });
+        // To avoid NaN Condition NaN will get divide by Zero to avoid map iterations
+        if (dataSize > 0) {
+          values = subpaths.map(subpath => {
+            return subpath.size / dataSize;
+          });
+        }
+
+        // Adding a MIN_BLOCK_SIZE to non-zero size entities to ensure that even the smallest entities are visible on the pie chart.
+        // Note: The percentage and size string calculations remain unchanged.
+        const clonedValues = structuredClone(values);
+        valuesWithMinBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -192,7 +207,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return byteToSize(subpath.size, 1);
         });
       }
-    
       this.setState({
         // Normalized path
         isLoading: false,
@@ -204,7 +218,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         plotData: [{
           type: 'pie',
           hole: 0.2,
-          values: values,
+          values: valuesWithMinBlockSize,
           customdata: percentage,
           labels: pathLabels,
           text: sizeStr,
@@ -264,13 +278,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   updateDisplayLimit(e): void {
-    let res = -1;
-    if (e.key === 'all') {
-      res = Number.MAX_VALUE;
-    } else {
-      res = Number.parseInt(e.key, 10);
-    }
-
+    let res = Number.parseInt(e.key, 10);
     this.updatePieChart(this.state.inputPath, res);
   }
 
@@ -517,18 +525,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         <Menu.Item key='20'>
           20
         </Menu.Item>
-        <Menu.Item key='all'>
-          All
+        <Menu.Item key='30'>
+          30
         </Menu.Item>
       </Menu>
     );
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage&nbsp;&nbsp;
-          <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
-            <Icon type='info-circle' />
-          </Tooltip>
+          Disk Usage
         </div>
         <div className='content-div'>
           {isLoading ? <span><Icon type='loading'/> Loading...</span> : (
@@ -549,9 +554,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown overlay={menu} placement='bottomCenter'>
-                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
+                      <Button>Display Limit: {displayLimit}</Button>
                     </Dropdown>
                   </div>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <Tooltip placement="rightTop" title="Additional block size is added to each entity, so even the small entities are visible. Please refer to pie-chart tooltip for exact size information.">
+                    <Icon type='info-circle' />
+                  </Tooltip>
                   <div className='metadata-button'>
                     <Button type='primary' onClick={e => this.showMetadataDetails(e, returnPath)}>
                       <b>
@@ -568,8 +577,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       data={plotData}
                       layout={
                         {
-                          width: 1200,
-                          height: 750,
+                          width: 1000,
+                          height: 850,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15

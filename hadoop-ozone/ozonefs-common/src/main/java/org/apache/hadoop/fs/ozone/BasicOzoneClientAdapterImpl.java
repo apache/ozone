@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -598,18 +597,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String createSnapshot(String pathStr, String snapshotName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    return objectStore.createSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
-        snapshotName);
+    return objectStore.createSnapshot(volume.getName(), bucket.getName(), snapshotName);
   }
 
   @Override
   public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    objectStore.renameSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
+    objectStore.renameSnapshot(volume.getName(),
+        bucket.getName(),
         snapshotOldName,
         snapshotNewName);
   }
@@ -617,9 +612,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public void deleteSnapshot(String pathStr, String snapshotName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    objectStore.deleteSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
+    objectStore.deleteSnapshot(volume.getName(),
+        bucket.getName(),
         snapshotName);
   }
 
@@ -662,12 +656,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
-        OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, snapPath);
+          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, volume.getName(), bucket.getName());
         }
         if (takeTemporaryFromSnapshot) {
-          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, snapPath);
+          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, volume.getName(), bucket.getName());
         }
       }
     }
@@ -706,8 +699,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (!ofsPath.isKey()) {
+    if (StringUtils.isEmpty(pathStr)) {
       throw new IOException("not a file");
     }
     OzoneFileStatus status = bucket.getFileStatus(pathStr);

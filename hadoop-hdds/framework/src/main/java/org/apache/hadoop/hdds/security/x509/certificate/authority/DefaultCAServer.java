@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -30,11 +29,8 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -58,7 +54,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
@@ -128,10 +123,8 @@ public class DefaultCAServer implements CertificateServer {
    */
   private PKIProfile profile;
   private CertificateApprover approver;
-  private CRLApprover crlApprover;
   private CertificateStore store;
   private Lock lock;
-  private static boolean testSecureFlag;
   private BigInteger rootCertificateId;
 
   /**
@@ -177,16 +170,13 @@ public class DefaultCAServer implements CertificateServer {
     Consumer<SecurityConfig> caInitializer =
         processVerificationStatus(status, type);
     caInitializer.accept(securityConfig);
-    crlApprover = new DefaultCRLApprover(securityConfig,
-        getCAKeys().getPrivate());
   }
 
   @Override
-  public X509CertificateHolder getCACertificate() throws IOException {
-    CertificateCodec certificateCodec =
-        new CertificateCodec(config, componentName);
+  public X509Certificate getCACertificate() throws IOException {
+    CertificateCodec certificateCodec = new CertificateCodec(config, componentName);
     try {
-      return certificateCodec.getTargetCertHolder();
+      return certificateCodec.getTargetCert();
     } catch (CertificateException e) {
       throw new IOException(e);
     }
@@ -204,16 +194,14 @@ public class DefaultCAServer implements CertificateServer {
    * exist. Return null if it doesn't exist.
    *
    * @param certSerialId         - Certificate for this CA.
-   * @return X509CertificateHolder
+   * @return X509Certificate
    * @throws CertificateException - usually thrown if this CA is not
    * initialized.
    * @throws IOException - on Error.
    */
   @Override
-  public X509Certificate getCertificate(String certSerialId) throws
-      IOException {
-    return store.getCertificateByID(new BigInteger(certSerialId),
-        CertificateStore.CertType.VALID_CERTS);
+  public X509Certificate getCertificate(String certSerialId) throws IOException {
+    return store.getCertificateByID(new BigInteger(certSerialId));
   }
 
   private KeyPair getCAKeys() throws IOException {
@@ -231,70 +219,54 @@ public class DefaultCAServer implements CertificateServer {
       CertificateApprover.ApprovalType approverType, NodeType role,
       String certSerialId) {
     LocalDateTime beginDate = LocalDateTime.now();
-    LocalDateTime endDate;
-    // When issuing certificates for sub-ca use the max certificate duration
-    // similar to self signed root certificate.
-    if (role == NodeType.SCM) {
-      endDate = beginDate.plus(config.getMaxCertificateDuration());
-    } else {
-      endDate = beginDate.plus(config.getDefaultCertDuration());
-    }
+    LocalDateTime endDate = expiryFor(beginDate, role);
 
-    CompletableFuture<X509CertificateHolder> xcertHolder =
-        approver.inspectCSR(csr);
-
-    CompletableFuture<CertPath> xCertHolders
-        = new CompletableFuture<>();
-
-    if (xcertHolder.isCompletedExceptionally()) {
-      // This means that approver told us there are things which it disagrees
-      // with in this Certificate Request. Since the first set of sanity
-      // checks failed, we just return the future object right here.
-      xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
-          "verify the CSR."));
+    CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
+    CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
+    if (csrInspection.isCompletedExceptionally()) {
+      try {
+        csrInspection.get();
+      } catch (Exception e) {
+        certPathPromise.completeExceptionally(new SCMSecurityException("Failed to verify the CSR.", e));
+      }
     }
     try {
       switch (approverType) {
       case MANUAL:
-        xCertHolders.completeExceptionally(new SCMSecurityException("Manual " +
-            "approval is not yet implemented."));
+        certPathPromise.completeExceptionally(new SCMSecurityException("Manual approval is not yet implemented."));
         break;
       case KERBEROS_TRUSTED:
       case TESTING_AUTOMATIC:
-        X509CertificateHolder xcert;
-        try {
-          xcert = signAndStoreCertificate(
-              beginDate, endDate, csr, role, certSerialId);
-        } catch (SCMSecurityException e) {
-          // Certificate with conflicting serial id, retry again may resolve
-          // this issue.
-          LOG.error("Certificate storage failed, retrying one more time.", e);
-          xcert = signAndStoreCertificate(
-              beginDate, endDate, csr, role, certSerialId);
-        }
+        X509Certificate signedCertificate = signAndStoreCertificate(beginDate, endDate, csr, role, certSerialId);
         CertificateCodec codec = new CertificateCodec(config, componentName);
         CertPath certPath = codec.getCertPath();
-        CertPath updatedCertPath = codec.prependCertToCertPath(xcert, certPath);
-        xCertHolders.complete(updatedCertPath);
+        CertPath updatedCertPath = codec.prependCertToCertPath(signedCertificate, certPath);
+        certPathPromise.complete(updatedCertPath);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
     } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xCertHolders.completeExceptionally(
-          new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
+      certPathPromise.completeExceptionally(new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
-    return xCertHolders;
+    return certPathPromise;
   }
 
-  private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
-      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role,
-      String certSerialId) throws IOException, OperatorCreationException,
-      CertificateException {
+  private LocalDateTime expiryFor(LocalDateTime beginDate, NodeType role) {
+    // When issuing certificates for sub-ca use the max certificate duration similar to self-signed root certificate.
+    if (role == NodeType.SCM) {
+      return beginDate.plus(config.getMaxCertificateDuration());
+    }
+    return beginDate.plus(config.getDefaultCertDuration());
+  }
+
+  private X509Certificate signAndStoreCertificate(
+      LocalDateTime beginDate, LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role, String certSerialId
+  ) throws IOException, OperatorCreationException, CertificateException {
 
     lock.lock();
-    X509CertificateHolder xcert;
+    X509Certificate xcert;
     try {
       Preconditions.checkState(!Strings.isNullOrEmpty(certSerialId));
       xcert = approver.sign(config,
@@ -305,8 +277,7 @@ public class DefaultCAServer implements CertificateServer {
           csr, scmID, clusterID, certSerialId);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
-        store.storeValidCertificate(xcert.getSerialNumber(),
-            CertificateCodec.getX509Certificate(xcert), role);
+        store.storeValidCertificate(xcert.getSerialNumber(), xcert, role);
       }
     } finally {
       lock.unlock();
@@ -315,55 +286,14 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<Optional<Long>> revokeCertificates(
-      List<BigInteger> certificates,
-      CRLReason reason,
-      Date revocationTime) {
-    CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
-    if (CollectionUtils.isEmpty(certificates)) {
-      revoked.completeExceptionally(new SCMSecurityException(
-          "Certificates cannot be null or empty"));
-      return revoked;
-    }
-    try {
-      revoked.complete(
-          store.revokeCertificates(certificates,
-              getCACertificate(), reason, revocationTime, crlApprover)
-      );
-    } catch (IOException ex) {
-      LOG.error("Revoking the certificate failed.", ex.getCause());
-      revoked.completeExceptionally(new SCMSecurityException(ex));
-    }
-    return revoked;
-  }
-
-  @Override
   public List<X509Certificate> listCertificate(NodeType role,
-      long startSerialId, int count, boolean isRevoked) throws IOException {
-    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
-        isRevoked ? CertificateStore.CertType.REVOKED_CERTS :
-            CertificateStore.CertType.VALID_CERTS);
+      long startSerialId, int count) throws IOException {
+    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count);
   }
 
   @Override
   public void reinitialize(SCMMetadataStore scmMetadataStore) {
     store.reinitialize(scmMetadataStore);
-  }
-
-  /**
-   * Get the CRLInfo based on the CRL Ids.
-   * @param crlIds - list of crl ids
-   * @return CRLInfo
-   * @throws IOException
-   */
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    return store.getCrls(crlIds);
-  }
-
-  @Override
-  public long getLatestCrlId() {
-    return store.getLatestCrlId();
   }
 
   /**
@@ -577,7 +507,7 @@ public class DefaultCAServer implements CertificateServer {
         .setKey(key);
 
     builder.addInetAddresses();
-    X509CertificateHolder selfSignedCertificate = builder.build();
+    X509Certificate selfSignedCertificate = builder.build();
 
     CertificateCodec certCodec =
         new CertificateCodec(config, componentName);
@@ -600,8 +530,7 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External cert path is not correct: " +
             extCertPath);
       }
-      X509CertificateHolder certHolder = certificateCodec.getTargetCertHolder(
-          extCertParent, extCertName.toString());
+      X509Certificate certificate = certificateCodec.getTargetCert(extCertParent, extCertName.toString());
       Path extPrivateKeyParent = extPrivateKeyPath.getParent();
       Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
       if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
@@ -612,9 +541,9 @@ public class DefaultCAServer implements CertificateServer {
           extPrivateKeyFileName.toString());
       PublicKey publicKey;
       publicKey = readPublicKeyWithExternalData(
-          externalPublicKeyLocation, keyCodec, certHolder);
+          externalPublicKeyLocation, keyCodec, certificate);
       keyCodec.writeKey(new KeyPair(publicKey, privateKey));
-      certificateCodec.writeCertificate(certHolder);
+      certificateCodec.writeCertificate(certificate);
     } catch (IOException | CertificateException | NoSuchAlgorithmException |
              InvalidKeySpecException e) {
       LOG.error("External root CA certificate initialization failed", e);
@@ -622,14 +551,11 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private PublicKey readPublicKeyWithExternalData(
-      String externalPublicKeyLocation, KeyCodec keyCodec,
-      X509CertificateHolder certHolder)
-      throws CertificateException, NoSuchAlgorithmException,
-      InvalidKeySpecException, IOException {
+      String externalPublicKeyLocation, KeyCodec keyCodec, X509Certificate certificate
+  ) throws CertificateException, NoSuchAlgorithmException, InvalidKeySpecException, IOException {
     PublicKey publicKey;
     if (externalPublicKeyLocation.isEmpty()) {
-      publicKey = CertificateCodec.getX509Certificate(certHolder)
-          .getPublicKey();
+      publicKey = certificate.getPublicKey();
     } else {
       Path publicKeyPath = Paths.get(externalPublicKeyLocation);
       Path publicKeyPathFileName = publicKeyPath.getFileName();
@@ -655,8 +581,4 @@ public class DefaultCAServer implements CertificateServer {
     INITIALIZE /* All artifacts are missing, we should init the system. */
   }
 
-  @VisibleForTesting
-  public static void setTestSecureFlag(boolean flag) {
-    testSecureFlag = flag;
-  }
 }

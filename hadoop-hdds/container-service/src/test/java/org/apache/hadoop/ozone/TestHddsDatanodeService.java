@@ -46,13 +46,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -106,22 +104,6 @@ public class TestHddsDatanodeService {
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
-  @Test
-  public void testStartup() {
-    service.start(conf);
-
-    assertNotNull(service.getDatanodeDetails());
-    assertNotNull(service.getDatanodeDetails().getHostName());
-    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
-    assertNotNull(service.getCRLStore());
-
-    service.stop();
-    // CRL store must be stopped when the service stops
-    assertNull(service.getCRLStore().getStore());
-    service.join();
-    service.close();
-  }
-
   @ParameterizedTest
   @ValueSource(strings = {OzoneConsts.SCHEMA_V1,
       OzoneConsts.SCHEMA_V2, OzoneConsts.SCHEMA_V3})
@@ -131,6 +113,10 @@ public class TestHddsDatanodeService {
     LOG.info("SchemaV3_enabled: " +
         conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
     service.start(conf);
+
+    assertNotNull(service.getDatanodeDetails());
+    assertNotNull(service.getDatanodeDetails().getHostName());
+    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
 
     // Get volumeSet and store volumes in temp folders
     // in order to access them after service.stop()

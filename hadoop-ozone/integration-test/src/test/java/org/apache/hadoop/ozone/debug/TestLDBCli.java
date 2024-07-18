@@ -143,6 +143,30 @@ public class TestLDBCli {
             Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("StartKey key3", Arrays.asList("--startkey", "key3")),
+            Named.of("Expect key3-key5", Pair.of("key3", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("invalid StartKey key9", Arrays.asList("--startkey", "key9")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("EndKey key3", Arrays.asList("--endkey", "key3")),
+            Named.of("Expect key1-key3", Pair.of("key1", "key4"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Invalid EndKey key9", Arrays.asList("--endkey", "key9")),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),

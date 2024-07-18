@@ -151,6 +151,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.Part> partsList =
         multipartUploadCompleteRequest.getPartsListList();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -494,7 +495,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .addAllMetadata(dbOpenKeyInfo.getMetadata())
           .addMetadata(OzoneConsts.ETAG,
               multipartUploadedKeyHash(partKeyInfoMap))
-          .setOwnerName(keyArgs.getOwnerName());
+          .setOwnerName(keyArgs.getOwnerName())
+          .addAllTags(dbOpenKeyInfo.getTags());
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,
       // we had an upgrade.
@@ -528,6 +530,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
       omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
           multipartUploadedKeyHash(partKeyInfoMap));
+      if (dbOpenKeyInfo.getTags() != null) {
+        omKeyInfo.setTags(dbOpenKeyInfo.getTags());
+      }
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     return omKeyInfo;

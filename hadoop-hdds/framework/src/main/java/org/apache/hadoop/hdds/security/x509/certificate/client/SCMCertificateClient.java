@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -359,25 +358,19 @@ public class SCMCertificateClient extends DefaultCertificateClient {
           CertificateCodec.getPEMEncodedString(rootCACertificatePath);
 
       PKCS10CertificationRequest csr = getCSRBuilder().build();
-      CertPath subSCMCertHolderList = rootCAServer.requestCertificate(
-          csr, KERBEROS_TRUSTED, SCM,
-              BigInteger.ONE.add(BigInteger.ONE).toString()).get();
-      String pemEncodedCert =
-          CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
+      String subCaSerialId = BigInteger.ONE.add(BigInteger.ONE).toString();
+      CertPath scmSubCACertPath = rootCAServer.requestCertificate(csr, KERBEROS_TRUSTED, SCM, subCaSerialId).get();
+      String pemEncodedCert = CertificateCodec.getPEMEncodedString(scmSubCACertPath);
 
       storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE);
       storeCertificate(pemEncodedCert, CAType.NONE);
       //note: this does exactly the same as store certificate
       persistSubCACertificate(pemEncodedCert);
-      X509Certificate cert =
-          (X509Certificate) subSCMCertHolderList.getCertificates().get(0);
-      X509CertificateHolder subSCMCertHolder =
-          CertificateCodec.getCertificateHolder(cert);
+      X509Certificate cert = (X509Certificate) scmSubCACertPath.getCertificates().get(0);
 
       // Persist scm cert serial ID.
-      saveCertIdCallback.accept(subSCMCertHolder.getSerialNumber().toString());
-    } catch (InterruptedException | ExecutionException | IOException |
-             java.security.cert.CertificateException e) {
+      saveCertIdCallback.accept(cert.getSerialNumber().toString());
+    } catch (InterruptedException | ExecutionException | IOException | java.security.cert.CertificateException e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
