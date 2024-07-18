@@ -34,7 +34,6 @@ import java.util.Objects;
 public final class DispatcherContext {
   private static final DispatcherContext HANDLE_READ_CHUNK
       = newBuilder(Op.HANDLE_READ_CHUNK).build();
-
   private static final DispatcherContext HANDLE_READ_BLOCK
       = newBuilder(Op.HANDLE_READ_BLOCK).build();
   private static final DispatcherContext HANDLE_WRITE_CHUNK

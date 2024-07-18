@@ -98,7 +98,6 @@ public class CSMMetrics {
   }
 
   public void incNumWriteStateMachineOps() {
-
     numWriteStateMachineOps.incr();
   }
 
