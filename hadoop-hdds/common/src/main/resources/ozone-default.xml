@@ -4217,6 +4217,20 @@
   </property>
 
   <property>
+    <name>ozone.om.db.max.open.files</name>
+    <value>-1</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files that OM RocksDB will open simultaneously
+      Essentially sets `max_open_files` config for the active OM RocksDB instance.
+      This will limit the total number of files opened by OM db.
+      Default is -1 which is unlimited and gives max performance.
+      If you are certain that your ulimit will always be bigger than number of files in the database,
+      set max_open_files to -1, or else set it to a value lesser than or equal to ulimit.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.db.max.open.files</name>
     <value>100</value>
     <tag>OZONE, OM</tag>

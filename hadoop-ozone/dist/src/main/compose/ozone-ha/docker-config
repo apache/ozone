@@ -50,6 +50,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

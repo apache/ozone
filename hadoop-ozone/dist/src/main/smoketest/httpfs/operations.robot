@@ -42,8 +42,3 @@ Execute create file command
     ${output2}        Run process       curl -X PUT -T ${file_name} ${curl_extra_commands} "${final_url2}" -H"Content-Type: application/octet-stream"   shell=True
     Should Be Equal As Integers         ${output2.rc}    0
     [return]          ${output2}
-
-Create file
-    [Arguments]     ${file_name}
-    Run process     touch ${file_name}  shell=True
-    Run process     echo "Hello world!">${file_name}     shell=True

@@ -52,6 +52,7 @@ OZONE-SITE.XML_hdds.container.report.interval=30s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

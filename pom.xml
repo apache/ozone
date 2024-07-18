@@ -203,7 +203,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <joda.time.version>2.12.7</joda.time.version>
 
     <compile-testing.version>0.21.0</compile-testing.version>
-    <errorprone-annotations.version>2.2.0</errorprone-annotations.version>
+    <errorprone-annotations.version>2.28.0</errorprone-annotations.version>
     <guava.version>32.1.3-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <gson.version>2.10.1</gson.version>
@@ -226,7 +226,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <io.grpc.version>1.58.0</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
-    <sqlite.version>3.44.1.0</sqlite.version>
+    <sqlite.version>3.46.0.0</sqlite.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
@@ -248,7 +248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
 
-    <maven-clean-plugin.version>3.3.2</maven-clean-plugin.version>
+    <maven-clean-plugin.version>3.4.0</maven-clean-plugin.version>
     <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.2</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
@@ -292,7 +292,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
 
-    <spring.version>5.3.34</spring.version>
+    <spring.version>5.3.37</spring.version>
     <jooq.version>3.11.10</jooq.version>
 
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
@@ -637,27 +637,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>jersey-core</artifactId>
         <version>${jersey.version}</version>
       </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-servlet</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-json</artifactId>
-        <version>${jersey.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>stax</groupId>
-            <artifactId>stax-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-server</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
 
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -685,11 +664,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.jolbox</groupId>
         <artifactId>bonecp</artifactId>
         <version>${bonecp.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey.contribs</groupId>
-        <artifactId>jersey-guice</artifactId>
-        <version>${jersey.version}</version>
       </dependency>
 
       <dependency>
@@ -1554,6 +1528,27 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <bannedImport>org.checkerframework.checker.nullness.qual.Nullable</bannedImport>
                       <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
                       <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-annotations</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <restrictImports>
+                    <reason>Annotation processing is disabled by default.  Override this ban in modules where processing is enabled.</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
+                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                      <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>

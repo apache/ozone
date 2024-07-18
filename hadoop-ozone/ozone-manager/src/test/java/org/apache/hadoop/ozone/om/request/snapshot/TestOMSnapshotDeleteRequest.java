@@ -159,8 +159,8 @@ public class TestOMSnapshotDeleteRequest {
         bucketName, deleteSnapshotName);
     OMException omException =
         assertThrows(OMException.class, () -> doPreExecute(omRequest));
-    assertEquals("Invalid snapshot name: " + deleteSnapshotName,
-        omException.getMessage());
+    assertTrue(omException.getMessage()
+        .contains("Invalid snapshot name: " + deleteSnapshotName));
   }
 
   @Test

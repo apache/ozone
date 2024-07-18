@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -288,6 +289,7 @@ class TestContainerReplication {
 
 
   @Test
+  @Flaky("HDDS-11087")
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();

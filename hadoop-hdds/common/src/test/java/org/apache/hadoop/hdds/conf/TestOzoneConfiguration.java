@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -149,6 +150,67 @@ public class TestOzoneConfiguration {
     assertSame(Integer.class, configuration.getMyClass());
     assertEquals(10.5, configuration.getThreshold());
     assertEquals(Duration.ofSeconds(3), configuration.getDuration());
+  }
+
+  @Test
+  public void testRestrictedComplianceModeWithOzoneConf() {
+    Configuration config = new Configuration();
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration(config);
+
+    // Set it to an allowed config value
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA512withDCA");
+    ozoneConfig.set("hdds.x509.signature.algorithm.restricted.whitelist", "SHA512withRSA,SHA512withDCA");
+
+    assertEquals("restricted", ozoneConfig.get("ozone.security.crypto.compliance.mode"));
+    assertEquals("SHA512withRSA,SHA512withDCA", ozoneConfig.get("hdds.x509.signature.algorithm.restricted.whitelist"));
+    assertEquals("SHA512withDCA", ozoneConfig.get("hdds.x509.signature.algorithm"));
+
+    // Set it to a disallowed config value
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA256withRSA");
+
+    assertThrows(ConfigurationException.class, () -> ozoneConfig.get("hdds.x509.signature.algorithm"));
+
+    // Check it with a Hadoop Configuration
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(ozoneConfig);
+    assertThrows(ConfigurationException.class, () -> hadoopConfig.get("hdds.x509.signature.algorithm"));
+  }
+
+  @Test
+  public void testRestrictedComplianceModeWithLegacyHadoopConf() {
+    Configuration config = new Configuration();
+    config.addResource("ozone-default.xml");
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
+    LegacyHadoopConfigurationSource legacyHadoopConf = new LegacyHadoopConfigurationSource(config);
+
+    // Set it to an allowed config value
+    legacyHadoopConf.set("hdds.x509.signature.algorithm", "SHA512withDCA");
+    legacyHadoopConf.set("hdds.x509.signature.algorithm.restricted.whitelist", "SHA512withRSA,SHA512withDCA");
+
+    assertEquals("restricted", legacyHadoopConf.get("ozone.security.crypto.compliance.mode"));
+    assertEquals("SHA512withRSA,SHA512withDCA",
+        legacyHadoopConf.get("hdds.x509.signature.algorithm.restricted.whitelist"));
+    assertEquals("SHA512withDCA", legacyHadoopConf.get("hdds.x509.signature.algorithm"));
+
+    // Set it to a disallowed config value
+    legacyHadoopConf.set("hdds.x509.signature.algorithm", "SHA256withRSA");
+
+    assertThrows(ConfigurationException.class, () -> legacyHadoopConf.get("hdds.x509.signature.algorithm"));
+
+    // Check it with a Hadoop Configuration
+    Configuration legacyConf = LegacyHadoopConfigurationSource.asHadoopConfiguration(legacyHadoopConf);
+    assertThrows(ConfigurationException.class, () -> legacyConf.get("hdds.x509.signature.algorithm"));
+  }
+
+  @Test
+  public void testUnrestrictedComplianceMode() {
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA256");
+    ozoneConfig.set("hdds.x509.signature.algorithm.unrestricted.whitelist", "SHA512withRSA");
+
+    assertEquals(ozoneConfig.get("hdds.x509.signature.algorithm"), "SHA256");
+    assertEquals(ozoneConfig.get("ozone.security.crypto.compliance.mode"), "unrestricted");
   }
 
   @Test
