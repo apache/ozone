@@ -139,7 +139,6 @@ abstract class AbstractCommitWatcher<BUFFER> {
     }
 
     try {
-      LOG.info("Proceeding watchForCommit({}) with f = {}", commitIndex, f);
       final XceiverClientReply reply = client.watchForCommit(commitIndex);
       f.complete(reply);
       final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
