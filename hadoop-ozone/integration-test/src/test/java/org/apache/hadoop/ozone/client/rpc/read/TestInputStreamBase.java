@@ -41,11 +41,10 @@ abstract class TestInputStreamBase {
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
   static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
   static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
-  protected static OzoneConfiguration conf;
 
   protected static MiniOzoneCluster newCluster(
       ContainerLayoutVersion containerLayout) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
