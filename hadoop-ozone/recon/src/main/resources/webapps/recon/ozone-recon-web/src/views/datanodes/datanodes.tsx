@@ -201,7 +201,7 @@ const COLUMNS = [
     render: (uuid: IDatanode, record: IDatanode) => {
       return (
         //1. Compare Decommission Api's UUID with all UUID in table and show Decommission Summary
-        (decommissionUids && decommissionUids.includes(record.uuid) && record.opState !== 'DECOMMISSIONED') ? 
+        (decommissionUuids && decommissionUuids.includes(record.uuid) && record.opState !== 'DECOMMISSIONED') ? 
            <DecommissionSummary uuid={uuid} record={record} /> : <span>{uuid}</span>
       );
     }
@@ -363,7 +363,7 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
 
 let cancelSignal: AbortController;
 let cancelDecommissionSignal: AbortController;
-let decommissionUids: string | string[] =[];
+let decommissionUuids: string | string[] =[];
 const COLUMN_UPDATE_DECOMMISSIONING = 'DECOMMISSIONING';
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
@@ -401,31 +401,33 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   _loadData = async () => {
     // Need to call decommission API on each interval to get updated status before datanode API to compare UUID's
     // update Operation State Column in table Manually before rendering
-    let decommissionAPIRequest = this._loadDecommisionAPI();
-
-    await decommissionAPIRequest.then(decommissionResponse => {
-      decommissionUids = decommissionResponse && decommissionResponse.data &&
-        decommissionResponse.data.DatanodesDecommissionInfo &&
-        decommissionResponse.data.DatanodesDecommissionInfo.map((item: { datanodeDetails: { uuid: any; }; }) => item.datanodeDetails.uuid);
+    try {
+    let decomissionResponse = await this._loadDecommisionAPI();
+    console.log("1=", decomissionResponse);
+    decommissionUuids =  decomissionResponse && decomissionResponse.data &&
+    decomissionResponse.data.DatanodesDecommissionInfo &&
+    decomissionResponse.data.DatanodesDecommissionInfo.map((item: { datanodeDetails: { uuid: any; }; }) => item.datanodeDetails.uuid);
+    console.log("2=",decommissionUuids);
+    }
+    catch (error:any)
+    {
+      console.log("catch",error);
       this.setState({
         loading: false
       });
-    }).catch(error => {
-      this.setState({
-        loading: false
-      });
-      decommissionUids = [];
+      decommissionUuids = [];
       showDataFetchError(error.toString());
-    });
-
+    }
+    console.log("3=");
+    try {
     // Call Datanode API Synchronously after completing Decommission API to render Operation Status Column
-    let datanodeApiRequest = this._loadDataNodeAPI();
-    await datanodeApiRequest.then(response => {
-      const datanodesResponse: IDatanodesResponse = response.data;
+    let datanodeApiResponse = await this._loadDataNodeAPI();
+    console.log("4=");
+      const datanodesResponse: IDatanodesResponse = datanodeApiResponse.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
       const dataSource: IDatanode[] = datanodes && datanodes.map(datanode => {
-        let decommissionCondition = decommissionUids && decommissionUids.includes(datanode.uuid) && datanode.opState !== 'DECOMMISSIONED';
+        let decommissionCondition = decommissionUuids && decommissionUuids.includes(datanode.uuid) && datanode.opState !== 'DECOMMISSIONED';
         return {
           hostname: datanode.hostname,
           uuid: datanode.uuid,
@@ -447,29 +449,29 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           networkLocation: datanode.networkLocation
         };
       });
-
+     console.log("5");
       this.setState({
         loading: false,
         dataSource,
         totalCount,
         lastUpdated: Number(moment())
       });
-    }).catch(error => {
+    }
+    catch(error:any) {
+      console.log("Inside catch2");
       this.setState({
         loading: false
       });
-      decommissionUids = [];
+      decommissionUuids = [];
       showDataFetchError(error.toString());
-    });
-
+    }
   };
 
   _loadDecommisionAPI = async () => {
     this.setState({
       loading: true
     });
-
-    decommissionUids = [];
+    decommissionUuids = [];
     const { request, controller } = await AxiosGetHelper('/api/v1/datanodes/decommission/info', cancelDecommissionSignal);
     cancelDecommissionSignal = controller;
     return request
