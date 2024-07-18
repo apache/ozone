@@ -88,6 +88,9 @@ public final class OMAuditLogger {
     CMD_AUDIT_ACTION_MAP.put(Type.AbortExpiredMultiPartUploads, OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD);
     CMD_AUDIT_ACTION_MAP.put(Type.SetVolumeProperty, OMAction.SET_OWNER);
     CMD_AUDIT_ACTION_MAP.put(Type.SetBucketProperty, OMAction.UPDATE_BUCKET);
+    CMD_AUDIT_ACTION_MAP.put(Type.Prepare, OMAction.UPGRADE_PREPARE);
+    CMD_AUDIT_ACTION_MAP.put(Type.CancelPrepare, OMAction.UPGRADE_CANCEL);
+    CMD_AUDIT_ACTION_MAP.put(Type.FinalizeUpgrade, OMAction.UPGRADE_FINALIZE);
   }
 
   private static OMAction getAction(OzoneManagerProtocolProtos.OMRequest request) {
