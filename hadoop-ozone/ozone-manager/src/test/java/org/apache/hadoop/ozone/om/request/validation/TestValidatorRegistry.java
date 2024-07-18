@@ -31,7 +31,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -82,8 +81,7 @@ public class TestValidatorRegistry {
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
             Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
             REQUEST_PROCESSING_PHASES);
-    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS,
-        Collections.singletonList(ClientVersion.CURRENT));
+    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS, ClientVersion.CURRENT);
 
     assertTrue(validators.isEmpty());
   }
