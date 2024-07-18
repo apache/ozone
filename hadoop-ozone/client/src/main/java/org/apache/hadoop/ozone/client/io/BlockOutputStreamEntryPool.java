@@ -395,7 +395,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.
-    Preconditions.checkArgument(currentStreamIndex < streamEntries.size());
+    Preconditions.checkArgument(currentStreamIndex < streamEntries.size(),
+        "currentStreamIndex(%s) must be < streamEntries.size(%s)", currentStreamIndex, streamEntries.size());
     return streamEntries.get(currentStreamIndex);
   }
 
