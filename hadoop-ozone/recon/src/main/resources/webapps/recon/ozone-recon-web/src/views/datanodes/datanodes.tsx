@@ -403,26 +403,21 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     // update Operation State Column in table Manually before rendering
     try {
     let decomissionResponse = await this._loadDecommisionAPI();
-    console.log("1=", decomissionResponse);
     decommissionUuids =  decomissionResponse && decomissionResponse.data &&
     decomissionResponse.data.DatanodesDecommissionInfo &&
     decomissionResponse.data.DatanodesDecommissionInfo.map((item: { datanodeDetails: { uuid: any; }; }) => item.datanodeDetails.uuid);
-    console.log("2=",decommissionUuids);
     }
-    catch (error:any)
+    catch (error: any)
     {
-      console.log("catch",error);
       this.setState({
         loading: false
       });
       decommissionUuids = [];
       showDataFetchError(error.toString());
     }
-    console.log("3=");
     try {
     // Call Datanode API Synchronously after completing Decommission API to render Operation Status Column
     let datanodeApiResponse = await this._loadDataNodeAPI();
-    console.log("4=");
       const datanodesResponse: IDatanodesResponse = datanodeApiResponse.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
@@ -449,7 +444,6 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           networkLocation: datanode.networkLocation
         };
       });
-     console.log("5");
       this.setState({
         loading: false,
         dataSource,
@@ -457,8 +451,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         lastUpdated: Number(moment())
       });
     }
-    catch(error:any) {
-      console.log("Inside catch2");
+    catch (error: any) {
       this.setState({
         loading: false
       });
