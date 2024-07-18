@@ -53,8 +53,16 @@ Create Random Volume
     [return]       vol-${random}
 
 Find Jars Dir
-    ${dir} =    Execute    ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
-    Set Environment Variable    HDDS_LIB_JARS_DIR    ${dir}
+    [arguments]    ${ozone_dir}=${OZONE_DIR}
+    ${dir} =    Execute    ${ozone_dir}/bin/ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
+    [return]    ${dir}
+
+Create bucket with layout
+    [Arguments]          ${volume}    ${layout}
+    ${postfix} =         Generate Random String    10    [LOWER]
+    ${bucket} =          Set Variable    bucket-${postfix}
+    ${result} =          Execute         ozone sh bucket create --layout ${layout} ${volume}/${bucket}
+    [Return]             ${bucket}
 
 Create Key
     [arguments]    ${key}    ${file}    ${args}=${EMPTY}

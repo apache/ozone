@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,11 +32,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -58,9 +61,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -116,7 +122,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OK,
         omClientResponse.getOMResponse().getStatus());
 
     // Entry should be deleted from openKey Table.
@@ -183,7 +189,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OK,
         omClientResponse.getOMResponse().getStatus());
 
     // Entry should be deleted from openKey Table.
@@ -216,6 +222,68 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getLatestVersionLocations().getLocationList());
     assertEquals(allocatedLocationList,
         omKeyInfo.getLatestVersionLocations().getLocationList());
+  }
+
+  @Test
+  public void testAtomicRewrite() throws Exception {
+    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+    Table<String, OmKeyInfo> closedKeyTable = omMetadataManager.getKeyTable(getBucketLayout());
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
+    KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
+
+    // Append new blocks
+    List<OmKeyLocationInfo> allocatedLocationList =
+        keyArgs.getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
+
+    OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
+    omKeyInfoBuilder.setExpectedDataGeneration(1L);
+    OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
+    omKeyInfo.appendNewBlocks(allocatedLocationList, false);
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
+    omKeyInfo.addAcl(acls.get(0));
+
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
+    OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
+    assertNotNull(openKeyInfo);
+    assertEquals(acls, openKeyInfo.getAcls());
+    // At this stage, we have an openKey, with rewrite generation of 1.
+    // However there is no closed key entry, so the commit should fail.
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
+
+    // Now add the key to the key table, and try again, but with different generation
+    omKeyInfoBuilder.setExpectedDataGeneration(null);
+    omKeyInfoBuilder.setUpdateID(0L);
+    OmKeyInfo invalidKeyInfo = omKeyInfoBuilder.build();
+    closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
+    // This should fail as the updateID ia zero and the open key has rewrite generation of 1.
+    omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
+
+    omKeyInfoBuilder.setUpdateID(1L);
+    OmKeyInfo closedKeyInfo = omKeyInfoBuilder.build();
+
+    closedKeyTable.delete(getOzonePathKey());
+    closedKeyTable.put(getOzonePathKey(), closedKeyInfo);
+
+    // Now the key should commit as the updateID and rewrite Generation match.
+    omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+
+    OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
+    assertNull(committedKey.getExpectedDataGeneration());
+    // Generation should be changed
+    assertNotEquals(closedKeyInfo.getGeneration(), committedKey.getGeneration());
+    assertEquals(acls, committedKey.getAcls());
   }
 
   @Test
@@ -260,7 +328,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OK,
         omClientResponse.getOMResponse().getStatus());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyList
@@ -385,7 +453,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OK,
         omClientResponse.getOMResponse().getStatus());
 
     // Key should be present in both OpenKeyTable and KeyTable with HSync commit
@@ -550,7 +618,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    assertEquals(KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     omKeyInfo =
@@ -596,7 +664,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 102L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     // New entry should be created in key Table.
     omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
@@ -750,6 +818,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,
               keyName, clientID);
+  }
+
+  @Nonnull
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addKeyToTable(true, false, keyInfo, clientID, 0, omMetadataManager);
+
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
   }
 
   @Nonnull

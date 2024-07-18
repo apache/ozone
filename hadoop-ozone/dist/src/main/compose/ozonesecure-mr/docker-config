@@ -37,6 +37,7 @@ OZONE-SITE.XML_ozone.om.kerberos.principal=om/om@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.kerberos.keytab.file=/etc/security/keytabs/om.keytab
 OZONE-SITE.XML_ozone.administrators=*
 OZONE-SITE.XML_ozone.s3.administrators="s3g"
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true

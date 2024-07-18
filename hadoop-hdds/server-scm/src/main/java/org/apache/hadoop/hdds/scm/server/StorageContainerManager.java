@@ -146,6 +146,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
@@ -236,6 +237,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private static SCMMetrics metrics;
   private static SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
+  private final NettyMetrics nettyMetrics;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -456,6 +458,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   private void initializeEventHandlers() {
@@ -1710,6 +1713,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       metrics.unRegister();
     }
 
+    nettyMetrics.unregister();
     if (perfMetrics != null) {
       perfMetrics.unRegister();
     }

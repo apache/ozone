@@ -37,7 +37,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -107,6 +106,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -297,11 +298,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
-  // Table-level locks that protects table read/write access. Note:
-  // Don't use this lock for tables other than deletedTable and deletedDirTable.
-  // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
-  private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
-
   private OzoneManager ozoneManager;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
@@ -317,6 +313,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
+  private final OMPerformanceMetrics perfMetrics;
   private final S3Batcher s3Batcher = new S3SecretBatcher();
 
   /**
@@ -328,7 +325,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
+    this(conf, ozoneManager, null);
+  }
+
+  public OmMetadataManagerImpl(OzoneConfiguration conf,
+                               OzoneManager ozoneManager,
+                               OMPerformanceMetrics perfMetrics)
+      throws IOException {
     this.ozoneManager = ozoneManager;
+    this.perfMetrics = perfMetrics;
     this.lock = new OzoneManagerLock(conf);
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
@@ -350,6 +355,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = 0;
+    perfMetrics = null;
   }
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
@@ -384,6 +390,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    perfMetrics = null;
   }
 
 
@@ -421,11 +428,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       stop();
       throw e;
     }
-  }
-
-  @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return tableLockMap.get(tableName);
+    perfMetrics = null;
   }
 
   public OzoneManager getOzoneManager() {
@@ -558,7 +561,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         rocksDBConfiguration.setSyncOption(true);
       }
 
-      this.store = loadDB(configuration, metaDir);
+      int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
+          OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
+
+      this.store = loadDB(configuration, metaDir, Optional.of(maxOpenFiles));
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -568,8 +574,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
+    return loadDB(configuration, metaDir, Optional.empty());
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, Optional<Integer> maxOpenFiles)
+      throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty(), Optional.empty(), true, true);
+        java.util.Optional.empty(), maxOpenFiles, true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -680,7 +691,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
-    tableLockMap.put(DELETED_TABLE, new ReentrantReadWriteLock(true));
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
@@ -718,7 +728,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
         OmKeyInfo.class);
     checkTableStatus(deletedDirTable, DELETED_DIR_TABLE, addCacheMetrics);
-    tableLockMap.put(DELETED_DIR_TABLE, new ReentrantReadWriteLock(true));
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
@@ -1163,7 +1172,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public ListKeysResult listKeys(String volumeName, String bucketName,
                                  String startKey, String keyPrefix, int maxKeys)
       throws IOException {
-
+    long startNanos = Time.monotonicNowNanos();
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
       return new ListKeysResult(result, false);
@@ -1232,11 +1241,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
-
+    long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
-
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
+      readFromRDbStartNs = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -1259,10 +1268,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           break;
         }
       }
+      readFromRDbStopNs = Time.monotonicNowNanos();
     }
 
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
 
+    if (perfMetrics != null) {
+      long keyCount;
+      if (isTruncated) {
+        keyCount = maxKeys;
+      } else {
+        keyCount = cacheKeyMap.size();
+      }
+      perfMetrics.setListKeysAveragePagination(keyCount);
+      float opsPerSec =
+              keyCount / ((Time.monotonicNowNanos() - startNanos) / 1000000000.0f);
+      perfMetrics.setListKeysOpsPerSec(opsPerSec);
+      perfMetrics.addListKeysReadFromRocksDbLatencyNs(readFromRDbStopNs - readFromRDbStartNs);
+    }
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
     currentCount = 0;
