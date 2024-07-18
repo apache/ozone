@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
