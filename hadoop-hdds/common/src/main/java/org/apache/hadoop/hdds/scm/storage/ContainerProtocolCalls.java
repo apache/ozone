@@ -870,7 +870,7 @@ public final class ContainerProtocolCalls  {
     return tryEachDatanode(xceiverClient.getPipeline(),
         d -> readBlock(xceiverClient,
             validators, builder, d),
-        d -> toErrorMessage(blockID, d));
+        d -> toErrorMessage(BlockID.getFromProtobuf(blockID), d));
   }
 
   private static StreamDataResponseProto readBlock(XceiverClientSpi xceiverClient,

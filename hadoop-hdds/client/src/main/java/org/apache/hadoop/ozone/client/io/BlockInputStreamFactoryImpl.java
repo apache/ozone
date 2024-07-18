@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -86,8 +87,12 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
-    } else {
+    } else if (config.isStreamReadBlock()) {
       return new StreamBlockInput(
+          blockInfo.getBlockID(), blockInfo.getLength(),
+          pipeline, token, xceiverFactory, refreshFunction, config);
+    } else {
+      return new BlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
           pipeline, token, xceiverFactory, refreshFunction, config);
     }

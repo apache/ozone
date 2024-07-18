@@ -71,6 +71,7 @@ public class TestStreamBlockInput {
   @BeforeEach
   public void setup() throws Exception {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadBlock(true);
     refreshFunction = mock(Function.class);
     blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);

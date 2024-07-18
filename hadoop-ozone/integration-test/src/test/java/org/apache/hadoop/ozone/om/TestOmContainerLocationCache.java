@@ -28,15 +28,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommittedBlockLengthResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -291,7 +292,8 @@ public class TestOmContainerLocationCache {
     verify(mockScmContainerClient, times(1))
         .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
-    mockReadBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
     try (InputStream is = key1.getContent()) {
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -365,8 +367,11 @@ public class TestOmContainerLocationCache {
 
     try (InputStream is = key1.getContent()) {
       // Simulate dn1 got errors, and the container's moved to dn2.
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
+          dnException, dnResponseCode);
       mockScmGetContainerPipeline(CONTAINER_ID.get(), DN2);
-      mockReadBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockGetBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
 
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -410,10 +415,12 @@ public class TestOmContainerLocationCache {
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 goes down, the container's to dn2.
-      mockReadBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
           dnException, dnResponseCode);
       mockScmGetContainerPipeline(CONTAINER_ID.get(), DN2);
-      mockReadBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockGetBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
 
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -457,7 +464,7 @@ public class TestOmContainerLocationCache {
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 got errors, and the container's moved to dn2.
-      mockReadBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null, ex,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null, ex,
           errorCode);
 
       assertThrows(expectedEx,
@@ -501,7 +508,8 @@ public class TestOmContainerLocationCache {
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 got errors, and the container's moved to dn2.
-      mockReadBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
           dnException, dnResponseCode);
 
       assertThrows(expectedEx,
@@ -553,7 +561,8 @@ public class TestOmContainerLocationCache {
 
     // but the empty pipeline is not cached, and when some data node is back.
     mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
-    mockReadBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
     // the subsequent effort to read the key is success.
     OzoneKeyDetails updatedKey1 = bucket.getKey(keyName);
     try (InputStream is = updatedKey1.getContent()) {
@@ -659,42 +668,41 @@ public class TestOmContainerLocationCache {
         newHashSet(containerId))).thenReturn(containerWithPipelines);
   }
 
-  private void mockReadBlock(XceiverClientGrpc mockDnProtocol,
-                             long containerId, long localId,
-                             byte[] data,
-                             Exception exception,
-                             Result errorCode) throws Exception {
+  private void mockGetBlock(XceiverClientGrpc mockDnProtocol,
+                            long containerId, long localId,
+                            byte[] data,
+                            Exception exception,
+                            Result errorCode) throws Exception {
+
     final CompletableFuture<ContainerCommandResponseProto> response;
     if (exception != null) {
       response = new CompletableFuture<>();
       response.completeExceptionally(exception);
     } else if (errorCode != null) {
-      ContainerCommandResponseProto readBlock =
+      ContainerCommandResponseProto getBlockResp =
           ContainerCommandResponseProto.newBuilder()
               .setResult(errorCode)
-              .setCmdType(Type.ReadBlock)
+              .setCmdType(Type.GetBlock)
               .build();
-      response = completedFuture(readBlock);
+      response = completedFuture(getBlockResp);
     } else {
-      ContainerCommandResponseProto readBlock =
+      ContainerCommandResponseProto getBlockResp =
           ContainerCommandResponseProto.newBuilder()
-              .setStreamData(StreamDataResponseProto.newBuilder()
-                  .addReadBlock(ReadBlockResponseProto.newBuilder()
+              .setGetBlock(GetBlockResponseProto.newBuilder()
+                  .setBlockData(BlockData.newBuilder()
+                      .addChunks(createChunkInfo(data))
                       .setBlockID(createBlockId(containerId, localId))
-                      .setChunkData(createChunkInfo(data))
-                      .setData(ByteString.copyFrom(data))
                       .build())
-                  .build())
+                  .build()
+              )
               .setResult(Result.SUCCESS)
-              .setCmdType(Type.StreamRead)
+              .setCmdType(Type.GetBlock)
               .build();
-      response = completedFuture(readBlock);
+      response = completedFuture(getBlockResp);
     }
-
     doAnswer(invocation -> new XceiverClientReply(response))
         .when(mockDnProtocol)
-        .sendCommandAsyncReadOnly(argThat(matchCmd(Type.ReadBlock)), any());
-
+        .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any());
   }
 
   @Nonnull
@@ -706,6 +714,43 @@ public class TestOmContainerLocationCache {
         .setChunkName("chunk1")
         .setChecksumData(checksum.computeChecksum(data).getProtoBufMessage())
         .build();
+  }
+
+  private void mockReadChunk(XceiverClientGrpc mockDnProtocol,
+                             long containerId, long localId,
+                             byte[] data,
+                             Exception exception,
+                             Result errorCode) throws Exception {
+    final CompletableFuture<ContainerCommandResponseProto> response;
+    if (exception != null) {
+      response = new CompletableFuture<>();
+      response.completeExceptionally(exception);
+    } else if (errorCode != null) {
+      ContainerCommandResponseProto readChunkResp =
+          ContainerCommandResponseProto.newBuilder()
+              .setResult(errorCode)
+              .setCmdType(Type.ReadChunk)
+              .build();
+      response = completedFuture(readChunkResp);
+    } else {
+      ContainerCommandResponseProto readChunkResp =
+          ContainerCommandResponseProto.newBuilder()
+              .setReadChunk(ReadChunkResponseProto.newBuilder()
+                  .setBlockID(createBlockId(containerId, localId))
+                  .setChunkData(createChunkInfo(data))
+                  .setData(ByteString.copyFrom(data))
+                  .build()
+              )
+              .setResult(Result.SUCCESS)
+              .setCmdType(Type.ReadChunk)
+              .build();
+      response = completedFuture(readChunkResp);
+    }
+
+    doAnswer(invocation -> new XceiverClientReply(response))
+        .when(mockDnProtocol)
+        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any());
+
   }
 
   private static Pipeline createPipeline(DatanodeDetails dn) {
