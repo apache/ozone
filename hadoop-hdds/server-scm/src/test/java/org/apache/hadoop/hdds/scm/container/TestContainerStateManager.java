@@ -50,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
@@ -146,6 +147,42 @@ public class TestContainerStateManager {
 
     assertEquals(2, replicas.size());
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+  }
+
+  @Test
+  public void testTransitionDeletingToClosedState() throws IOException {
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(HddsProtos.LifeCycleState.DELETING)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    containerStateManager.transitionDeletingToClosedState(cid);
+    assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
+        .getState());
+  }
+
+  @Test
+  public void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainer() throws IOException {
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    assertThrows(IOException.class, () -> containerStateManager.transitionDeletingToClosedState(cid));
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {

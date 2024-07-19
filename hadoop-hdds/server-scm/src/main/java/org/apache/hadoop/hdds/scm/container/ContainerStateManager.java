@@ -151,6 +151,18 @@ public interface ContainerStateManager {
                             HddsProtos.LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException;
 
+
+  /**
+   * Bypasses the container state machine to change a container's state from DELETING to CLOSED. This API was
+   * specially introduced to fix a bug (HDDS-11136), and should NOT be used in any other context.
+   *
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
+   * @param id id of the container to transition
+   * @throws IOException
+   */
+  @Replicate
+  void transitionDeletingToClosedState(HddsProtos.ContainerID id) throws IOException;
+
   /**
    *
    */

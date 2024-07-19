@@ -349,8 +349,13 @@ public class AbstractContainerReportHandler {
       break;
     case DELETING:
       /*
-       * The container is under deleting. do nothing.
+      HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to CLOSED
+      state.
        */
+      if (replica.getState() == State.CLOSED && replica.hasIsEmpty() && !replica.getIsEmpty()) {
+        containerManager.transitionDeletingToClosedState(containerId);
+      }
+
       break;
     case DELETED:
       /*
