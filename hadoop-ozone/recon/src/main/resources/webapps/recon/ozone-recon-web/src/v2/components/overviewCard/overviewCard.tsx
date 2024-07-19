@@ -31,9 +31,8 @@ import {
 } from '@ant-design/icons';
 
 import StorageBar from '@/components/storageBar/storageBar';
-import OverviewCardWrapper from '@/v2/components/overviewCardWrapper';
+import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 import { IOverviewCardProps } from '@/v2/types/overview';
-import { IStorageReport } from '@/types/datanode.types';
 import './overviewCard.less';
 
 const IconSelector = ({ iconType, ...extras }: { iconType: string }) => {
