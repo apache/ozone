@@ -18,6 +18,7 @@ services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
     hostname: kdc
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -27,6 +28,7 @@ services:
         ipv4_address: 172.25.0.100
   kms:
     image: apache/hadoop:${HADOOP_VERSION}
+    dns_search: .
     ports:
       - 9600:9600
     env_file:
@@ -43,6 +45,7 @@ services:
         ipv4_address: 172.25.0.101
   datanode1:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -65,6 +68,7 @@ services:
         ipv4_address: 172.25.0.102
   datanode2:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -87,6 +91,7 @@ services:
         ipv4_address: 172.25.0.103
   datanode3:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -110,6 +115,7 @@ services:
   om1:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om1
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -135,6 +141,7 @@ services:
   om2:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om2
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -160,6 +167,7 @@ services:
   om3:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om3
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -185,6 +193,7 @@ services:
   httpfs:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: httpfs
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -203,6 +212,7 @@ services:
   s3g:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -220,6 +230,7 @@ services:
   scm1.org:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm1.org
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -247,6 +258,7 @@ services:
   scm2.org:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm2.org
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -275,6 +287,7 @@ services:
   scm3.org:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm3.org
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -303,6 +316,7 @@ services:
   recon:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: recon
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
