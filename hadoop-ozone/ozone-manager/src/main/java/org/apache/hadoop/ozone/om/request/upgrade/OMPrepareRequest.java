@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import java.util.HashMap;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -69,12 +72,15 @@ public class OMPrepareRequest extends OMClientRequest {
     LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
 
     OMRequest omRequest = getOmRequest();
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
     OzoneManagerProtocolProtos.PrepareRequestArgs args =
         omRequest.getPrepareRequest().getArgs();
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(omRequest);
     responseBuilder.setCmdType(Type.Prepare);
     OMClientResponse response = null;
+    Exception exception = null;
 
     // Allow double buffer this many seconds to flush all transactions before
     // returning an error to the caller.
@@ -123,6 +129,7 @@ public class OMPrepareRequest extends OMClientRequest {
           "log index {}", ozoneManager.getOMNodeId(), transactionLogIndex,
           omResponse, omResponse.getTxnID());
     } catch (OMException e) {
+      exception = e;
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
@@ -130,6 +137,7 @@ public class OMPrepareRequest extends OMClientRequest {
     } catch (InterruptedException | IOException e) {
       // Set error code so that prepare failure does not cause the OM to
       // terminate.
+      exception = e;
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
@@ -149,6 +157,8 @@ public class OMPrepareRequest extends OMClientRequest {
       }
     }
 
+    auditLog(auditLogger, buildAuditMessage(OMAction.UPGRADE_PREPARE,
+        new HashMap<>(), exception, userInfo));
     return response;
   }
 

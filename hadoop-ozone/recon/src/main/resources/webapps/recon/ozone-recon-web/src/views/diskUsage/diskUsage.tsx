@@ -556,12 +556,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       </Menu>
     )
 
-    console.log(plotData);
-    console.log(plotData.map((value) => {
-      return {
-        name: value.name
-      }
-    }))
     const eChartsOptions = {
       title: {
         text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,

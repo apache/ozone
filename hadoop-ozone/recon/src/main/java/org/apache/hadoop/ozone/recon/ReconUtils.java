@@ -32,10 +32,11 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.Date;
+import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -592,6 +593,54 @@ public class ReconUtils {
     } catch (Exception exception) {
       log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
+    }
+  }
+
+  /**
+   * Finds all subdirectories under a parent directory in an FSO bucket. It builds
+   * a list of paths for these subdirectories. These sub-directories are then used
+   * to search for open files in the openFileTable.
+   *
+   * How it works:
+   * - Starts from a parent directory identified by parentId.
+   * - Looks through all child directories of this parent.
+   * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
+   *   following our openFileTable format.
+   * - Adds these paths to a list and explores each child further for more subdirectories.
+   *
+   * @param parentId The ID of the parent directory from which to start gathering subdirectories.
+   * @param subPaths The list to which the paths of subdirectories will be added.
+   * @param volumeID The ID of the volume containing the parent directory.
+   * @param bucketID The ID of the bucket containing the parent directory.
+   * @param reconNamespaceSummaryManager The manager used to retrieve NSSummary objects.
+   * @throws IOException If an I/O error occurs while fetching NSSummary objects.
+   */
+  public static void gatherSubPaths(long parentId, List<String> subPaths,
+                              long volumeID, long bucketID,
+                              ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+      throws IOException {
+    // Fetch the NSSummary object for parentId
+    NSSummary parentSummary =
+        reconNamespaceSummaryManager.getNSSummary(parentId);
+    if (parentSummary == null) {
+      return;
+    }
+
+    Set<Long> childDirIds = parentSummary.getChildDir();
+    for (Long childId : childDirIds) {
+      // Fetch the NSSummary for each child directory
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
+      if (childSummary != null) {
+        String subPath =
+            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID,
+                childId);
+        // Add to subPaths
+        subPaths.add(subPath);
+        // Recurse into this child directory
+        gatherSubPaths(childId, subPaths, volumeID, bucketID,
+            reconNamespaceSummaryManager);
+      }
     }
   }
 

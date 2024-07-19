@@ -21,6 +21,7 @@ x-common-config:
     - docker-config
     - ../../../common/security.conf
   image: ${OZONE_IMAGE}
+  dns_search: .
 
 x-environment:
   &environment
