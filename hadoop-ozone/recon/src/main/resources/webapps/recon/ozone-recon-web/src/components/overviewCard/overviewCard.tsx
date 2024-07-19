@@ -141,8 +141,14 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
 
   render() {
     let { icon, data, title, loading, hoverable, storageReport, linkToUrl, error } = this.props;
+
     let meta = <Meta title={data} description={title} />;
-    const errorClass = error ? 'card-error' : '';
+    let errorClass = error ? 'card-error' : '';
+
+    if (typeof data === 'string' && data === 'N/A'){
+      errorClass = 'card-error';
+    }
+
     if (storageReport) {
       meta = (
         <div className='ant-card-percentage'>
@@ -158,7 +164,7 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
 
     return (
       <OverviewCardWrapper linkToUrl={linkToUrl}>
-        <Card className={`overview-card ${ errorClass }`} loading={loading} hoverable={hoverable}>
+        <Card className={`overview-card ${errorClass}`} loading={loading} hoverable={hoverable}>
           <Row type='flex' justify='space-between'>
             <Col span={18}>
               <Row>
