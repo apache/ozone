@@ -126,6 +126,21 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
+  @Metric(about = "deleteKeyFailure latency in nano seconds")
+  private MutableRate deleteKeyFailureLatencyNs;
+
+  @Metric(about = "deleteKeySuccess latency in nano seconds")
+  private MutableRate deleteKeySuccessLatencyNs;
+
+  @Metric(about = "resolveBucketLink latency in deleteKeys")
+  private MutableRate deleteKeysResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check latency in deleteKeys")
+  private MutableRate deleteKeysAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink and ACLs check latency in deleteKey")
+  private MutableRate deleteKeyResolveBucketAndAclCheckLatencyNs;
+  
   @Metric(about = "readFromRockDb latency in listKeys")
   private MutableRate listKeysReadFromRocksDbLatencyNs;
 
@@ -242,6 +257,26 @@ public class OMPerformanceMetrics {
     return listKeysResolveBucketLatencyNs;
   }
 
+  public void setDeleteKeyFailureLatencyNs(long latencyInNs) {
+    deleteKeyFailureLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeySuccessLatencyNs(long latencyInNs) {
+    deleteKeySuccessLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeysResolveBucketLatencyNs(long latencyInNs) {
+    deleteKeysResolveBucketLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeysAclCheckLatencyNs(long latencyInNs) {
+    deleteKeysAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
+    return deleteKeyResolveBucketAndAclCheckLatencyNs;
+  }
+    
   public void addListKeysReadFromRocksDbLatencyNs(long latencyInNs) {
     listKeysReadFromRocksDbLatencyNs.add(latencyInNs);
   }

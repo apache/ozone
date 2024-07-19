@@ -67,27 +67,26 @@ public final class HddsClientUtils {
           .add(NotReplicatedException.class)
           .build();
 
-  private static void doNameChecks(String resName) {
+  private static void doNameChecks(String resName, String resType) {
     if (resName == null) {
-      throw new IllegalArgumentException("Bucket or Volume name is null");
+      throw new IllegalArgumentException(resType + " name is null");
     }
 
     if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
         resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
-      throw new IllegalArgumentException(
-          "Bucket or Volume length is illegal, "
-              + "valid length is 3-63 characters");
+      throw new IllegalArgumentException(resType +
+          " length is illegal, " + "valid length is 3-63 characters");
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name cannot start with a period or dash");
+      throw new IllegalArgumentException(resType +
+          " name cannot start with a period or dash");
     }
 
     if (resName.charAt(resName.length() - 1) == '.' ||
         resName.charAt(resName.length() - 1) == '-') {
-      throw new IllegalArgumentException("Bucket or Volume name "
-          + "cannot end with a period or dash");
+      throw new IllegalArgumentException(resType +
+          " name cannot end with a period or dash");
     }
   }
 
@@ -108,27 +107,27 @@ public final class HddsClientUtils {
     return false;
   }
 
-  private static void doCharacterChecks(char currChar, char prev,
+  private static void doCharacterChecks(char currChar, char prev, String resType,
       boolean isStrictS3) {
     if (Character.isUpperCase(currChar)) {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name does not support uppercase characters");
+      throw new IllegalArgumentException(resType +
+          " name does not support uppercase characters");
     }
     if (!isSupportedCharacter(currChar, isStrictS3)) {
-      throw new IllegalArgumentException("Bucket or Volume name has an " +
-          "unsupported character : " + currChar);
+      throw new IllegalArgumentException(resType +
+          " name has an unsupported character : " + currChar);
     }
     if (prev == '.' && currChar == '.') {
-      throw new IllegalArgumentException("Bucket or Volume name should not " +
-          "have two contiguous periods");
+      throw new IllegalArgumentException(resType +
+          " name should not have two contiguous periods");
     }
     if (prev == '-' && currChar == '.') {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name should not have period after dash");
+      throw new IllegalArgumentException(resType +
+          " name should not have period after dash");
     }
     if (prev == '.' && currChar == '-') {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name should not have dash after period");
+      throw new IllegalArgumentException(resType +
+          " name should not have dash after period");
     }
   }
 
@@ -140,7 +139,11 @@ public final class HddsClientUtils {
    * @throws IllegalArgumentException
    */
   public static void verifyResourceName(String resName) {
-    verifyResourceName(resName, true);
+    verifyResourceName(resName, "resource", true);
+  }
+
+  public static void verifyResourceName(String resName, String resType) {
+    verifyResourceName(resName, resType, true);
   }
 
   /**
@@ -150,9 +153,9 @@ public final class HddsClientUtils {
    *
    * @throws IllegalArgumentException
    */
-  public static void verifyResourceName(String resName, boolean isStrictS3) {
+  public static void verifyResourceName(String resName, String resType, boolean isStrictS3) {
 
-    doNameChecks(resName);
+    doNameChecks(resName, resType);
 
     boolean isIPv4 = true;
     char prev = (char) 0;
@@ -162,13 +165,13 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      doCharacterChecks(currChar, prev, isStrictS3);
+      doCharacterChecks(currChar, prev, resType, isStrictS3);
       prev = currChar;
     }
 
     if (isIPv4) {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name cannot be an IPv4 address or all numeric");
+      throw new IllegalArgumentException(resType +
+          " name cannot be an IPv4 address or all numeric");
     }
   }
 
