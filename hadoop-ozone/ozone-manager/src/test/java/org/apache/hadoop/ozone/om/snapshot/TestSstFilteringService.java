@@ -314,7 +314,7 @@ public class TestSstFilteringService {
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
 
     // delete snap1
-    writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
+    deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
     sstFilteringService.resume();
     // Filtering service will only act on snap2 as it is an active snaphot
     waitForSnapshotsAtLeast(sstFilteringService, countTotalSnapshots);
@@ -505,5 +505,10 @@ public class TestSstFilteringService {
   private void createSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
     writeClient.createSnapshot(volumeName, bucketName, snapshotName);
     countTotalSnapshots++;
+  }
+
+  private void deleteSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
+    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+    countTotalSnapshots--;
   }
 }
