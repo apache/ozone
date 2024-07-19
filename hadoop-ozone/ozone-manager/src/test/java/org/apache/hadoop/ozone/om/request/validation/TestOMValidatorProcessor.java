@@ -18,13 +18,18 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.Version;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RegisterValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.reflections.Reflections;
+import org.reflections.scanners.Scanners;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -32,7 +37,10 @@ import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
@@ -47,20 +55,43 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * Compile tests against the annotation processor for the
- * {@link OMClientVersionValidator} annotation.
+ * Compile tests against the annotation processor for all validators annotated with
+ * {@link RegisterValidator} annotation.
  *
  * The processor should ensure the method signatures and return values, based
  * on annotation arguments provided.
  */
-public class TestOMClientVersionValidatorProcessor {
+public class TestOMValidatorProcessor {
 
   private static final String CLASSNAME = "Validation";
+  private static final Map<Class<?>, Class<?>> ANNOTATION_VERSION_CLASS_MAP = new Reflections(
+      new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("")).setScanners(Scanners.TypesAnnotated)
+          .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream().filter(annotationClass -> {
+            try {
+              return annotationClass.getMethod(RegisterValidator.REQUEST_TYPE_METHOD_NAME).getReturnType()
+                  .equals(Type.class);
+            } catch (NoSuchMethodException e) {
+              throw new RuntimeException(e);
+            }
+          })
+          .collect(Collectors.toMap(Function.identity(), annotationClass -> {
+            try {
+              return annotationClass.getMethod(RegisterValidator.MAX_VERSION_METHOD_NAME).getReturnType();
+            } catch (NoSuchMethodException e) {
+              throw new RuntimeException(e);
+            }
+          }));
 
-  @Test
-  public void testAnnotationCanOnlyBeAppliedOnMethods() {
-    Class<OMClientVersionValidator> c = OMClientVersionValidator.class;
-    for (Annotation a : c.getAnnotations()) {
+  private static Stream<Arguments> annotatedClasses() {
+    return ANNOTATION_VERSION_CLASS_MAP.entrySet().stream().flatMap(e ->
+        Arrays.stream(e.getValue().getEnumConstants()).map(version -> Arguments.of(e.getKey(), version)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testAnnotationCanOnlyBeAppliedOnMethods(Class<?> annotationClass,
+                                                                                    V version) {
+    for (Annotation a : annotationClass.getAnnotations()) {
       if (a instanceof Target) {
         assertEquals(1, ((Target) a).value().length);
         assertSame(((Target) a).value()[0], ElementType.METHOD);
@@ -68,290 +99,327 @@ public class TestOMClientVersionValidatorProcessor {
     }
   }
 
-  @Test
-  public void testACorrectAnnotationSetupForPreProcessCompiles() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testACorrectAnnotationSetupForPreProcessCompiles(Class<?> annotationClass,
+                                                                                             V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions("ServiceException"));
+        exceptions("ServiceException"), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testACorrectAnnotationSetupForPostProcessCompiles() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testACorrectAnnotationSetupForPostProcessCompiles(Class<?> annotationClass,
+                                                                                              V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions("ServiceException"));
+        exceptions("ServiceException"), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testValidatorDoesNotNecessarilyThrowsExceptions() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testValidatorDoesNotNecessarilyThrowsExceptions(Class<?> annotationClass,
+                                                                                            V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testNonStaticValidatorDoesNotCompile() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testNonStaticValidatorDoesNotCompile(Class<?> annotationClass,
+                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC);
   }
 
-  @Test
-  public void testValidatorMethodCanBeFinal() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testValidatorMethodCanBeFinal(Class<?> annotationClass,
+                                                                          V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static", "final"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testValidatorMethodCanBePrivate() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testValidatorMethodCanBePrivate(Class<?> annotationClass,
+                                                                            V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("private", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testValidatorMethodCanBeDefaultVisible() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testValidatorMethodCanBeDefaultVisible(Class<?> annotationClass,
+                                                                                   V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testValidatorMethodCanBeProtected() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testValidatorMethodCanBeProtected(Class<?> annotationClass,
+                                                                              V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("protected", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source)).succeeded();
   }
 
-  @Test
-  public void testNotEnoughParametersForPreProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testNotEnoughParametersForPreProcess(Class<?> annotationClass,
+                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(
             String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 2, 1));
   }
 
-  @Test
-  public void testTooManyParametersForPreProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testTooManyParametersForPreProcess(Class<?> annotationClass,
+                                                                               V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(
             String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 2, 3));
   }
 
-  @Test
-  public void testNotEnoughParametersForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testNotEnoughParametersForPostProcess(Class<?> annotationClass,
+                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(
             String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 2));
   }
 
-  @Test
-  public void testTooManyParametersForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testTooManyParametersForPostProcess(Class<?> annotationClass,
+                                                                                V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
             "String name"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(
             String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 4));
   }
 
-  @Test
-  public void testWrongReturnValueForPreProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongReturnValueForPreProcess(Class<?> annotationClass,
+                                                                              V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("String"),
         parameters("OMRequest rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST);
   }
 
-  @Test
-  public void testWrongReturnValueForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongReturnValueForPostProcess(Class<?> annotationClass,
+                                                                               V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("String"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE);
   }
 
-  @Test
-  public void testWrongFirstArgumentForPreProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongFirstArgumentForPreProcess(Class<?> annotationClass,
+                                                                                V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("String rq", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST);
   }
 
-  @Test
-  public void testWrongFirstArgumentForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongFirstArgumentForPostProcess(Class<?> annotationClass,
+                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("String rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST);
   }
 
-  @Test
-  public void testWrongSecondArgumentForPreProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongSecondArgumentForPreProcess(Class<?> annotationClass,
+                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(preProcess(), aReqType()),
+        annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMRequest"),
         parameters("OMRequest rq", "String ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
 
-  @Test
-  public void testWrongSecondArgumentForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongSecondArgumentForPostProcess(Class<?> annotationClass,
+                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "String rp", "ValidationContext ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE);
   }
 
-  @Test
-  public void testWrongThirdArgumentForPostProcess() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testWrongThirdArgumentForPostProcess(Class<?> annotationClass,
+                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType()),
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "String ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     assertThat(compile(source))
         .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
   
-  @Test
-  public void testInvalidProcessingPhase() {
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testInvalidProcessingPhase(Class<?> annotationClass,
+                                                                       V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf("INVALID", aReqType(), ClientVersion.CURRENT),
+        annotationOf("INVALID", aReqType(), annotationClass, version),
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions("ServiceException"));
+        exceptions("ServiceException"), annotationClass);
 
     assertThat(compile(source)).failed();
-  }
-
-  @Test
-  public void testInvalidClientVersion() {
-    List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(RequestProcessingPhase.PRE_PROCESS, aReqType(), null),
-        modifiers("public", "static"),
-        returnValue("OMResponse"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
-        exceptions("ServiceException"));
-
-    assertThat(compile(source)).failed();
-  }
-
-  private static List<Arguments> getClientVersions() {
-    List<Arguments> clientVersions =
-        Arrays.stream(ClientVersion.values()).map(Arguments::of).collect(Collectors.toList());
-    return clientVersions;
   }
 
   @ParameterizedTest
-  @MethodSource("getClientVersions")
-  public void testMultipleErrorMessages(ClientVersion clientVersion) {
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testInvalidClientVersion(Class<?> annotationClass,
+                                                                     V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(postProcess(), aReqType(), clientVersion),
+        annotationOf(RequestProcessingPhase.PRE_PROCESS, aReqType(), annotationClass, null),
+        modifiers("public", "static"),
+        returnValue("OMResponse"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
+        exceptions("ServiceException"), annotationClass);
+
+    assertThat(compile(source)).failed();
+  }
+
+  @ParameterizedTest
+  @MethodSource("annotatedClasses")
+  public <V extends Enum<V> & Version> void testMultipleErrorMessages(Class<?> annotationClass,
+                                                                      V version) {
+    List<String> source = generateSourceOfValidatorMethodWith(
+        annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers(),
         returnValue("String"),
         parameters("String rq", "int rp", "String ctx"),
-        exceptions());
+        exceptions(), annotationClass);
 
     Compilation compilation = compile(source);
     assertThat(compilation)
@@ -407,8 +475,9 @@ public class TestOMClientVersionValidatorProcessor {
       String[] modifiers,
       String returnType,
       String[] paramspecs,
-      String[] exceptions) {
-    List<String> lines = new ArrayList<>(allImports());
+      String[] exceptions,
+      Class<?> annotationClass) {
+    List<String> lines = new ArrayList<>(allImports(annotationClass));
     lines.add("");
     lines.add("public class " + CLASSNAME + " {");
     lines.add("");
@@ -421,43 +490,40 @@ public class TestOMClientVersionValidatorProcessor {
     lines.add("}");
     lines.add("");
     lines.stream()
-        .filter(s -> !s.startsWith("import"))
+//        .filter(s -> !s.startsWith("import"))
         .forEach(System.out::println);
     return lines;
   }
 
-  private String annotationOf(
-      RequestProcessingPhase phase,
-      Type reqType) {
-    return annotationOf(phase.name(), reqType, ClientVersion.CURRENT);
+  private <V extends Enum<V> & Version> String annotationOf(RequestProcessingPhase phase,
+                                                  Type reqType, Class<?> annotationClass) {
+    return annotationOf(phase.name(), reqType, annotationClass,
+        (V)ANNOTATION_VERSION_CLASS_MAP.get(annotationClass).getEnumConstants()[0]);
   }
 
-  private String annotationOf(
-      RequestProcessingPhase phase,
-      Type reqType,
-      ClientVersion clientVersion) {
-    return annotationOf(phase.name(), reqType, clientVersion);
+  private <V extends Enum<V> & Version> String annotationOf(
+      RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V maxVersion) {
+    return annotationOf(phase.name(), reqType, annotationClass, maxVersion);
   }
 
-  private String annotationOf(
+  private <V extends Enum<V> & Version> String annotationOf(
       String phase,
       Type reqType,
-      ClientVersion clientVersion) {
+      Class<?> annotationClass,
+      V maxVersion) {
     StringBuilder annotation = new StringBuilder();
-    annotation.append("@OMClientVersionValidator(");
+    annotation.append("@" + annotationClass.getName() + "(");
     annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
-    if (clientVersion != null) {
-      annotation.append(", maxVersion = ").append(clientVersion.name());
+    if (maxVersion != null) {
+      annotation.append(", maxVersion = ").append(maxVersion.name());
     }
     annotation.append(" )");
     return annotation.toString();
   }
 
-  private List<String> allImports() {
+  private List<String> allImports(Class<?> annotationClass) {
     List<String> imports = new ArrayList<>();
-    imports.add("import org.apache.hadoop.ozone.om.request.validation"
-        + ".OMClientVersionValidator;");
     imports.add("import org.apache.hadoop.ozone.protocol.proto"
         + ".OzoneManagerProtocolProtos.OMRequest;");
     imports.add("import org.apache.hadoop.ozone.protocol.proto"
@@ -466,15 +532,18 @@ public class TestOMClientVersionValidatorProcessor {
         + ".ValidationContext;");
     imports.add("import com.google.protobuf.ServiceException;");
     for (RequestProcessingPhase phase : RequestProcessingPhase.values()) {
-      imports.add("import static org.apache.hadoop.ozone.om.request.validation"
+      imports.add("import static org.apache.hadoop.ozone.request.validation"
           + ".RequestProcessingPhase." + phase.name() + ";");
     }
     for (Type reqType : Type.values()) {
       imports.add("import static org.apache.hadoop.ozone.protocol.proto"
           + ".OzoneManagerProtocolProtos.Type." + reqType.name() + ";");
     }
-    for (ClientVersion clientVersion : ClientVersion.values()) {
-      imports.add("import static org.apache.hadoop.ozone.ClientVersion." + clientVersion.name() + ";");
+    imports.add("import " + annotationClass.getName() + ";");
+
+    for (Object enumConstant : ANNOTATION_VERSION_CLASS_MAP.get(annotationClass).getEnumConstants()) {
+      imports.add("import static " + ANNOTATION_VERSION_CLASS_MAP.get(annotationClass).getCanonicalName() + "." +
+          ((Enum)enumConstant).name() + ";");
     }
     return imports;
   }

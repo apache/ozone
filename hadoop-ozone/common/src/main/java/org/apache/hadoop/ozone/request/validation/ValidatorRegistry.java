@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.om.request.validation;
+package org.apache.hadoop.ozone.request.validation;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.tuple.Pair;
@@ -53,13 +53,13 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
   /**
    * Creates a {@link ValidatorRegistry} instance that discovers validation
    * methods in the provided package and the packages in the same resource.
-   * A validation method is recognized by the {@link OMClientVersionValidator}
-   * annotation that contains important information about how and when to use
-   * the validator.
+   * A validation method is recognized by all the annotations classes which
+   * are annotated by {@link RegisterValidator} annotation that contains
+   * important information about how and when to use the validator.
    * @param validatorPackage the main package inside which validatiors should
    *                         be discovered.
    */
-  ValidatorRegistry(Class<RequestType> requestType,
+  public ValidatorRegistry(Class<RequestType> requestType,
                     String validatorPackage,
                     Set<Class<? extends Version>> allowedVersionTypes,
                     Set<RequestProcessingPhase> allowedProcessingPhases) {
@@ -77,12 +77,12 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
   /**
    * Creates a {@link ValidatorRegistry} instance that discovers validation
    * methods under the provided URL.
-   * A validation method is recognized by the {@link OMClientVersionValidator}
+   * A validation method is recognized by all annotations having the annotated by {@link RegisterValidator}
    * annotation that contains important information about how and when to use
    * the validator.
    * @param searchUrls the path in which the annotated methods are searched.
    */
-  ValidatorRegistry(Class<RequestType> requestType,
+  public ValidatorRegistry(Class<RequestType> requestType,
                     Collection<URL> searchUrls,
                     Set<Class<? extends Version>> allowedVersionTypes,
                     Set<RequestProcessingPhase> allowedProcessingPhases) {
@@ -189,11 +189,9 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
   /**
    * Initializes the internal request validator store.
    * The requests are stored in the following structure:
-   * - An EnumMap with the {@link VersionExtractor} as the key, and in which
-   *   - values are an EnumMap with the request type as the key, and in which
-   *     - values are Pair of lists, in which
-   *       - left side is the pre-processing validations list
-   *       - right side is the post-processing validations list
+   * - An EnumMap with the RequestType as the key, and in which
+   *   - values are an EnumMap with the request processing phase as the key, and in which
+   *     - values is an {@link IndexedItems } containing the validation list
    * @param validatorsToBeRegistered collection of the annotated validtors to process.
    */
   private void initMaps(Class<RequestType> requestType,
@@ -232,7 +230,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
       method.setAccessible(true);
 
       EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
-          this.getAndInitialize(versionClass, () -> new EnumMap<>(requestType), this.indexedValidatorMap);
+          this.indexedValidatorMap.get(versionClass);
       EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
           this.getAndInitialize(type, () -> new EnumMap<>(RequestProcessingPhase.class), requestMap);
       this.getAndInitialize(phase, IndexedItems::new, phaseMap).add(method, maxVersion.getVersion());

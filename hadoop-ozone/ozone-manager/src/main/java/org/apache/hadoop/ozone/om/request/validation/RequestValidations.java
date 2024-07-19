@@ -23,6 +23,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.request.validation.ValidatorRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +36,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.POST_PROCESS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.PRE_PROCESS;
 
 /**
  * Main class to configure and set up and access the request/response

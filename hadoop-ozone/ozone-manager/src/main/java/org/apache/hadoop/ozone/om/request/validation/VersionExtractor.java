@@ -37,7 +37,7 @@ public enum VersionExtractor {
     }
 
     @Override
-    public Class<? extends Enum<? extends Version>> getVersionClass() {
+    public Class<OMLayoutFeature> getVersionClass() {
       return OMLayoutFeature.class;
     }
   },
@@ -53,11 +53,11 @@ public enum VersionExtractor {
     }
 
     @Override
-    public Class<? extends Enum<? extends Version>> getVersionClass() {
+    public Class<ClientVersion> getVersionClass() {
       return ClientVersion.class;
     }
   };
 
   public abstract Version extractVersion(OMRequest req, ValidationContext ctx);
-  public abstract Class<? extends Enum<? extends Version>> getVersionClass();
+  public abstract Class<? extends Version> getVersionClass();
 }

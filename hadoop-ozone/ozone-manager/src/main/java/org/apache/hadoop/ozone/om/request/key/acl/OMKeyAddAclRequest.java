@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;

@@ -15,9 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.request.validation;
+package org.apache.hadoop.ozone.request.validation;
 
 import org.apache.hadoop.ozone.Version;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -30,7 +31,6 @@ import java.lang.annotation.Target;
  * maxVersion : Returns an enum which implement {@link Version}
  * requestType: Returns an Enum value.
  * processingPhase: Returns {@link RequestProcessingPhase}
- *
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)

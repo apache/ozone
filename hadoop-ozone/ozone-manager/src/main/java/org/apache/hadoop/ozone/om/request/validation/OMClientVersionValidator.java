@@ -18,6 +18,9 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RegisterValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.request.validation.ValidatorRegistry;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,14 +28,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * An annotation to mark methods that do certain request validations.
+ * An annotation to mark methods that do certain request validations based on the
+ * request protocol's client version.
  *
  * The methods annotated with this annotation are collected by the
  * {@link ValidatorRegistry} class during the initialization of the server.
  *
  * The conditions specify the specific use case in which the validator should be
- * applied to the request. See {@link VersionExtractor} for more details
- * on the specific conditions.
+ * applied to the request. See {@link VersionExtractor} for getting all the supported different
+ * {@link org.apache.hadoop.ozone.Version}.
  * The validator method should be applied to just one specific request type
  * to help keep these methods simple and straightforward. If you want to use
  * the same validation for different request types, use inheritance, and
