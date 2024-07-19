@@ -441,6 +441,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
+  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+    RDBStore store = (RDBStore) omMetadataManager.getStore();
+    String checkpointPrefix = store.getDbLocation().getName();
+    return Paths.get(store.getSnapshotsParentDir(),
+        checkpointPrefix + snapshotInfo.getCheckpointDir());
+  }
+
   /**
    * Creates snapshot checkpoint that corresponds to snapshotInfo.
    * @param omMetadataManager the metadata manager

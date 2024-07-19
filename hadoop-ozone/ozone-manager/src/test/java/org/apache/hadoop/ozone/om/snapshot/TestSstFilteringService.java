@@ -206,7 +206,7 @@ public class TestSstFilteringService {
     createSnapshot(volumeName, bucketName2, snapshotName1);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
-    assertFalse(snapshotInfo.isSstFiltered());
+    assertFalse(SstFilteringService.isSstFiltered(om.getMetadataManager(), snapshotInfo));
     waitForSnapshotsAtLeast(filteringService, countExistingSnapshots + 1);
     assertEquals(countExistingSnapshots + 1, filteringService.getSnapshotFilteredCount().get());
 
@@ -238,8 +238,9 @@ public class TestSstFilteringService {
 
     // Need to read the sstFiltered flag which is set in background process and
     // hence snapshotInfo.isSstFiltered() may not work sometimes.
-    assertTrue(om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
-        .getTableKey(volumeName, bucketName2, snapshotName1)).isSstFiltered());
+    assertTrue(SstFilteringService.isSstFiltered(om.getMetadataManager(),
+        om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
+            .getTableKey(volumeName, bucketName2, snapshotName1))));
 
     String snapshotName2 = "snapshot2";
     final long count;

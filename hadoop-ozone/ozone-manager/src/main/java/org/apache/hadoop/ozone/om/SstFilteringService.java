@@ -38,6 +38,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +73,7 @@ public class SstFilteringService extends BackgroundService
   // multiple times.
   private static final int SST_FILTERING_CORE_POOL_SIZE = 1;
 
+  public static final String SST_FILTERED_FILE = "sstFiltered";
   private final OzoneManager ozoneManager;
 
   // Number of files to be batched in an iteration.
@@ -77,6 +82,12 @@ public class SstFilteringService extends BackgroundService
   private AtomicLong snapshotFilteredCount;
 
   private AtomicBoolean running;
+
+  public static boolean isSstFiltered(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+    Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(omMetadataManager,
+        snapshotInfo).toFile().getAbsolutePath(), SST_FILTERED_FILE);
+    return snapshotInfo.isSstFiltered() || sstFilteredFile.toFile().exists();
+  }
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -114,31 +125,25 @@ public class SstFilteringService extends BackgroundService
 
 
     /**
-     * Marks the SSTFiltered flag corresponding to the snapshot.
-     * @param volume Volume name of the snapshot
-     * @param bucket Bucket name of the snapshot
-     * @param snapshotName Snapshot name
+     * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.
+     * @param snapshotInfo snapshotInfo
      * @throws IOException
      */
-    private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
-        String snapshotName) throws IOException {
+    private void markSSTFilteredFlagForSnapshot(SnapshotInfo snapshotInfo) throws IOException {
       OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
-              .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+          .acquireWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(), snapshotInfo.getName());
       boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
-        Table<String, SnapshotInfo> snapshotInfoTable =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable();
+        Path snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotInfo);
         try {
-          // mark the snapshot as filtered by writing to the file
-          String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
-              snapshotName);
-          SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
-
-          snapshotInfo.setSstFiltered(true);
-          snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
+          // mark the snapshot as filtered by creating a file.
+          Files.write(Paths.get(snapshotDir.toFile().getAbsolutePath(), SST_FILTERED_FILE),
+              Long.toString(System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8));
         } finally {
           ozoneManager.getMetadataManager().getLock()
-              .releaseWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+              .releaseWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
+                  snapshotInfo.getBucketName(), snapshotInfo.getName());
         }
       }
     }
@@ -167,8 +172,7 @@ public class SstFilteringService extends BackgroundService
             Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
             String snapShotTableKey = keyValue.getKey();
             SnapshotInfo snapshotInfo = keyValue.getValue();
-
-            if (snapshotInfo.isSstFiltered()) {
+            if (isSstFiltered(ozoneManager.getMetadataManager(), snapshotInfo)) {
               continue;
             }
 
@@ -194,6 +198,9 @@ public class SstFilteringService extends BackgroundService
                   .lock()) {
                 db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
               }
+              markSSTFilteredFlagForSnapshot(snapshotInfo);
+              snapshotLimit--;
+              snapshotFilteredCount.getAndIncrement();
             } catch (OMException ome) {
               // FILE_NOT_FOUND is obtained when the snapshot is deleted
               // In this case, get the snapshotInfo from the db, check if
@@ -210,10 +217,6 @@ public class SstFilteringService extends BackgroundService
                 }
               }
             }
-            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(), snapshotInfo.getName());
-            snapshotLimit--;
-            snapshotFilteredCount.getAndIncrement();
           } catch (RocksDBException | IOException e) {
             LOG.error("Exception encountered while filtering a snapshot", e);
           }
