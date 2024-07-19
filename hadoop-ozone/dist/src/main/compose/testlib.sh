@@ -398,13 +398,14 @@ run_rebot() {
 
   shift 2
 
-  local tempdir="$(mktemp -d --suffix rebot)"
+  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
-  docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
-    $(get_runner_image_spec) \
-    bash -c "rebot --nostatusrc -d /rebot-output $@"
-  mv -v "${tempdir}"/* "${output_dir}"/
+  if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
+      $(get_runner_image_spec) \
+      bash -c "rebot --nostatusrc -d /rebot-output $@"; then
+    mv -v "${tempdir}"/* "${output_dir}"/
+  fi
   rmdir "${tempdir}"
 }
 
