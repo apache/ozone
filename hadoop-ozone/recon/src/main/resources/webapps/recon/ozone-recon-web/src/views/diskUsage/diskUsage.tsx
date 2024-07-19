@@ -323,8 +323,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           values.push(byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
           values.push(byteToSize(response.data.sizeWithReplica, 3));
-          console.log(values);
-
           this.setState({
             showPanel: true,
             panelKeys: keys,
