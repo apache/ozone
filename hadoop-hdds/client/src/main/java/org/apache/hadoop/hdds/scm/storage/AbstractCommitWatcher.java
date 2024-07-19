@@ -142,9 +142,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
       final XceiverClientReply reply = client.watchForCommit(commitIndex);
       f.complete(reply);
       final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
-      // The replies can be cleaned up concurrently when the block is full.
-      Preconditions.checkState(removed == f || removed == null,
-          "removed(%s) must be the same as f(%s) for commit %s", removed, f, commitIndex);
+      Preconditions.checkState(removed == f);
 
       final long index = reply != null ? reply.getLogIndex() : 0;
       adjustBuffers(index);
