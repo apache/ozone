@@ -31,7 +31,6 @@ import { showDataFetchError, byteToSize } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import { ClusterStateResponse, OverviewState } from '@/v2/types/overview';
-import { AxiosAllGetHelper } from '@/utils/axiosRequestHelper';
 
 const Overview: React.FC<{}> = (props = {}) => {
 
@@ -66,7 +65,8 @@ const Overview: React.FC<{}> = (props = {}) => {
   const [storageReport, setStorageReport] = useState<IStorageReport>({
     capacity: 0,
     used: 0,
-    remaining: 0
+    remaining: 0,
+    committed: 0
   })
 
   const loadOverviewPageData = () => {
@@ -81,7 +81,7 @@ const Overview: React.FC<{}> = (props = {}) => {
       cancelOverviewSignal
     ]);
 
-    const { requests, controller } = AxiosAllGetHelper([
+    const { requests, controller } = PromiseAllSettledGetHelper([
       '/api/v1/clusterState',
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
@@ -89,10 +89,56 @@ const Overview: React.FC<{}> = (props = {}) => {
     ], cancelOverviewSignal);
     cancelOverviewSignal = controller;
 
-    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
+    requests.then(axios.spread((
+      clusterStateResponse: Awaited<Promise<any>>,
+      taskstatusResponse: Awaited<Promise<any>>,
+      openResponse: Awaited<Promise<any>>,
+      deletePendingResponse: Awaited<Promise<any>>
+    ) => {
+      let responseError = [
+        clusterStateResponse,
+        taskstatusResponse,
+        openResponse,
+        deletePendingResponse
+      ].filter((resp) => resp.status === 'rejected');
 
-      const clusterState: ClusterStateResponse = clusterStateResponse.data;
-      const taskStatus = taskstatusResponse.data;
+      if (responseError.length !== 0) {
+        responseError.forEach((err) => {
+          if (err.reason.toString().includes("CanceledError")){
+            throw new CanceledError('canceled', "ERR_CANCELED");
+          }
+          else {
+            const reqMethod = err.reason.config.method;
+            const reqURL = err.reason.config.url
+            showDataFetchError(`Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`);
+          }
+        })
+      }
+
+      const clusterState: ClusterStateResponse = clusterStateResponse.value?.data ?? {
+        missingContainers: 'N/A',
+        totalDatanodes: 'N/A',
+        healthyDatanodes: 'N/A',
+        pipelines: 'N/A',
+        storageReport: {
+          capacity: 0,
+          used: 0,
+          remaining: 0,
+          committed: 0
+        },
+        containers: 'N/A',
+        volumes: 'N/A',
+        buckets: 'N/A',
+        keys: 'N/A',
+        openContainers: 'N/A',
+        deletedContainers: 'N/A',
+        keysPendingDeletion: 'N/A',
+        scmServiceId: 'N/A',
+        omServiceId: 'N/A',
+      };
+      const taskStatus = taskstatusResponse.value?.data ?? [{
+        taskName: 'N/A', lastUpdatedTimestamp: 0, lastUpdatedSeqNumber: 0
+      }];
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
