@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
@@ -161,6 +162,8 @@ public interface CertificateClient extends Closeable {
   ReloadingX509KeyManager getKeyManager() throws CertificateException;
 
   ReloadingX509TrustManager getTrustManager() throws CertificateException;
+
+  ClientTrustManager createClientTrustManager() throws IOException;
 
   /**
    * Register a receiver that will be called after the certificate renewed.

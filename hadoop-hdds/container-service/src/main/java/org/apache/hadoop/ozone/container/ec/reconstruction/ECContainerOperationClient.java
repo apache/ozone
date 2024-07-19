@@ -65,29 +65,19 @@ public class ECContainerOperationClient implements Closeable {
   }
 
   public ECContainerOperationClient(ConfigurationSource conf,
-      CertificateClient certificateClient) throws IOException {
-    this(createClientManager(conf, certificateClient));
+      ClientTrustManager clientTrustManager) throws IOException {
+    this(createClientManager(conf, clientTrustManager));
   }
 
   @Nonnull
   private static XceiverClientManager createClientManager(
-      ConfigurationSource conf, CertificateClient certificateClient)
+      ConfigurationSource conf, ClientTrustManager clientTrustManager)
       throws IOException {
-    ClientTrustManager trustManager = null;
-
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider localCaCerts = () -> {
-        List<X509Certificate> caCerts = new ArrayList<>();
-        caCerts.addAll(certificateClient.getAllCaCerts());
-        caCerts.addAll(certificateClient.getAllRootCaCerts());
-        return caCerts;
-      };
-      trustManager = new ClientTrustManager(localCaCerts, localCaCerts);
-    }
-    return new XceiverClientManager(conf,
-        new XceiverClientManager.XceiverClientManagerConfigBuilder()
-            .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
-        trustManager);
+    XceiverClientManager.ScmClientConfig scmClientConfig = new XceiverClientManager.XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(256)
+        .setStaleThresholdMs(10 * 1000)
+        .build();
+    return new XceiverClientManager(conf, scmClientConfig, clientTrustManager);
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,

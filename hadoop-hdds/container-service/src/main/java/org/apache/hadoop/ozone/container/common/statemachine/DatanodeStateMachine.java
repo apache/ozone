@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -214,9 +215,9 @@ public class DatanodeStateMachine implements Closeable {
         ReplicationSupervisorMetrics.create(supervisor);
 
     ecReconstructionMetrics = ECReconstructionMetrics.create();
-
+    certClient.createClientTrustManager();
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
-        conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
+        conf, certClient.createClientTrustManager(), secretKeyClient, context, ecReconstructionMetrics,
         threadNamePrefix);
 
     // This is created as an instance variable as Mockito needs to access it in
