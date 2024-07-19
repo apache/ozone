@@ -20,12 +20,11 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -50,13 +49,15 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconUtils.constructObjectPathWithPrefix;
+import static org.apache.hadoop.ozone.recon.ReconUtils.retrieveKeysFromTable;
+import static org.apache.hadoop.ozone.recon.ReconUtils.gatherSubPaths;
 import static org.apache.hadoop.ozone.recon.ReconUtils.validateNames;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
@@ -64,6 +65,11 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 
 /**
  * REST endpoint for search implementation in OM DB Insight.
+ *
+ * This class provides endpoints for searching keys in the Ozone Manager database.
+ * It supports searching for both open and deleted keys across File System Optimized (FSO)
+ * and Object Store (non-FSO) bucket layouts. The results include matching keys and their
+ * data sizes.
  */
 @Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
@@ -88,14 +94,14 @@ public class OMDBInsightSearchEndpoint {
 
 
   /**
-   * Performs a search for open keys in the Ozone Manager (OM) database using a specified search prefix.
+   * Performs a search for open keys in the Ozone Manager OpenKey and OpenFile table using a specified search prefix.
    * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
    * compiling a list of keys that match the given prefix along with their data sizes.
-   * <p>
+   *
    * The search prefix must start from the bucket level ('/volumeName/bucketName/') or any specific directory
    * or key level (e.g., '/volA/bucketA/dir1' for everything under 'dir1' inside 'bucketA' of 'volA').
    * The search operation matches the prefix against the start of keys' names within the OM DB.
-   * <p>
+   *
    * Example Usage:
    * 1. A startPrefix of "/volA/bucketA/" retrieves every key under bucket 'bucketA' in volume 'volA'.
    * 2. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
@@ -110,11 +116,12 @@ public class OMDBInsightSearchEndpoint {
   @GET
   @Path("/open/search")
   public Response searchOpenKeys(
-      @DefaultValue(DEFAULT_START_PREFIX) @QueryParam("startPrefix")
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix")
       String startPrefix,
-      @DefaultValue(RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
       int limit,
-      @DefaultValue(RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY) @QueryParam("prevKey") String prevKey) throws IOException {
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey")
+      String prevKey) throws IOException {
 
     try {
       // Ensure startPrefix is not null or empty and starts with '/'
@@ -221,7 +228,7 @@ public class OMDBInsightSearchEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
+      gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
           reconNamespaceSummaryManager);
 
       // Iterate over the subpaths and retrieve the open files
@@ -325,46 +332,108 @@ public class OMDBInsightSearchEndpoint {
     return prevKeyPrefix;
   }
 
-
   /**
-   * Common method to retrieve keys from a table based on a search prefix and a limit.
+   * Performs a search for deleted keys in the Ozone Manager DeletedTable using a specified search prefix.
+   * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
+   * compiling a list of keys that match the given prefix along with their data sizes.
    *
-   * @param table       The table to retrieve keys from.
-   * @param startPrefix The search prefix to match keys against.
-   * @param limit       The maximum number of keys to retrieve.
+   * The search prefix must start from the bucket level ('/volumeName/bucketName/') or any specific directory
+   * or key level (e.g., '/volA/bucketA/dir1' for everything under 'dir1' inside 'bucketA' of 'volA').
+   * The search operation matches the prefix against the start of keys' names within the OM DB DeletedTable.
+   *
+   * Example Usage:
+   * 1. A startPrefix of "/volA/bucketA/" retrieves every key under bucket 'bucketA' in volume 'volA'.
+   * 2. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
+   *
+   * @param startPrefix The prefix for searching keys, starting from the bucket level or any specific path.
+   * @param limit       Limits the number of returned keys.
    * @param prevKey     The key to start after for the next set of records.
-   * @return A map of keys and their corresponding OmKeyInfo objects.
-   * @throws IOException If there are problems accessing the table.
+   * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
+   * @throws IOException On failure to access the OM database or process the operation.
    */
-  private Map<String, OmKeyInfo> retrieveKeysFromTable(
-      Table<String, OmKeyInfo> table, String startPrefix, int limit, String prevKey)
-      throws IOException {
-    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
-      // If a previous key is provided, seek to the previous key and skip it.
-      if (!prevKey.isEmpty()) {
-        keyIter.seek(prevKey);
-        if (keyIter.hasNext()) {
-          // Skip the previous key
-          keyIter.next();
-        }
-      } else {
-        // If no previous key is provided, start from the search prefix.
-        keyIter.seek(startPrefix);
+  @GET
+  @Path("/deletePending/search")
+  public Response searchDeletedKeys(
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix")
+      String startPrefix,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
+      int limit,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey")
+      String prevKey) throws IOException {
+
+    try {
+      // Ensure startPrefix is not null or empty and starts with '/'
+      if (startPrefix == null || startPrefix.length() == 0) {
+        return createBadRequestResponse(
+            "Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
-      while (keyIter.hasNext() && matchedKeys.size() < limit) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String dbKey = entry.getKey();
-        if (!dbKey.startsWith(startPrefix)) {
-          break; // Exit the loop if the key no longer matches the prefix
-        }
-        matchedKeys.put(dbKey, entry.getValue());
+      startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+      // Split the path to ensure it's at least at the bucket level
+      String[] pathComponents = startPrefix.split("/");
+      if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+        return createBadRequestResponse(
+            "Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
-    } catch (IOException exception) {
-      LOG.error("Error retrieving keys from table for path: {}", startPrefix, exception);
-      throw exception;
+
+      // Ensure the limit is non-negative
+      limit = Math.max(0, limit);
+
+      // Initialize response object
+      KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
+      long replicatedTotal = 0;
+      long unreplicatedTotal = 0;
+      boolean keysFound = false; // Flag to track if any keys are found
+      String lastKey = null;
+
+      // Search for deleted keys in DeletedTable
+      Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+      Map<String, RepeatedOmKeyInfo> deletedKeys = retrieveKeysFromTable(deletedTable, startPrefix, limit, prevKey);
+
+      for (Map.Entry<String, RepeatedOmKeyInfo> entry : deletedKeys.entrySet()) {
+        keysFound = true;
+        RepeatedOmKeyInfo repeatedOmKeyInfo = entry.getValue();
+
+        for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
+          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
+
+          // Fetch bucket info and classify key as FSO or Non-FSO
+          String bucketKey = omMetadataManager.getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+          OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+          if (bucketInfo != null) {
+            if (bucketInfo.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+              insightResponse.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
+            } else {
+              insightResponse.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
+            }
+            replicatedTotal += keyInfo.getReplicatedSize();
+            unreplicatedTotal += keyInfo.getDataSize();
+          }
+        }
+        lastKey = entry.getKey(); // Update lastKey
+      }
+
+      // If no keys were found, return a response indicating that no keys matched
+      if (!keysFound) {
+        return noMatchedKeysResponse(startPrefix);
+      }
+
+      // Set the aggregated totals in the response
+      insightResponse.setReplicatedDataSize(replicatedTotal);
+      insightResponse.setUnreplicatedDataSize(unreplicatedTotal);
+      insightResponse.setLastKey(lastKey);
+
+      // Return the response with the matched keys and their data sizes
+      return Response.ok(insightResponse).build();
+    } catch (IOException e) {
+      // Handle IO exceptions and return an internal server error response
+      return createInternalServerErrorResponse(
+          "Error searching deleted keys in OM DB: " + e.getMessage());
+    } catch (IllegalArgumentException e) {
+      // Handle illegal argument exceptions and return a bad request response
+      return createBadRequestResponse(
+          "Invalid startPrefix: " + e.getMessage());
     }
-    return matchedKeys;
   }
 
   /**

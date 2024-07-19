@@ -32,6 +32,8 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.Date;
@@ -54,6 +56,8 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
@@ -594,6 +598,47 @@ public class ReconUtils {
       log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
     }
+  }
+
+  /**
+   * Common method to retrieve keys from a table based on a search prefix and a limit.
+   *
+   * @param table       The table to retrieve keys from.
+   * @param startPrefix The search prefix to match keys against.
+   * @param limit       The maximum number of keys to retrieve.
+   * @param prevKey     The key to start after for the next set of records.
+   * @return A map of keys and their corresponding OmKeyInfo or RepeatedOmKeyInfo objects.
+   * @throws IOException If there are problems accessing the table.
+   */
+  public static <T> Map<String, T> retrieveKeysFromTable(
+      Table<String, T> table, String startPrefix, int limit, String prevKey)
+      throws IOException {
+    Map<String, T> matchedKeys = new LinkedHashMap<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
+      // If a previous key is provided, seek to the previous key and skip it.
+      if (!prevKey.isEmpty()) {
+        keyIter.seek(prevKey);
+        if (keyIter.hasNext()) {
+          // Skip the previous key
+          keyIter.next();
+        }
+      } else {
+        // If no previous key is provided, start from the search prefix.
+        keyIter.seek(startPrefix);
+      }
+      while (keyIter.hasNext() && matchedKeys.size() < limit) {
+        Table.KeyValue<String, T> entry = keyIter.next();
+        String dbKey = entry.getKey();
+        if (!dbKey.startsWith(startPrefix)) {
+          break; // Exit the loop if the key no longer matches the prefix
+        }
+        matchedKeys.put(dbKey, entry.getValue());
+      }
+    } catch (IOException exception) {
+      log.error("Error retrieving keys from table for path: {}", startPrefix, exception);
+      throw exception;
+    }
+    return matchedKeys;
   }
 
   /**
