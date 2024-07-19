@@ -101,8 +101,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  CompletableFuture<XceiverClientReply> sendWatchForCommit(long commitIndex) {
-    return commitWatcher.watchForCommitAsync(commitIndex);
+  XceiverClientReply sendWatchForCommit(long commitIndex) throws IOException {
+    return commitWatcher.watchForCommit(commitIndex);
   }
 
   @Override
