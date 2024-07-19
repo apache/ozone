@@ -314,7 +314,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
-      if (summaryResponse.countStats.type === 'KEY') {
+      if (summaryResponse.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
         const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
         cancelKeyMetadataSignal = metadataNewController;
