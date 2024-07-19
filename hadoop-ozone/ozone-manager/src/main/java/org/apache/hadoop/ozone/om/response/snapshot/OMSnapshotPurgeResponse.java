@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -35,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
