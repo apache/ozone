@@ -4759,6 +4759,14 @@ abstract class OzoneRpcClientTests {
     assertEquals(secondTags.size(), updatedKey.getTags().size());
     assertThat(updatedKey.getTags()).containsAllEntriesOf(secondTags);
     assertThat(updatedKey.getTags()).doesNotContainKeys("tag-key-1", "tag-key-2");
+
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      String dirKey = "dir1/";
+      bucket.createDirectory(dirKey);
+      OMException exception = assertThrows(OMException.class,
+          () -> bucket.putObjectTagging(dirKey, tags));
+      assertThat(exception.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
   }
 
   @ParameterizedTest
@@ -4794,6 +4802,14 @@ abstract class OzoneRpcClientTests {
     OzoneKey updatedKey = bucket.getKey(keyName);
     assertEquals(0, updatedKey.getTags().size());
     assertEquals(key.getModificationTime(), updatedKey.getModificationTime());
+
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      String dirKey = "dir1/";
+      bucket.createDirectory(dirKey);
+      OMException exception = assertThrows(OMException.class,
+          () -> bucket.deleteObjectTagging(dirKey));
+      assertThat(exception.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
   }
 
   @ParameterizedTest
