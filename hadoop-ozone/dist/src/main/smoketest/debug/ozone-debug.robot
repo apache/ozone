@@ -20,8 +20,8 @@ Resource            ../lib/os.robot
 
 *** Keywords ***
 Execute read-replicas CLI tool
-    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                  Execute     ls -d /opt/hadoop/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    ${directory} =                  Execute     ls -d ${TEMP_DIR}/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
@@ -40,7 +40,7 @@ Read Replicas Manifest
 Validate JSON
     [arguments]                     ${json}
     Should Be Equal                 ${json}[filename]                   ${VOLUME}/${BUCKET}/${TESTFILE}
-    ${file_size} =                  Get File Size                       ${TESTFILE}
+    ${file_size} =                  Get File Size                       ${TEMP_DIR}/${TESTFILE}
     Should Be Equal                 ${json}[datasize]                   ${file_size}
     Should Be Equal As Integers     ${json}[blocks][0][blockIndex]      1
     Should Not Be Empty             Convert To String       ${json}[blocks][0][containerId]

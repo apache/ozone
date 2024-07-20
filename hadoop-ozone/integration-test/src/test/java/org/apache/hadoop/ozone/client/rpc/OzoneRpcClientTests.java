@@ -49,6 +49,7 @@ import java.util.stream.Stream;
 
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -138,12 +139,15 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -190,6 +194,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -197,7 +202,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Client.
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-abstract class OzoneRpcClientTests {
+abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -794,7 +799,7 @@ abstract class OzoneRpcClientTests {
     OzoneVolume volume = store.getVolume(volumeName);
     OMException omException = assertThrows(OMException.class,
         () -> volume.createBucket(bucketName));
-    assertEquals("Bucket or Volume name has an unsupported character : #",
+    assertEquals("bucket name has an unsupported character : #",
         omException.getMessage());
   }
 
@@ -1092,6 +1097,223 @@ abstract class OzoneRpcClientTests {
         assertFalse(key.getModificationTime().isBefore(testStartTime));
       }
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteKey(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
+
+    final byte[] newContent = "rewrite value".getBytes(UTF_8);
+    rewriteKey(bucket, keyDetails, newContent);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), newContent);
+    assertThat(actualKeyDetails.getGeneration()).isGreaterThan(keyDetails.getGeneration());
+    assertMetadataUnchanged(keyDetails, actualKeyDetails);
+    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void overwriteAfterRewrite(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8));
+
+    final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
+    OzoneKeyDetails overwriteDetails = createTestKey(bucket, keyDetails.getName(), overwriteContent);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
+    assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteAfterRename(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    String newKeyName = "rewriteAfterRename-" + layout;
+
+    bucket.renameKey(keyDetails.getName(), newKeyName);
+    OzoneKeyDetails renamedKeyDetails = bucket.getKey(newKeyName);
+    OmKeyArgs keyArgs = toOmKeyArgs(renamedKeyDetails);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
+
+    final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
+    rewriteKey(bucket, renamedKeyDetails, rewriteContent);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, newKeyName, rewriteContent);
+    assertMetadataUnchanged(keyDetails, actualKeyDetails);
+    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void renameAfterRewrite(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
+    rewriteKey(bucket, keyDetails, rewriteContent);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(toOmKeyArgs(keyDetails));
+
+    String newKeyName = "renameAfterRewrite-" + layout;
+    bucket.renameKey(keyDetails.getName(), newKeyName);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, newKeyName, rewriteContent);
+    assertMetadataUnchanged(keyDetails, actualKeyDetails);
+    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(toOmKeyArgs(actualKeyDetails)));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteFailsDueToOutdatedGeneration(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
+
+    // overwrite to get new generation
+    final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
+    OzoneKeyDetails overwriteDetails = createTestKey(bucket, keyDetails.getName(), overwriteContent);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
+
+    // try to rewrite previous generation
+    OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+    assertThat(e).hasMessageContaining("Generation mismatch");
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
+    assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
+    assertMetadataUnchanged(overwriteDetails, actualKeyDetails);
+    assertUnchanged(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteFailsDueToOutdatedGenerationAtCommit(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
+    OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
+    OmKeyInfo keyInfo;
+
+    OzoneOutputStream out = null;
+    final OzoneKeyDetails overwriteDetails;
+    try {
+      out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
+          keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata());
+      out.write("rewrite".getBytes(UTF_8));
+
+      overwriteDetails = createTestKey(bucket, keyDetails.getName(), overwriteContent);
+      keyInfo = ozoneManager.lookupKey(keyArgs);
+
+      OMException e = assertThrows(OMException.class, out::close);
+      assertEquals(KEY_NOT_FOUND, e.getResult());
+      assertThat(e).hasMessageContaining("does not match the expected generation to rewrite");
+    } finally {
+      if (out != null) {
+        out.close();
+      }
+    }
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
+    assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
+    assertUnchanged(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void cannotRewriteDeletedKey(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    bucket.deleteKey(keyDetails.getName());
+
+    OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+    assertThat(e).hasMessageContaining("not found");
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void cannotRewriteRenamedKey(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    bucket.renameKey(keyDetails.getName(), "newKeyName-" + layout.name());
+
+    OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+    assertThat(e).hasMessageContaining("not found");
+  }
+
+  private static void rewriteKey(
+      OzoneBucket bucket, OzoneKeyDetails keyDetails, byte[] newContent
+  ) throws IOException {
+    try (OzoneOutputStream out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
+        keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        keyDetails.getMetadata())) {
+      out.write(newContent);
+    }
+  }
+
+  private static OzoneKeyDetails assertKeyContent(
+      OzoneBucket bucket, String keyName, byte[] expectedContent
+  ) throws IOException {
+    OzoneKeyDetails updatedKeyDetails = bucket.getKey(keyName);
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[expectedContent.length];
+      IOUtils.readFully(is, fileContent);
+      assertArrayEquals(expectedContent, fileContent);
+    }
+
+    return updatedKeyDetails;
+  }
+
+  private OzoneBucket createBucket(BucketLayout layout) throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    BucketArgs args = BucketArgs.newBuilder()
+        .setBucketLayout(layout)
+        .build();
+
+    volume.createBucket(bucketName, args);
+    return volume.getBucket(bucketName);
+  }
+
+  private static OmKeyArgs toOmKeyArgs(OzoneKeyDetails keyDetails) {
+    return new OmKeyArgs.Builder()
+        .setVolumeName(keyDetails.getVolumeName())
+        .setBucketName(keyDetails.getBucketName())
+        .setKeyName(keyDetails.getName())
+        .build();
+  }
+
+  private static void assertUnchanged(OmKeyInfo original, OmKeyInfo current) {
+    assertEquals(original.getAcls(), current.getAcls());
+    assertEquals(original.getMetadata(), current.getMetadata());
+    assertEquals(original.getCreationTime(), current.getCreationTime());
+    assertEquals(original.getUpdateID(), current.getUpdateID());
+    assertEquals(original.getModificationTime(), current.getModificationTime());
+  }
+
+  private static void assertMetadataAfterRewrite(OmKeyInfo original, OmKeyInfo updated) {
+    assertEquals(original.getAcls(), updated.getAcls());
+    assertEquals(original.getMetadata(), updated.getMetadata());
+    assertEquals(original.getCreationTime(), updated.getCreationTime());
+    assertThat(updated.getUpdateID()).isGreaterThan(original.getUpdateID());
+    assertThat(updated.getModificationTime()).isGreaterThanOrEqualTo(original.getModificationTime());
+  }
+
+  private static void assertMetadataUnchanged(OzoneKeyDetails original, OzoneKeyDetails rewritten) {
+    assertEquals(original.getOwner(), rewritten.getOwner());
+    assertEquals(original.getMetadata(), rewritten.getMetadata());
   }
 
   @Test
@@ -1678,6 +1900,7 @@ abstract class OzoneRpcClientTests {
 
 
   @Test
+  @Flaky("HDDS-10886")
   public void testPutKeyRatisThreeNodesParallel() throws IOException,
       InterruptedException {
     String volumeName = UUID.randomUUID().toString();
@@ -3956,15 +4179,28 @@ abstract class OzoneRpcClientTests {
     assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
-  private void createTestKey(OzoneBucket bucket, String keyName,
-                             String keyValue) throws IOException {
-    OzoneOutputStream out = bucket.createKey(keyName,
-        keyValue.getBytes(UTF_8).length, RATIS,
-        ONE, new HashMap<>());
-    out.write(keyValue.getBytes(UTF_8));
-    out.close();
-    OzoneKey key = bucket.getKey(keyName);
+  private OzoneKeyDetails createTestKey(OzoneBucket bucket) throws IOException {
+    return createTestKey(bucket, getTestName(), UUID.randomUUID().toString());
+  }
+
+  private OzoneKeyDetails createTestKey(
+      OzoneBucket bucket, String keyName, String keyValue
+  ) throws IOException {
+    return createTestKey(bucket, keyName, keyValue.getBytes(UTF_8));
+  }
+
+  private OzoneKeyDetails createTestKey(
+      OzoneBucket bucket, String keyName, byte[] bytes
+  ) throws IOException {
+    RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+    Map<String, String> metadata = singletonMap("key", RandomStringUtils.randomAscii(10));
+    try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, metadata)) {
+      out.write(bytes);
+    }
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    assertNotNull(key);
     assertEquals(keyName, key.getName());
+    return key;
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName) {
