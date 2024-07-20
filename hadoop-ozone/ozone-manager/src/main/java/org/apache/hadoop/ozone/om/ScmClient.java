@@ -21,6 +21,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -33,9 +35,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT;
@@ -113,12 +117,26 @@ public class ScmClient {
     }
     try {
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
-      // Don't keep empty pipelines in the cache.
-      List<Long> emptyPipelines = result.entrySet().stream()
-          .filter(e -> e.getValue().isEmpty())
+      // Don't keep empty pipelines or insufficient EC pipelines in the cache.
+      List<Long> unsatisfiedCachePipelines = result.entrySet().stream()
+          .filter(e -> {
+            Pipeline pipeline = e.getValue();
+            // filter empty pipelines
+            if (pipeline.isEmpty()) {
+              return true;
+            }
+            // filter insufficient EC pipelines
+            ReplicationConfig repConfig = pipeline.getReplicationConfig();
+            if (repConfig instanceof ECReplicationConfig) {
+              int d = ((ECReplicationConfig) repConfig).getData();
+              Set<Integer> dataIndexes = IntStream.rangeClosed(1, d).boxed().collect(Collectors.toSet());
+              return !pipeline.getReplicaIndexes().values().containsAll(dataIndexes);
+            }
+            return false;
+          })
           .map(Map.Entry::getKey)
           .collect(Collectors.toList());
-      containerLocationCache.invalidateAll(emptyPipelines);
+      containerLocationCache.invalidateAll(unsatisfiedCachePipelines);
       return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
