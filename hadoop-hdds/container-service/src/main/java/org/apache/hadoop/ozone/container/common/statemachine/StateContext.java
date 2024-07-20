@@ -658,47 +658,49 @@ public class StateContext {
     // Adding not null check, in a case where datanode is still starting up, but
     // we called stop DatanodeStateMachine, this sets state to SHUTDOWN, and
     // there is a chance of getting task as null.
-    if (task != null) {
-      try {
-        if (this.isEntering()) {
-          task.onEnter();
-        }
+    if (task == null) {
+      return;
+    }
 
-        if (!isThreadPoolAvailable(service)) {
-          long count = threadPoolNotAvailableCount.incrementAndGet();
-          long unavailableTime = Time.monotonicNow() - lastHeartbeatSent.get();
-          if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
-            LOG.warn("No available thread in pool for the past {} seconds " +
-                    "and {} times.", unit.toSeconds(unavailableTime), count);
-          }
-          return;
-        }
-        threadPoolNotAvailableCount.set(0);
-        task.execute(service);
-        lastHeartbeatSent.set(Time.monotonicNow());
-        DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
-        if (this.state != newState) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Task {} executed, state transited from {} to {}",
-                    task.getClass().getSimpleName(), this.state, newState);
-          }
-          if (isExiting(newState)) {
-            task.onExit();
-          }
-          this.setState(newState);
-        }
-
-        if (!shutdownGracefully &&
-                this.state == DatanodeStateMachine.DatanodeStates.SHUTDOWN) {
-          LOG.error("Critical error occurred in StateMachine, setting " +
-                  "shutDownMachine");
-          // When some exception occurred, set shutdownStateMachine to true, so
-          // that we can terminate the datanode.
-          setShutdownOnError();
-        }
-      } finally {
-        task.clear();
+    try {
+      if (this.isEntering()) {
+        task.onEnter();
       }
+
+      if (!isThreadPoolAvailable(service)) {
+        long count = threadPoolNotAvailableCount.incrementAndGet();
+        long unavailableTime = Time.monotonicNow() - lastHeartbeatSent.get();
+        if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool for the past {} seconds " +
+              "and {} times.", unit.toSeconds(unavailableTime), count);
+        }
+        return;
+      }
+      threadPoolNotAvailableCount.set(0);
+      task.execute(service);
+      lastHeartbeatSent.set(Time.monotonicNow());
+      DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
+      if (this.state != newState) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Task {} executed, state transited from {} to {}",
+              task.getClass().getSimpleName(), this.state, newState);
+        }
+        if (isExiting(newState)) {
+          task.onExit();
+        }
+        this.setState(newState);
+      }
+
+      if (!shutdownGracefully &&
+          this.state == DatanodeStateMachine.DatanodeStates.SHUTDOWN) {
+        LOG.error("Critical error occurred in StateMachine, setting " +
+            "shutDownMachine");
+        // When some exception occurred, set shutdownStateMachine to true, so
+        // that we can terminate the datanode.
+        setShutdownOnError();
+      }
+    } finally {
+      task.clear();
     }
   }
 
