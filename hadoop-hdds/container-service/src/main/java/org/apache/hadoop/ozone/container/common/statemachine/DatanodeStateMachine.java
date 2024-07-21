@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
@@ -215,9 +216,12 @@ public class DatanodeStateMachine implements Closeable {
         ReplicationSupervisorMetrics.create(supervisor);
 
     ecReconstructionMetrics = ECReconstructionMetrics.create();
-    certClient.createClientTrustManager();
+    ClientTrustManager clientTrustManager = null;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      clientTrustManager = certClient.createClientTrustManager();
+    }
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
-        conf, certClient.createClientTrustManager(), secretKeyClient, context, ecReconstructionMetrics,
+        conf, clientTrustManager, secretKeyClient, context, ecReconstructionMetrics,
         threadNamePrefix);
 
     // This is created as an instance variable as Mockito needs to access it in
