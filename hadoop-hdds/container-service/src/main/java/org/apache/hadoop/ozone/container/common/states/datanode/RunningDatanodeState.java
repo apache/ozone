@@ -85,7 +85,7 @@ public class RunningDatanodeState implements DatanodeState {
   public void execute(ExecutorService executor) {
     ecs = new ExecutorCompletionService<>(executor);
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
+      Callable<EndPointStates> endpointTask = buildEndPointTask(endpoint);
       if (endpointTask != null) {
         // Just do a timely wait. A slow EndpointStateMachine won't occupy
         // the thread in executor from DatanodeStateMachine for a long time,
@@ -116,34 +116,31 @@ public class RunningDatanodeState implements DatanodeState {
     this.ecs = e;
   }
 
-  private Callable<EndPointStates> getEndPointTask(
+  @SuppressWarnings("checkstyle:Indentation")
+  private Callable<EndPointStates> buildEndPointTask(
       EndpointStateMachine endpoint) {
-    Callable<EndPointStates> endpointTask = null;
-    for (EndpointStateMachine endpointStateMachine : connectionManager.getValues()) {
-      if (endpointStateMachine.getAddressString().equals(endpoint.getAddressString())) {
-        if (endpoint.getState().getValue() == EndPointStates.GETVERSION.getValue()) {
-          endpointTask = new VersionEndpointTask(endpoint, conf,
-              context.getParent().getContainer());
-        } else if (endpoint.getState().getValue() == EndPointStates.REGISTER.getValue()) {
-          endpointTask = RegisterEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setContext(context)
-              .setDatanodeDetails(context.getParent().getDatanodeDetails())
-              .setOzoneContainer(context.getParent().getContainer())
-              .build();
-        } else if (endpoint.getState().getValue() == EndPointStates.HEARTBEAT.getValue()) {
-          endpointTask = HeartbeatEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setDatanodeDetails(context.getParent().getDatanodeDetails())
-              .setContext(context)
-              .build();
-        }
-      }
+    switch (endpoint.getState()) {
+      case GETVERSION:
+        return new VersionEndpointTask(endpoint, conf,
+            context.getParent().getContainer());
+      case REGISTER:
+        return RegisterEndpointTask.newBuilder()
+            .setConfig(conf)
+            .setEndpointStateMachine(endpoint)
+            .setContext(context)
+            .setDatanodeDetails(context.getParent().getDatanodeDetails())
+            .setOzoneContainer(context.getParent().getContainer())
+            .build();
+      case HEARTBEAT:
+        return HeartbeatEndpointTask.newBuilder()
+            .setConfig(conf)
+            .setEndpointStateMachine(endpoint)
+            .setDatanodeDetails(context.getParent().getDatanodeDetails())
+            .setContext(context)
+            .build();
+      default:
+        return null;
     }
-
-    return endpointTask;
   }
 
   /**
