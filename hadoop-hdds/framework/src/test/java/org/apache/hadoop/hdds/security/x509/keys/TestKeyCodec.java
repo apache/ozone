@@ -85,21 +85,21 @@ public class TestKeyCodec {
       throws NoSuchProviderException, NoSuchAlgorithmException,
       IOException, InvalidKeySpecException {
     KeyPair keys = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, component);
-    pemWriter.writeKey(keys);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, component);
+    keyStorage.storeKey(keys);
 
     // Assert that locations have been created.
-    Path keyLocation = pemWriter.getSecurityConfig().getKeyLocation(component);
+    Path keyLocation = securityConfig.getKeyLocation(component);
     assertTrue(keyLocation.toFile().exists());
 
     // Assert that locations are created in the locations that we specified
     // using the Config.
     assertTrue(keyLocation.toString().startsWith(prefix));
     Path privateKeyPath = Paths.get(keyLocation.toString(),
-        pemWriter.getSecurityConfig().getPrivateKeyFileName());
+        securityConfig.getPrivateKeyFileName());
     assertTrue(privateKeyPath.toFile().exists());
     Path publicKeyPath = Paths.get(keyLocation.toString(),
-        pemWriter.getSecurityConfig().getPublicKeyFileName());
+        securityConfig.getPublicKeyFileName());
     assertTrue(publicKeyPath.toFile().exists());
 
     // Read the private key and test if the expected String in the PEM file
@@ -115,8 +115,7 @@ public class TestKeyCodec {
     assertThat(publicKeydata).contains("PUBLIC KEY");
 
     // Let us decode the PEM file and parse it back into binary.
-    KeyFactory kf = KeyFactory.getInstance(
-        pemWriter.getSecurityConfig().getKeyAlgo());
+    KeyFactory kf = KeyFactory.getInstance(securityConfig.getKeyAlgo());
 
     // Replace the PEM Human readable guards.
     privateKeydata =
@@ -147,7 +146,7 @@ public class TestKeyCodec {
 
     // Now let us assert the permissions on the Directories and files are as
     // expected.
-    Set<PosixFilePermission> expectedSet = pemWriter.getFilePermissionSet();
+    Set<PosixFilePermission> expectedSet = KeyStorage.FILE_PERMISSION_SET;
     Set<PosixFilePermission> currentSet =
         Files.getPosixFilePermissions(privateKeyPath);
     assertEquals(expectedSet.size(), currentSet.size());
@@ -159,7 +158,7 @@ public class TestKeyCodec {
     currentSet.removeAll(expectedSet);
     assertEquals(0, currentSet.size());
 
-    expectedSet = pemWriter.getDirPermissionSet();
+    expectedSet = KeyStorage.DIR_PERMISSION_SET;
     currentSet =
         Files.getPosixFilePermissions(keyLocation);
     assertEquals(expectedSet.size(), currentSet.size());
@@ -176,30 +175,29 @@ public class TestKeyCodec {
   public void testReWriteKey()
       throws Exception {
     KeyPair kp = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, component);
-    SecurityConfig secConfig = pemWriter.getSecurityConfig();
-    pemWriter.writeKey(kp);
+    KeyStorage keyStorage = new KeyStorage(this.securityConfig, component);
+    keyStorage.storeKey(kp);
 
     // Assert that rewriting of keys throws exception with valid messages.
     IOException ioException = assertThrows(IOException.class,
-            () -> pemWriter.writeKey(kp));
+        () -> keyStorage.storeKey(kp));
     assertThat(ioException.getMessage())
         .contains("Private Key file already exists.");
     FileUtils.deleteQuietly(Paths.get(
-        secConfig.getKeyLocation(component).toString() + "/" + secConfig
+        securityConfig.getKeyLocation(component).toString() + "/" + securityConfig
             .getPrivateKeyFileName()).toFile());
     ioException = assertThrows(IOException.class,
-            () -> pemWriter.writeKey(kp));
+        () -> keyStorage.storeKey(kp));
     assertThat(ioException.getMessage())
         .contains("Public Key file already exists.");
     FileUtils.deleteQuietly(Paths.get(
-        secConfig.getKeyLocation(component).toString() + "/" + secConfig
+        securityConfig.getKeyLocation(component).toString() + "/" + securityConfig
             .getPublicKeyFileName()).toFile());
 
     // Should succeed now as both public and private key are deleted.
-    pemWriter.writeKey(kp);
+    keyStorage.storeKey(kp);
     // Should succeed with overwrite flag as true.
-    pemWriter.writeKey(kp, true);
+    keyStorage.storeKey(kp, true);
 
   }
 
@@ -210,14 +208,14 @@ public class TestKeyCodec {
   public void testWriteKeyInNonPosixFS()
       throws Exception {
     KeyPair kp = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, component);
-    pemWriter.setIsPosixFileSystem(() -> false);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, component);
+    keyStorage.setIsPosixFileSystem(() -> false);
 
     // Assert key rewrite fails in non Posix file system.
     IOException ioException = assertThrows(IOException.class,
-            () -> pemWriter.writeKey(kp));
+        () -> keyStorage.storeKey(kp));
     assertThat(ioException.getMessage())
-        .contains("Unsupported File System for pem file.");
+        .contains("Unsupported File System.");
   }
 
   @Test
@@ -226,10 +224,10 @@ public class TestKeyCodec {
       InvalidKeySpecException {
 
     KeyPair kp = keyGenerator.generateKey();
-    KeyCodec keycodec = new KeyCodec(securityConfig, component);
-    keycodec.writeKey(kp);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, component);
+    keyStorage.storeKey(kp);
 
-    PublicKey pubKey = keycodec.readPublicKey();
+    PublicKey pubKey = keyStorage.readPublicKey();
     assertNotNull(pubKey);
   }
 }
