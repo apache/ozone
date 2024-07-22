@@ -388,7 +388,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     // check if fields are valid
     if (fieldsFilter != null &&
-        !checkValidValueFields(dbPath, fieldsFilter, columnFamilyDefinition)){
+        !checkValidValueFields(dbPath, fieldsFilter, columnFamilyDefinition)) {
       return false;
     }
 
@@ -419,7 +419,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       IOUtils.closeQuietly(iterator, readOptions, slice);
     }
   }
-  boolean checkValidValueFields(String dbPath, String valueFields, DBColumnFamilyDefinition<?, ?> columnFamilyDefinition) {
+  boolean checkValidValueFields(String dbPath, String valueFields,
+                                DBColumnFamilyDefinition<?, ?> columnFamilyDefinition) {
     Map<String, Object> valueSchema = new HashMap<>();
     try {
       boolean schemaSuccess = new ValueSchema().getValueFields(dbPath, valueSchema, 2, tableName);
@@ -577,7 +578,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             for (String field : valueFields.split(",")) {
               String[] subfields = field.split("\\.");
               try {
-                Field valueClassField = getRequiredFieldFromAllFields(dbColumnFamilyDefinition.getValueType(), subfields[0]);
+                Field valueClassField = getRequiredFieldFromAllFields(dbColumnFamilyDefinition.getValueType(),
+                    subfields[0]);
                 Object valueObject = valueClassField.get(o);
                 if (subfields.length == 1) {
                   filteredValue.put(field, valueObject);
@@ -597,10 +599,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                   Field classSubField = getRequiredFieldFromAllFields(typeOfClassField, subfields[1]);
 
                   if (Collection.class.isAssignableFrom(valueObject.getClass())) {
-                    List<Map<String,Object>> subfieldObjectsList = new ArrayList<>();
+                    List<Map<String, Object>> subfieldObjectsList = new ArrayList<>();
                     for (Object ob : (List) valueObject) {
                       Map<String, Object> subfieldValueMap = new HashMap<>();
-                      subfieldValueMap.put(subfields[1],classSubField.get(ob));
+                      subfieldValueMap.put(subfields[1], classSubField.get(ob));
                       subfieldObjectsList.add(subfieldValueMap);
                     }
                     filteredValue.put(field, subfieldObjectsList);
@@ -609,7 +611,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                   }
                 }
               } catch (NoSuchFieldException ex) {
-              err().println("ERROR: no such field: " + valueFields);
+                err().println("ERROR: no such field: " + valueFields);
               }
             }
             sb.append(WRITER.writeValueAsString(filteredValue));
