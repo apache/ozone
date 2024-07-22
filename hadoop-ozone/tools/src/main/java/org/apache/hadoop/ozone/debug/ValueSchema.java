@@ -88,7 +88,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
 
     String dbPath = parent.getDbPath();
     Map<String, Object> fields = new HashMap<>();
-    success = getValueFields(dbPath, fields);
+    success = getValueFields(dbPath, fields, depth, tableName);
 
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(fields));
 
@@ -101,7 +101,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     return null;
   }
 
-  private boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {
+  public boolean getValueFields(String dbPath, Map<String, Object> valueSchema, int d, String table) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
@@ -111,14 +111,14 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
       return false;
     }
     final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-        dbDefinition.getColumnFamily(tableName);
+        dbDefinition.getColumnFamily(table);
     if (columnFamilyDefinition == null) {
-      err().print("Error: Table with name '" + tableName + "' not found");
+      err().print("Error: Table with name '" + table + "' not found");
       return false;
     }
 
     Class<?> c = columnFamilyDefinition.getValueType();
-    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, depth));
+    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, d));
 
     return true;
   }
@@ -148,7 +148,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     }
   }
 
-  private List<Field> getAllFields(Class clazz) {
+  public List<Field> getAllFields(Class clazz) {
     // NOTE: Schema of interface type, like ReplicationConfig, cannot be fetched.
     //       An empty list "[]" will be shown for such types of fields.
     if (clazz == null) {

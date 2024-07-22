@@ -55,9 +55,12 @@ import picocli.CommandLine;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +123,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @CommandLine.Option(names = {"--endkey", "--ek", "-e"},
       description = "Key at which iteration of the DB ends")
   private String endKey;
+
+  @CommandLine.Option(names = {"--fields"},
+      description = "Comma-separated list of fields needed for each value. " +
+          "eg.) \"name,acls.type\" for showing name and type under acls.")
+  private String fieldsFilter;
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
@@ -291,7 +299,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         }
         Future<Void> future = threadPool.submit(
             new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
-                withKey, schemaV3));
+                withKey, schemaV3, fieldsFilter));
         futures.add(future);
         batch = new ArrayList<>(batchSize);
         sequenceId++;
@@ -299,7 +307,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
-          batch, logWriter, sequenceId, withKey, schemaV3));
+          batch, logWriter, sequenceId, withKey, schemaV3, fieldsFilter));
       futures.add(future);
     }
 
@@ -378,6 +386,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return true;
     }
 
+    // check if fields are valid
+    if (fieldsFilter != null &&
+        !checkValidValueFields(dbPath, fieldsFilter, columnFamilyDefinition)){
+      return false;
+    }
+
     ManagedRocksIterator iterator = null;
     ManagedReadOptions readOptions = null;
     ManagedSlice slice = null;
@@ -404,6 +418,46 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     } finally {
       IOUtils.closeQuietly(iterator, readOptions, slice);
     }
+  }
+  boolean checkValidValueFields(String dbPath, String valueFields, DBColumnFamilyDefinition<?, ?> columnFamilyDefinition) {
+    Map<String, Object> valueSchema = new HashMap<>();
+    try {
+      boolean schemaSuccess = new ValueSchema().getValueFields(dbPath, valueSchema, 2, tableName);
+      if (!schemaSuccess) {
+        err().println("Error: Schema for table with name '" + tableName + "' not found");
+        return false;
+      }
+      Map<String, Object> valueClassSchema =
+          (Map<String, Object>) valueSchema.get(columnFamilyDefinition.getValueType().getSimpleName());
+
+      if (valueClassSchema == null) {
+        err().print("Error: Schema for table with name '" + tableName +
+            "' and value type '" + columnFamilyDefinition.getValueType().getSimpleName() + "' not found");
+        return false;
+      }
+
+      for (String field : valueFields.split(",")) { // TODO: check for distinct values
+        String[] subfields = field.split("\\.");
+        if (subfields.length > 2) {
+          err().println("Warn: Fields only up to 2nd level is allowed. Ignoring the subfields from 3rd level onwards");
+        }
+        Object subfieldValueSchema = valueClassSchema.get(subfields[0]);
+        if (subfieldValueSchema == null) {
+          err().println("Error: Field with name '" + field + "' not found");
+          return false;
+        }
+        if ((subfields.length > 1) &&
+            (subfieldValueSchema instanceof String ||
+                ((Map<String, Object>) subfieldValueSchema).get(subfields[1]) == null)) {
+          err().println("Error: subField with name '" + field + "' not found");
+          return false;
+        }
+      }
+    } catch (Exception ex) {
+      err().println("exception from fields check:" + ex.getMessage());
+    }
+
+    return true;
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
@@ -465,16 +519,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     private final long sequenceId;
     private final boolean withKey;
     private final boolean schemaV3;
+    private String valueFields;
 
     Task(DBColumnFamilyDefinition dbColumnFamilyDefinition,
          ArrayList<ByteArrayKeyValue> batch, LogWriter logWriter,
-         long sequenceId, boolean withKey, boolean schemaV3) {
+         long sequenceId, boolean withKey, boolean schemaV3, String valueFields) {
       this.dbColumnFamilyDefinition = dbColumnFamilyDefinition;
       this.batch = batch;
       this.logWriter = logWriter;
       this.sequenceId = sequenceId;
       this.withKey = withKey;
       this.schemaV3 = schemaV3;
+      this.valueFields = valueFields;
     }
 
     @Override
@@ -515,7 +571,53 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
           Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(byteArrayKeyValue.getValue());
-          sb.append(WRITER.writeValueAsString(o));
+
+          if (valueFields != null) {
+            Map<String, Object> filteredValue = new HashMap<>();
+            for (String field : valueFields.split(",")) {
+              String[] subfields = field.split("\\.");
+              try {
+                Field valueClassField = getRequiredFieldFromAllFields(dbColumnFamilyDefinition.getValueType(), subfields[0]);
+                Object valueObject = valueClassField.get(o);
+                if (subfields.length == 1) {
+                  filteredValue.put(field, valueObject);
+                } else {
+                  Class<?> typeOfClassField;
+                  try {
+                    if (Collection.class.isAssignableFrom(valueClassField.getType())) {
+                      typeOfClassField = (Class<?>)
+                          ((ParameterizedType) valueClassField.getGenericType()).getActualTypeArguments()[0];
+                    } else {
+                      typeOfClassField = valueClassField.getType();
+                    }
+                  } catch (ClassCastException ex) {
+                    typeOfClassField = valueClassField.getType();
+                  }
+
+                  Field classSubField = getRequiredFieldFromAllFields(typeOfClassField, subfields[1]);
+
+                  if (Collection.class.isAssignableFrom(valueObject.getClass())) {
+                    List<Map<String,Object>> subfieldObjectsList = new ArrayList<>();
+                    for (Object ob : (List) valueObject) {
+                      Map<String, Object> subfieldValueMap = new HashMap<>();
+                      subfieldValueMap.put(subfields[1],classSubField.get(ob));
+                      subfieldObjectsList.add(subfieldValueMap);
+                    }
+                    filteredValue.put(field, subfieldObjectsList);
+                  } else {
+                    filteredValue.put(field, classSubField.get(valueObject));
+                  }
+                }
+              } catch (NoSuchFieldException ex) {
+              err().println("ERROR: no such field: " + valueFields);
+              }
+            }
+            sb.append(WRITER.writeValueAsString(filteredValue));
+
+          } else {
+            sb.append(WRITER.writeValueAsString(o));
+          }
+
           results.add(sb.toString());
         }
         logWriter.log(results, sequenceId);
@@ -524,6 +626,22 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         LOG.error("Exception parse Object", e);
       }
       return null;
+    }
+
+    Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
+      List<Field> classFieldList = new ValueSchema().getAllFields(clazz);
+      Field classField = null;
+      for (Field f : classFieldList) {
+        if (f.getName().equals(fieldName)) {
+          classField = f;
+          break;
+        }
+      }
+      if (classField == null) {
+        throw new NoSuchFieldException();
+      }
+      classField.setAccessible(true);
+      return classField;
     }
   }
 
