@@ -153,7 +153,7 @@ public class BlockOutputStream extends OutputStream {
   private boolean allowPutBlockPiggybacking;
 
   private CompletableFuture<Void> lastFlushFuture;
-  private Set<CompletableFuture<Void>> allFlushFutures = Collections.newSetFromMap(new ConcurrentHashMap<>());
+  private Set<CompletableFuture<Void>> allPendingFlushFutures = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
   /**
    * Creates a new BlockOutputStream.
@@ -359,7 +359,7 @@ public class BlockOutputStream extends OutputStream {
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
-        recordFlushFuture(watchForCommitAsync(putBlockFuture));
+        recordWatchForCommitAsync(putBlockFuture);
       }
 
       if (bufferPool.isAtCapacity()) {
@@ -368,11 +368,15 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
+  private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
+    recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
+  }
+
   private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
     Preconditions.checkState(Thread.holdsLock(this));
     this.lastFlushFuture = flushFuture;
-    allFlushFutures.add(flushFuture);
-    flushFuture.whenComplete((r, e) -> allFlushFutures.remove(flushFuture));
+    allPendingFlushFutures.add(flushFuture);
+    flushFuture.whenComplete((r, e) -> allPendingFlushFutures.remove(flushFuture));
   }
 
   private void allocateNewBufferIfNeeded() throws IOException {
@@ -436,7 +440,7 @@ public class BlockOutputStream extends OutputStream {
         updateWriteChunkLength();
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
-        lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+        recordWatchForCommitAsync(putBlockResultFuture);
       }
       if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
         handleFullBuffer();
@@ -654,7 +658,7 @@ public class BlockOutputStream extends OutputStream {
 
     if (close) {
       // When closing, must wait for all flush futures to complete.
-      for (CompletableFuture<Void> flushFuture : allFlushFutures) {
+      for (CompletableFuture<Void> flushFuture : allPendingFlushFutures) {
         flushFuture.get();
       }
     }
@@ -700,7 +704,7 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Flushing without data");
     }
     if (putBlockResultFuture != null) {
-      recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
+      recordWatchForCommitAsync(putBlockResultFuture);
     }
     return lastFlushFuture;
   }
