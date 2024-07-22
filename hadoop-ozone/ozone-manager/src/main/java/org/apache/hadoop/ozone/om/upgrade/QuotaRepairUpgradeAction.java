@@ -38,8 +38,7 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE,
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT);
     if (enabled) {
-      QuotaRepairTask quotaRepairTask = new QuotaRepairTask(
-          arg.getMetadataManager());
+      QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
       quotaRepairTask.repair();
     }
   }
