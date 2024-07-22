@@ -623,7 +623,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           results.add(sb.toString());
         }
         logWriter.log(results, sequenceId);
-      } catch (Exception e) {
+      } catch (IOException | IllegalAccessException e) {
         exception = true;
         LOG.error("Exception parse Object", e);
       }
