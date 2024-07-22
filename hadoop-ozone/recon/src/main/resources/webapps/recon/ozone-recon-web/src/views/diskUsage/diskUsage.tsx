@@ -37,7 +37,7 @@ import {
 
 import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
 import { EChart } from '@/components/eChart/eChart';
-import { byteToSize, showDataFetchError, showDatInfoWarning } from '@/utils/common';
+import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
@@ -374,112 +374,112 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           values.push(summaryResponse.countStats.numKey);
         }
 
-        if (summaryResponse.objectInfo.bucketName && summaryResponse.objectInfo.bucketName !== -1) {
+        if (summaryResponse.objectInfo?.bucketName !== -1) {
           keys.push('Bucket Name');
           values.push(summaryResponse.objectInfo.bucketName);
         }
 
-        if (summaryResponse.objectInfo.bucketLayout && summaryResponse.objectInfo.bucketLayout !== -1) {
+        if (summaryResponse.objectInfo?.bucketLayout !== -1) {
           keys.push('Bucket Layout');
           values.push(summaryResponse.objectInfo.bucketLayout);
         }
 
-        if (summaryResponse.objectInfo.creationTime && summaryResponse.objectInfo.creationTime !== -1) {
+        if (summaryResponse.objectInfo?.creationTime !== -1) {
           keys.push('Creation Time');
           values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
         }
 
-        if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
+        if (summaryResponse.objectInfo?.dataSize !== -1) {
           keys.push('Data Size');
           values.push(byteToSize(summaryResponse.objectInfo.dataSize, 3));
         }
 
-        if (summaryResponse.objectInfo.encInfo && summaryResponse.objectInfo.encInfo !== -1) {
+        if (summaryResponse.objectInfo?.encInfo !== -1) {
           keys.push('ENC Info');
           values.push(summaryResponse.objectInfo.encInfo);
         }
 
-        if (summaryResponse.objectInfo.fileName && summaryResponse.objectInfo.fileName !== -1) {
+        if (summaryResponse.objectInfo?.fileName !== -1) {
           keys.push('File Name');
           values.push(summaryResponse.objectInfo.fileName);
         }
 
-        if (summaryResponse.objectInfo.keyName && summaryResponse.objectInfo.keyName !== -1) {
+        if (summaryResponse.objectInfo?.keyName !== -1) {
           keys.push('Key Name');
           values.push(summaryResponse.objectInfo.keyName);
         }
 
-        if (summaryResponse.objectInfo.modificationTime && summaryResponse.objectInfo.modificationTime !== -1) {
+        if (summaryResponse.objectInfo?.modificationTime !== -1) {
           keys.push('Modification Time');
           values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
         }
 
-        if (summaryResponse.objectInfo.name && summaryResponse.objectInfo.name !== -1) {
+        if (summaryResponse.objectInfo?.name !== -1) {
           keys.push('Name');
           values.push(summaryResponse.objectInfo.name);
         }
 
-        if (summaryResponse.objectInfo.owner && summaryResponse.objectInfo.owner !== -1) {
+        if (summaryResponse.objectInfo?.owner !== -1) {
           keys.push('Owner');
           values.push(summaryResponse.objectInfo.owner);
         }
 
-        if (summaryResponse.objectInfo.quotaInBytes && summaryResponse.objectInfo.quotaInBytes !== -1) {
+        if (summaryResponse.objectInfo?.quotaInBytes !== -1) {
           keys.push('Quota In Bytes');
           values.push(byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
         }
 
-        if (summaryResponse.objectInfo.quotaInNamespace && summaryResponse.objectInfo.quotaInNamespace !== -1) {
+        if (summaryResponse.objectInfo?.quotaInNamespace !== -1) {
           keys.push('Quota In Namespace');
           values.push(byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
         }
 
-        if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationFactor && summaryResponse.objectInfo.replicationConfig.replicationFactor !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== -1) {
           keys.push('Replication Factor');
           values.push(summaryResponse.objectInfo.replicationConfig.replicationFactor);
         }
 
-        if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationType && summaryResponse.objectInfo.replicationConfig.replicationType !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.replicationType !== -1) {
           keys.push('Replication Type');
           values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
         }
 
-        if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.requiredNodes && summaryResponse.objectInfo.replicationConfig.requiredNodes !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== -1) {
           keys.push('Replication Required Nodes');
           values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
         }
 
-        if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
+        if (summaryResponse.objectInfo?.sourceBucket !== -1) {
           keys.push('Source Bucket');
           values.push(summaryResponse.objectInfo.sourceBucket);
         }
 
-        if (summaryResponse.objectInfo.sourceVolume && summaryResponse.objectInfo.sourceVolume !== -1) {
+        if (summaryResponse.objectInfo?.sourceVolume !== -1) {
           keys.push('Source Volume');
           values.push(summaryResponse.objectInfo.sourceVolume);
         }
 
-        if (summaryResponse.objectInfo.storageType && summaryResponse.objectInfo.storageType !== -1) {
+        if (summaryResponse.objectInfo?.storageType !== -1) {
           keys.push('Storage Type');
           values.push(summaryResponse.objectInfo.storageType);
         }
 
-        if (summaryResponse.objectInfo.usedBytes && summaryResponse.objectInfo.usedBytes !== -1) {
+        if (summaryResponse.objectInfo?.usedBytes !== -1) {
           keys.push('Used Bytes');
           values.push(summaryResponse.objectInfo.usedBytes);
         }
 
-        if (summaryResponse.objectInfo.usedNamespace && summaryResponse.objectInfo.usedNamespace !== -1) {
+        if (summaryResponse.objectInfo?.usedNamespace !== -1) {
           keys.push('Used NameSpaces');
           values.push(summaryResponse.objectInfo.usedNamespace);
         }
 
-        if (summaryResponse.objectInfo.volumeName && summaryResponse.objectInfo.volumeName !== -1) {
+        if (summaryResponse.objectInfo?.volumeName !== -1) {
           keys.push('Volume Name');
           values.push(summaryResponse.objectInfo.volumeName);
         }
 
-        if (summaryResponse.objectInfo.volume && summaryResponse.objectInfo.volume !== -1) {
+        if (summaryResponse.objectInfo?.volume !== -1) {
           keys.push('Volume');
           values.push(summaryResponse.objectInfo.volume);
         }
