@@ -56,6 +56,7 @@ final class ServiceInfoProvider {
 
   private String caCertPEM;
   private List<String> caCertPEMList;
+  private SecurityConfig securityConfig;
 
   /**
    * Initializes the provider.
@@ -95,6 +96,7 @@ final class ServiceInfoProvider {
   ServiceInfoProvider(SecurityConfig config, OzoneManagerProtocol om,
       CertificateClient certClient, boolean skipInitializationForTesting) {
     this.om = om;
+    this.securityConfig = config;
     if (config.isSecurityEnabled() && !skipInitializationForTesting) {
       this.certClient = certClient;
       Set<X509Certificate> certs = getCACertificates();
@@ -150,7 +152,8 @@ final class ServiceInfoProvider {
 
   private String toPEMEncodedString(X509Certificate cert) {
     try {
-      return cert == null ? null : CertificateCodec.getPEMEncodedString(cert);
+      CertificateCodec certificateCodec = securityConfig.getCertificateCodec();
+      return cert == null ? null : certificateCodec.getPEMEncodedString(cert);
     } catch (SCMSecurityException e) {
       throw new RuntimeException(e);
     }

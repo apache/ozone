@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 import com.google.common.base.Preconditions;
@@ -53,11 +52,12 @@ class InfoSubcommand extends ScmCertSubcommand {
     // Print container report info.
     System.out.printf("Certificate id: %s%n", serialId);
     try {
-      X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
+      CertificateCodec certificateCodec = new CertificateCodec();
+      X509Certificate cert = certificateCodec.getX509Certificate(certPemStr);
       System.out.println(cert);
-    } catch (CertificateException ex) {
+    } catch (IOException ex) {
       System.err.println("Failed to get certificate id " + serialId);
-      throw new IOException("Fail to get certificate id " + serialId, ex);
+      throw ex;
     }
   }
 }

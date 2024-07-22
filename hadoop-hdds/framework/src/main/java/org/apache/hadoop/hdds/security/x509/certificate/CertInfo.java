@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.security.x509.certificate;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CertInfoProto;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -28,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.security.cert.X509Certificate;
 import java.util.Comparator;
 import java.util.Objects;
@@ -51,6 +51,7 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   private final X509Certificate x509Certificate;
   // Timestamp when the certificate got persisted in the DB.
   private final long timestamp;
+  private static final CertificateCodec CERTIFICATE_CODEC = new CertificateCodec();
 
   private CertInfo(X509Certificate x509Certificate, long timestamp) {
     this.x509Certificate = x509Certificate;
@@ -64,20 +65,15 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
         .build();
   }
 
-  public CertInfoProto getProtobuf() throws SCMSecurityException {
+  public CertInfoProto getProtobuf() throws IOException {
     return CertInfoProto.newBuilder()
-        .setX509Certificate(getX509CertificatePEMEncodedString())
+        .setX509Certificate(CERTIFICATE_CODEC.writePEMEncoded(getX509Certificate(), new StringWriter()).toString())
         .setTimestamp(getTimestamp())
         .build();
   }
 
   public X509Certificate getX509Certificate() {
     return x509Certificate;
-  }
-
-  public String getX509CertificatePEMEncodedString()
-      throws SCMSecurityException {
-    return CertificateCodec.getPEMEncodedString(getX509Certificate());
   }
 
   public long getTimestamp() {
@@ -145,8 +141,7 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
 
     public Builder setX509Certificate(String x509Certificate)
         throws IOException {
-      return setX509Certificate(CertificateCodec.getX509Certificate(
-          x509Certificate, CertificateCodec::toIOException));
+      return setX509Certificate(CERTIFICATE_CODEC.getX509Certificate(x509Certificate));
     }
 
     public Builder setTimestamp(long timestamp) {
