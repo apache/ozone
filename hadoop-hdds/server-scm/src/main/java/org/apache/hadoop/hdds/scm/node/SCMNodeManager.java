@@ -83,6 +83,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -1217,6 +1218,47 @@ public class SCMNodeManager implements NodeManager {
     return storagePercentage;
   }
 
+  @Override
+  public Map<String, String> getNodeStatics() {
+    if (nodeStateManager.getAllNodes().size() < 1) {
+      return new HashMap<>();
+    }
+    Map<String, String> nodeStatics = new HashMap<>();
+    float[] usages = new float[nodeStateManager.getAllNodes().size()];
+    float totalOzoneUsed = 0;
+    int i = 0;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      String[] storagePercentage = calculateStoragePercentage(
+          dni.getStorageReports());
+      if (storagePercentage[0].equals("N/A")) {
+        usages[i++] = 0;
+      } else {
+        float storagePerc = Float.parseFloat(storagePercentage[0]);
+        usages[i++] = storagePerc;
+        totalOzoneUsed = totalOzoneUsed + storagePerc;
+      }
+    }
+
+    totalOzoneUsed /= nodeStateManager.getAllNodes().size();
+    Arrays.sort(usages);
+    float median = usages[usages.length / 2];
+    nodeStatics.put(UsageStatics.MEDINNA.getLabel(), String.valueOf(median));
+    float max = usages[usages.length - 1];
+    nodeStatics.put(UsageStatics.MAX.getLabel(), String.valueOf(max));
+    float min = usages[0];
+    nodeStatics.put(UsageStatics.MIN.getLabel(), String.valueOf(min));
+
+    float dev = 0;
+    for (i = 0; i < usages.length; i++) {
+      dev += (usages[i] - totalOzoneUsed) * (usages[i] - totalOzoneUsed);
+    }
+    dev = (float) Math.sqrt(dev / usages.length);
+    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+    return nodeStatics;
+  }
+
   /**
    * Based on the current time and the last heartbeat, calculate the time difference
    * and get a string of the relative value. E.g. "2s ago", "1m 2s ago", etc.
@@ -1280,6 +1322,20 @@ public class SCMNodeManager implements NodeManager {
     }
 
     UsageStates(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum UsageStatics {
+    MIN("Min"),
+    MAX("Max"),
+    MEDINNA("Medina"),
+    STDEV("Stdev");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    UsageStatics(String label) {
       this.label = label;
     }
   }

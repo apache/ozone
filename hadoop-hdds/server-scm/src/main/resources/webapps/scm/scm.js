@@ -32,6 +32,13 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
+            $scope.statistical = {
+                usages : {}
+            }
+            $scope.statistical.usages.min = "";
+            $scope.statistical.usages.max = "";
+            $scope.statistical.usages.medina = "";
+            $scope.statistical.usages.stdev = "";
 
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
@@ -81,6 +88,18 @@
                     $scope.totalItems = nodeStatusCopy.length;
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+
+                    ctrl.nodemanagermetrics.NodeStatics.map(({ key, value }) => {
+                        if(key == "Min") {
+                            $scope.statistical.usages.min = value;
+                        } else if(key == "Max") {
+                            $scope.statistical.usages.max = value;
+                        } else if(key == "Medina") {
+                            $scope.statistical.usages.medina = value;
+                        } else if(key == "Stdev") {
+                            $scope.statistical.usages.stdev = value;
+                        }
+                    });
                 });
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
