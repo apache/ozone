@@ -88,7 +88,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     assertEquals(0, fsoBucketInfo.getUsedNamespace());
     assertEquals(0, fsoBucketInfo.getUsedBytes());
     
-    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
     quotaRepairTask.repair();
 
     // 10 files of each type, obs have replication of three and
@@ -131,7 +131,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     assertEquals(-2, omVolumeArgs.getQuotaInBytes());
     assertEquals(-2, omVolumeArgs.getQuotaInNamespace());
 
-    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
     quotaRepairTask.repair();
 
     bucketInfo = omMetadataManager.getBucketTable().get(

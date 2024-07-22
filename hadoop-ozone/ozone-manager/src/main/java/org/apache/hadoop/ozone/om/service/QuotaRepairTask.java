@@ -20,8 +20,10 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,12 +38,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -65,76 +72,127 @@ public class QuotaRepairTask {
   private static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
   public static final long EPOCH_DEFAULT = -1L;
-  private final OMMetadataManager metadataManager;
-  private final Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
-  private final Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
+  private final OzoneManager om;
   private ExecutorService executor;
-  private final Map<String, CountPair> keyCountMap = new ConcurrentHashMap<>();
-  private final Map<String, CountPair> fileCountMap
-      = new ConcurrentHashMap<>();
-  private final Map<String, CountPair> directoryCountMap
-      = new ConcurrentHashMap<>();
-  private final Map<String, String> oldVolumeKeyNameMap = new HashMap();
-
-  public QuotaRepairTask(OMMetadataManager metadataManager) {
-    this.metadataManager = metadataManager;
+  public QuotaRepairTask(OzoneManager ozoneManager) {
+    this.om = ozoneManager;
   }
-  
+
   public void repair() throws Exception {
     LOG.info("Starting quota repair task");
-    prepareAllVolumeBucketInfo();
+    try {
+      // thread pool with 3 Table type * (1 task each + 3 thread each)
+      executor = Executors.newFixedThreadPool(12);
 
+      // repair active db
+      OMMetadataManager activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
+      repairActiveDb(activeMetaManager);
+      // list all snapshot
+      // repair snapshot dbs
+
+      updateOldVolumeQuotaSupport(om.getMetadataManager());
+    } finally {
+      LOG.info("Completed quota repair task");
+      executor.shutdown();
+    }
+  }
+
+  private void repairActiveDb(OMMetadataManager metadataManager) throws Exception {
+    Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
+    Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
+    Map<String, OmBucketInfo> oriBucketInfoMap = new HashMap<>();
+    prepareAllBucketInfo(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager);
+
+    repairCount(nameBucketInfoMap, idBucketInfoMap, metadataManager);
+
+    // update bucket count
+    updateOldBucketQuotaSupport(metadataManager, nameBucketInfoMap);
     IOzoneManagerLock lock = metadataManager.getLock();
-    // thread pool with 3 Table type * (1 task each + 3 thread each)
-    executor = Executors.newFixedThreadPool(12);
     try {
       nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
           BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
-      repairCount();
+      try (BatchOperation batchOperation = metadataManager.getStore().initBatchOperation()) {
+        for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
+          if (!isChange(oriBucketInfoMap.get(entry.getKey()), entry.getValue())) {
+            continue;
+          }
+          String bucketKey = metadataManager.getBucketKey(entry.getValue().getVolumeName(),
+              entry.getValue().getBucketName());
+          metadataManager.getBucketTable().putWithBatch(batchOperation, bucketKey, entry.getValue());
+          metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+              CacheValue.get(EPOCH_DEFAULT, entry.getValue()));
+        }
+        metadataManager.getStore().commitBatchOperation(batchOperation);
+      }
     } finally {
       nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
           BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
-      executor.shutdown();
-      LOG.info("Completed quota repair task");
     }
-    updateOldVolumeQuotaSupport();
-
-    // cleanup epoch added to avoid extra epoch id in cache
-    ArrayList<Long> epochs = new ArrayList<>();
-    epochs.add(EPOCH_DEFAULT);
-    metadataManager.getBucketTable().cleanupCache(epochs);
-    metadataManager.getVolumeTable().cleanupCache(epochs);
   }
   
-  private void prepareAllVolumeBucketInfo() throws IOException {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-        iterator = metadataManager.getVolumeTable().iterator()) {
+  private OMMetadataManager createActiveDBCheckpoint(
+      OMMetadataManager omMetaManager, OzoneConfiguration conf) throws IOException {
+    // cleanup
+    File dbLocation = omMetaManager.getStore().getDbLocation();
+    if (dbLocation == null) {
+      throw new NullPointerException("db location is null");
+    }
+    String tempData = dbLocation.getParent();
+    if (tempData == null) {
+      throw new NullPointerException("parent db dir is null");
+    }
+    File repairTmpPath = Paths.get(tempData, "temp-repair-quota").toFile();
+    FileUtils.deleteDirectory(repairTmpPath);
 
-      OmVolumeArgs omVolumeArgs;
+    // create snapshot
+    DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint("temp-repair-quota", true);
+    return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
+  }
+
+  private void prepareAllBucketInfo(
+      Map<String, OmBucketInfo> nameBucketInfoMap, Map<String, OmBucketInfo> idBucketInfoMap,
+      Map<String, OmBucketInfo> oriBucketInfoMap, OMMetadataManager metadataManager) throws IOException {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+             iterator = metadataManager.getBucketTable().iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> entry =
-            iterator.next();
-        omVolumeArgs = entry.getValue();
-        getAllBuckets(omVolumeArgs.getVolume(), omVolumeArgs.getObjectID());
-        if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
-            || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-          oldVolumeKeyNameMap.put(entry.getKey(), entry.getValue().getVolume());
-        }
+        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
+        OmBucketInfo bucketInfo = entry.getValue();
+        String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
+            bucketInfo.getBucketName());
+        oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
+        bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
+        bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+        nameBucketInfoMap.put(bucketNameKey, bucketInfo);
+        idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
+                bucketInfo.getObjectID()), bucketInfo);
       }
     }
   }
 
-  private void updateOldVolumeQuotaSupport() throws IOException {
+  private boolean isChange(OmBucketInfo lBucketInfo, OmBucketInfo rBucketInfo) {
+    if (lBucketInfo.getUsedNamespace() != rBucketInfo.getUsedNamespace()
+        || lBucketInfo.getUsedBytes() != rBucketInfo.getUsedBytes()
+        || lBucketInfo.getQuotaInNamespace() != rBucketInfo.getQuotaInNamespace()
+        || lBucketInfo.getQuotaInBytes() != rBucketInfo.getQuotaInBytes()) {
+      return true;
+    }
+    return false;
+  }
+
+  private static void updateOldVolumeQuotaSupport(OMMetadataManager metadataManager) throws IOException {
     LOG.info("Starting volume quota support update");
     IOzoneManagerLock lock = metadataManager.getLock();
-    try (BatchOperation batchOperation = metadataManager.getStore()
-        .initBatchOperation()) {
-      for (Map.Entry<String, String> volEntry
-          : oldVolumeKeyNameMap.entrySet()) {
-        lock.acquireReadLock(VOLUME_LOCK, volEntry.getValue());
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+             iterator = metadataManager.getVolumeTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();
+        OmVolumeArgs omVolumeArgs = entry.getValue();
+        if (!(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
+            || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT)) {
+          continue;
+        }
         try {
-          OmVolumeArgs omVolumeArgs = metadataManager.getVolumeTable().get(
-              volEntry.getKey());
+          lock.acquireReadLock(VOLUME_LOCK, omVolumeArgs.getVolume());
           boolean isQuotaReset = false;
           if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
             omVolumeArgs.setQuotaInBytes(QUOTA_RESET);
@@ -146,35 +204,18 @@ public class QuotaRepairTask {
           }
           if (isQuotaReset) {
             metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(volEntry.getKey()),
-                CacheValue.get(EPOCH_DEFAULT, omVolumeArgs));
-            metadataManager.getVolumeTable().putWithBatch(batchOperation,
-                volEntry.getKey(), omVolumeArgs);
+                new CacheKey<>(entry.getKey()), CacheValue.get(EPOCH_DEFAULT, omVolumeArgs));
+            metadataManager.getVolumeTable().put(entry.getKey(), omVolumeArgs);
           }
         } finally {
-          lock.releaseReadLock(VOLUME_LOCK, volEntry.getValue());
+          lock.releaseReadLock(VOLUME_LOCK, omVolumeArgs.getVolume());
         }
       }
-      metadataManager.getStore().commitBatchOperation(batchOperation);
     }
     LOG.info("Completed volume quota support update");
   }
   
-  private void getAllBuckets(String volumeName, long volumeId)
-      throws IOException {
-    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        volumeName, null, null, Integer.MAX_VALUE, false);
-    for (OmBucketInfo bucketInfo : bucketList) {
-      bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-      bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
-      nameBucketInfoMap.put(buildNamePath(volumeName,
-          bucketInfo.getBucketName()), bucketInfo);
-      idBucketInfoMap.put(buildIdPath(volumeId, bucketInfo.getObjectID()),
-          bucketInfo);
-    }
-  }
-  
-  private String buildNamePath(String volumeName, String bucketName) {
+  private static String buildNamePath(String volumeName, String bucketName) {
     final StringBuilder builder = new StringBuilder();
     builder.append(OM_KEY_PREFIX)
         .append(volumeName)
@@ -184,7 +225,7 @@ public class QuotaRepairTask {
     return builder.toString();
   }
 
-  private String buildIdPath(long volumeId, long bucketId) {
+  private static String buildIdPath(long volumeId, long bucketId) {
     final StringBuilder builder = new StringBuilder();
     builder.append(OM_KEY_PREFIX)
         .append(volumeId)
@@ -194,8 +235,13 @@ public class QuotaRepairTask {
     return builder.toString();
   }
   
-  private void repairCount() throws Exception {
-    LOG.info("Starting quota repair for all keys, files and directories");
+  private void repairCount(
+      Map<String, OmBucketInfo> nameBucketInfoMap, Map<String, OmBucketInfo> idBucketInfoMap,
+      OMMetadataManager metadataManager) throws Exception {
+    LOG.info("Starting quota repair counting for all keys, files and directories");
+    Map<String, CountPair> keyCountMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> fileCountMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> directoryCountMap = new ConcurrentHashMap<>();
     try {
       nameBucketInfoMap.keySet().stream().forEach(e -> keyCountMap.put(e,
           new CountPair()));
@@ -225,30 +271,15 @@ public class QuotaRepairTask {
       throw new Exception(ex.getCause());
     }
     
-    // persist bucket info
+    // update count to bucket info
     updateCountToBucketInfo(nameBucketInfoMap, keyCountMap);
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
-    
-    // update quota enable flag for old volume and buckets
-    updateOldBucketQuotaSupport();
-
-    try (BatchOperation batchOperation = metadataManager.getStore()
-        .initBatchOperation()) {
-      for (Map.Entry<String, OmBucketInfo> entry
-          : nameBucketInfoMap.entrySet()) {
-        String bucketKey = metadataManager.getBucketKey(
-            entry.getValue().getVolumeName(),
-            entry.getValue().getBucketName());
-        metadataManager.getBucketTable().putWithBatch(batchOperation,
-            bucketKey, entry.getValue());
-      }
-      metadataManager.getStore().commitBatchOperation(batchOperation);
-    }
-    LOG.info("Completed quota repair for all keys, files and directories");
+    LOG.info("Completed quota repair counting for all keys, files and directories");
   }
 
-  private void updateOldBucketQuotaSupport() {
+  private static void updateOldBucketQuotaSupport(
+      OMMetadataManager metadataManager, Map<String, OmBucketInfo> nameBucketInfoMap) {
     for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
       if (entry.getValue().getQuotaInBytes() == OLD_QUOTA_DEFAULT
           || entry.getValue().getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
@@ -261,13 +292,6 @@ public class QuotaRepairTask {
         }
         OmBucketInfo bucketInfo = builder.build();
         entry.setValue(bucketInfo);
-        
-        // there is a new value to be updated in bucket cache
-        String bucketKey = metadataManager.getBucketKey(
-            bucketInfo.getVolumeName(), bucketInfo.getBucketName());
-        metadataManager.getBucketTable().addCacheEntry(
-            new CacheKey<>(bucketKey),
-            CacheValue.get(EPOCH_DEFAULT, bucketInfo));
       }
     }
   }
@@ -315,7 +339,7 @@ public class QuotaRepairTask {
     }
   }
   
-  private <VALUE> void captureCount(
+  private static <VALUE> void captureCount(
       Map<String, CountPair> prefixUsageMap,
       BlockingQueue<List<Table.KeyValue<String, VALUE>>> q,
       AtomicBoolean isRunning, boolean haveValue) throws UncheckedIOException {
@@ -334,7 +358,7 @@ public class QuotaRepairTask {
     }
   }
   
-  private <VALUE> void extractCount(
+  private static <VALUE> void extractCount(
       Table.KeyValue<String, VALUE> kv,
       Map<String, CountPair> prefixUsageMap,
       boolean haveValue) {
@@ -357,7 +381,7 @@ public class QuotaRepairTask {
     }
   }
   
-  private synchronized void updateCountToBucketInfo(
+  private static synchronized void updateCountToBucketInfo(
       Map<String, OmBucketInfo> bucketInfoMap,
       Map<String, CountPair> prefixUsageMap) {
     for (Map.Entry<String, CountPair> entry : prefixUsageMap.entrySet()) {
@@ -370,7 +394,7 @@ public class QuotaRepairTask {
     }
   }
   
-  private String getVolumeBucketPrefix(String key) {
+  private static String getVolumeBucketPrefix(String key) {
     // get bucket prefix with /<volume>/<bucket>/ 
     // -- as represents name in OBS and id in FSO
     String prefix = key;
