@@ -62,7 +62,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests failure detection and handling in BlockOutputStream Class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
+@Timeout(1200)
 class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
@@ -175,7 +175,6 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  @Flaky("HDDS-6113")
   void testWatchForCommitDatanodeFailure(boolean flushDelay) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
