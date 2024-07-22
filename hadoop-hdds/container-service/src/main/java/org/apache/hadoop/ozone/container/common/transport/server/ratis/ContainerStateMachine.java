@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -441,6 +442,15 @@ public class ContainerStateMachine extends BaseStateMachine {
           .setTraceID(proto.getTraceID());
 
       builder.setStateMachineData(write.getData());
+    } else if (proto.getCmdType() == Type.Echo) {
+      final EchoRequestProto echo = proto.getEcho();
+      final EchoRequestProto commitEchoProto =
+          EchoRequestProto.newBuilder(echo)
+              // skipping the payload field so it doesn't get written to the ratis log
+              .clearPayload()
+              .build();
+      protoBuilder.setEcho(commitEchoProto)
+              .build();
     }
     final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
     TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
