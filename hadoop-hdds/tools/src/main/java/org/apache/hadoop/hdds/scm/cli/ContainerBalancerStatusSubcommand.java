@@ -137,17 +137,17 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
     int iterationNumber = iterationStatusInfo.getIterationNumber();
     String iterationResult = iterationStatusInfo.getIterationResult();
-    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMove();
+    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMoveGB();
     long dataSizeMovedGB = iterationStatusInfo.getDataSizeMovedGB();
     long containerMovesScheduled = iterationStatusInfo.getContainerMovesScheduled();
     long containerMovesCompleted = iterationStatusInfo.getContainerMovesCompleted();
     long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
     long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
-    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolume() + "\n")
+    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesGBList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolumeGB() + "\n")
             .collect(Collectors.joining());
-    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolume() + "\n")
+    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesGBList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolumeGB() + "\n")
             .collect(Collectors.joining());
     return String.format(
             "%-50s %s%n" +
