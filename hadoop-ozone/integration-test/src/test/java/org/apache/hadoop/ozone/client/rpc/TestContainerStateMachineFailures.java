@@ -731,7 +731,7 @@ public class TestContainerStateMachineFailures {
       key.flush();
     }
 
-    validateData("ratis1", 2, "ratisratisratisratis");
+    validateData("ratis1", 1, "ratisratisratisratis");
   }
 
   @Test
@@ -762,7 +762,7 @@ public class TestContainerStateMachineFailures {
     key.write("ratis".getBytes(UTF_8));
     key.flush();
     key.close();
-    validateData("ratis1", 2, "ratisratisratisratis");
+    validateData("ratis1", 1, "ratisratisratisratis");
   }
 
   private void induceFollowerFailure(OmKeyLocationInfo omKeyLocationInfo,
