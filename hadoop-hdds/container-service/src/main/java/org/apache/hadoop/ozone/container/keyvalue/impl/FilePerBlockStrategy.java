@@ -217,13 +217,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   public void finishWriteChunks(KeyValueContainer container,
       BlockData blockData) throws IOException {
     final File chunkFile = getChunkFile(container, blockData.getBlockID());
-    try {
-      files.close(chunkFile);
-      verifyChunkFileExists(chunkFile);
-    } catch (IOException e) {
-      onFailure(container.getContainerData().getVolume());
-      throw e;
-    }
+    files.close(chunkFile);
   }
 
   @Override
