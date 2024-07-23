@@ -35,12 +35,16 @@ const {
 
 interface IAppState {
   collapsed: boolean;
+  enableNewUI: boolean;
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
   constructor(props = {}) {
     super(props);
-    this.state = { collapsed: false };
+    this.state = {
+      collapsed: false,
+      enableNewUI: false
+    };
   }
 
   onCollapse = (collapsed: boolean) => {
@@ -61,11 +65,11 @@ class App extends React.Component<Record<string, object>, IAppState> {
               <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
                 <AntDSwitch
-                  disabled={true}
+                  // disabled={true}
                   checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
                   onChange={(checked: boolean) => {
                     this.setState({
-                      newUI: checked
+                      enableNewUI: checked
                     });
                   }} />
               </div>
@@ -76,7 +80,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {
-                  (this.state.newUI)
+                  (this.state.enableNewUI)
                     ? routesV2.map(
                       (route, idx) => <MakeRouteWithSubRoutes key={idx} {...route} />
                     )
