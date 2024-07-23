@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -137,6 +138,7 @@ public class TestSnapshotDeletingService {
 
   @Test
   @Order(2)
+  @Flaky("HDDS-11130")
   public void testSnapshotSplitAndMove() throws Exception {
 
     if (runIndividualTest) {
@@ -220,6 +222,7 @@ public class TestSnapshotDeletingService {
   @SuppressWarnings("checkstyle:MethodLength")
   @Test
   @Order(3)
+  @Flaky("HDDS-11131")
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
         om.getMetadataManager().getDirectoryTable();

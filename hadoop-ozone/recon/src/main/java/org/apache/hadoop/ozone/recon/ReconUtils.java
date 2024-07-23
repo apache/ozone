@@ -29,8 +29,14 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
-import java.util.ArrayList;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.List;
+import java.util.TimeZone;
+import java.util.Date;
+import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,6 +45,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,6 +72,8 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -79,6 +88,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -415,6 +426,32 @@ public class ReconUtils {
   }
 
   /**
+   * Converts Unix numeric permissions into a symbolic representation.
+   * @param numericPermissions The numeric string, e.g., "750".
+   * @return The symbolic representation, e.g., "rwxr-x---".
+   */
+  public static String convertNumericToSymbolic(String numericPermissions) {
+    int owner = Character.getNumericValue(numericPermissions.charAt(0));
+    int group = Character.getNumericValue(numericPermissions.charAt(1));
+    int others = Character.getNumericValue(numericPermissions.charAt(2));
+
+    return String.format("%s%s%s",
+        convertToSymbolicPermission(owner),
+        convertToSymbolicPermission(group),
+        convertToSymbolicPermission(others));
+  }
+
+  /**
+   * Converts a single digit Unix permission into a symbolic representation.
+   * @param permission The permission digit.
+   * @return The symbolic representation for the digit.
+   */
+  public static String convertToSymbolicPermission(int permission) {
+    String[] symbols = {"---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+    return symbols[permission];
+  }
+
+  /**
    * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
    * returns the top N records as specified by the limit.
    *
@@ -508,5 +545,151 @@ public class ReconUtils {
   @VisibleForTesting
   public static void setLogger(Logger logger) {
     log = logger;
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return if tables are initialized
+   */
+  public static boolean isInitializationComplete(ReconOMMetadataManager omMetadataManager) {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null
+        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
+  }
+
+  /**
+   * Converts string date in a provided format to server timezone's epoch milllioseconds.
+   *
+   * @param dateString
+   * @param dateFormat
+   * @param timeZone
+   * @return the epoch milliseconds representation of the date.
+   * @throws ParseException
+   */
+  public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    String localDateFormat = dateFormat;
+    try {
+      if (StringUtils.isEmpty(dateString)) {
+        return Instant.now().toEpochMilli();
+      }
+      if (StringUtils.isEmpty(dateFormat)) {
+        localDateFormat = "MM-dd-yyyy HH:mm:ss";
+      }
+      if (null == timeZone) {
+        timeZone = TimeZone.getDefault();
+      }
+      SimpleDateFormat sdf = new SimpleDateFormat(localDateFormat);
+      sdf.setTimeZone(timeZone); // Set server's timezone
+      Date date = sdf.parse(dateString);
+      return date.getTime(); // Convert to epoch milliseconds
+    } catch (ParseException parseException) {
+      log.error("Date parse exception for date: {} in format: {} -> {}", dateString, localDateFormat, parseException);
+      return Instant.now().toEpochMilli();
+    } catch (Exception exception) {
+      log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
+      return Instant.now().toEpochMilli();
+    }
+  }
+
+  /**
+   * Finds all subdirectories under a parent directory in an FSO bucket. It builds
+   * a list of paths for these subdirectories. These sub-directories are then used
+   * to search for open files in the openFileTable.
+   *
+   * How it works:
+   * - Starts from a parent directory identified by parentId.
+   * - Looks through all child directories of this parent.
+   * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
+   *   following our openFileTable format.
+   * - Adds these paths to a list and explores each child further for more subdirectories.
+   *
+   * @param parentId The ID of the parent directory from which to start gathering subdirectories.
+   * @param subPaths The list to which the paths of subdirectories will be added.
+   * @param volumeID The ID of the volume containing the parent directory.
+   * @param bucketID The ID of the bucket containing the parent directory.
+   * @param reconNamespaceSummaryManager The manager used to retrieve NSSummary objects.
+   * @throws IOException If an I/O error occurs while fetching NSSummary objects.
+   */
+  public static void gatherSubPaths(long parentId, List<String> subPaths,
+                              long volumeID, long bucketID,
+                              ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+      throws IOException {
+    // Fetch the NSSummary object for parentId
+    NSSummary parentSummary =
+        reconNamespaceSummaryManager.getNSSummary(parentId);
+    if (parentSummary == null) {
+      return;
+    }
+
+    Set<Long> childDirIds = parentSummary.getChildDir();
+    for (Long childId : childDirIds) {
+      // Fetch the NSSummary for each child directory
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
+      if (childSummary != null) {
+        String subPath =
+            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID,
+                childId);
+        // Add to subPaths
+        subPaths.add(subPath);
+        // Recurse into this child directory
+        gatherSubPaths(childId, subPaths, volumeID, bucketID,
+            reconNamespaceSummaryManager);
+      }
+    }
+  }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public static Response validateNames(String resName)
+      throws IllegalArgumentException {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
+  }
+
+  /**
+   * Constructs an object path with the given IDs.
+   *
+   * @param ids The IDs to construct the object path with.
+   * @return The constructed object path.
+   */
+  public static String constructObjectPathWithPrefix(long... ids) {
+    StringBuilder pathBuilder = new StringBuilder();
+    for (long id : ids) {
+      pathBuilder.append(OM_KEY_PREFIX).append(id);
+    }
+    return pathBuilder.toString();
   }
 }

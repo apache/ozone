@@ -42,6 +42,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -284,6 +286,71 @@ public class TestOMDBUpdatesHandler {
     assertNotNull(keyPut2.getOldValue());
     assertEquals("key_new2",
         ((OmKeyInfo)keyPut2.getOldValue()).getKeyName());
+  }
+
+  /**
+   * Test to verify that events with duplicate keys in different tables
+   * (FileTable and DirectoryTable) are handled correctly without causing
+   * ClassCastException or event conflicts.
+   *
+   * This test simulates creating a file, deleting the file, and then creating
+   * a directory with the same name under the same parent ID in different tables.
+   * It ensures that the events are correctly processed and stored in the
+   * `omdbLatestUpdateEvents` map without causing any type mismatches or
+   * exceptions.
+   *
+   * @throws Exception if any error occurs during the test execution.
+   */
+  @Test
+  public void testEventsHavingDuplicateRocksDBKey() throws Exception {
+    // Step 1: Create a file with the name "sameName" in the fileTable
+    OmKeyInfo fileKeyInfo = getOmKeyInfo("sampleVol", "bucketOne", "sameName");
+    omMetadataManager.getFileTable().put("/sampleVol/bucketOne/parentId/sameName", fileKeyInfo);
+
+    // Step 2: Delete the file by adding its information to the deletedTable
+    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(fileKeyInfo);
+    omMetadataManager.getDeletedTable().put("/sampleVol/bucketOne/parentId/sameName", repeatedKeyInfo);
+
+    // Step 3: Create a directory with the same name "sameName" in the directoryTable
+    OmDirectoryInfo dirInfo = OmDirectoryInfo.newBuilder()
+        .setName("sameName")
+        .setParentObjectID(fileKeyInfo.getParentObjectID())
+        .setObjectID(fileKeyInfo.getObjectID())
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
+        .build();
+    omMetadataManager.getDirectoryTable().put("/sampleVol/bucketOne/parentId/sameName", dirInfo);
+
+    // Capture the events from the OM Metadata Manager
+    List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
+    OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
+
+    // Retrieve the captured events and assert the correct number of events
+    List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
+    // Verify no events were discarded
+    assertEquals(3, events.size());
+
+    // Validate the file creation event
+    OMDBUpdateEvent filePutEvent = events.get(0);
+    assertEquals(PUT, filePutEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", filePutEvent.getKey());
+    assertEquals("sameName", ((OmKeyInfo) filePutEvent.getValue()).getKeyName());
+    assertNull(filePutEvent.getOldValue());
+
+    // Validate the file deletion event
+    OMDBUpdateEvent fileDeleteEvent = events.get(1);
+    assertEquals(PUT, fileDeleteEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", fileDeleteEvent.getKey());
+    assertEquals("sameName",
+        ((RepeatedOmKeyInfo) fileDeleteEvent.getValue()).getOmKeyInfoList().get(0).getKeyName());
+
+    // Validate the directory creation event
+    OMDBUpdateEvent dirPutEvent = events.get(2);
+    assertEquals(PUT, dirPutEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", dirPutEvent.getKey());
+    assertEquals("sameName", ((OmDirectoryInfo) dirPutEvent.getValue()).getName());
+    // There will be no old value as the key was not present in the directoryTable before
+    assertNull(dirPutEvent.getOldValue());
   }
 
   @Test

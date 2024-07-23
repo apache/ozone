@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -256,11 +256,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
    * @return list of snapshot
    */
-  List<SnapshotInfo> listSnapshot(
+  ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
 
@@ -320,13 +320,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
-
-  /**
-   * Retrieve RWLock for the table.
-   * @param tableName table name.
-   * @return ReentrantReadWriteLock
-   */
-  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.

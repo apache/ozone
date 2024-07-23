@@ -48,7 +48,7 @@ Key Should Match Local File
     Key Should Match Local File     o3://${OM_SERVICE_ID}/vol1/bucket/passwd    /etc/passwd
 
 Compare Key With Local File with Different File
-    ${random_file} =            Create Random File
+    ${random_file} =            Create Random File KB    42
     ${matches} =                Compare Key With Local File     o3://${OM_SERVICE_ID}/vol1/bucket/passwd    ${random_file}
     Should Be Equal             ${matches}     ${FALSE}
     [Teardown]                  Remove File    ${random_file}

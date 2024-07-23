@@ -107,6 +107,14 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private Map<String, String> tags;
 
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long expectedDataGeneration = null;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -124,6 +132,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
     this.tags = b.tags;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public String getVolumeName() {
@@ -166,8 +175,24 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
+  public void setExpectedDataGeneration(Long generation) {
+    this.expectedDataGeneration = generation;
+  }
+
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
+  }
+
   public String getOwnerName() {
     return ownerName;
+  }
+
+  /**
+   * Returns the generation of the object. Note this is currently the same as updateID for a key.
+   * @return long
+   */
+  public long getGeneration() {
+    return getUpdateID();
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
@@ -452,6 +477,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
     private boolean isFile;
     private final Map<String, String> tags = new HashMap<>();
+    private Long expectedDataGeneration = null;
 
     public Builder() {
     }
@@ -590,6 +616,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setExpectedDataGeneration(Long existingGeneration) {
+      this.expectedDataGeneration = existingGeneration;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -695,6 +726,9 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
+    if (expectedDataGeneration != null) {
+      kb.setExpectedDataGeneration(expectedDataGeneration);
+    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -744,6 +778,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
+    }
+    if (keyInfo.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
     }
 
     if (keyInfo.hasOwnerName()) {
@@ -862,6 +899,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (fileChecksum != null) {
       builder.setFileChecksum(fileChecksum);
+    }
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
     }
 
     return builder.build();

@@ -72,6 +72,7 @@ import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.Message;
@@ -493,6 +494,11 @@ public final class OzoneManagerRatisServer {
       if (leaderNotReadyException != null) {
         throw new ServiceException(new OMLeaderNotReadyException(
             leaderNotReadyException.getMessage()));
+      }
+
+      LeaderSteppingDownException leaderSteppingDownException = reply.getLeaderSteppingDownException();
+      if (leaderSteppingDownException != null) {
+        throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
       }
 
       StateMachineException stateMachineException =
