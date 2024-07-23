@@ -80,13 +80,9 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {
-                  (this.state.enableNewUI)
-                    ? routesV2.map(
-                      (route, idx) => <MakeRouteWithSubRoutes key={idx} {...route} />
-                    )
-                    : routes.map(
-                      (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                    )
+                  routes.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                  )
                 }
               </Switch>
             </Content>
