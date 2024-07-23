@@ -81,19 +81,17 @@ function ozonecmd_case
   # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
 
-  # Add JVM parameter for Java 9+
-  # (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true) to allow Netty unsafe memory allocation.
-  # Corresponding issue https://issues.apache.org/jira/browse/HDDS-10382.
-  NETTY_OPTS=""
-
   # Get the version string
   JAVA_VERSION_STRING=$(java -version 2>&1)
 
   # Extract the major version number
   JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | grep -oE '[0-9]+(\.[0-9]+)*' | head -n 1 | awk -F. '{print ($1 == 1 ? $2 : $1)}')
 
+  # Add JVM parameter for Java 9+
+  # (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true) to allow Netty unsafe memory allocation.
+  # Corresponding issue https://issues.apache.org/jira/browse/HDDS-10382.
   if [[ "${JAVA_MAJOR_VERSION}" -ge "9" ]]; then
-    NETTY_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true"
+    NETTY_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${NETTY_OPTS}"
   fi
 
   case ${subcmd} in
