@@ -23,7 +23,6 @@ import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { routes } from '@/routes';
-import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
