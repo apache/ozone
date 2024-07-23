@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -30,9 +33,13 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import jakarta.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -41,6 +48,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  * Handles DeleteKeys request for recursive bucket deletion.
  */
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
+
+  public static final Logger LOG = LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
 
   public OmKeysDeleteRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omRequest,
@@ -82,7 +91,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           OzoneManager ozoneManager, long trxnLogIndex,
           List<OmKeyInfo> omKeyInfoList,
           List<OmKeyInfo> dirList, OMMetadataManager omMetadataManager,
-          long quotaReleased) throws IOException {
+          long quotaReleased, List<String> dbOpenKeys) throws IOException {
 
     // Mark all keys which can be deleted, in cache as deleted.
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
@@ -90,16 +99,33 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               omKeyInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+      final long parentId = omKeyInfo.getParentObjectID();
+      final String fileName = omKeyInfo.getFileName();
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(omMetadataManager
-              .getOzonePathKey(volumeId, bucketId,
-                      omKeyInfo.getParentObjectID(),
-                      omKeyInfo.getFileName())),
+              .getOzonePathKey(volumeId, bucketId, parentId, fileName)),
           CacheValue.get(trxnLogIndex));
 
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
       quotaReleased += sumBlockLengths(omKeyInfo);
+
+      // If omKeyInfo has hsync metadata, delete its corresponding open key as well
+      String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      if (hsyncClientId != null) {
+        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
+        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
+        if (openKeyInfo != null) {
+          // Remove the open key by putting a tombstone entry
+          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
+          // Append to the list of open keys to be deleted. The list is not expected to be large.
+          dbOpenKeys.add(dbOpenKey);
+        } else {
+          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
+        }
+      }
     }
+
     // Mark directory keys.
     for (OmKeyInfo omKeyInfo : dirList) {
       final long volumeId = omMetadataManager.getVolumeId(
@@ -123,16 +149,22 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId) {
+      Map<String, ErrorInfo> keyToErrors,
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
+    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
+          .setKey(key.getKey()).setErrorCode(key.getValue().getCode())
+          .setErrorMsg(key.getValue().getMessage()).build());
+    }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
-                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject(), volumeId);
+        omBucketInfo.copyObject(), volumeId, dbOpenKeys);
     return omClientResponse;
-
   }
 }

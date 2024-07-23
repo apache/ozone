@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
+import org.reflections.scanners.Scanners;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 
@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
@@ -70,8 +71,8 @@ public class ValidatorRegistry {
   ValidatorRegistry(Collection<URL> searchUrls) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
-        .setScanners(new MethodAnnotationsScanner())
-        .useParallelExecutor()
+        .setScanners(Scanners.MethodsAnnotated)
+        .setParallel(true)
     );
 
     Set<Method> describedValidators =
@@ -157,13 +158,13 @@ public class ValidatorRegistry {
       for (ValidationCondition condition : descriptor.conditions()) {
         EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
             requestTypeMap = getAndInitialize(
-                condition, newTypeMap(), validators);
+                condition, this::newTypeMap, validators);
         EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
-            descriptor.requestType(), newPhaseMap(), requestTypeMap);
+            descriptor.requestType(), this::newPhaseMap, requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
-          getAndInitialize(PRE_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(PRE_PROCESS, ArrayList::new, phases).add(m);
         } else if (isPostProcessValidator(descriptor)) {
-          getAndInitialize(POST_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(POST_PROCESS, ArrayList::new, phases).add(m);
         }
       }
     }
@@ -178,13 +179,8 @@ public class ValidatorRegistry {
     return new EnumMap<>(RequestProcessingPhase.class);
   }
 
-  private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
-    V inMapValue = from.get(key);
-    if (inMapValue == null || !from.containsKey(key)) {
-      from.put(key, defaultValue);
-      return defaultValue;
-    }
-    return inMapValue;
+  private <K, V> V getAndInitialize(K key, Supplier<V> defaultSupplier, Map<K, V> from) {
+    return from.computeIfAbsent(key, k -> defaultSupplier.get());
   }
 
   private boolean isPreProcessValidator(RequestFeatureValidator descriptor) {

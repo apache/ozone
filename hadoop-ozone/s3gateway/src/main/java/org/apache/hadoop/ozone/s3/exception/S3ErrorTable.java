@@ -139,6 +139,12 @@ public final class S3ErrorTable {
       "BucketAlreadyExists", "The requested bucket name is not available" +
       " as it already exists.", HTTP_CONFLICT);
 
+  public static final OS3Exception INVALID_TAG = new OS3Exception(
+      "InvalidTag", "Your request contains tag input that is not valid.", HTTP_BAD_REQUEST);
+
+  public static final OS3Exception NO_SUCH_TAG_SET = new OS3Exception(
+      "NoSuchTagSet", "The specified tag does not exist.", HTTP_NOT_FOUND);
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }

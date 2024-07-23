@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosResponse } from 'axios';
 
 export const AxiosGetHelper = (
   url: string,
   controller: AbortController,
-  message: string = "",
+  message: string = '',
   params: any = {},
-): { "request": Promise<AxiosResponse<any, any>>, "controller": AbortController } => {
+): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
@@ -34,11 +34,25 @@ export const AxiosGetHelper = (
   }
 }
 
-export const AxiosAllGetHelper = (
+export const AxiosPutHelper = (
+  url: string,
+  data: any = {},
+  controller: AbortController,
+  message: string = '',  //optional
+): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
+  controller && controller.abort(message);
+  controller = new AbortController(); // generate new AbortController for the upcoming request
+  return {
+    request: axios.put(url, data, { signal: controller.signal }),
+    controller: controller
+  }
+}
+
+export const PromiseAllSettledGetHelper = (
   urls: string[],
   controller: AbortController,
-  message: string = ""
-): { requests: Promise<AxiosResponse<any, any>[]>, "controller": AbortController } => {
+  message: string = ''
+): { requests: Promise<PromiseSettledResult<AxiosResponse<any, any>>[]>; controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
@@ -50,7 +64,7 @@ export const AxiosAllGetHelper = (
   });
 
   return {
-    requests: axios.all(axiosGetRequests),
+    requests: Promise.allSettled(axiosGetRequests),
     controller: controller
   }
 }

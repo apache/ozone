@@ -116,7 +116,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     this.blockID = blockId;
     this.length = blockLen;
     setPipeline(pipeline);
@@ -133,7 +133,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
                           Token<OzoneBlockTokenIdentifier> token,
                           XceiverClientFactory xceiverClientFactory,
                           OzoneClientConfig config
-  ) {
+  ) throws IOException {
     this(blockId, blockLen, pipeline, token,
         xceiverClientFactory, null, config);
   }
@@ -244,32 +244,27 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @VisibleForTesting
   protected List<ChunkInfo> getChunkInfoListUsingClient() throws IOException {
-    final Pipeline pipeline = xceiverClient.getPipeline();
-
+    Pipeline pipeline = pipelineRef.get();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Initializing BlockInputStream for get key to access {}",
-          blockID.getContainerID());
-    }
-
-    DatanodeBlockID.Builder blkIDBuilder =
-        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-
-    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    if (replicaIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicaIndex);
+      LOG.debug("Initializing BlockInputStream for get key to access {} with pipeline {}.",
+          blockID.getContainerID(), pipeline);
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClient, VALIDATORS, blkIDBuilder.build(), tokenRef.get());
+        xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
 
     return response.getBlockData().getChunksList();
   }
 
-  private void setPipeline(Pipeline pipeline) {
+  private void setPipeline(Pipeline pipeline) throws IOException {
     if (pipeline == null) {
       return;
+    }
+    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
+
+    if (replicaIndexes > 1) {
+      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
+          pipeline));
     }
 
     // irrespective of the container state, we will always read via Standalone
@@ -294,10 +289,18 @@ public class BlockInputStream extends BlockExtendedInputStream {
       throw new IllegalArgumentException("Not GetBlock: response=" + response);
     }
     final GetBlockResponseProto b = response.getGetBlock();
+    final long blockLength = b.getBlockData().getSize();
     final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
     for (int i = 0; i < chunks.size(); i++) {
       final ChunkInfo c = chunks.get(i);
-      if (c.getLen() <= 0) {
+      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
+      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
+      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
+      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
+        DatanodeBlockID blockID = b.getBlockData().getBlockID();
+        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
+            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
+      } else if (c.getLen() <= 0) {
         throw new IOException("Failed to get chunkInfo["
             + i + "]: len == " + c.getLen());
       }

@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,6 +58,10 @@ public class TestRoundRobinVolumeChoosingPolicy {
     String volume1 = baseDir + "disk1";
     String volume2 = baseDir + "disk2";
     policy = new RoundRobinVolumeChoosingPolicy();
+
+    // Use the exact capacity and availability specified in this test. Do not reserve space to prevent volumes from
+    // filling up.
+    CONF.setFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, 0);
 
     SpaceUsageSource source1 = MockSpaceUsageSource.fixed(500, 100);
     SpaceUsageCheckFactory factory1 = MockSpaceUsageCheckFactory.of(

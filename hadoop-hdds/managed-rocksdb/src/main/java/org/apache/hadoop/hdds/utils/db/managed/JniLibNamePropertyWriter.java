@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.util.Environment;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -39,8 +38,8 @@ public final class JniLibNamePropertyWriter {
     String filePath = args[0];
     try (Writer writer = new OutputStreamWriter(
         Files.newOutputStream(Paths.get(filePath)), StandardCharsets.UTF_8)) {
-      writer.write("rocksdbLibName=" +
-          Environment.getJniLibraryFileName("rocksdb"));
+      String libName = ManagedRocksObjectUtils.getRocksDBLibFileName();
+      writer.write("rocksdbLibName=" + libName);
     } catch (IOException e) {
       e.printStackTrace();
     }

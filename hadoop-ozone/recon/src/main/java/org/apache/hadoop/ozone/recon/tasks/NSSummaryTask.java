@@ -63,7 +63,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
-          LoggerFactory.getLogger(NSSummaryTask.class);
+      LoggerFactory.getLogger(NSSummaryTask.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager reconOMMetadataManager;
@@ -166,11 +166,10 @@ public class NSSummaryTask implements ReconOmTask {
           TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
       // Log performance metrics
-      LOG.info("Task execution time: {} milliseconds", durationInMillis);
+      LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
     return new ImmutablePair<>(getTaskName(), true);
   }
 
 }
-

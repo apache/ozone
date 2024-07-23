@@ -50,7 +50,7 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
     return CODEC;
   }
 
-  private static TransactionInfo valueOf(String transactionInfo) {
+  public static TransactionInfo valueOf(String transactionInfo) {
     final String[] tInfo = transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
     Preconditions.checkArgument(tInfo.length == 2,
         "Unexpected split length: %s in \"%s\"", tInfo.length, transactionInfo);

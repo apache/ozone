@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -146,7 +146,21 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id - the id for this open
    * @return bytes of DB key.
    */
-  String getOpenKey(String volume, String bucket, String key, long id);
+  default String getOpenKey(String volume, String bucket, String key, long id) {
+    return getOpenKey(volume, bucket, key, String.valueOf(id));
+  }
+
+  /**
+   * Returns the DB key name of a open key in OM metadata store. Should be
+   * #open# prefix followed by actual key name.
+   *
+   * @param volume - volume name
+   * @param bucket - bucket name
+   * @param key - key name
+   * @param clientId - client Id String for this open key
+   * @return bytes of DB key.
+   */
+  String getOpenKey(String volume, String bucket, String key, String clientId);
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
@@ -242,11 +256,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
    * @return list of snapshot
    */
-  List<SnapshotInfo> listSnapshot(
+  ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
 
@@ -306,13 +320,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
-
-  /**
-   * Retrieve RWLock for the table.
-   * @param tableName table name.
-   * @return ReentrantReadWriteLock
-   */
-  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -538,9 +545,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id             - client id for this open request
    * @return DB directory key as String.
    */
-  String getOpenFileName(long volumeId, long bucketId,
-                         long parentObjectId, String fileName, long id);
+  default String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, long id) {
+    return getOpenFileName(volumeId, bucketId, parentObjectId, fileName, String.valueOf(id));
+  }
 
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param clientId       - client id String for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, String clientId);
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in

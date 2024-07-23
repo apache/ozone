@@ -107,7 +107,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
     if (currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
       //reorder according to the latest sizeLeavingNode
-      potentialSources.add(nodeManager.getUsageInfo(dui));
+      addBackSourceDataNode(dui);
       return;
     }
     LOG.warn("Cannot find datanode {} in candidate source datanodes",
@@ -138,6 +138,12 @@ public class FindSourceGreedy implements FindSourceStrategy {
     potentialSources.removeIf(a -> a.getDatanodeDetails().equals(dui));
   }
 
+  @Override
+  public void addBackSourceDataNode(DatanodeDetails dn) {
+    DatanodeUsageInfo dui = nodeManager.getUsageInfo(dn);
+    potentialSources.add(dui);
+  }
+
   /**
    * Checks if specified size can leave a specified target datanode
    * according to {@link ContainerBalancerConfiguration}
@@ -152,11 +158,16 @@ public class FindSourceGreedy implements FindSourceStrategy {
     if (sizeLeavingNode.containsKey(source)) {
       long sizeLeavingAfterMove = sizeLeavingNode.get(source) + size;
       //size can be moved out of source datanode only when the following
-      //two condition are met.
-      //1 sizeLeavingAfterMove does not succeed the configured
+      //three conditions are met.
+      //1 size should be greater than zero bytes
+      //2 sizeLeavingAfterMove does not succeed the configured
       // MaxSizeLeavingTarget
-      //2 after subtracting sizeLeavingAfterMove, the usage is bigger
+      //3 after subtracting sizeLeavingAfterMove, the usage is bigger
       // than or equal to lowerLimit
+      if (size <= 0) {
+        LOG.debug("{} bytes container cannot leave datanode {}", size, source.getUuidString());
+        return false;
+      }
       if (sizeLeavingAfterMove > config.getMaxSizeLeavingSource()) {
         LOG.debug("{} bytes cannot leave datanode {} because 'size.leaving" +
                 ".source.max' limit is {} and {} bytes have already left.",

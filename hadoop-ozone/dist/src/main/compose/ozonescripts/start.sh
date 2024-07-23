@@ -14,6 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+source ../compose_v2_compatibility.sh
+
 set -x
 docker-compose ps | grep datanode | awk '{print $1}' | xargs -n1  docker inspect --format '{{ .Config.Hostname }}' > ../../etc/hadoop/workers
 docker-compose ps | grep ozonescripts | awk '{print $1}' | xargs -I CONTAINER -n1 docker exec CONTAINER cp /opt/hadoop/etc/hadoop/workers /etc/hadoop/workers

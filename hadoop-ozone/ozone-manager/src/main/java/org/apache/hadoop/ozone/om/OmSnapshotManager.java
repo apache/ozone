@@ -41,6 +41,7 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -83,6 +84,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
@@ -272,7 +275,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     };
 
     // Init snapshot cache
-    this.snapshotCache = new SnapshotCache(loader, softCacheSize);
+    long cacheCleanupServiceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
+            OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
+        cacheCleanupServiceInterval);
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -382,7 +390,8 @@ public final class OmSnapshotManager implements AutoCloseable {
           return new OmSnapshot(km, pm, ozoneManager,
               snapshotInfo.getVolumeName(),
               snapshotInfo.getBucketName(),
-              snapshotInfo.getName());
+              snapshotInfo.getName(),
+              snapshotInfo.getSnapshotId());
         } catch (Exception e) {
           // Close RocksDB if there is any failure.
           if (!snapshotMetadataManager.getStore().isClosed()) {
@@ -426,7 +435,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    *
    * @param key SnapshotId.
    */
-  public void invalidateCacheEntry(UUID key) throws IOException {
+  public void invalidateCacheEntry(UUID key) {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
     }
@@ -439,49 +448,31 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @return instance of DBCheckpoint
    */
   public static DBCheckpoint createOmSnapshotCheckpoint(
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, BatchOperation batchOperation)
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire active DB deletedDirectoryTable write lock to block
-    // DirDeletingTask
-    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
-        .writeLock().lock();
-    // Acquire active DB deletedTable write lock to block KeyDeletingTask
-    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-        .writeLock().lock();
-
     boolean snapshotDirExist = false;
-
-    try {
-      // Create DB checkpoint for snapshot
-      String checkpointPrefix = store.getDbLocation().getName();
-      Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-          checkpointPrefix + snapshotInfo.getCheckpointDir());
-      if (Files.exists(snapshotDirPath)) {
-        snapshotDirExist = true;
-        dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
-      } else {
-        dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
-      }
-
-      // Clean up active DB's deletedTable right after checkpoint is taken,
-      // with table write lock held
-      deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-      // Clean up deletedDirectoryTable as well
-      deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-    } finally {
-      // Release deletedTable write lock
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-          .writeLock().unlock();
-      // Release deletedDirectoryTable write lock
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
-          .writeLock().unlock();
+    // Create DB checkpoint for snapshot
+    String checkpointPrefix = store.getDbLocation().getName();
+    Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
+        checkpointPrefix + snapshotInfo.getCheckpointDir());
+    if (Files.exists(snapshotDirPath)) {
+      snapshotDirExist = true;
+      dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
+    } else {
+      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
+
+    // Clean up active DB's deletedTable right after checkpoint is taken,
+    // There is no need to take any lock as of now, because transactions are flushed sequentially.
+    deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
+    // Clean up deletedDirectoryTable as well
+    deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
 
     if (dbCheckpoint != null && snapshotDirExist) {
       LOG.info("Checkpoint : {} for snapshot {} already exists.",
@@ -504,7 +495,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void deleteKeysFromDelDirTableInSnapshotScope(
       OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName) throws IOException {
+      String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
     final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
@@ -517,7 +508,7 @@ public final class OmSnapshotManager implements AutoCloseable {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
             }
-            omMetadataManager.getDeletedDirTable().delete(entry.getKey());
+            omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation, entry.getKey());
             return null;
           });
     }
@@ -590,7 +581,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void deleteKeysFromDelKeyTableInSnapshotScope(
       OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName) throws IOException {
+      String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
     final String keyPrefix =
@@ -603,7 +594,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Removing key {} from DeletedTable", entry.getKey());
         }
-        omMetadataManager.getDeletedTable().delete(entry.getKey());
+        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation, entry.getKey());
         return null;
       });
     }
@@ -949,7 +940,9 @@ public final class OmSnapshotManager implements AutoCloseable {
       snapshotDiffManager.close();
     }
 
-    invalidateCache();
+    if (snapshotCache != null) {
+      snapshotCache.close();
+    }
 
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();

@@ -17,26 +17,40 @@
  */
 
 import React from 'react';
-import {Table, Icon, Tooltip, Popover} from 'antd';
-import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import {ReplicationIcon} from 'utils/themeIcons';
-import StorageBar from 'components/storageBar/storageBar';
+import { ActionMeta, ValueType } from 'react-select';
+import { Table, Tooltip, Popover, Button, Popconfirm } from 'antd';
+import { TablePaginationConfig } from 'antd/es/table';
+import {
+  CheckCircleFilled,
+  CheckCircleOutlined,
+  CloseCircleFilled,
+  DeleteOutlined,
+  HourglassFilled,
+  HourglassOutlined,
+  InfoCircleOutlined,
+  QuestionCircleOutlined,
+  WarningOutlined
+} from '@ant-design/icons';
+
 import {
   DatanodeState,
   DatanodeStateList,
   DatanodeOpState,
   DatanodeOpStateList,
   IStorageReport
-} from 'types/datanode.types';
+} from '@/types/datanode.types';
+import StorageBar from '@/components/storageBar/storageBar';
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
+import { showDataFetchError } from '@/utils/common';
+import { ColumnSearch } from '@/utils/columnSearch';
+import { ReplicationIcon } from '@/utils/themeIcons';
+import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { AxiosGetHelper, AxiosPutHelper } from '@/utils/axiosRequestHelper';
+
 import './datanodes.less';
-import {AutoReloadHelper} from 'utils/autoReloadHelper';
-import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
-import {ActionMeta, ValueType} from 'react-select';
-import {showDataFetchError} from 'utils/common';
-import {ColumnSearch} from 'utils/columnSearch';
-import { AxiosGetHelper } from 'utils/axiosRequestHelper';
+
 
 interface IDatanodeResponse {
   hostname: string;
@@ -96,13 +110,14 @@ interface IDatanodesState {
   lastUpdated: number;
   selectedColumns: IOption[];
   columnOptions: IOption[];
+  selectedRowKeys: string[];
 }
 
 const renderDatanodeState = (state: DatanodeState) => {
   const stateIconMap = {
-    HEALTHY: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
-    STALE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
-    DEAD: <Icon type='close-circle' theme='filled' className='icon-failure'/>
+    HEALTHY: <CheckCircleFilled twoToneColor='#1da57a' className='icon-success' />,
+    STALE: <HourglassFilled className='icon-warning' />,
+    DEAD: <CloseCircleFilled className='icon-failure' />
   };
   const icon = state in stateIconMap ? stateIconMap[state] : '';
   return <span>{icon} {state}</span>;
@@ -110,15 +125,35 @@ const renderDatanodeState = (state: DatanodeState) => {
 
 const renderDatanodeOpState = (opState: DatanodeOpState) => {
   const opStateIconMap = {
-    IN_SERVICE: <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/>,
-    DECOMMISSIONING: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
-    DECOMMISSIONED: <Icon type='warning' theme='outlined' className='icon-warning'/>,
-    ENTERING_MAINTENANCE: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
-    IN_MAINTENANCE: <Icon type='warning' theme='outlined' className='icon-warning'/>
+    IN_SERVICE: <CheckCircleOutlined twoToneColor='#1da57a' className='icon-success' />,
+    DECOMMISSIONING: <HourglassOutlined className='icon-warning' />,
+    DECOMMISSIONED: <WarningOutlined className='icon-warning' />,
+    ENTERING_MAINTENANCE: <HourglassOutlined className='icon-warning' />,
+    IN_MAINTENANCE: <WarningOutlined className='icon-warning' />
   };
   const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
   return <span>{icon} {opState}</span>;
 };
+
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  let elapsedTime = '';
+  const duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
+  )
+
+  const durationKeys = ['seconds', 'minutes', 'hours', 'days', 'months', 'years']
+  durationKeys.forEach((k) => {
+    const time = duration['_data'][k]
+    if (time !== 0) {
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
+
+  return elapsedTime.trim().length === 0 ? 'Just now' : elapsedTime.trim() + ' ago';
+}
 
 const COLUMNS = [
   {
@@ -127,7 +162,7 @@ const COLUMNS = [
     key: 'hostname',
     isVisible: true,
     isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, {numeric: true}),
+    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, { numeric: true }),
     defaultSortOrder: 'ascend' as const,
     fixed: 'left'
   },
@@ -138,7 +173,7 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeStateList && DatanodeStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeStateList && DatanodeStateList.map(state => ({ text: state, value: state })),
     onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
     render: (text: DatanodeState) => renderDatanodeState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
@@ -150,12 +185,12 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeOpStateList && DatanodeOpStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeOpStateList && DatanodeOpStateList.map(state => ({ text: state, value: state })),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
- 
+
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -174,8 +209,9 @@ const COLUMNS = [
     render: (text: string, record: IDatanode) => (
       <StorageBar
         total={record.storageTotal} used={record.storageUsed}
-        remaining={record.storageRemaining} committed={record.storageCommitted}/>
-    )},
+        remaining={record.storageRemaining} committed={record.storageCommitted} />
+    )
+  },
   {
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
@@ -227,12 +263,12 @@ const COLUMNS = [
   },
   {
     title:
-  <span>
-    Leader Count&nbsp;
-    <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
-      <Icon type='info-circle'/>
-    </Tooltip>
-  </span>,
+      <span>
+        Leader Count&nbsp;
+        <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
+          <InfoCircleOutlined />
+        </Tooltip>
+      </span>,
     dataIndex: 'leaderCount',
     key: 'leaderCount',
     isVisible: true,
@@ -249,12 +285,12 @@ const COLUMNS = [
   },
   {
     title:
-    <span>
-    Open Containers&nbsp;
-    <Tooltip title='The number of open containers per pipeline.'>
-      <Icon type='info-circle'/>
-    </Tooltip>
-  </span>,
+      <span>
+        Open Containers&nbsp;
+        <Tooltip title='The number of open containers per pipeline.'>
+          <InfoCircleOutlined />
+        </Tooltip>
+      </span>,
     dataIndex: 'openContainers',
     key: 'openContainers',
     isVisible: true,
@@ -319,26 +355,6 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
-const getTimeDiffFromTimestamp = (timestamp: number): string => {
-  const timestampDate = new Date(timestamp);
-  const currentDate = new Date();
-
-  let elapsedTime = "";
-  let duration: moment.Duration = moment.duration(
-    moment(currentDate).diff(moment(timestampDate))
-  )
-
-  const durationKeys = ["seconds", "minutes", "hours", "days", "months", "years"]
-  durationKeys.forEach((k) => {
-    let time = duration["_data"][k]
-    if (time !== 0){
-      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
-    }
-  })
-
-  return elapsedTime.trim().length === 0 ? "Just now" : elapsedTime.trim() + " ago";
-}
-
 let cancelSignal: AbortController;
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
@@ -352,7 +368,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       totalCount: 0,
       lastUpdated: 0,
       selectedColumns: [],
-      columnOptions: defaultColumns
+      columnOptions: defaultColumns,
+      selectedRowKeys: []
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -377,7 +394,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-    
+
     const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
     cancelSignal = controller;
     request.then(response => {
@@ -421,6 +438,21 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     });
   };
 
+  removeDatanode = async (selectedRowKeys: any) => {
+    const { request, controller } = await AxiosPutHelper('/api/v1/datanodes/remove', selectedRowKeys, cancelSignal);
+    cancelSignal = controller;
+    request.then(() => {
+      this._loadData();
+    }).catch(error => {
+      showDataFetchError(error.toString());
+    }).finally(() => {
+      this.setState({
+        loading: false,
+        selectedRowKeys: []
+      });
+    });
+  }
+
   componentDidMount(): void {
     // Fetch datanodes on component mount
     this._loadData();
@@ -436,9 +468,44 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     console.log(current, pageSize);
   };
 
+  onSelectChange = (newSelectedRowKeys: any) => {
+    this.setState({
+      selectedRowKeys: newSelectedRowKeys
+    });
+  };
+
+  onDisable = (record: any) => {
+    // Enable Checkbox for explicit removal who's State = DEAD
+    if (record.state !== 'DEAD') {
+      // Will return disabled checkboxes records who's Record state is not DEAD and Opeartional State=['IN_SERVICE','ENTERING_MAINTENANCE','DECOMMISSIONING','IN_MAINTENANCE','DECOMMISSIONED']
+      return true;
+    }
+  };
+
+  popConfirm = () => {
+    this.setState({ loading: true });
+    this.removeDatanode(this.state.selectedRowKeys);
+  };
+
+  cancel = () => {
+    this.setState({ selectedRowKeys: [] });
+  };
+
   render() {
-    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions} = this.state;
-    const paginationConfig: PaginationConfig = {
+    const { dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions, selectedRowKeys } = this.state;
+
+    const rowSelection = {
+      selectedRowKeys,
+      onChange: this.onSelectChange,
+      getCheckboxProps: record => ({
+        disabled: this.onDisable(record),
+        opState: record.opState,
+      }),
+    };
+
+    const hasSelected = selectedRowKeys.length > 0;
+
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -471,7 +538,29 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         </div>
 
         <div className='content-div'>
+          {totalCount > 0 &&
+            <div style={{ marginBottom: 16 }}>
+              <Popconfirm
+                disabled={!hasSelected}
+                placement="topLeft"
+                title={`Are you sure you want Recon to stop tracking the selected ${selectedRowKeys.length} datanodes ?`}
+                icon={
+                  <QuestionCircleOutlined style={{ color: 'red' }} />
+                }
+                onConfirm={this.popConfirm}
+                onCancel={this.cancel}
+              >
+                <Tooltip placement="topLeft" title="Remove the dead datanodes.">
+                  <InfoCircleOutlined />
+                </Tooltip>
+                &nbsp;&nbsp;
+                <Button type="primary" shape="round" icon={<DeleteOutlined />} disabled={!hasSelected} loading={loading}> Remove
+                </Button>
+              </Popconfirm>
+            </div>
+          }
           <Table
+            rowSelection={rowSelection}
             dataSource={dataSource}
             columns={COLUMNS.reduce<any[]>((filtered, column) => {
               if (selectedColumns.some(e => e.value === column.key)) {
@@ -490,9 +579,9 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             }, [])}
             loading={loading}
             pagination={paginationConfig}
-            rowKey='hostname'
-            scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
-            locale={{filterTitle: ""}}
+            rowKey='uuid'
+            scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+            locale={{ filterTitle: '' }}
           />
         </div>
       </div>
