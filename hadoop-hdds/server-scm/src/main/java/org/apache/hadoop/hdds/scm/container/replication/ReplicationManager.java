@@ -244,13 +244,13 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.metrics = ReplicationManagerMetrics.create(this);
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler(metrics);
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement, this);
     this.nodeManager = nodeManager;
-    this.metrics = ReplicationManagerMetrics.create(this);
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
@@ -365,7 +365,7 @@ public class ReplicationManager implements SCMService {
 
   /**
    * Process all the containers now, and wait for the processing to complete.
-   * This in intended to be used in tests.
+   * This is intended to be used in tests.
    */
   public synchronized void processAll() {
     if (!shouldRun()) {
@@ -380,6 +380,12 @@ public class ReplicationManager implements SCMService {
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
     ReplicationQueue newRepQueue = new ReplicationQueue();
+
+    getMetrics().resetEcUnderReplicatedContainers();
+    getMetrics().resetEcCriticalUnderReplicatedContainers();
+    getMetrics().resetEcUnhealthyReplicatedContainers();
+    getMetrics().resetEcMissingContainers();
+
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;

@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -215,7 +216,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "mis-replicated EC container due to insufficient nodes available.")
   private MutableCounterLong ecPartialReplicationForMisReplicationTotal;
 
-  @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
+  @Metric("Number of Reconstruct EC Container commands that could not be sent "
       + "due to the pending commands on the target datanode")
   private MutableCounterLong ecReconstructionCmdsDeferredTotal;
 
@@ -226,6 +227,20 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of replicate container commands that could not be sent due "
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
+
+  @Metric("Number of EC containers with insufficient replicas")
+  private MutableGaugeLong ecUnderReplicatedContainers;
+
+  @Metric("Number of EC containers with insufficient replicas that equal "
+      + "the number of data")
+  private MutableGaugeLong ecCriticalUnderReplicatedContainers;
+
+  @Metric("Number of EC containers with insufficient replicas that are "
+      + "less than the number of data replicas")
+  private MutableGaugeLong ecUnhealthyReplicatedContainers;
+
+  @Metric("EC Containers with no online replicas")
+  private MutableGaugeLong ecMissingContainers;
 
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
@@ -282,6 +297,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         CONTAINER_HEALTH_STATE_METRICS.entrySet()) {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }
+
+    ecUnderReplicatedContainers.snapshot(builder, all);
+    ecCriticalUnderReplicatedContainers.snapshot(builder, all);
+    ecUnhealthyReplicatedContainers.snapshot(builder, all);
+    ecMissingContainers.snapshot(builder, all);
 
     replicationCmdsSentTotal.snapshot(builder, all);
     replicasCreatedTotal.snapshot(builder, all);
@@ -612,6 +632,54 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getPartialReplicationForMisReplicationTotal() {
     return this.partialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrEcUnderReplicatedContainers() {
+    this.ecUnderReplicatedContainers.incr();
+  }
+
+  public long getEcUnderReplicatedContainers() {
+    return this.ecUnderReplicatedContainers.value();
+  }
+
+  public void resetEcUnderReplicatedContainers() {
+    ecUnderReplicatedContainers.set(0);
+  }
+
+  public void incrEcCriticalUnderReplicatedContainers() {
+    this.ecCriticalUnderReplicatedContainers.incr();
+  }
+
+  public long getEcCriticalUnderReplicatedContainers() {
+    return this.ecCriticalUnderReplicatedContainers.value();
+  }
+
+  public void resetEcCriticalUnderReplicatedContainers() {
+    ecCriticalUnderReplicatedContainers.set(0);
+  }
+
+  public void incrEcUnhealthyReplicatedContainers() {
+    this.ecUnhealthyReplicatedContainers.incr();
+  }
+
+  public long getEcUnhealthyReplicatedContainers() {
+    return this.ecUnhealthyReplicatedContainers.value();
+  }
+
+  public void resetEcUnhealthyReplicatedContainers() {
+    ecUnhealthyReplicatedContainers.set(0);
+  }
+
+  public void incrEcMissingContainers() {
+    this.ecMissingContainers.incr();
+  }
+
+  public long getEcMissingContainers() {
+    return this.ecMissingContainers.value();
+  }
+
+  public void resetEcMissingContainers() {
+    ecMissingContainers.set(0);
   }
 
 }
