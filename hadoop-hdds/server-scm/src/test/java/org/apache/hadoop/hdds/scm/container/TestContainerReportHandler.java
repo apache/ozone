@@ -447,11 +447,11 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Tests that a DELETING container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
-   * transition if a non-empty CLOSING (or any other state) replica is reported.
+   * Tests that a DELETING RATIS container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
+   * transition if a non-empty CLOSING replica is reported.
    */
   @Test
-  public void shouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
+  public void ratisContainerShouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
     ContainerInfo container = getContainer(LifeCycleState.DELETING);
     containerStateManager.addContainer(container.getProtobuf());
 
@@ -482,6 +482,32 @@ public class TestContainerReportHandler {
     ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+  }
+
+  /**
+   * Tests that a DELETING RATIS container transitions to CLOSED if a non-empty QUASI_CLOSED replica is reported.
+   */
+  @Test
+  public void ratisContainerShouldTransitionFromDeletingToClosedWhenNonEmptyQuasiClosedReplica() throws IOException {
+    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // set up a non-empty QUASI_CLOSED replica
+    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
+    ContainerReplicaProto replica = builder.setContainerID(container.getContainerID())
+        .setIsEmpty(false)
+        .setState(ContainerReplicaProto.State.QUASI_CLOSED)
+        .setKeyCount(0)
+        .setBlockCommitSequenceId(123)
+        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+
+    // should transition on processing the QUASI_CLOSED replica's report
+    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    ContainerReportsProto containerReport = getContainerReports(replica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, containerReport), publisher);
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
   }
 

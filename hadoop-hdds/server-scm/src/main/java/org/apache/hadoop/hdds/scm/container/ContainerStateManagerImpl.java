@@ -377,8 +377,8 @@ public final class ContainerStateManagerImpl
         final ContainerInfo oldInfo = containers.getContainerInfo(id);
         final LifeCycleState oldState = oldInfo.getState();
         if (oldState != DELETING) {
-          throw new InvalidContainerStateException("Container " + oldInfo + "must be in DELETING state to " +
-            "transition to CLOSED.");
+          throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
+              " back to CLOSED. The container must be in the DELETING state.");
         }
         ExecutionUtil.create(() -> {
           containers.updateState(id, oldState, CLOSED);

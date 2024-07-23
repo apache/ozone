@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -50,7 +51,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
@@ -182,7 +184,12 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    assertThrows(IOException.class, () -> containerStateManager.transitionDeletingToClosedState(cid));
+    try {
+      containerStateManager.transitionDeletingToClosedState(cid);
+      fail("Was expecting an Exception, but did not catch any.");
+    } catch (IOException e) {
+      assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
+    }
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {
