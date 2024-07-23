@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -33,6 +32,7 @@ import java.util.concurrent.locks.Lock;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,7 +159,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public byte[] readChecksumFileAsBytes(KeyValueContainerData data)  {
+  public ByteString readChecksumFileAsBytes(KeyValueContainerData data)  {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -167,7 +167,7 @@ public class ContainerChecksumTreeManager {
       File checksumFile = getContainerChecksumFile(data);
 
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return IOUtils.toByteArray(inStream);
+        return ByteString.readFrom(inStream);
       } catch (FileNotFoundException ex) {
         LOG.info("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
             containerID, checksumFile, ex);

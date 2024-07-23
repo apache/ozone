@@ -105,7 +105,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
-  public void testReadContainerMerkleTree() throws Exception {
+  public void testGetContainerMerkleTree() throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
@@ -134,7 +134,7 @@ public class TestContainerCommandReconciliation {
     DNContainerOperationClient dnClient = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getDnContainerOperationClient();
     for (DatanodeDetails dn: datanodeDetails) {
-      ByteString merkleTree = dnClient.readContainerMerkleTree(container.getContainerID(), dn);
+      ByteString merkleTree = dnClient.getContainerMerkleTree(container.getContainerID(), dn);
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
           ContainerProtos.ContainerChecksumInfo.parseFrom(merkleTree);
       assertTreesSortedAndMatch(tree.toProto(), containerChecksumInfo.getContainerMerkleTree());

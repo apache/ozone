@@ -723,10 +723,16 @@ public final class ContainerProtocolCalls  {
     return response.getEcho();
   }
 
-  public static ContainerProtos.ReadContainerMerkleTreeResponseProto readContainerMerkleTree(
+  /**
+   * Gets the Container merkle tree for a container from a datanode.
+   * @param client - client that communicates with the container
+   * @param containerID - Container Id of the container
+   * @param encodedContainerID - Encoded token if security is enabled
+   */
+  public static ContainerProtos.GetContainerMerkleTreeResponseProto getContainerMerkleTree(
       XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
-    ContainerProtos.ReadContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
-        ContainerProtos.ReadContainerMerkleTreeRequestProto
+    ContainerProtos.GetContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
+        ContainerProtos.GetContainerMerkleTreeRequestProto
             .newBuilder()
             .setContainerID(containerID)
             .build();
@@ -734,10 +740,10 @@ public final class ContainerProtocolCalls  {
 
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(Type.ReadContainerMerkleTree)
+        .setCmdType(Type.GetContainerMerkleTree)
         .setContainerID(containerID)
         .setDatanodeUuid(id)
-        .setReadContainerMerkleTree(containerMerkleTreeRequestProto);
+        .setGetContainerMerkleTree(containerMerkleTreeRequestProto);
     if (encodedContainerID != null) {
       builder.setEncodedToken(encodedContainerID);
     }
@@ -748,7 +754,7 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     ContainerCommandResponseProto response =
         client.sendCommand(request, getValidatorList());
-    return response.getReadContainerMerkleTree();
+    return response.getGetContainerMerkleTree();
   }
 
   /**

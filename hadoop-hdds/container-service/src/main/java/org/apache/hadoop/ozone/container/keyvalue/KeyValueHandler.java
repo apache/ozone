@@ -112,7 +112,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerMerkleTreeResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetContainerMerkleTreeResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
@@ -298,8 +298,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     case Echo:
       return handler.handleEcho(request, kvContainer);
-    case ReadContainerMerkleTree:
-      return handler.handleReadContainerMerkleTree(request, kvContainer);
+    case GetContainerMerkleTree:
+      return handler.handleGetContainerMerkleTree(request, kvContainer);
     default:
       return null;
     }
@@ -598,10 +598,10 @@ public class KeyValueHandler extends Handler {
     return getEchoResponse(request);
   }
 
-  ContainerCommandResponseProto handleReadContainerMerkleTree(
+  ContainerCommandResponseProto handleGetContainerMerkleTree(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
 
-    if (!request.hasReadContainerMerkleTree()) {
+    if (!request.hasGetContainerMerkleTree()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Read Container Merkle tree request. trace ID: {}",
             request.getTraceID());
@@ -610,8 +610,8 @@ public class KeyValueHandler extends Handler {
     }
 
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    byte[] checksumBytes = checksumManager.readChecksumFileAsBytes(containerData);
-    return getReadContainerMerkleTreeResponse(request, checksumBytes);
+    ByteString checksumByteString = checksumManager.readChecksumFileAsBytes(containerData);
+    return getGetContainerMerkleTreeResponse(request, checksumByteString);
   }
 
   /**
@@ -1210,7 +1210,7 @@ public class KeyValueHandler extends Handler {
       KeyValueContainerData containerData =
           (KeyValueContainerData) container.getContainerData();
       ByteString containerMerkleTree =
-          dnClient.readContainerMerkleTree(containerData.getContainerID(), dn);
+          dnClient.getContainerMerkleTree(containerData.getContainerID(), dn);
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
           ContainerProtos.ContainerChecksumInfo.parseFrom(containerMerkleTree);
       LOG.debug("Container Merkle Tree for container {} is {}",

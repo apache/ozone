@@ -335,15 +335,15 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
-  public static ContainerCommandResponseProto getReadContainerMerkleTreeResponse(
-      ContainerCommandRequestProto request, byte[] checksumBytes) {
+  public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(
+      ContainerCommandRequestProto request, ByteString checksumByteString) {
 
-    ContainerProtos.ReadContainerMerkleTreeResponseProto.Builder containerMerkleTree =
-        ContainerProtos.ReadContainerMerkleTreeResponseProto.newBuilder()
+    ContainerProtos.GetContainerMerkleTreeResponseProto.Builder containerMerkleTree =
+        ContainerProtos.GetContainerMerkleTreeResponseProto.newBuilder()
             .setContainerID(request.getContainerID())
-            .setContainerMerkleTree(ByteString.copyFrom(checksumBytes));
+            .setContainerMerkleTree(checksumByteString);
     return getSuccessResponseBuilder(request)
-        .setReadContainerMerkleTree(containerMerkleTree).build();
+        .setGetContainerMerkleTree(containerMerkleTree).build();
   }
 
   private ContainerCommandResponseBuilders() {

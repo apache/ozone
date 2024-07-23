@@ -37,18 +37,18 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import jakarta.annotation.Nonnull;
-import org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper;
+import org.apache.hadoop.ozone.container.TokenHelper;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
+import static org.apache.hadoop.ozone.container.TokenHelper.encode;
 
 /**
  * This class wraps necessary container-level rpc calls for container reconcilitaion.
- *   - ReadContainerMerkleTree
+ *   - GetContainerMerkleTree
  */
 public class DNContainerOperationClient implements AutoCloseable {
 
@@ -86,14 +86,14 @@ public class DNContainerOperationClient implements AutoCloseable {
     return xceiverClientManager;
   }
 
-  public ByteString readContainerMerkleTree(long containerId, DatanodeDetails dn)
+  public ByteString getContainerMerkleTree(long containerId, DatanodeDetails dn)
       throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(createSingleNodePipeline(dn));
     try {
       String containerToken = encode(tokenHelper.getContainerToken(
           ContainerID.valueOf(containerId)));
-      ContainerProtos.ReadContainerMerkleTreeResponseProto response =
-          ContainerProtocolCalls.readContainerMerkleTree(xceiverClient,
+      ContainerProtos.GetContainerMerkleTreeResponseProto response =
+          ContainerProtocolCalls.getContainerMerkleTree(xceiverClient,
               containerId, containerToken);
       return response.getContainerMerkleTree();
     } finally {
