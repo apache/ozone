@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -107,10 +108,70 @@ public class TestContainerReportHandling {
     }
   }
 
+  @Test
+  void testDeletingContainerTransitionsToClosedWhenNonEmptyReplicaIsReportedWithScmHA() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+
+    int numSCM = 3;
+    try (MiniOzoneHAClusterImpl cluster = newHACluster(conf, numSCM)) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = cluster.newClient()) {
+        // create a container and close it
+        createTestData(client);
+        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+        assertThat(keyLocations).isNotEmpty();
+        OmKeyLocationInfo keyLocation = keyLocations.get(0);
+        ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
+        waitForContainerClose(cluster, containerID.getId());
+
+        // move the container to DELETING
+        ContainerManager containerManager = cluster.getScmLeader().getContainerManager();
+        containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
+        assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
+
+        // restart a DN and wait for the container to get CLOSED in all SCMs
+        HddsDatanodeService dn = cluster.getHddsDatanode(keyLocation.getPipeline().getFirstNode());
+        cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+        ContainerManager[] array = new ContainerManager[numSCM];
+        for (int i = 0; i < numSCM; i++) {
+          array[i] = cluster.getStorageContainerManager(i).getContainerManager();
+        }
+        GenericTestUtils.waitFor(() -> {
+          try {
+            for (ContainerManager manager : array) {
+              if (manager.getContainer(containerID).getState() != HddsProtos.LifeCycleState.CLOSED) {
+                return false;
+              }
+            }
+            return true;
+          } catch (ContainerNotFoundException e) {
+            fail(e);
+          }
+          return false;
+        }, 2000, 20000);
+
+        assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
+      }
+    }
+  }
+
+
   private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
       throws IOException {
     return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .build();
+  }
+
+  private static MiniOzoneHAClusterImpl newHACluster(OzoneConfiguration conf, int numSCM) throws IOException {
+    return MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId("om-service")
+        .setSCMServiceId("scm-service")
+        .setNumOfOzoneManagers(1)
+        .setNumOfStorageContainerManagers(numSCM)
         .build();
   }
 
