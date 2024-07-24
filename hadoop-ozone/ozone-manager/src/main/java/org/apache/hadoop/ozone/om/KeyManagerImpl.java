@@ -1990,6 +1990,9 @@ public class KeyManagerImpl implements KeyManager {
           parentInfo.getObjectID())) {
         break;
       }
+      if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
+        continue;
+      }
       String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
           dirInfo.getName());
       OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
@@ -2023,6 +2026,9 @@ public class KeyManagerImpl implements KeyManager {
         if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
             parentInfo.getObjectID())) {
           break;
+        }
+        if (!metadataManager.getFileTable().isExist(entry.getKey())) {
+          continue;
         }
         fileInfo.setFileName(fileInfo.getKeyName());
         String fullKeyPath = OMFileRequest.getAbsolutePath(

@@ -24,6 +24,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -84,7 +86,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-          
+
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -92,6 +94,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           if (null != omBucketInfo
               && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedNamespace(-1L);
+            String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
+                path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
+            omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
+                CacheValue.get(trxnLogIndex));
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
@@ -115,6 +121,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
             omBucketInfo.incrUsedNamespace(-1L);
+            String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
+                path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
+            omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
+                CacheValue.get(trxnLogIndex));
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }

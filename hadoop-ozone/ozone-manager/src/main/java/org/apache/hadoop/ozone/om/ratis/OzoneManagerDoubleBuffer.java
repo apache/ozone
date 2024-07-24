@@ -294,7 +294,7 @@ public final class OzoneManagerDoubleBuffer {
    * and commit to DB.
    */
   @VisibleForTesting
-  void flushTransactions() {
+  public void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
     }
@@ -698,7 +698,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   @VisibleForTesting
-  void resume() {
+  public void resume() {
     isRunning.set(true);
   }
 
