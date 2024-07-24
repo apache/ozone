@@ -185,6 +185,7 @@ public final class  ReconServerConfigKeys {
 
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
+
   /**
    * Private constructor for utility class.
    */

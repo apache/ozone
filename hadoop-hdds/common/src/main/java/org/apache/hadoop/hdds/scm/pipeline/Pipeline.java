@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -113,7 +112,7 @@ public final class Pipeline {
     suggestedLeaderId = b.suggestedLeaderId;
     nodeStatus = b.nodeStatus;
     nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
-    replicaIndexes = b.replicaIndexes != null ? ImmutableMap.copyOf(b.replicaIndexes) : ImmutableMap.of();
+    replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
   }
@@ -541,7 +540,7 @@ public final class Pipeline {
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
-    private Map<DatanodeDetails, Integer> replicaIndexes;
+    private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
     public Builder() { }
 
@@ -555,13 +554,14 @@ public final class Pipeline {
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
       if (nodeStatus != null) {
-        replicaIndexes = new HashMap<>();
+        final ImmutableMap.Builder<DatanodeDetails, Integer> b = ImmutableMap.builder();
         for (DatanodeDetails dn : nodeStatus.keySet()) {
           int index = pipeline.getReplicaIndex(dn);
           if (index > 0) {
-            replicaIndexes.put(dn, index);
+            b.put(dn, index);
           }
         }
+        replicaIndexes = b.build();
       }
     }
 
@@ -598,7 +598,7 @@ public final class Pipeline {
 
     public Builder setNodeOrder(List<Integer> orders) {
       // for build from ProtoBuf
-      this.nodeOrder = orders;
+      this.nodeOrder = Collections.unmodifiableList(orders);
       return this;
     }
 
@@ -624,7 +624,7 @@ public final class Pipeline {
 
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
-      this.replicaIndexes = indexes;
+      this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);
       return this;
     }
 

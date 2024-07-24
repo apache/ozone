@@ -106,43 +106,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <id>depcheck</id>
             <phase></phase>
           </execution>
-          <execution>
-            <id>banned-rocksdb-imports</id>
-            <phase>process-sources</phase>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <RestrictImports>
-                  <includeTestCode>false</includeTestCode>
-                  <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
-                  <!-- By default, ban all the classes in org.rocksdb -->
-                  <bannedImport>org.rocksdb.**</bannedImport>
-                  <allowedImports>
-                    <allowedImport>org.rocksdb.AbstractEventListener</allowedImport>
-                    <allowedImport>org.rocksdb.Checkpoint</allowedImport>
-                    <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
-                    <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
-                    <allowedImport>org.rocksdb.ColumnFamilyOptions</allowedImport>
-                    <allowedImport>org.rocksdb.CompactionJobInfo</allowedImport>
-                    <allowedImport>org.rocksdb.CompressionType</allowedImport>
-                    <allowedImport>org.rocksdb.DBOptions</allowedImport>
-                    <allowedImport>org.rocksdb.FlushOptions</allowedImport>
-                    <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
-                    <allowedImport>org.rocksdb.Options</allowedImport>
-                    <allowedImport>org.rocksdb.RocksDB</allowedImport>
-                    <allowedImport>org.rocksdb.RocksDBException</allowedImport>
-                    <allowedImport>org.rocksdb.SstFileReader</allowedImport>
-                    <allowedImport>org.rocksdb.TableProperties</allowedImport>
-                    <allowedImport>org.rocksdb.ReadOptions</allowedImport>
-                    <allowedImport>org.rocksdb.SstFileReaderIterator</allowedImport>
-                  </allowedImports>
-                  <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
-                </RestrictImports>
-              </rules>
-            </configuration>
-          </execution>
         </executions>
       </plugin>
     </plugins>

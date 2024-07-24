@@ -58,8 +58,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -137,6 +135,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 /**
@@ -301,6 +301,8 @@ public class ObjectEndpoint extends EndpointBase {
         digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
       }
 
+      Map<String, String> tags = getTaggingFromHeaders(headers);
+
       long putLength;
       String eTag = null;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
@@ -313,7 +315,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         try (OzoneOutputStream output = getClientProtocol().createKey(
             volume.getName(), bucketName, keyPath, length, replicationConfig,
-            customMetadata)) {
+            customMetadata, tags)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -515,6 +517,7 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
+      addTagCountIfAny(responseBuilder, keyDetails);
       long metadataLatencyNs =
           getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -554,6 +557,17 @@ public class ObjectEndpoint extends EndpointBase {
     responseBuilder
         .header(LAST_MODIFIED,
             RFC1123Util.FORMAT.format(lastModificationTime));
+  }
+
+  static void addTagCountIfAny(
+      ResponseBuilder responseBuilder, OzoneKey key) {
+    // See x-amz-tagging-count in https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html
+    // The number of tags, IF ANY, on the object, when you have the relevant
+    // permission to read object tags
+    if (!key.getTags().isEmpty()) {
+      responseBuilder
+          .header(TAG_COUNT_HEADER, key.getTags().size());
+    }
   }
 
   /**
@@ -751,11 +765,13 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
 
+      Map<String, String> tags = getTaggingFromHeaders(headers);
+
       ReplicationConfig replicationConfig =
           getReplicationConfig(ozoneBucket, storageType);
 
       OmMultipartInfo multipartInfo =
-          ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata);
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata, tags);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -921,10 +937,8 @@ public class ObjectEndpoint extends EndpointBase {
                 uploadID, chunkSize, digestInputStream, perf);
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
-      // OzoneOutputStream is closed, so we need to save the KeyOutputStream
-      // in the OzoneOutputStream and use it to get the
-      // OmMultipartCommitUploadPartInfo after OzoneOutputStream is closed.
-      KeyOutputStream keyOutputStream = null;
+      // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
+      final OzoneOutputStream outputStream;
       long metadataLatencyNs;
       if (copyHeader != null) {
         Pair<String, String> result = parseSourceHeader(copyHeader);
@@ -975,7 +989,7 @@ public class ObjectEndpoint extends EndpointBase {
                   sourceObject, ozoneOutputStream, 0, length);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
-              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
+              outputStream = ozoneOutputStream;
             }
           } else {
             try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
@@ -986,7 +1000,7 @@ public class ObjectEndpoint extends EndpointBase {
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
-              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
+              outputStream = ozoneOutputStream;
             }
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -1000,21 +1014,18 @@ public class ObjectEndpoint extends EndpointBase {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream);
-          ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
-              .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
-                      digestInputStream.getMessageDigest().digest())
-                  .toLowerCase());
-          keyOutputStream
-              = ozoneOutputStream.getKeyOutputStream();
+          byte[] digest = digestInputStream.getMessageDigest().digest();
+          ozoneOutputStream.getMetadata()
+              .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+          outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
         perf.appendSizeBytes(putLength);
       }
       perf.appendMetaLatencyNanos(metadataLatencyNs);
 
-      assert keyOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
-          keyOutputStream.getCommitUploadPartInfo();
+          outputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getETag();
       // If the OmMultipartCommitUploadPartInfo does not contain eTag,
       // fall back to MPU part name for compatibility in case the (old) OM
@@ -1138,7 +1149,8 @@ public class ObjectEndpoint extends EndpointBase {
       String destKey, String destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
-      PerformanceStringBuilder perf, long startNanos)
+      PerformanceStringBuilder perf, long startNanos,
+      Map<String, String> tags)
       throws IOException {
     long copyLength;
     if (datastreamEnabled && !(replication != null &&
@@ -1147,11 +1159,11 @@ public class ObjectEndpoint extends EndpointBase {
       perf.appendStreamMode();
       copyLength = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
-              chunkSize, replication, metadata, src, perf, startNanos);
+              chunkSize, replication, metadata, src, perf, startNanos, tags);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
           .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
-              replication, metadata)) {
+              replication, metadata, tags)) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -1206,6 +1218,23 @@ public class ObjectEndpoint extends EndpointBase {
       }
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
+      // Object tagging in copyObject with tagging directive
+      Map<String, String> tags;
+      String tagCopyDirective = headers.getHeaderString(TAG_DIRECTIVE_HEADER);
+      if (StringUtils.isEmpty(tagCopyDirective) || tagCopyDirective.equals(CopyDirective.COPY.name())) {
+        // Tag-set will be copied from the source directly
+        tags = sourceKeyDetails.getTags();
+      } else if (tagCopyDirective.equals(CopyDirective.REPLACE.name())) {
+        // Replace the tags with the tags from the request headers
+        tags = getTaggingFromHeaders(headers);
+      } else {
+        OS3Exception ex = newError(INVALID_ARGUMENT, tagCopyDirective);
+        ex.setErrorMessage("An error occurred (InvalidArgument) " +
+            "when calling the CopyObject operation: " +
+            "The tagging copy directive specified is invalid. Valid values are COPY or REPLACE.");
+        throw ex;
+      }
+
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
       String metadataCopyDirective = headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
@@ -1219,7 +1248,7 @@ public class ObjectEndpoint extends EndpointBase {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +
             "when calling the CopyObject operation: " +
-            "The metadata directive specified is invalid. Valid values are COPY or REPLACE.");
+            "The metadata copy directive specified is invalid. Valid values are COPY or REPLACE.");
         throw ex;
       }
 
@@ -1228,7 +1257,7 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         sourceDigestInputStream = new DigestInputStream(src, getMessageDigestInstance());
         copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
-                customMetadata, perf, startNanos);
+                customMetadata, perf, startNanos, tags);
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(

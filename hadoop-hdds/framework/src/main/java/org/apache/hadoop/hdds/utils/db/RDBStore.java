@@ -163,7 +163,7 @@ public class RDBStore implements DBStore {
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
             compactionLogTableCF.getHandle());
         // Set activeRocksDB in differ to access compaction log CF.
-        rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb().get());
+        rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb());
         // Load all previous compaction logs
         rocksDBCheckpointDiffer.loadAllCompactionLogs();
       }
