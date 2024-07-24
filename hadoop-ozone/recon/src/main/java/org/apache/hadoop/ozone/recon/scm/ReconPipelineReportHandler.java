@@ -83,9 +83,10 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
         throw ex;
       }
 
-      LOG.info("Adding new pipeline {} to Recon pipeline metadata.",
-          pipelineFromScm);
-      reconPipelineManager.addPipeline(pipelineFromScm);
+      if (reconPipelineManager.addPipeline(pipelineFromScm)) {
+        LOG.info("Pipeline {} verified from SCM and added to Recon pipeline metadata.",
+            pipelineFromScm);
+      }
     }
 
     Pipeline pipeline;

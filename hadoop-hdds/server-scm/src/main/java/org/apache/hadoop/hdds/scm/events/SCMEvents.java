@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -207,15 +206,6 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
-
-  /**
-   * A CRL status report will be sent by datanodes. This report is received
-   * and processed by SCMDatanodeHeartbeatDispatcher.
-   */
-  public static final TypedEvent<CRLStatusReportFromDatanode>
-      CRL_STATUS_REPORT =
-      new TypedEvent<>(CRLStatusReportFromDatanode.class,
-          "Crl_Status_Report");
 
   /**
    * Private Ctor. Never Constructed.

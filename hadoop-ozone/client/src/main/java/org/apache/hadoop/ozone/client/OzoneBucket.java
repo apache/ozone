@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -490,6 +491,28 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * This API allows to atomically update an existing key. The key read before invoking this API
+   * should remain unchanged for this key to be written. This is controlled by the generation
+   * field in the existing Key param. If the key is replaced or updated the generation will change. If the
+   * generation has changed since the existing Key was read, either the initial key create will fail,
+   * or the key will fail to commit after the data has been written as the checks are carried out
+   * both at key open and commit time.
+   *
+   * @param keyName Existing key to rewrite. This must exist in the bucket.
+   * @param size The size of the new key
+   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   *                              and commit time.
+   * @param replicationConfig The replication configuration for the key to be rewritten.
+   * @param metadata custom key value metadata
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
+      ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
+    return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
+  }
+
+  /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.
    *
@@ -673,6 +696,16 @@ public class OzoneBucket extends WithMetadata {
    */
   public void deleteKeys(List<String> keyList) throws IOException {
     proxy.deleteKeys(volumeName, name, keyList);
+  }
+
+  /**
+   * Deletes the given list of keys from the bucket.
+   * @param keyList List of the key name to be deleted.
+   * @param quiet flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    return proxy.deleteKeys(volumeName, name, keyList, quiet);
   }
 
   /**
@@ -1851,8 +1884,7 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile(),
-            keyInfo.getOwnerName());
+            keyInfo.isFile(), keyInfo.getOwnerName());
         keysResultList.add(ozoneKey);
       }
     }

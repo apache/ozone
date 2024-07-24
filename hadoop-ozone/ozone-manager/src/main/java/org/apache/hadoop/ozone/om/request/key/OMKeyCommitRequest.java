@@ -240,6 +240,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+
+      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
+      // not persisted in the key table.
+      omKeyInfo.setExpectedDataGeneration(null);
+
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
       if (isHSync) {
@@ -497,4 +503,22 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  protected void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+      throws OMException {
+    if (toCommit.getExpectedDataGeneration() != null) {
+      // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
+      // in the open key entry.
+      auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(toCommit.getExpectedDataGeneration()));
+      if (existing == null) {
+        throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
+      }
+      if (!toCommit.getExpectedDataGeneration().equals(existing.getUpdateID())) {
+        throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
+            ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
+            KEY_NOT_FOUND);
+      }
+    }
+  }
+
 }

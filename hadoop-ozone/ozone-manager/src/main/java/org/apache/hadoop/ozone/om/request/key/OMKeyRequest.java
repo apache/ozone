@@ -775,7 +775,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
-      // Clear the old one when the key is overwritten.
       dbKeyInfo.getMetadata().clear();
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
@@ -785,6 +784,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.getTags().clear();
       dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getTagsList()));
+
+      if (keyArgs.hasExpectedDataGeneration()) {
+        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+      }
 
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;

@@ -41,6 +41,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <scope>compile</scope>
@@ -96,18 +100,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <artifactId>ratis-server</artifactId>
+      <artifactId>ratis-server-api</artifactId>
       <groupId>org.apache.ratis</groupId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-reload4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-jdk18on</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <artifactId>ratis-metrics-dropwizard3</artifactId>
@@ -262,6 +256,43 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.apache.ozone</groupId>
+              <artifactId>hdds-config</artifactId>
+              <version>${hdds.version}</version>
+            </path>
+          </annotationProcessorPaths>
+          <annotationProcessors>
+            <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
+          </annotationProcessors>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>ban-annotations</id> <!-- override default restriction from root POM -->
+            <configuration>
+              <rules>
+                <restrictImports>
+                  <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
+                  <bannedImports>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
+                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                    <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
+                  </bannedImports>
+                </restrictImports>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

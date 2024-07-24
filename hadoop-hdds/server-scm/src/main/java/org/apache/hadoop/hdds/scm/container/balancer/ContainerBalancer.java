@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -53,6 +54,7 @@ public class ContainerBalancer extends StatefulService {
   private volatile Thread currentBalancingThread;
   private volatile ContainerBalancerTask task = null;
   private ReentrantLock lock;
+  private OffsetDateTime startedAt;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -176,6 +178,24 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
+   * Get balancer status info.
+   *
+   * @return balancer status info if balancer started
+   */
+  public ContainerBalancerStatusInfo getBalancerStatusInfo() throws IOException {
+    if (isBalancerRunning()) {
+      ContainerBalancerConfigurationProto configProto = readConfiguration(ContainerBalancerConfigurationProto.class);
+      return new ContainerBalancerStatusInfo(
+              this.startedAt,
+              configProto,
+              task.getCurrentIterationsStatistic()
+      );
+    } else {
+      return null;
+    }
+
+  }
+  /**
    * Checks if ContainerBalancer is in valid state to call stop.
    *
    * @return true if balancer can be stopped, otherwise false
@@ -204,6 +224,7 @@ public class ContainerBalancer extends StatefulService {
   @Override
   public void start() throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException {
+    startedAt = OffsetDateTime.now();
     lock.lock();
     try {
       // should be leader-ready, out of safe mode, and not running already
@@ -251,6 +272,7 @@ public class ContainerBalancer extends StatefulService {
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException, IOException {
+    startedAt = OffsetDateTime.now();
     lock.lock();
     try {
       // validates state, config, and then saves config

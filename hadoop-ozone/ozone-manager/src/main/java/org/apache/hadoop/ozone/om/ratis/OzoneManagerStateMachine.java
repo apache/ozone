@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -100,6 +101,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
+  private final NettyMetrics nettyMetrics;
+
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
@@ -120,6 +123,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   /**
@@ -620,6 +624,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    if (this.nettyMetrics != null) {
+      this.nettyMetrics.unregister();
+    }
   }
 
   /**
