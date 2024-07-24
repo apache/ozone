@@ -153,7 +153,7 @@ public class BlockOutputStream extends OutputStream {
   private boolean allowPutBlockPiggybacking;
 
   private CompletableFuture<Void> lastFlushFuture;
-  private Set<CompletableFuture<Void>> allPendingFlushFutures = Collections.newSetFromMap(new ConcurrentHashMap<>());
+  private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
 
   /**
    * Creates a new BlockOutputStream.
@@ -375,8 +375,7 @@ public class BlockOutputStream extends OutputStream {
   private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
     Preconditions.checkState(Thread.holdsLock(this));
     this.lastFlushFuture = flushFuture;
-    allPendingFlushFutures.add(flushFuture);
-    flushFuture.whenComplete((r, e) -> allPendingFlushFutures.remove(flushFuture));
+    this.allPendingFlushFutures = allPendingFlushFutures.thenCombine(flushFuture, (last, curr) -> null);
   }
 
   private void allocateNewBufferIfNeeded() throws IOException {
@@ -658,9 +657,7 @@ public class BlockOutputStream extends OutputStream {
 
     if (close) {
       // When closing, must wait for all flush futures to complete.
-      for (CompletableFuture<Void> flushFuture : allPendingFlushFutures) {
-        flushFuture.get();
-      }
+      allPendingFlushFutures.get();
     }
   }
 
