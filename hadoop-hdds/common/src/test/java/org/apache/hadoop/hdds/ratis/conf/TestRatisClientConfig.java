@@ -44,6 +44,8 @@ class TestRatisClientConfig {
         subject.getWatchRequestTimeout());
     assertEquals(fromConfig.getWriteRequestTimeout(),
         subject.getWriteRequestTimeout());
+    assertEquals(fromConfig.getExponentialPolicyMaxRetries(),
+        subject.getExponentialPolicyMaxRetries());
   }
 
   @Test
@@ -53,16 +55,19 @@ class TestRatisClientConfig {
     final Duration maxSleep = Duration.ofMinutes(2);
     final Duration watchRequestTimeout = Duration.ofMillis(555);
     final Duration writeRequestTimeout = Duration.ofMillis(444);
+    final int maxRetry = 10;
 
     subject.setExponentialPolicyBaseSleep(baseSleep);
     subject.setExponentialPolicyMaxSleep(maxSleep);
     subject.setWatchRequestTimeout(watchRequestTimeout);
     subject.setWriteRequestTimeout(writeRequestTimeout);
+    subject.setExponentialPolicyMaxRetries(maxRetry);
 
     assertEquals(baseSleep, subject.getExponentialPolicyBaseSleep());
     assertEquals(maxSleep, subject.getExponentialPolicyMaxSleep());
     assertEquals(watchRequestTimeout, subject.getWatchRequestTimeout());
     assertEquals(writeRequestTimeout, subject.getWriteRequestTimeout());
+    assertEquals(maxRetry, subject.getExponentialPolicyMaxRetries());
   }
 
 }
