@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -67,17 +68,11 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo newChecksumInfo = captureLatencyNs(
-          metrics.getReadContainerMerkleTreeLatencyNS(), () -> read(data)).toBuilder()
+      ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
           .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
           .build();
-      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
-          () -> write(data, newChecksumInfo));
+      write(data, newChecksumInfo);
       LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
-    } catch (IOException ex) {
-      metrics.incrementMerkleTreeWriteFailures();
-      throw new IOException("Error occurred when writing container merkle tree for containerID "
-          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -92,8 +87,7 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = captureLatencyNs(
-          metrics.getReadContainerMerkleTreeLatencyNS(), () -> read(data)).toBuilder();
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data).toBuilder();
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
@@ -104,13 +98,8 @@ public class ContainerChecksumTreeManager {
           .clearDeletedBlocks()
           .addAllDeletedBlocks(sortedDeletedBlockIDs)
           .build();
-      captureLatencyNs(metrics.getUpdateContainerMerkleTreeLatencyNS(),
-          () -> write(data, checksumInfoBuilder.build()));
+      write(data, checksumInfoBuilder.build());
       LOG.debug("Deleted block list for container {} updated", data.getContainerID());
-    } catch (IOException ex) {
-      metrics.incrementMerkleTreeUpdateFailures();
-      throw new IOException("Error occurred when updating container merkle tree for containerID "
-          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -149,16 +138,15 @@ public class ContainerChecksumTreeManager {
             .build();
       }
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+        return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(),
+            () -> ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
       }
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeReadFailures();
+      throw new IOException("Error occurred when reading container merkle tree for containerID "
+              + data.getContainerID(), ex);
     } finally {
       readLock.unlock();
-    }
-  }
-
-  private ContainerProtos.ContainerChecksumInfo readFile(File checksumFile) throws IOException {
-    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-      return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
     }
   }
 
@@ -167,7 +155,12 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {
-      checksumInfo.writeTo(outStream);
+      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
+          () -> checksumInfo.writeTo(outStream));
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeWriteFailures();
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -177,6 +170,7 @@ public class ContainerChecksumTreeManager {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
+  @VisibleForTesting
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;
   }

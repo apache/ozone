@@ -46,17 +46,11 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of Merkle tree read failure")
   private MutableCounterLong numMerkleTreeReadFailure;
 
-  @Metric(about = "Number of Merkle tree update failure")
-  private MutableCounterLong numMerkleTreeUpdateFailure;
-
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
   @Metric(about = "Merkle tree read latency")
   private MutableRate merkleTreeReadLatencyNS;
-
-  @Metric(about = "Merkle tree update latency")
-  private MutableRate merkleTreeUpdateLatencyNS;
 
   @Metric(about = "Merkle tree creation latency")
   private MutableRate merkleTreeCreateLatencyNS;
@@ -69,20 +63,12 @@ public class ContainerMerkleTreeMetrics {
     this.numMerkleTreeReadFailure.incr();
   }
 
-  public void incrementMerkleTreeUpdateFailures() {
-    this.numMerkleTreeUpdateFailure.incr();
-  }
-
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
     return this.merkleTreeWriteLatencyNS;
   }
 
   public MutableRate getReadContainerMerkleTreeLatencyNS() {
     return this.merkleTreeReadLatencyNS;
-  }
-
-  public MutableRate getUpdateContainerMerkleTreeLatencyNS() {
-    return this.merkleTreeUpdateLatencyNS;
   }
 
   public MutableRate getCreateMerkleTreeLatencyNS() {
