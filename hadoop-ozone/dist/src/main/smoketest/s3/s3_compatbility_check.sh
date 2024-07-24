@@ -83,5 +83,6 @@ run_robot_test objectcopy
 run_robot_test objectmultidelete
 run_robot_test objecthead
 run_robot_test MultipartUpload
+run_robot_test objecttagging
 
 rebot --outputdir results/ results/*.xml

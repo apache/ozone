@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Protocol for OmMetadataReader's.
@@ -165,4 +166,11 @@ public interface IOmMetadataReader {
    * @throws IOException if there is error.
    */
   List<OzoneAcl> getAcl(OzoneObj obj) throws IOException;
+
+  /**
+   * Gets the tags for the specified key.
+   * @param args Key args
+   * @return Tags associated with the key.
+   */
+  Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
 }

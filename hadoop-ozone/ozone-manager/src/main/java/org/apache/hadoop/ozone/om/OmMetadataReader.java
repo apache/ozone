@@ -382,6 +382,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @param obj Ozone object.
    * @throws IOException if there is error.
    */
+  @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
 
     String volumeName = obj.getVolumeName();
@@ -425,6 +426,45 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         audit.logReadSuccess(
             buildAuditMessageForSuccess(OMAction.GET_ACL, obj.toAuditMap()));
       }
+    }
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getLookupResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(args));
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetObjectTaggingAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
+                ACLType.READ, bucket,
+                args.getKeyName())
+        );
+      }
+      metrics.incNumGetObjectTagging();
+      return keyManager.getObjectTagging(resolvedArgs, bucket);
+    } catch (Exception ex) {
+      metrics.incNumGetObjectTaggingFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.GET_OBJECT_TAGGING,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_OBJECT_TAGGING,
+            auditMap));
+      }
+
+      perfMetrics.addGetObjectTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 

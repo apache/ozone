@@ -94,7 +94,7 @@ public class TestPartUploadWithStream {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -115,7 +115,7 @@ public class TestPartUploadWithStream {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -124,7 +124,7 @@ public class TestPartUploadWithStream {
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = REST.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -137,7 +137,7 @@ public class TestPartUploadWithStream {
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(S3BUCKET, S3KEY, content.length(), 1,
-          "random", body);
+          "random", null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
     assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());

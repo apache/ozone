@@ -44,6 +44,7 @@ Put object to s3
 Get object from s3
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
+                                Should not contain        ${result}   TagCount
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte /tmp/zerobyte.result
     Compare files               /tmp/zerobyte              /tmp/zerobyte.result
 

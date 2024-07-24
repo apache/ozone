@@ -106,7 +106,7 @@ public class TestUploadWithStream {
     byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
     ByteArrayInputStream body =
         new ByteArrayInputStream(keyContent);
-    Response response = REST.put(S3BUCKET, S3KEY, 0, 0, null, body);
+    Response response = REST.put(S3BUCKET, S3KEY, 0, 0, null, null, body);
 
     assertEquals(200, response.getStatus());
   }
@@ -140,7 +140,7 @@ public class TestUploadWithStream {
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
     REST.setHeaders(headers);
 
-    Response response = REST.put(S3BUCKET, S3KEY, 0, 0, null, null);
+    Response response = REST.put(S3BUCKET, S3KEY, 0, 0, null, null, null);
 
     assertEquals(200, response.getStatus());
 
