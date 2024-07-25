@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.core.Response;
+
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -106,7 +108,10 @@ public class HeatMapServiceImpl extends HeatMapService {
   }
 
   public HealthCheckResponse doHeatMapHealthCheck() {
-    return heatMapProvider.doHeatMapHealthCheck();
+    if (null != heatMapProvider) {
+      return heatMapProvider.doHeatMapHealthCheck();
+    }
+    return new HealthCheckResponse.Builder("HeatMapProviderImpl class not loaded or initialized.",
+        Response.Status.OK.getStatusCode()).build();
   }
-
 }
