@@ -485,6 +485,28 @@ public class TestContainerReportHandler {
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
   }
 
+  @Test
+  public void ratisContainerShouldNotTransitionFromDeletingToClosedWhenEmptyClosedReplica() throws IOException {
+    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // set up an empty CLOSED replica
+    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
+    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+        .setIsEmpty(true)
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .setKeyCount(0)
+        .setBlockCommitSequenceId(123)
+        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+
+    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+  }
+
   /**
    * Tests that a DELETING RATIS container transitions to CLOSED if a non-empty QUASI_CLOSED replica is reported.
    */
