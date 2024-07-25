@@ -38,9 +38,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -260,6 +263,18 @@ public class OzoneManagerServiceProviderImpl
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
+    } catch (RuntimeException runtimeException) {
+      LOG.warn("Unexpected runtime error starting Recon OM Metadata Manager.", runtimeException);
+      LOG.warn("Trying to delete existing recon OM snapshot DB and fetch new one.");
+      metrics.incrNumSnapshotRequests();
+      LOG.info("Fetching full snapshot from Ozone Manager");
+      // Update local Recon OM DB to new snapshot.
+      try {
+        boolean success = updateReconOmDBWithNewSnapshot();
+        LOG.info("Fetched full new snapshot from Ozone Manager: {}", success);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
@@ -539,7 +554,7 @@ public class OzoneManagerServiceProviderImpl
    * full snapshot from Ozone Manager.
    */
   @VisibleForTesting
-  public boolean syncDataFromOM() {
+  public boolean syncDataFromOM() throws IOException {
     if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
       try {
         LOG.info("Syncing data from Ozone Manager.");
@@ -613,6 +628,7 @@ public class OzoneManagerServiceProviderImpl
             reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
           }
         }
+        printFileAndKeyTableCount(omMetadataManager);
       } finally {
         isSyncDataFromOMRunning.set(false);
       }
@@ -621,6 +637,35 @@ public class OzoneManagerServiceProviderImpl
       return false;
     }
     return true;
+  }
+
+  private void printFileAndKeyTableCount(ReconOMMetadataManager omMetadataManager) throws IOException {
+    Table fileTable = omMetadataManager.getTable("fileTable");
+    Table keyTable = omMetadataManager.getTable("keyTable");
+    if (keyTable == null) {
+      LOG.error("Table keyTable not found in OM Metadata.");
+      return;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+               = keyTable.iterator()) {
+        long count = Iterators.size(iterator);
+        LOG.debug("keyTable Table count: {}", count);
+      }
+    }
+
+    if (fileTable == null) {
+      LOG.error("Table fileTable not found in OM Metadata.");
+    }
+
+    if (LOG.isDebugEnabled()) {
+      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+               = fileTable.iterator()) {
+        long count = Iterators.size(iterator);
+        LOG.debug("fileTable Table count: {}", count);
+      }
+    }
   }
 
   public void checkAndValidateReconDbPermissions() {
