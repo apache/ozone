@@ -111,7 +111,7 @@ public class AccessHeatMapEndpoint {
   /**
    * This API do a health check for HeatMapProvider source if it is initialized
    * and returning response.
-   * @return
+   * @return HealthCheckResponse wrapped in Response object.
    */
   @GET
   @Path("/healthCheck")
