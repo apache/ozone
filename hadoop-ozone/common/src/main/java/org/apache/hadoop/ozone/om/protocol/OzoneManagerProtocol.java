@@ -1152,4 +1152,12 @@ public interface OzoneManagerProtocol
    */
   boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException;
+
+  /**
+   * API for OM to force fetch the network topology tree information from SCM
+   * without having to rely on ozone.om.network.topology.refresh.duration.
+   * @return status of the refetch operation (success/failure).
+   * @throws IOException
+   */
+  boolean refetchNetworkTopologyTree() throws IOException;
 }

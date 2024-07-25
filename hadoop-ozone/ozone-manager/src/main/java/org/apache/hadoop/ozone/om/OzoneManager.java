@@ -1095,9 +1095,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
   public UUID refetchSecretKey() {
     secretKeyClient.refetchSecretKey();
     return secretKeyClient.getCurrentSecretKey().getId();
+  }
+
+  @Override
+  public boolean refetchNetworkTopologyTree() {
+    return scmTopologyClient.refetchClusterTree(configuration);
   }
 
   @VisibleForTesting
