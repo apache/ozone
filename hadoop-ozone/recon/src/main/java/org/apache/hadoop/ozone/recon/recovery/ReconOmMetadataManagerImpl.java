@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -70,11 +69,6 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
                                     ReconUtils reconUtils) {
     this.reconUtils = reconUtils;
     this.ozoneConfiguration = configuration;
-  }
-
-  @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return super.getTableLock(tableName);
   }
 
   @Override

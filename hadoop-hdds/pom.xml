@@ -39,6 +39,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>interface-server</module>
     <module>client</module>
     <module>common</module>
+    <module>crypto-api</module>
+    <module>crypto-default</module>
     <module>framework</module>
     <module>managed-rocksdb</module>
     <module>rocksdb-checkpoint-differ</module>

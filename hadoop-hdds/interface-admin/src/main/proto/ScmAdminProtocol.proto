@@ -84,6 +84,7 @@ message ScmContainerLocationRequest {
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
+  optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -139,6 +140,7 @@ message ScmContainerLocationResponse {
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
+  optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
 
   enum Status {
     OK = 1;
@@ -193,6 +195,7 @@ enum Type {
   SingleNodeQuery = 41;
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
+  GetContainerBalancerStatusInfo = 44;
 }
 
 /**
@@ -605,6 +608,38 @@ message ContainerBalancerStatusRequestProto {
 
 message ContainerBalancerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ContainerBalancerStatusInfoRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusInfoResponseProto {
+  optional bool isRunning = 1;
+  optional ContainerBalancerStatusInfo containerBalancerStatusInfo = 2;
+}
+message ContainerBalancerStatusInfo {
+  optional uint64 startedAt = 1;
+  optional ContainerBalancerConfigurationProto configuration = 2;
+  repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
+}
+
+message ContainerBalancerTaskIterationStatusInfo {
+  optional int32 iterationNumber = 1;
+  optional string iterationResult = 2;
+  optional int64 sizeScheduledForMoveGB = 3;
+  optional int64 dataSizeMovedGB = 4;
+  optional int64 containerMovesScheduled = 5;
+  optional int64 containerMovesCompleted = 6;
+  optional int64 containerMovesFailed = 7;
+  optional int64 containerMovesTimeout = 8;
+  repeated NodeTransferInfo sizeEnteringNodesGB = 9;
+  repeated NodeTransferInfo sizeLeavingNodesGB = 10;
+}
+
+message NodeTransferInfo {
+  optional string uuid = 1;
+  optional int64 dataVolumeGB = 2;
 }
 
 message DecommissionScmRequestProto {

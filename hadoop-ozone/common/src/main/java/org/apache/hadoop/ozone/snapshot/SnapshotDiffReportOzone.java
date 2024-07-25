@@ -89,6 +89,14 @@ public class SnapshotDiffReportOzone
     return super.getDiffList();
   }
 
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
   public String getToken() {
     return token;
   }

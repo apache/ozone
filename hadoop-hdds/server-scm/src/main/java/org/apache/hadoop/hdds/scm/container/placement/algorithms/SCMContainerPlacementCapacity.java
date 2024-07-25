@@ -72,6 +72,8 @@ public final class SCMContainerPlacementCapacity
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementCapacity.class);
 
+  private final SCMContainerPlacementMetrics metrics;
+
   /**
    * Constructs a Container Placement with considering only capacity.
    * That is this policy tries to place containers based on node weight.
@@ -83,6 +85,7 @@ public final class SCMContainerPlacementCapacity
       final ConfigurationSource conf, final NetworkTopology networkTopology,
       final boolean fallback, final SCMContainerPlacementMetrics metrics) {
     super(nodeManager, conf);
+    this.metrics = metrics;
   }
 
   /**
@@ -104,6 +107,7 @@ public final class SCMContainerPlacementCapacity
           List<DatanodeDetails> favoredNodes,
           final int nodesRequired, long metadataSizeRequired,
           long dataSizeRequired) throws SCMException {
+    metrics.incrDatanodeRequestCount(nodesRequired);
     List<DatanodeDetails> healthyNodes = super.chooseDatanodesInternal(
             usedNodes, excludedNodes, favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
@@ -123,6 +127,7 @@ public final class SCMContainerPlacementCapacity
    */
   @Override
   public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+    metrics.incrDatanodeChooseAttemptCount();
     int firstNodeNdx = getRand().nextInt(healthyNodes.size());
     int secondNodeNdx = getRand().nextInt(healthyNodes.size());
 
@@ -142,6 +147,7 @@ public final class SCMContainerPlacementCapacity
           ? firstNodeDetails : secondNodeDetails;
     }
     healthyNodes.remove(datanodeDetails);
+    metrics.incrDatanodeChooseSuccessCount();
     return datanodeDetails;
   }
 }

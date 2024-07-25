@@ -30,7 +30,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.parseInputPath;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
@@ -104,9 +103,6 @@ public class DiskUsageSubCommand implements Callable {
     if ("PATH_NOT_FOUND".equals(duResponse.path("status").asText(""))) {
       printPathNotFound();
     } else {
-      if (parent.isNotValidBucketOrOBSBucket(path)) {
-        printBucketReminder();
-      }
 
       long totalSize = duResponse.path("size").asLong(-1);
       if (!noHeader) {

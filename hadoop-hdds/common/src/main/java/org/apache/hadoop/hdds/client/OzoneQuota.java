@@ -77,9 +77,11 @@ public final class OzoneQuota {
     PARSE_ORDER = Collections.unmodifiableList(reversed);
   }
 
+  private static final RawQuotaInBytes ZERO_BYTES = new RawQuotaInBytes(Units.B, 0);
+
   // Quota to decide how many buckets can be created.
   private long quotaInNamespace;
-  // Quota to decide how many storage space will be used in bytes.
+  // Quota to decide how much storage space will be used in bytes.
   private final long quotaInBytes;
   private final RawQuotaInBytes rawQuotaInBytes;
 
@@ -89,6 +91,9 @@ public final class OzoneQuota {
   private static class RawQuotaInBytes {
     static RawQuotaInBytes valueOf(long quotaInBytes) {
       Preconditions.assertTrue(quotaInBytes >= 0, () -> "quotaInBytes = " + quotaInBytes + " must be >= 0");
+      if (quotaInBytes == 0) {
+        return ZERO_BYTES;
+      }
       final int i = Long.numberOfTrailingZeros(quotaInBytes) / 10;
       final Units unit = Units.values()[i];
       final RawQuotaInBytes b = unit.getRawQuotaInBytes(quotaInBytes >> (i * 10));

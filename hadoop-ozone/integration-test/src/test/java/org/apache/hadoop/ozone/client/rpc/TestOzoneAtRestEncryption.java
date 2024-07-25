@@ -177,12 +177,6 @@ class TestOzoneAtRestEncryption {
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
-    TestOzoneRpcClient.setCluster(cluster);
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setOzoneManager(ozoneManager);
-    TestOzoneRpcClient.setStorageContainerLocationClient(
-        storageContainerLocationClient);
-    TestOzoneRpcClient.setStore(store);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -216,8 +210,6 @@ class TestOzoneAtRestEncryption {
   static void reInitClient() throws IOException {
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setStore(store);
   }
 
 

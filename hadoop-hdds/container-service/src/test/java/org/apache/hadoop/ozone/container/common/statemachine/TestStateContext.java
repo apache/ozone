@@ -668,8 +668,6 @@ public class TestStateContext {
         totalIncrementalCount);
     batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME,
         totalIncrementalCount);
-    batchRefreshfullReports(ctx,
-        StateContext.CRL_STATUS_REPORT_PROTO_NAME, totalIncrementalCount);
     batchAddIncrementalReport(ctx,
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
         totalIncrementalCount);
@@ -678,12 +676,11 @@ public class TestStateContext {
     expectedReportCount.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
     expectedReportCount.put(StateContext.NODE_REPORT_PROTO_NAME, 1);
     expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
-    expectedReportCount.put(StateContext.CRL_STATUS_REPORT_PROTO_NAME, 1);
     // Should keep less or equal than maxLimit depending on other reports' size.
-    // Here, the incremental container reports count must be 96
-    // (100 - 4 non-incremental reports)
+    // Here, the incremental container reports count must be 97
+    // (100 - 3 non-incremental reports)
     expectedReportCount.put(
-        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 96);
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
     checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
         expectedReportCount);
     checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
@@ -691,7 +688,7 @@ public class TestStateContext {
     expectedReportCount.clear();
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
-        totalIncrementalCount - 96);
+        totalIncrementalCount - 97);
     checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
         expectedReportCount);
     checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
