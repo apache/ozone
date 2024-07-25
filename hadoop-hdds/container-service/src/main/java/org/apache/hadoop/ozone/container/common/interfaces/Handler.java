@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -76,13 +75,12 @@ public abstract class Handler {
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender,
-      DNContainerOperationClient dnClient) {
+      IncrementalReportSender<Container> icrSender) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, metrics,
-          icrSender, dnClient);
+          icrSender);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");

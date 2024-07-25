@@ -63,7 +63,6 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -147,7 +146,6 @@ public class KeyValueHandler extends Handler {
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
-  private DNContainerOperationClient dnClient;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -192,17 +190,6 @@ public class KeyValueHandler extends Handler {
     byteBufferToByteString =
         ByteStringConversion
             .createByteBufferConversion(isUnsafeByteBufferConversionEnabled);
-  }
-
-  public KeyValueHandler(ConfigurationSource config,
-                         String datanodeId,
-                         ContainerSet contSet,
-                         VolumeSet volSet,
-                         ContainerMetrics metrics,
-                         IncrementalReportSender<Container> icrSender,
-                         DNContainerOperationClient dnClient) {
-    this(config, datanodeId, contSet, volSet, metrics, icrSender);
-    this.dnClient = dnClient;
   }
 
   @VisibleForTesting
@@ -1231,16 +1218,6 @@ public class KeyValueHandler extends Handler {
   @Override
   public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
-    for (DatanodeDetails dn : peers) {
-      KeyValueContainerData containerData =
-          (KeyValueContainerData) container.getContainerData();
-      ByteString containerMerkleTree =
-          dnClient.getContainerMerkleTree(containerData.getContainerID(), dn);
-      ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
-          ContainerProtos.ContainerChecksumInfo.parseFrom(containerMerkleTree);
-      LOG.debug("Container Merkle Tree for container {} is {}",
-          containerData.getContainerID(), containerChecksumInfo.getContainerMerkleTree());
-    }
     ContainerData data = container.getContainerData();
     long id = data.getContainerID();
     ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES)

@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -120,7 +119,6 @@ public class OzoneContainer {
   private final GrpcTlsConfig tlsClientConfig;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
-  private final DNContainerOperationClient dnClient;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
 
@@ -171,8 +169,6 @@ public class OzoneContainer {
     containerSet = new ContainerSet(recoveringContainerTimeout);
     metadataScanner = null;
 
-    dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
-
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -194,7 +190,7 @@ public class OzoneContainer {
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics, icrSender, dnClient));
+              containerSet, volumeSet, metrics, icrSender));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
@@ -286,10 +282,6 @@ public class OzoneContainer {
 
   public GrpcTlsConfig getTlsClientConfig() {
     return tlsClientConfig;
-  }
-
-  public DNContainerOperationClient getDnContainerOperationClient() {
-    return dnClient;
   }
 
   /**

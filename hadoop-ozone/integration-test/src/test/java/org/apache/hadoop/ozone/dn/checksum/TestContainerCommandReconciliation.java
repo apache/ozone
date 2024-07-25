@@ -74,6 +74,7 @@ public class TestContainerCommandReconciliation {
   private static ObjectStore store;
   private static OzoneConfiguration conf;
   private static File testDir;
+  private static DNContainerOperationClient dnClient;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -91,6 +92,7 @@ public class TestContainerCommandReconciliation {
     cluster.waitForClusterToBeReady();
     rpcClient = OzoneClientFactory.getRpcClient(conf);
     store = rpcClient.getObjectStore();
+    dnClient = new DNContainerOperationClient(conf, null, null);
   }
 
   @AfterAll
@@ -131,8 +133,6 @@ public class TestContainerCommandReconciliation {
     // Verify all the ContainerMerkle Tree matches
     List<DatanodeDetails> datanodeDetails = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails).collect(Collectors.toList());
-    DNContainerOperationClient dnClient = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getDnContainerOperationClient();
     for (DatanodeDetails dn: datanodeDetails) {
       ByteString merkleTree = dnClient.getContainerMerkleTree(container.getContainerID(), dn);
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =

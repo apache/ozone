@@ -191,7 +191,7 @@ public class TestSecureContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, metrics,
-              c -> { }, null));
+              c -> { }));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
