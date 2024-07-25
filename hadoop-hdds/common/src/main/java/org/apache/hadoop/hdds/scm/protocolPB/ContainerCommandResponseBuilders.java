@@ -336,12 +336,12 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(
-      ContainerCommandRequestProto request, ByteString checksumByteString) {
+      ContainerCommandRequestProto request, ByteString checksumTree) {
 
     ContainerProtos.GetContainerMerkleTreeResponseProto.Builder containerMerkleTree =
         ContainerProtos.GetContainerMerkleTreeResponseProto.newBuilder()
             .setContainerID(request.getContainerID())
-            .setContainerMerkleTree(checksumByteString);
+            .setContainerMerkleTree(checksumTree);
     return getSuccessResponseBuilder(request)
         .setGetContainerMerkleTree(containerMerkleTree).build();
   }

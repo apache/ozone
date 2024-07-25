@@ -610,8 +610,19 @@ public class KeyValueHandler extends Handler {
     }
 
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    ByteString checksumByteString = checksumManager.readChecksumFileAsBytes(containerData);
-    return getGetContainerMerkleTreeResponse(request, checksumByteString);
+    ByteString checksumTree = null;
+    try {
+      checksumTree = checksumManager.getContainerChecksumInfo(containerData);
+    } catch (IOException ex) {
+      return ContainerCommandResponseProto.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setTraceID(request.getTraceID())
+          .setResult(IO_EXCEPTION)
+          .setMessage(ex.getMessage())
+          .build();
+    }
+
+    return getGetContainerMerkleTreeResponse(request, checksumTree);
   }
 
   /**
@@ -1206,6 +1217,7 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
+    // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     for (DatanodeDetails dn : peers) {
       KeyValueContainerData containerData =
           (KeyValueContainerData) container.getContainerData();

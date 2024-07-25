@@ -37,14 +37,15 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import jakarta.annotation.Nonnull;
-import org.apache.hadoop.ozone.container.TokenHelper;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.container.TokenHelper.encode;
+import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 /**
  * This class wraps necessary container-level rpc calls for container reconcilitaion.
@@ -76,10 +77,12 @@ public class DNContainerOperationClient implements AutoCloseable {
           () -> HAUtils.buildCAX509List(null, conf);
       trustManager = new ClientTrustManager(remoteCacerts, localCaCerts);
     }
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     return new XceiverClientManager(conf,
         new XceiverClientManager.XceiverClientManagerConfigBuilder()
-            .setMaxCacheSize(100).setStaleThresholdMs(10 * 1000).build(),
-        trustManager);
+            .setMaxCacheSize(dnConf.getContainerClientCacheSize())
+            .setStaleThresholdMs(dnConf.getContainerClientCacheStaleThreshold())
+            .build(), trustManager);
   }
 
   public XceiverClientManager getXceiverClientManager() {

@@ -159,7 +159,8 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ByteString readChecksumFileAsBytes(KeyValueContainerData data)  {
+  public ByteString getContainerChecksumInfo(KeyValueContainerData data)
+      throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -169,11 +170,13 @@ public class ContainerChecksumTreeManager {
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
         return ByteString.readFrom(inStream);
       } catch (FileNotFoundException ex) {
-        LOG.info("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
+        // TODO: Build the container checksum tree when it doesn't exist.
+        LOG.error("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
             containerID, checksumFile, ex);
       } catch (IOException ex) {
-        LOG.info("Error occured when reading checksum file for container {} at the path {}. " +
-                "Returning an empty instance.", containerID, checksumFile, ex);
+        throw new IOException("Error occured when reading checksum file for container " + containerID +
+            " at the path " + checksumFile + ". Returning an empty instance.", ex);
+
       }
       return null;
     } finally {
