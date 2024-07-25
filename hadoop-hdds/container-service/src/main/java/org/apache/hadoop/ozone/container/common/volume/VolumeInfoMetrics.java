@@ -154,7 +154,7 @@ public class VolumeInfoMetrics {
   }
 
   public void dbCompactTimeIncr(long time) {
-     dbCompactTimes.addAndGet(time);
+    dbCompactTimes.addAndGet(time);
   }
 
 }
