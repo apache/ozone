@@ -39,7 +39,7 @@ const showInfoNotification = (title: string, description: string) => {
     description,
     duration: 15
   };
-  notification.info(args);
+  notification.warn(args);
 };
 
 export const showDataFetchError = (error: string) => {
