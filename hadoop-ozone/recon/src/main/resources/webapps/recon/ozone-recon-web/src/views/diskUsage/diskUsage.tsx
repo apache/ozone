@@ -322,7 +322,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
-      if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {      
+      if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {
         if (summaryResponse.type === 'KEY') {
           const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
