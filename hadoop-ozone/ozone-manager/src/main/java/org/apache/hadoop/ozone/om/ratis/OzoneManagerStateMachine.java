@@ -375,12 +375,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
-      if (readonlyMode.get()) {
-        // return failure without updating transaction index as double buffer is stopped
-        return CompletableFuture.supplyAsync(() -> createErrorResponse(request,
-            new OMException("OM is running in readonly mode due to internal error",
-            OMException.ResultCodes.READONLY_MODE), termIndex)).thenApply(this::processResponse);
-      }
 
       return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
           .thenApply(this::processResponse);
@@ -571,6 +565,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    if (readonlyMode.get()) {
+      // return failure without updating transaction index as double buffer is stopped
+      LOG.error("OM is running in readonly mode due to internal error, rejected apply transaction for index: {}",
+          termIndex);
+      // release transaction to avoid any blocking transaction waiting for lock in applyTransaction
+      // and request should fail as READONLY_MODE
+      ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
+      return createErrorResponse(request,
+          new OMException("OM is running in readonly mode due to internal error, request index: " + termIndex,
+              OMException.ResultCodes.READONLY_MODE), termIndex);
+    }
     try {
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, termIndex, ozoneManagerDoubleBuffer);
@@ -591,7 +596,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           .getBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY,
               OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
       if (onFailureReadonlyEnable) {
-        LOG.error("Failed to write, moving to readonly mode, Exception occurred ", e);
+        LOG.error("Failed to write, moving to readonly mode, request index: {}, Exception occurred ", termIndex, e);
         if (readonlyMode.compareAndSet(false, true)) {
           // update readonly mode, flush existing transaction and pause state machine
           readonlyMode.set(true);

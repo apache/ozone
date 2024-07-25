@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
@@ -136,23 +137,26 @@ public class TestOzoneManagerReadonlyMode {
 
     cluster.restartOzoneManager();
 
-    // restart, verify state machine remains in readonly mode
+    // restart, verify state machine remains in readonly mode for all nodes
     GenericTestUtils.waitFor(() -> {
+      boolean allReady = true;
       for (OzoneManager om : ((MiniOzoneHAClusterImpl) cluster).getOzoneManagersList()) {
-        if (om.getOmRatisServer().getOmStateMachine().isReadOnly()) {
-          return true;
+        if (!om.getOmRatisServer().getOmStateMachine().isReadOnly()) {
+          allReady = false;
         }
       }
-      return false;
-    }, 100, 10000);
+      return allReady;
+    }, 100, 30000);
 
     try {
       objectStore.createVolume(volumeName + "1112");
+      fail("must fail create vol");
     } catch (Exception ex) {
       assertTrue(ex.getMessage().contains("OM is running in readonly mode"));
     }
 
     for (int i = 0; i < 10; ++i) {
+      Thread.sleep(200);
       cluster.newClient().getObjectStore().listVolumes("");
     }
   }
