@@ -316,8 +316,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       // If status is INITIALIZING, we cannot add entities for metadata as it will cause null failures and showing Warning message
       // Hence we only add Entities if the status is not INITIALIZING 
-      if (summaryResponse.status ===  'INITIALIZING')
-      {
+      if (summaryResponse.status ===  'INITIALIZING') {
         showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
         return;
       }
