@@ -105,7 +105,6 @@ public class HeatMapServiceImpl extends HeatMapService {
     return path;
   }
 
-  @Override
   public HealthCheckResponse doHeatMapHealthCheck() {
     return heatMapProvider.doHeatMapHealthCheck();
   }
