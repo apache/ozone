@@ -63,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestDefaultProfile {
   private SecurityConfig securityConfig;
   private DefaultProfile defaultProfile;
-  private MockApprover testApprover;
+  private DefaultApprover approver;
   private KeyPair keyPair;
 
   @BeforeEach
@@ -72,8 +72,7 @@ public class TestDefaultProfile {
     configuration.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(configuration);
     defaultProfile = new DefaultProfile();
-    testApprover = new MockApprover(defaultProfile,
-        securityConfig);
+    approver = new DefaultApprover(defaultProfile, securityConfig);
     keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
   }
 
@@ -114,7 +113,7 @@ public class TestDefaultProfile {
         .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
-    assertTrue(testApprover.verifyPkcs10Request(csr));
+    assertTrue(approver.verifyPkcs10Request(csr));
   }
 
 
@@ -148,7 +147,7 @@ public class TestDefaultProfile {
         .build();
     // Signature verification should fail here, since the public/private key
     // does not match.
-    assertFalse(testApprover.verifyPkcs10Request(csr));
+    assertFalse(approver.verifyPkcs10Request(csr));
   }
 
   /**
@@ -170,7 +169,7 @@ public class TestDefaultProfile {
         .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
-    assertTrue(testApprover.verfiyExtensions(csr));
+    assertTrue(approver.verfiyExtensions(csr));
   }
 
   /**
@@ -192,7 +191,7 @@ public class TestDefaultProfile {
         .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
   }
 
   /**
@@ -209,12 +208,12 @@ public class TestDefaultProfile {
     Extensions emailExtension = getSANExtension(GeneralName.rfc822Name,
         "bilbo@apache.org", false);
     PKCS10CertificationRequest csr = getInvalidCSR(keyPair, emailExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
 
     emailExtension = getSANExtension(GeneralName.rfc822Name, "bilbo" +
         "@apache.org", true);
     csr = getInvalidCSR(keyPair, emailExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
 
   }
 
@@ -229,11 +228,11 @@ public class TestDefaultProfile {
     Extensions oExtension = getSANExtension(
         GeneralName.uniformResourceIdentifier, "s3g.ozone.org", false);
     PKCS10CertificationRequest csr = getInvalidCSR(keyPair, oExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
     oExtension = getSANExtension(GeneralName.uniformResourceIdentifier,
         "s3g.ozone.org", false);
     csr = getInvalidCSR(keyPair, oExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
   }
 
   /**
@@ -248,13 +247,13 @@ public class TestDefaultProfile {
         "ozone.hadoop.org",
         true);
     PKCS10CertificationRequest csr = getInvalidCSR(keyPair, dnsExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
     // This tests should pass, hence the assertTrue
     dnsExtension = getSANExtension(GeneralName.dNSName,
         "ozone.hadoop.org",
         false);
     csr = getInvalidCSR(keyPair, dnsExtension);
-    assertTrue(testApprover.verfiyExtensions(csr));
+    assertTrue(approver.verfiyExtensions(csr));
   }
 
 
@@ -269,12 +268,12 @@ public class TestDefaultProfile {
     Extensions extendedExtension =
         getKeyUsageExtension(KeyPurposeId.id_kp_clientAuth, false);
     PKCS10CertificationRequest csr = getInvalidCSR(keyPair, extendedExtension);
-    assertTrue(testApprover.verfiyExtensions(csr));
+    assertTrue(approver.verfiyExtensions(csr));
 
     extendedExtension = getKeyUsageExtension(KeyPurposeId.id_kp_serverAuth,
         false);
     csr = getInvalidCSR(keyPair, extendedExtension);
-    assertTrue(testApprover.verfiyExtensions(csr));
+    assertTrue(approver.verfiyExtensions(csr));
   }
 
 
@@ -289,12 +288,12 @@ public class TestDefaultProfile {
     Extensions extendedExtension =
         getKeyUsageExtension(KeyPurposeId.id_kp_clientAuth, true);
     PKCS10CertificationRequest csr = getInvalidCSR(keyPair, extendedExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
 
     extendedExtension = getKeyUsageExtension(KeyPurposeId.id_kp_OCSPSigning,
         false);
     csr = getInvalidCSR(keyPair, extendedExtension);
-    assertFalse(testApprover.verfiyExtensions(csr));
+    assertFalse(approver.verfiyExtensions(csr));
   }
 
 

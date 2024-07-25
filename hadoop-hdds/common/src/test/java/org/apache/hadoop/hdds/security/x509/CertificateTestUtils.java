@@ -152,6 +152,7 @@ public final class CertificateTestUtils {
         .addExtension(Extension.authorityKeyIdentifier, false, authorityKeyId)
         .addExtension(Extension.basicConstraints, true, constraints);
 
+    //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
     return new JcaX509CertificateConverter()
         .setProvider(new BouncyCastleProvider())
         .getCertificate(certificateBuilder.build(contentSigner));

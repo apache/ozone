@@ -166,7 +166,7 @@ public class NSSummaryTask implements ReconOmTask {
           TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
       // Log performance metrics
-      LOG.info("Task execution time: {} milliseconds", durationInMillis);
+      LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
     return new ImmutablePair<>(getTaskName(), true);

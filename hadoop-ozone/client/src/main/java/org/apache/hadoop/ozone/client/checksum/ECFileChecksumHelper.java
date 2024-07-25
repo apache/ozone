@@ -186,13 +186,10 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
             blockID.getContainerID());
       }
-      xceiverClientSpi =
-          getXceiverClientFactory().acquireClientForReadData(pipeline);
+      xceiverClientSpi = getXceiverClientFactory().acquireClientForReadData(pipeline);
 
-      ContainerProtos.DatanodeBlockID datanodeBlockID = blockID
-          .getDatanodeBlockIDProtobuf();
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClientSpi, datanodeBlockID, token);
+          .getBlock(xceiverClientSpi, blockID, token, pipeline.getReplicaIndexes());
 
       chunks = response.getBlockData().getChunksList();
     } finally {
