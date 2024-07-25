@@ -21,6 +21,7 @@
   "/namespace/du?path=/dummyVolume/dummyBucket/key:id*&sortSubPaths=true": "/key",
   "/namespace/du?path=/vol1/bucket1/empty&files=true&sortSubPaths=true": "/empty",
   "/namespace/du?path=/clunky&files=true&sortSubpaths=true": "/clunky",
+  "/namespace/du?path=/*&replica=true": "/replica",
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",

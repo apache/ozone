@@ -322,8 +322,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
-      if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {
-        if (summaryResponse.countStats.type === 'KEY') {
+      if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {      
+        if (summaryResponse.type === 'KEY') {
           const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
           cancelKeyMetadataSignal = metadataNewController;
@@ -332,8 +332,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             values.push(byteToSize(response.data.size, 3));
             keys.push('File Size With Replication');
             values.push(byteToSize(response.data.sizeWithReplica, 3));
-            console.log(values);
-
             this.setState({
               showPanel: true,
               panelKeys: keys,

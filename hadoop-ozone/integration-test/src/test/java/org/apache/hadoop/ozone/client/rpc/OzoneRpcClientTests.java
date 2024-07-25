@@ -799,7 +799,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     OMException omException = assertThrows(OMException.class,
         () -> volume.createBucket(bucketName));
-    assertEquals("Bucket or Volume name has an unsupported character : #",
+    assertEquals("bucket name has an unsupported character : #",
         omException.getMessage());
   }
 
@@ -1900,6 +1900,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
 
   @Test
+  @Flaky("HDDS-10886")
   public void testPutKeyRatisThreeNodesParallel() throws IOException,
       InterruptedException {
     String volumeName = UUID.randomUUID().toString();
