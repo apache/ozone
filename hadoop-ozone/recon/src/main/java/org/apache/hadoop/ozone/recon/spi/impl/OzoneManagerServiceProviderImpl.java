@@ -628,7 +628,7 @@ public class OzoneManagerServiceProviderImpl
             reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
           }
         }
-        printFileAndKeyTableCount(omMetadataManager);
+        printFileAndKeyTableCount();
       } finally {
         isSyncDataFromOMRunning.set(false);
       }
@@ -639,7 +639,7 @@ public class OzoneManagerServiceProviderImpl
     return true;
   }
 
-  private void printFileAndKeyTableCount(ReconOMMetadataManager omMetadataManager) throws IOException {
+  private void printFileAndKeyTableCount() throws IOException {
     Table fileTable = omMetadataManager.getTable("fileTable");
     Table keyTable = omMetadataManager.getTable("keyTable");
     if (keyTable == null) {
