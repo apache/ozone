@@ -107,4 +107,10 @@ public class AccessHeatMapEndpoint {
       throw new WebApplicationException(Response.Status.NOT_FOUND);
     }
   }
+
+  @GET
+  @Path("/healthCheck")
+  public Response getReadAccessMetaData() {
+    return Response.ok(heatMapService.doHeatMapHealthCheck()).build();
+  }
 }

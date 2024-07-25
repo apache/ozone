@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+import org.apache.hadoop.ozone.recon.api.types.HealthCheckResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -102,6 +103,11 @@ public class HeatMapServiceImpl extends HeatMapService {
       path = path.substring(1);
     }
     return path;
+  }
+
+  @Override
+  public HealthCheckResponse doHeatMapHealthCheck() {
+    return heatMapProvider.doHeatMapHealthCheck();
   }
 
 }
