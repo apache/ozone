@@ -670,7 +670,7 @@ public class BasicRootedOzoneClientAdapterImpl
         OzoneBucket bucket = getBucket(volumeName, bucketName, false);
         return getFileStatusAdapterWithSnapshotIndicator(volume, bucket, uri);
       } else {
-        OzoneFileStatus status = objectStore.getClientProxy().getOzoneFileStatus(volumeName, bucketName, key);
+        OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, bucketName, key);
         return toFileStatusAdapter(status, userName, uri, qualifiedPath, ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
