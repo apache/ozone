@@ -612,4 +612,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_IGNORED_REQUEST_FAILURE =
+      "ozone.om.requests.ignore.terminate.on.failure";
 }

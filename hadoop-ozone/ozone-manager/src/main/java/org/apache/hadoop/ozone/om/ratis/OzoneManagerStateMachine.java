@@ -22,13 +22,18 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -371,6 +376,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // In such cases, OM must be terminated instead of completing the future exceptionally,
       // Otherwise, OM may continue applying transactions which leads to an inconsistent state.
       if (omResponse.getStatus() == INTERNAL_ERROR) {
+        if (getSplitRequestIgnoreFailure().contains(omResponse.getCmdType().name().toLowerCase())) {
+          return OMRatisHelper.convertResponseToMessage(omResponse);
+        }
         terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
       } else if (omResponse.getStatus() == METADATA_ERROR) {
         terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
@@ -554,6 +562,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
+      if (getSplitRequestIgnoreFailure().contains(request.getCmdType().name().toLowerCase())) {
+        LOG.warn("request handling failure for command: {}, index: {} is ignored, exception occurred ",
+            request.getCmdType().name(), termIndex, e);
+        return createErrorResponse(request, new IOException(e), termIndex);
+      }
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
@@ -641,5 +654,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
+  }
+
+  private Set<String> getSplitRequestIgnoreFailure() {
+    String ignoreCmdList = ozoneManager.getConfiguration().get(OMConfigKeys.OZONE_OM_IGNORED_REQUEST_FAILURE);
+    if (StringUtils.isNotEmpty(ignoreCmdList)) {
+      return Arrays.stream(ignoreCmdList.split(",")).map(String::trim).map(String::toLowerCase)
+          .collect(Collectors.toSet());
+    }
+    return Collections.emptySet();
   }
 }
