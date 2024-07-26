@@ -522,8 +522,9 @@ public class BasicRootedOzoneClientAdapterImpl
       // Create volume and bucket if they do not exist, and retry key creation.
       // This call will throw an exception if it fails, or the exception is different than it handles.
       handleVolumeOrBucketCreationOnException(volumeName, bucketName, e);
-      proxy.createDirectory(volumeName, bucketName, keyStr);
-      throw e;
+      if (keyStr != null && !keyStr.isEmpty()) {
+        proxy.createDirectory(volumeName, bucketName, keyStr);
+      }
     }
     return true;
   }
