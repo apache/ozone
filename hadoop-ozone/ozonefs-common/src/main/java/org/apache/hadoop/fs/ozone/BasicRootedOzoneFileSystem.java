@@ -704,6 +704,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     String key = pathToKey(f);
     OFSPath ofsPath = new OFSPath(key,
         ozoneConfiguration);
+    OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
     // Handle rm root
     if (ofsPath.isRoot()) {
       // Intentionally drop support for rm root
@@ -727,7 +728,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     // delete bucket
     if (ofsPath.isBucket()) {
-      return deleteBucket(f, recursive, ofsPath);
+      return deleteBucket(f, recursive, bucket);
     }
     
     // delete files and directory
@@ -742,8 +743,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     boolean result;
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-
-      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
       if (bucket.getBucketLayout().isFileSystemOptimized()) {
         String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
             OZONE_URI_DELIMITER + ofsPath.getKeyName();
@@ -766,15 +765,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return result;
   }
 
-  private boolean deleteBucket(Path f, boolean recursive, OFSPath ofsPath)
+  private boolean deleteBucket(Path f, boolean recursive, OzoneBucket bucket)
       throws IOException {
     // check status of normal bucket
     try {
       getFileStatus(f);
     } catch (FileNotFoundException ex) {
       // remove orphan link bucket directly
-      if (isLinkBucket(f, ofsPath)) {
-        deleteBucketFromVolume(f, ofsPath);
+      if (isLinkBucket(f, bucket)) {
+        deleteBucketFromVolume(f, bucket);
         return true;
       }
       LOG.warn("delete: Path does not exist: {}", f);
@@ -787,8 +786,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     boolean handleTrailingSlash = f.toString().endsWith(OZONE_URI_DELIMITER);
     // remove link bucket directly if link and
     // rm path does not have trailing slash
-    if (isLinkBucket(f, ofsPath) && !handleTrailingSlash) {
-      deleteBucketFromVolume(f, ofsPath);
+    if (isLinkBucket(f, bucket) && !handleTrailingSlash) {
+      deleteBucketFromVolume(f, bucket);
       return true;
     }
 
@@ -799,14 +798,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // if so, the contents of bucket were deleted and skip delete bucket
     // otherwise, Handle delete bucket
     if (!handleTrailingSlash) {
-      deleteBucketFromVolume(f, ofsPath);
+      deleteBucketFromVolume(f, bucket);
     }
     return result;
   }
 
-  private boolean isLinkBucket(Path f, OFSPath ofsPath) {
+  private boolean isLinkBucket(Path f, OzoneBucket bucket) {
     try {
-      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
       if (bucket.isLink()) {
         return true;
       }
@@ -818,12 +816,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return false;
   }
 
-  private void deleteBucketFromVolume(Path f, OFSPath ofsPath)
+  private void deleteBucketFromVolume(Path f, OzoneBucket bucket)
       throws IOException {
     OzoneVolume volume =
-        adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
+        adapterImpl.getObjectStore().getVolume(bucket.getVolumeName());
     try {
-      volume.deleteBucket(ofsPath.getBucketName());
+      volume.deleteBucket(bucket.getName());
     } catch (OMException ex) {
       // bucket is not empty
       if (ex.getResult() == BUCKET_NOT_EMPTY) {
