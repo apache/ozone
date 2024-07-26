@@ -49,7 +49,7 @@ public interface NodeManagerMXBean {
    */
   Map<String, Map<String, String>> getNodeStatusInfo();
 
-  default Map<String, String> getNodeStatics() {
+  default Map<String, String> getNodeStatistics() {
     return new HashMap<>();
   }
 

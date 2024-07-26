@@ -32,13 +32,15 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
-            $scope.statistical = {
-                usages : {}
+            $scope.statistics = {
+                nodes : {
+                    usages : {}
+                }
             }
-            $scope.statistical.usages.min = "";
-            $scope.statistical.usages.max = "";
-            $scope.statistical.usages.medina = "";
-            $scope.statistical.usages.stdev = "";
+            $scope.statistics.nodes.usages.min = "";
+            $scope.statistics.nodes.usages.max = "";
+            $scope.statistics.nodes.usages.median = "";
+            $scope.statistics.nodes.usages.stdev = "";
 
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
@@ -89,15 +91,15 @@
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
 
-                    ctrl.nodemanagermetrics.NodeStatics.map(({ key, value }) => {
+                    ctrl.nodemanagermetrics.NodeStatistics.map(({ key, value }) => {
                         if(key == "Min") {
-                            $scope.statistical.usages.min = value;
+                            $scope.statistics.nodes.usages.min = value;
                         } else if(key == "Max") {
-                            $scope.statistical.usages.max = value;
-                        } else if(key == "Medina") {
-                            $scope.statistical.usages.medina = value;
+                            $scope.statistics.nodes.usages.max = value;
+                        } else if(key == "Median") {
+                            $scope.statistics.nodes.usages.median = value;
                         } else if(key == "Stdev") {
-                            $scope.statistical.usages.stdev = value;
+                            $scope.statistics.nodes.usages.stdev = value;
                         }
                     });
                 });

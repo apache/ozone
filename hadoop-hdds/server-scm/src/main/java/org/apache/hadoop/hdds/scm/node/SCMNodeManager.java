@@ -1219,17 +1219,24 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, String> getNodeStatics() {
-    if (nodeStateManager.getAllNodes().size() < 1) {
-      return new HashMap<>();
-    }
+  public Map<String, String> getNodeStatistics() {
     Map<String, String> nodeStatics = new HashMap<>();
+    // Statistics node usaged
+    nodeUsageStatics(nodeStatics);
+    // todo: Statistics of other instances
+    return nodeStatics;
+  }
+
+  private void nodeUsageStatics(Map<String, String> nodeStatics) {
+    if (nodeStateManager.getAllNodes().size() < 1) {
+      return;
+    }
     float[] usages = new float[nodeStateManager.getAllNodes().size()];
     float totalOzoneUsed = 0;
     int i = 0;
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       String[] storagePercentage = calculateStoragePercentage(
-          dni.getStorageReports());
+              dni.getStorageReports());
       if (storagePercentage[0].equals("N/A")) {
         usages[i++] = 0;
       } else {
@@ -1242,7 +1249,7 @@ public class SCMNodeManager implements NodeManager {
     totalOzoneUsed /= nodeStateManager.getAllNodes().size();
     Arrays.sort(usages);
     float median = usages[usages.length / 2];
-    nodeStatics.put(UsageStatics.MEDINNA.getLabel(), String.valueOf(median));
+    nodeStatics.put(UsageStatics.MEDIAN.getLabel(), String.valueOf(median));
     float max = usages[usages.length - 1];
     nodeStatics.put(UsageStatics.MAX.getLabel(), String.valueOf(max));
     float min = usages[0];
@@ -1256,7 +1263,6 @@ public class SCMNodeManager implements NodeManager {
     DecimalFormat decimalFormat = new DecimalFormat("#0.00");
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
     nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
-    return nodeStatics;
   }
 
   /**
@@ -1329,7 +1335,7 @@ public class SCMNodeManager implements NodeManager {
   private enum UsageStatics {
     MIN("Min"),
     MAX("Max"),
-    MEDINNA("Medina"),
+    MEDIAN("Median"),
     STDEV("Stdev");
     private String label;
     public String getLabel() {
