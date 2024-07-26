@@ -346,137 +346,137 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return;
         }
 
-        if (summaryResponse.countStats.status === 'PATH_NOT_FOUND') {
+        if (summaryResponse.countStats?.status === 'PATH_NOT_FOUND') {
           showDataFetchError(`Invalid Path: ${path}`);
           return;
         }
 
-        if (summaryResponse.countStats.numVolume !== -1) {
+        if (summaryResponse.countStats?.numVolume !== undefined && summaryResponse.countStats?.numVolume !== -1) {
           keys.push('Volumes');
           values.push(summaryResponse.countStats.numVolume);
         }
 
-        if (summaryResponse.countStats.numBucket !== -1) {
+        if (summaryResponse.countStats?.numBucket !== undefined && summaryResponse.countStats?.numBucket !== -1) {
           keys.push('Buckets');
           values.push(summaryResponse.countStats.numBucket);
         }
 
-        if (summaryResponse.countStats.numDir !== -1) {
+        if (summaryResponse.countStats?.numDir !== undefined && summaryResponse.countStats?.numDir !== -1) {
           keys.push('Total Directories');
           values.push(summaryResponse.countStats.numDir);
         }
 
-        if (summaryResponse.countStats.numKey !== -1) {
+        if (summaryResponse.countStats?.numKey !== undefined && summaryResponse.countStats?.numKey !== -1) {
           keys.push('Total Keys');
           values.push(summaryResponse.countStats.numKey);
         }
 
-        if (summaryResponse.objectInfo?.bucketName !== -1) {
+        if (summaryResponse.objectInfo?.bucketName !== undefined && summaryResponse.objectInfo?.bucketName !== -1) {
           keys.push('Bucket Name');
           values.push(summaryResponse.objectInfo.bucketName);
         }
 
-        if (summaryResponse.objectInfo?.bucketLayout !== -1) {
+        if (summaryResponse.objectInfo?.bucketLayout !== undefined && summaryResponse.objectInfo?.bucketLayout !== -1) {
           keys.push('Bucket Layout');
           values.push(summaryResponse.objectInfo.bucketLayout);
         }
 
-        if (summaryResponse.objectInfo?.creationTime !== -1) {
+        if (summaryResponse.objectInfo?.creationTime !== undefined && summaryResponse.objectInfo?.creationTime !== -1) {
           keys.push('Creation Time');
           values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
         }
 
-        if (summaryResponse.objectInfo?.dataSize !== -1) {
+        if (summaryResponse.objectInfo?.dataSize !== undefined && summaryResponse.objectInfo?.dataSize !== -1) {
           keys.push('Data Size');
           values.push(byteToSize(summaryResponse.objectInfo.dataSize, 3));
         }
 
-        if (summaryResponse.objectInfo?.encInfo !== -1) {
+        if (summaryResponse.objectInfo?.encInfo !== undefined && summaryResponse.objectInfo?.encInfo !== -1) {
           keys.push('ENC Info');
           values.push(summaryResponse.objectInfo.encInfo);
         }
 
-        if (summaryResponse.objectInfo?.fileName !== -1) {
+        if (summaryResponse.objectInfo?.fileName !== undefined && summaryResponse.objectInfo?.fileName !== -1) {
           keys.push('File Name');
           values.push(summaryResponse.objectInfo.fileName);
         }
 
-        if (summaryResponse.objectInfo?.keyName !== -1) {
+        if (summaryResponse.objectInfo?.keyName !== undefined && summaryResponse.objectInfo?.keyName !== -1) {
           keys.push('Key Name');
           values.push(summaryResponse.objectInfo.keyName);
         }
 
-        if (summaryResponse.objectInfo?.modificationTime !== -1) {
+        if (summaryResponse.objectInfo?.modificationTime !== undefined && summaryResponse.objectInfo?.modificationTime !== -1) {
           keys.push('Modification Time');
           values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
         }
 
-        if (summaryResponse.objectInfo?.name !== -1) {
+        if (summaryResponse.objectInfo?.name !== undefined && summaryResponse.objectInfo?.name !== -1) {
           keys.push('Name');
           values.push(summaryResponse.objectInfo.name);
         }
 
-        if (summaryResponse.objectInfo?.owner !== -1) {
+        if (summaryResponse.objectInfo?.owner !== undefined && summaryResponse.objectInfo?.owner !== -1) {
           keys.push('Owner');
           values.push(summaryResponse.objectInfo.owner);
         }
 
-        if (summaryResponse.objectInfo?.quotaInBytes !== -1) {
+        if (summaryResponse.objectInfo?.quotaInBytes !== undefined && summaryResponse.objectInfo?.quotaInBytes !== -1) {
           keys.push('Quota In Bytes');
           values.push(byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
         }
 
-        if (summaryResponse.objectInfo?.quotaInNamespace !== -1) {
+        if (summaryResponse.objectInfo?.quotaInNamespace !== undefined && summaryResponse.objectInfo?.quotaInNamespace !== -1) {
           keys.push('Quota In Namespace');
           values.push(byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
         }
 
-        if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== undefined && summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== -1) {
           keys.push('Replication Factor');
           values.push(summaryResponse.objectInfo.replicationConfig.replicationFactor);
         }
 
-        if (summaryResponse.objectInfo?.replicationConfig?.replicationType !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.replicationType !== undefined && summaryResponse.objectInfo?.replicationConfig?.replicationType !== -1) {
           keys.push('Replication Type');
           values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
         }
 
-        if (summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== -1) {
+        if (summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== undefined && summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== -1) {
           keys.push('Replication Required Nodes');
           values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
         }
 
-        if (summaryResponse.objectInfo?.sourceBucket !== -1) {
+        if (summaryResponse.objectInfo?.sourceBucket !== undefined && summaryResponse.objectInfo?.sourceBucket !== -1) {
           keys.push('Source Bucket');
           values.push(summaryResponse.objectInfo.sourceBucket);
         }
 
-        if (summaryResponse.objectInfo?.sourceVolume !== -1) {
+        if (summaryResponse.objectInfo?.sourceVolume !== undefined && summaryResponse.objectInfo?.sourceVolume !== -1) {
           keys.push('Source Volume');
           values.push(summaryResponse.objectInfo.sourceVolume);
         }
 
-        if (summaryResponse.objectInfo?.storageType !== -1) {
+        if (summaryResponse.objectInfo?.storageType !== undefined && summaryResponse.objectInfo?.storageType !== -1) {
           keys.push('Storage Type');
           values.push(summaryResponse.objectInfo.storageType);
         }
 
-        if (summaryResponse.objectInfo?.usedBytes !== -1) {
+        if (summaryResponse.objectInfo?.usedBytes !== undefined && summaryResponse.objectInfo?.usedBytes !== -1) {
           keys.push('Used Bytes');
           values.push(summaryResponse.objectInfo.usedBytes);
         }
 
-        if (summaryResponse.objectInfo?.usedNamespace !== -1) {
+        if (summaryResponse.objectInfo?.usedNamespace !== undefined && summaryResponse.objectInfo?.usedNamespace !== -1) {
           keys.push('Used NameSpaces');
           values.push(summaryResponse.objectInfo.usedNamespace);
         }
 
-        if (summaryResponse.objectInfo?.volumeName !== -1) {
+        if (summaryResponse.objectInfo?.volumeName !== undefined && summaryResponse.objectInfo?.volumeName !== -1) {
           keys.push('Volume Name');
           values.push(summaryResponse.objectInfo.volumeName);
         }
 
-        if (summaryResponse.objectInfo?.volume !== -1) {
+        if (summaryResponse.objectInfo?.volume !== undefined && summaryResponse.objectInfo?.volume !== -1) {
           keys.push('Volume');
           values.push(summaryResponse.objectInfo.volume);
         }
@@ -519,13 +519,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       // Append quota information
       // In case the object's quota isn't set
-      if (quotaResponse.allowed !== -1) {
+      if (quotaResponse.allowed !== undefined && quotaResponse.allowed !== -1) {
         keys.push('Quota Allowed');
         values.push(byteToSize(quotaResponse.allowed, 3));
       }
 
-      keys.push('Quota Used');
-      values.push(byteToSize(quotaResponse.used, 3));
+      if (quotaResponse.used !== undefined && quotaResponse.used !== -1) {
+        keys.push('Quota Used');
+        values.push(byteToSize(quotaResponse.used, 3));
+      }
       this.setState({
         showPanel: true,
         panelKeys: keys,
