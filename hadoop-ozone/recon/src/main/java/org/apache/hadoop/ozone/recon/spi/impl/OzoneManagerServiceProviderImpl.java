@@ -644,10 +644,9 @@ public class OzoneManagerServiceProviderImpl
     Table keyTable = omMetadataManager.getTable("keyTable");
     if (keyTable == null) {
       LOG.error("Table keyTable not found in OM Metadata.");
-      return;
     }
 
-    if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled() && null != keyTable) {
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
                = keyTable.iterator()) {
         long count = Iterators.size(iterator);
@@ -659,7 +658,7 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Table fileTable not found in OM Metadata.");
     }
 
-    if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled() && null != fileTable) {
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
                = fileTable.iterator()) {
         long count = Iterators.size(iterator);
