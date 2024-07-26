@@ -241,11 +241,8 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  OzoneBucket getBucket(OFSPath ofsPath, boolean createIfNotExist)
-      throws IOException {
-
-    return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-        createIfNotExist, true);
+  OzoneBucket getBucket(OFSPath ofsPath, boolean createIfNotExist)throws IOException {
+    return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(), createIfNotExist);
   }
 
   /**
@@ -254,17 +251,10 @@ public class BasicRootedOzoneClientAdapterImpl
    *
    * @param createIfNotExist Set this to true if the caller is a write operation
    *                         in order to create the volume and bucket.
-   * @param returnIfNotExist Set this to true, if you need the bucket details
-   *                         fetched from OM and returned. If set to false, the
-   *                         method returns null if the bucket was not existing,
-   *                         and the method call created it. (This is to spare
-   *                         the getBucketInfo RPC call when the return value is
-   *                         ignored.)
    * @throws IOException Exceptions other than OMException with result code
    *                     VOLUME_NOT_FOUND or BUCKET_NOT_FOUND.
    */
-  private OzoneBucket getBucket(String volumeStr, String bucketStr,
-      boolean createIfNotExist, boolean returnIfNotExist) throws IOException {
+  private OzoneBucket getBucket(String volumeStr, String bucketStr, boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
 
@@ -287,10 +277,8 @@ public class BasicRootedOzoneClientAdapterImpl
     } catch (OMException ex) {
       if (createIfNotExist) {
         handleVolumeOrBucketCreationOnException(volumeStr, bucketStr, ex);
-        if (returnIfNotExist) {
-          // Try to get the bucket again
-          bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-        }
+        // Try to get the bucket again
+        bucket = proxy.getBucketDetails(volumeStr, bucketStr);
       } else {
         throw ex;
       }
@@ -512,7 +500,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
     String bucketName = ofsPath.getBucketName();
     if (bucketName.isEmpty()) {
-      // Create volume only
+      // Create volume only as path only contains one element the volume.
       objectStore.createVolume(volumeName);
       return true;
     }
@@ -520,24 +508,21 @@ public class BasicRootedOzoneClientAdapterImpl
     String keyStr = ofsPath.getKeyName();
     try {
       if (keyStr == null || keyStr.isEmpty()) {
-        // Empty keyStr here indicates only volume and bucket is
-        // given in pathStr, so getBucket above should handle the creation
-        // of volume and bucket. We won't feed empty keyStr to
-        // bucket.createDirectory as that would be a NPE.
-        getBucket(volumeName, bucketName, true, false);
+        // This is the case when the given path only contains volume and bucket.
+        // If the bucket does not exist, then this will throw and bucket will be created
+        // in handleVolumeOrBucketCreationOnException later.
+        proxy.getBucketDetails(volumeName, bucketName);
       } else {
-        try {
-          proxy.createDirectory(volumeName, bucketName, keyStr);
-        } catch (OMException e) {
-          // Create volume and bucket if they do not exist, and retry key creation.
-          handleVolumeOrBucketCreationOnException(volumeName, bucketName, e);
-          proxy.createDirectory(volumeName, bucketName, keyStr);
-        }
+        proxy.createDirectory(volumeName, bucketName, keyStr);
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
         throw new FileAlreadyExistsException(e.getMessage());
       }
+      // Create volume and bucket if they do not exist, and retry key creation.
+      // This call will throw an exception if it fails, or the exception is different than it handles.
+      handleVolumeOrBucketCreationOnException(volumeName, bucketName, e);
+      proxy.createDirectory(volumeName, bucketName, keyStr);
       throw e;
     }
     return true;
@@ -831,7 +816,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
 
-    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false, true);
+    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
