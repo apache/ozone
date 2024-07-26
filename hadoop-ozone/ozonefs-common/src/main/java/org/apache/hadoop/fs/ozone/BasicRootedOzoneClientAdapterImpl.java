@@ -245,7 +245,7 @@ public class BasicRootedOzoneClientAdapterImpl
       throws IOException {
 
     return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-        createIfNotExist);
+        createIfNotExist, true);
   }
 
   /**
@@ -254,11 +254,17 @@ public class BasicRootedOzoneClientAdapterImpl
    *
    * @param createIfNotExist Set this to true if the caller is a write operation
    *                         in order to create the volume and bucket.
+   * @param returnIfNotExist Set this to true, if you need the bucket details
+   *                         fetched from OM and returned. If set to false, the
+   *                         method returns null if the bucket was not existing,
+   *                         and the method call created it. (This is to spare
+   *                         the getBucketInfo RPC call when the return value is
+   *                         ignored.)
    * @throws IOException Exceptions other than OMException with result code
    *                     VOLUME_NOT_FOUND or BUCKET_NOT_FOUND.
    */
   private OzoneBucket getBucket(String volumeStr, String bucketStr,
-      boolean createIfNotExist) throws IOException {
+      boolean createIfNotExist, boolean returnIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
 
@@ -268,7 +274,7 @@ public class BasicRootedOzoneClientAdapterImpl
           "getBucket: Invalid argument: given bucket string is empty.");
     }
 
-    OzoneBucket bucket;
+    OzoneBucket bucket = null;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
@@ -280,51 +286,52 @@ public class BasicRootedOzoneClientAdapterImpl
       OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
       if (createIfNotExist) {
-        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
-        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
-        // when ACL is disabled. Both exceptions need to be handled.
-        switch (ex.getResult()) {
-        case VOLUME_NOT_FOUND:
-          // Create the volume first when the volume doesn't exist
-          try {
-            objectStore.createVolume(volumeStr);
-          } catch (OMException newVolEx) {
-            // Ignore the case where another client created the volume
-            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-              throw newVolEx;
-            }
-          }
-          // No break here. Proceed to create the bucket
-        case BUCKET_NOT_FOUND:
-          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
-          // exists, so that we don't call create volume and incur
-          // unnecessary ACL checks which could lead to unwanted behavior.
-          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
-          // Create the bucket
-          try {
-            // Buckets created by OFS should be in FSO layout
-            volume.createBucket(bucketStr,
-                BucketArgs.newBuilder().setBucketLayout(
-                    this.defaultOFSBucketLayout).build());
-          } catch (OMException newBucEx) {
-            // Ignore the case where another client created the bucket
-            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
-              throw newBucEx;
-            }
-          }
-          break;
-        default:
-          // Throw unhandled exception
-          throw ex;
+        handleVolumeOrBucketCreationOnException(volumeStr, bucketStr, ex);
+        if (returnIfNotExist) {
+          // Try to get the bucket again
+          bucket = proxy.getBucketDetails(volumeStr, bucketStr);
         }
-        // Try get bucket again
-        bucket = proxy.getBucketDetails(volumeStr, bucketStr);
       } else {
         throw ex;
       }
     }
 
     return bucket;
+  }
+
+  private void handleVolumeOrBucketCreationOnException(String volumeStr, String bucketStr, OMException ex)
+      throws IOException {
+    // OM can throw VOLUME_NOT_FOUND when the parent volume does not exist, and in this case we may create the volume,
+    // OM can also throw BUCKET_NOT_FOUND when the parent bucket does not exist, and so we also may create the bucket.
+    // This method creates the volume and the bucket when an exception marks that they don't exist.
+    switch (ex.getResult()) {
+    case VOLUME_NOT_FOUND:
+      // Create the volume first when the volume doesn't exist
+      try {
+        objectStore.createVolume(volumeStr);
+      } catch (OMException newVolEx) {
+        // Ignore the case where another client created the volume
+        if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+          throw newVolEx;
+        }
+      }
+      // No break here. Proceed to create the bucket
+    case BUCKET_NOT_FOUND:
+      // Create the bucket
+      try {
+        // Buckets created by OFS should be in FSO layout
+        BucketArgs defaultBucketArgs = BucketArgs.newBuilder().setBucketLayout(this.defaultOFSBucketLayout).build();
+        proxy.createBucket(volumeStr, bucketStr, defaultBucketArgs);
+      } catch (OMException newBucEx) {
+        // Ignore the case where another client created the bucket
+        if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
+          throw newBucEx;
+        }
+      }
+      break;
+    default:
+      throw ex;
+    }
   }
 
   /**
@@ -517,9 +524,15 @@ public class BasicRootedOzoneClientAdapterImpl
         // given in pathStr, so getBucket above should handle the creation
         // of volume and bucket. We won't feed empty keyStr to
         // bucket.createDirectory as that would be a NPE.
-        getBucket(volumeName, bucketName, true);
+        getBucket(volumeName, bucketName, true, false);
       } else {
-        proxy.createDirectory(volumeName, bucketName, keyStr);
+        try {
+          proxy.createDirectory(volumeName, bucketName, keyStr);
+        } catch (OMException e) {
+          // Create volume and bucket if they do not exist, and retry key creation.
+          handleVolumeOrBucketCreationOnException(volumeName, bucketName, e);
+          proxy.createDirectory(volumeName, bucketName, keyStr);
+        }
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
@@ -818,7 +831,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
 
-    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
+    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false, true);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
