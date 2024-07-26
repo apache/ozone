@@ -496,24 +496,30 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (ofsPath.getVolumeName().isEmpty()) {
+
+    String volumeName = ofsPath.getVolumeName();
+    if (volumeName.isEmpty()) {
       // Volume name unspecified, invalid param, return failure
       return false;
     }
-    if (ofsPath.getBucketName().isEmpty()) {
+
+    String bucketName = ofsPath.getBucketName();
+    if (bucketName.isEmpty()) {
       // Create volume only
-      objectStore.createVolume(ofsPath.getVolumeName());
+      objectStore.createVolume(volumeName);
       return true;
     }
+
     String keyStr = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, true);
-      // Empty keyStr here indicates only volume and bucket is
-      // given in pathStr, so getBucket above should handle the creation
-      // of volume and bucket. We won't feed empty keyStr to
-      // bucket.createDirectory as that would be a NPE.
-      if (keyStr != null && keyStr.length() > 0) {
-        bucket.createDirectory(keyStr);
+      if (keyStr == null || keyStr.isEmpty()) {
+        // Empty keyStr here indicates only volume and bucket is
+        // given in pathStr, so getBucket above should handle the creation
+        // of volume and bucket. We won't feed empty keyStr to
+        // bucket.createDirectory as that would be a NPE.
+        getBucket(volumeName, bucketName, true);
+      } else {
+        proxy.createDirectory(volumeName, bucketName, keyStr);
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
