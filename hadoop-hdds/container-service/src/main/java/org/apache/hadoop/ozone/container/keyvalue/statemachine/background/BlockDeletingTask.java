@@ -221,7 +221,7 @@ public class BlockDeletingTask implements BackgroundTask {
           releasedBytes += KeyValueContainerUtil.getBlockLength(
               entry.getValue());
           succeedBlockIDs.add(entry.getValue().getLocalID());
-          succeedBlockDBKeys.add(entry.getKey());
+          succeedBlockDBKeys.add(blockName);
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
         } catch (IOException e) {
@@ -230,7 +230,7 @@ public class BlockDeletingTask implements BackgroundTask {
       }
 
       // Mark blocks as deleted in the container checksum tree.
-      // Data for these blocks does not need to be copied if container replicas diverge.
+      // Data for these blocks does not need to be copied during container reconciliation if container replicas diverge.
       // Do this before the delete transactions are removed from the database.
       checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlockIDs);
 
@@ -375,9 +375,8 @@ public class BlockDeletingTask implements BackgroundTask {
       deleteBlocksResult.deletedBlocksTxs().forEach(
           tx -> crr.addAll(tx.getLocalIDList()));
 
-      // TODO if block file was not found, will it still get added to CRR?
       // Mark blocks as deleted in the container checksum tree.
-      // Data for these blocks does not need to be copied if container replicas diverge.
+      // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
       // Do this before the delete transactions are removed from the database.
       checksumTreeManager.markBlocksAsDeleted(containerData, crr.getDeletedBlocks());
 
