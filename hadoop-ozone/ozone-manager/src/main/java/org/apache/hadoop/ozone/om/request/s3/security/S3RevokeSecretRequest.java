@@ -118,7 +118,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
 
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.S3_REVOKESECRET_USER, kerberosID);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.REVOKE_S3_SECRET, auditMap,
         exception, getOmRequest().getUserInfo()));
 

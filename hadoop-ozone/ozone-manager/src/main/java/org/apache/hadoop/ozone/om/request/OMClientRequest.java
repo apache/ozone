@@ -480,7 +480,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param auditLogger
    * @param builder
    */
-  protected void auditLog(AuditLogger auditLogger, OMAuditLogger.Builder builder) {
+  protected void markForAudit(AuditLogger auditLogger, OMAuditLogger.Builder builder) {
     builder.setLog(true);
     builder.setAuditLogger(auditLogger);
   }
