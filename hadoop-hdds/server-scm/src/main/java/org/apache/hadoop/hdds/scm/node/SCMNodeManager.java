@@ -1220,14 +1220,14 @@ public class SCMNodeManager implements NodeManager {
 
   @Override
   public Map<String, String> getNodeStatistics() {
-    Map<String, String> nodeStatics = new HashMap<>();
+    Map<String, String> nodeStatistics = new HashMap<>();
     // Statistics node usaged
-    nodeUsageStatics(nodeStatics);
+    nodeUsageStatistics(nodeStatistics);
     // todo: Statistics of other instances
-    return nodeStatics;
+    return nodeStatistics;
   }
 
-  private void nodeUsageStatics(Map<String, String> nodeStatics) {
+  private void nodeUsageStatistics(Map<String, String> nodeStatics) {
     if (nodeStateManager.getAllNodes().size() < 1) {
       return;
     }
