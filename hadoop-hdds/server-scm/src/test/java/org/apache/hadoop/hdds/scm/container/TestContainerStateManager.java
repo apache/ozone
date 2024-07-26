@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -53,6 +54,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -151,6 +154,47 @@ public class TestContainerStateManager {
 
     Assertions.assertEquals(2, replicas.size());
     Assertions.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+  }
+
+  @Test
+  public void testTransitionDeletingToClosedState() throws IOException {
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(HddsProtos.LifeCycleState.DELETING)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    containerStateManager.transitionDeletingToClosedState(cid);
+    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+            containerStateManager.getContainer(ContainerID.getFromProtobuf(cid)).getState());
+  }
+
+  @Test
+  public void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainer() throws IOException {
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    try {
+      containerStateManager.transitionDeletingToClosedState(cid);
+      fail("Was expecting an Exception, but did not catch any.");
+    } catch (IOException e) {
+      assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
+    }
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {
