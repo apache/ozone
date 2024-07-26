@@ -117,7 +117,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
-  protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
+  protected OmKeyInfo checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -139,6 +139,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
     assertNotNull(omKeyInfo);
+    return omKeyInfo;
   }
 
   @Override
@@ -152,6 +153,11 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     long lastKnownParentId = omBucketInfo.getObjectID();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
+    if (keyPath == null) {
+      // The file is at the root of the bucket, so it has no parent folder. The parent is
+      // the bucket itself.
+      return lastKnownParentId;
+    }
     Iterator<Path> elements = keyPath.iterator();
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {

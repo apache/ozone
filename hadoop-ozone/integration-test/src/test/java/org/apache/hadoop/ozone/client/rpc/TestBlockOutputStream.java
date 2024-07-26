@@ -97,7 +97,7 @@ class TestBlockOutputStream {
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
-    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(5));
     conf.setFromObject(raftClientConfig);
 
     RatisClientConfig ratisClientConfig =

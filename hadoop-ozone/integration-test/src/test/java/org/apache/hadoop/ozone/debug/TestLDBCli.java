@@ -59,12 +59,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -96,6 +99,7 @@ public class TestLDBCli {
 
     cmd = new CommandLine(new RDBParser())
         .addSubcommand(new DBScanner())
+        .addSubcommand(new ValueSchema())
         .setOut(pstdout)
         .setErr(pstderr);
 
@@ -140,6 +144,30 @@ public class TestLDBCli {
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("UnlimitedLength", Pair.of(0, "")),
             Named.of("Limit -1", Arrays.asList("--length", "-1")),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("StartKey key3", Arrays.asList("--startkey", "key3")),
+            Named.of("Expect key3-key5", Pair.of("key3", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("invalid StartKey key9", Arrays.asList("--startkey", "key9")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("EndKey key3", Arrays.asList("--endkey", "key3")),
+            Named.of("Expect key1-key3", Pair.of("key1", "key4"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Invalid EndKey key9", Arrays.asList("--endkey", "key9")),
             Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
@@ -259,6 +287,29 @@ public class TestLDBCli {
     // Check stdout
     assertEquals("{  }\n", stdout.toString());
 
+    // Check stderr
+    assertEquals("", stderr.toString());
+  }
+
+  @Test
+  void testSchemaCommand() throws IOException {
+    // Prepare dummy table
+    prepareTable(KEY_TABLE, false);
+
+    // Prepare scan args
+    List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "value-schema",
+        "--column-family", KEY_TABLE));
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    // Check exit code. Print stderr if not expected
+    assertEquals(0, exitCode, stderr.toString());
+
+    // Check stdout
+    Pattern p = Pattern.compile(".*keyName.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(stdout.toString());
+    assertTrue(m.find());
     // Check stderr
     assertEquals("", stderr.toString());
   }

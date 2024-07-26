@@ -162,8 +162,8 @@ public class TestOMSnapshotCreateRequest {
         bucketName, snapshotName);
     OMException omException =
         assertThrows(OMException.class, () -> doPreExecute(omRequest));
-    assertEquals("Invalid snapshot name: " + snapshotName,
-        omException.getMessage());
+    assertTrue(omException.getMessage()
+        .contains("Invalid snapshot name: " + snapshotName));
   }
 
   @Test

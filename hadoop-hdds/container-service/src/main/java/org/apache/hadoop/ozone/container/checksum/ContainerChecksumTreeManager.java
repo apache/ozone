@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -37,6 +38,8 @@ import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+
 /**
  * This class coordinates reading and writing Container checksum information for all containers.
  */
@@ -47,6 +50,7 @@ public class ContainerChecksumTreeManager {
   // Used to coordinate reads and writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
   private final Striped<ReadWriteLock> fileLock;
+  private final ContainerMerkleTreeMetrics metrics;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
@@ -54,6 +58,8 @@ public class ContainerChecksumTreeManager {
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
     fileLock = SimpleStriped.readWriteLock(
         conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(), true);
+    // TODO: TO unregister metrics on stop.
+    metrics = ContainerMerkleTreeMetrics.create();
   }
 
   /**
@@ -67,7 +73,7 @@ public class ContainerChecksumTreeManager {
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          .setContainerMerkleTree(tree.toProto())
+          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
           .build();
       write(data, newChecksumInfo);
       LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
@@ -102,7 +108,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ContainerDiff diff(KeyValueContainerData thisContainer, File otherContainerTree)
+  public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo otherInfo)
       throws IOException {
     // TODO HDDS-10928 compare the checksum info of the two containers and return a summary.
     //  Callers can act on this summary to repair their container replica using the peer's replica.
@@ -142,8 +148,13 @@ public class ContainerChecksumTreeManager {
             .build();
       }
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+        return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(),
+            () -> ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
       }
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeReadFailures();
+      throw new IOException("Error occurred when reading container merkle tree for containerID "
+              + data.getContainerID(), ex);
     } finally {
       readLock.unlock();
     }
@@ -153,10 +164,24 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {
-      checksumInfo.writeTo(outStream);
+      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
+          () -> checksumInfo.writeTo(outStream));
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeWriteFailures();
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
+  }
+
+  public File getContainerChecksumFile(KeyValueContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  }
+
+  @VisibleForTesting
+  public ContainerMerkleTreeMetrics getMetrics() {
+    return this.metrics;
   }
 
   /**

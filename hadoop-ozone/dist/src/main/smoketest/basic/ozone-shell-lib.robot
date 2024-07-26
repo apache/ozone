@@ -21,6 +21,7 @@ Resource            ../commonlib.robot
 *** Variables ***
 ${prefix}    generated
 ${SCM}       scm
+${TMP_JSON}  ${TEMP_DIR}/bb1.json
 
 *** Keywords ***
 
@@ -44,18 +45,18 @@ Test ozone shell
                     Should Be Equal     ${result}       10995116277760
     ${result} =     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
                     Should Be Empty     ${result}
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' ${TMP_JSON}
                     Should Be Equal     ${result}       DISK
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       10995116277760
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       100
                     Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 1TB --namespace-quota 1000
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       1099511627776
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       1000
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '.[] | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
@@ -75,16 +76,16 @@ Test ozone shell
                     Execute             ozone sh bucket delete -r --yes ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
                     Execute             ozone sh volume create ${protocol}${server}/${volume}
-                    Execute             ozone sh volume info ${protocol}${server}/${volume} > volume.json
-    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInBytes' volume.json
+                    Execute             ozone sh volume info ${protocol}${server}/${volume} > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInNamespace' volume.json
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}

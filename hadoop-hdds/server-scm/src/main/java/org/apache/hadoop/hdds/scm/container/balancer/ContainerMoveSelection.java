@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
+import java.util.Objects;
+
 /**
  * This class represents a target datanode and the container to be moved from
  * a source to that target.
@@ -51,5 +53,25 @@ public class ContainerMoveSelection {
   public void setContainerID(
       ContainerID containerID) {
     this.containerID = containerID;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ContainerMoveSelection that = (ContainerMoveSelection) o;
+    if (targetNode != that.targetNode) {
+      return false;
+    }
+    return containerID == that.containerID;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(targetNode, containerID);
   }
 }
