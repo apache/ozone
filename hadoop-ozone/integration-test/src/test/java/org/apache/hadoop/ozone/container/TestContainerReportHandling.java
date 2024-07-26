@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
