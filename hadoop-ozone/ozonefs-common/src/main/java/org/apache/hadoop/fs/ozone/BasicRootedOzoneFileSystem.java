@@ -38,6 +38,8 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.ozone.BucketCache.BucketKey;
+import org.apache.hadoop.fs.ozone.BucketCache.BucketCacheInfo;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -74,6 +76,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
@@ -86,6 +89,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_MINUTES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_DEFAULT_MINUTES;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -122,6 +129,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean hsyncEnabled = OZONE_FS_HSYNC_ENABLED_DEFAULT;
   private boolean isRatisStreamingEnabled
       = OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT;
+  private int bucketCacheMaxSize = OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE_DEFAULT;
+  private int bucketCacheExpiryDurationMinutes =
+      OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_DEFAULT_MINUTES;
   private int streamingAutoThreshold;
 
   private static final String URI_EXCEPTION_TEXT =
@@ -132,7 +142,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private static final int PATH_DEPTH_TO_BUCKET = 2;
   private OzoneConfiguration ozoneConfiguration;
-
+  private BucketCache bucketCache;
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -206,6 +216,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IOException(msg, ue);
     }
     ozoneConfiguration = OzoneConfiguration.of(getConfSource());
+    bucketCacheMaxSize = conf.getInt(
+        OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE,
+        OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE_DEFAULT);
+    bucketCacheExpiryDurationMinutes = conf.getInt(
+        OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_MINUTES,
+        OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_DEFAULT_MINUTES
+    );
+    bucketCache = new BucketCache(bucketCacheMaxSize, bucketCacheExpiryDurationMinutes, TimeUnit.MINUTES);
   }
 
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
@@ -222,6 +240,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       adapter.close();
     } finally {
+      if (bucketCache != null) {
+        bucketCache.invalidateAll();
+      }
       super.close();
     }
   }
@@ -328,6 +349,22 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         + getClass().getSimpleName() + " FileSystem implementation");
   }
 
+  private OzoneBucket getOrLoadBucket(OFSPath ofsPath) throws IOException {
+    BucketCacheInfo cacheInfo =
+        bucketCache.get(ofsPath.getVolumeName(), ofsPath.getBucketName());
+
+    if (cacheInfo != null) {
+      return adapterImpl.toOzoneBucket(
+          new BucketKey(ofsPath.getVolumeName(), ofsPath.getBucketName()),
+          cacheInfo);
+    } else {
+      // If not in cache, fetch bucket and update cache
+      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+      bucketCache.put(bucket);
+      return bucket;
+    }
+  }
+
   private class RenameIterator extends OzoneListingIterator {
     private final String srcPath;
     private final String dstPath;
@@ -345,7 +382,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           ozoneConfiguration);
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
-      this.bucket = adapterImpl.getBucket(ofsPath, false);
+      this.bucket = getOrLoadBucket(ofsPath);
     }
 
     @Override
@@ -414,7 +451,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
       throw new IOException("Cannot rename a key to a different bucket");
     }
-    OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
+    OzoneBucket bucket = getOrLoadBucket(ofsSrc);
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return renameFSO(bucket, ofsSrc, ofsDst);
     }
@@ -743,7 +780,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
 
-      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+      OzoneBucket bucket = getOrLoadBucket(ofsPath);
       if (bucket.getBucketLayout().isFileSystemOptimized()) {
         String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
             OZONE_URI_DELIMITER + ofsPath.getKeyName();

@@ -598,6 +598,14 @@ public final class OzoneConfigKeys {
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
 
+  public static final String OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE =
+      "ozone.client.bucket.cache.max.size";
+  public static final int OZONE_CLIENT_BUCKET_CACHE_MAX_SIZE_DEFAULT =
+      100;
+  public static final String OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_MINUTES =
+      "ozone.client.bucket.cache.expiry.duration.minutes";
+  public static final int OZONE_CLIENT_BUCKET_CACHE_EXPIRY_DURATION_DEFAULT_MINUTES =
+      10;
 
   // Values for bucket layout configurations.
   public static final String OZONE_BUCKET_LAYOUT_LEGACY =

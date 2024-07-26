@@ -1351,6 +1351,28 @@
   </property>
 
   <property>
+    <name>ozone.client.bucket.cache.max.size</name>
+    <value>100</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum number of bucket entries that can be held in the client-side bucket cache.
+      Once this limit is reached, older entries will be evicted.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.bucket.cache.expiry.duration.minutes</name>
+    <value>10</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The duration in minutes for which a bucket entry is considered valid in the client-side bucket cache
+      after it is accessed. After this time period, the entry will expire and be removed from the cache.
+      This setting helps in controlling the freshness of the cached bucket data and can be adjusted
+      based on the expected frequency of bucket access.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.close.threshold</name>
     <value>0.9f</value>
     <tag>OZONE, DATANODE</tag>
