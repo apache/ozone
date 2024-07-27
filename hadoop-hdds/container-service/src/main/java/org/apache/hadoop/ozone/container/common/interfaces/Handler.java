@@ -70,7 +70,6 @@ public abstract class Handler {
     this.icrSender = icrSender;
   }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,

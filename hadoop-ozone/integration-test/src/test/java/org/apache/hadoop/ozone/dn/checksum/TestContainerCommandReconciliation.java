@@ -44,6 +44,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,8 +74,10 @@ public class TestContainerCommandReconciliation {
   private static OzoneClient rpcClient;
   private static ObjectStore store;
   private static OzoneConfiguration conf;
-  private static File testDir;
   private static DNContainerOperationClient dnClient;
+
+  @TempDir
+  private static File testDir;
 
   @BeforeAll
   public static void init() throws Exception {

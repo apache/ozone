@@ -184,7 +184,7 @@ public class ContainerChecksumTreeManager {
             containerID, checksumFile, ex);
       } catch (IOException ex) {
         throw new IOException("Error occured when reading checksum file for container " + containerID +
-            " at the path " + checksumFile + ". Returning an empty instance.", ex);
+            " at the path " + checksumFile, ex);
 
       }
       return null;
