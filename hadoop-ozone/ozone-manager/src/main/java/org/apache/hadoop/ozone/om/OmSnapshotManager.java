@@ -441,13 +441,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
-    RDBStore store = (RDBStore) omMetadataManager.getStore();
-    String checkpointPrefix = store.getDbLocation().getName();
-    return Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
-  }
-
   /**
    * Creates snapshot checkpoint that corresponds to snapshotInfo.
    * @param omMetadataManager the metadata manager
@@ -699,6 +692,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   public static String getSnapshotPrefix(String snapshotName) {
     return OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX +
         snapshotName + OM_KEY_PREFIX;
+  }
+
+  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+    RDBStore store = (RDBStore) omMetadataManager.getStore();
+    String checkpointPrefix = store.getDbLocation().getName();
+    return Paths.get(store.getSnapshotsParentDir(),
+        checkpointPrefix + snapshotInfo.getCheckpointDir());
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,

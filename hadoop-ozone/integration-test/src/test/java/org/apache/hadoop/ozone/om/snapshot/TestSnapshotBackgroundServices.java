@@ -573,7 +573,7 @@ public class TestSnapshotBackgroundServices {
       } catch (IOException e) {
         fail();
       }
-      return SstFilteringService.isSstFiltered(ozoneManager.getMetadataManager(), snapshotInfo);
+      return SstFilteringService.isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo);
     }, 1000, 10000);
   }
 

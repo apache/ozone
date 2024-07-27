@@ -117,6 +117,8 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
    */
   private void deleteCheckpointDirectory(OMMetadataManager omMetadataManager,
                                          SnapshotInfo snapshotInfo) {
+    // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
+    // inside the snapshot directory. Any operation  apart from delete can run in parallel along with operation.
     OMLockDetails omLockDetails = omMetadataManager.getLock()
         .acquireWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
             snapshotInfo.getName());
