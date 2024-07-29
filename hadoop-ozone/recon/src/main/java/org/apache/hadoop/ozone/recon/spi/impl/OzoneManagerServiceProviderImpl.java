@@ -552,6 +552,8 @@ public class OzoneManagerServiceProviderImpl
   /**
    * Based on current state of Recon's OM DB, we either get delta updates or
    * full snapshot from Ozone Manager.
+   * @return true or false if sync operation between Recon and OM was successful or failed.
+   * @throws IOException
    */
   @VisibleForTesting
   public boolean syncDataFromOM() throws IOException {
@@ -628,7 +630,7 @@ public class OzoneManagerServiceProviderImpl
             reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
           }
         }
-        printFileAndKeyTableCount();
+        printOMDBMetaInfo();
       } finally {
         isSyncDataFromOMRunning.set(false);
       }
@@ -639,30 +641,21 @@ public class OzoneManagerServiceProviderImpl
     return true;
   }
 
-  private void printFileAndKeyTableCount() throws IOException {
-    Table fileTable = omMetadataManager.getTable("fileTable");
-    Table keyTable = omMetadataManager.getTable("keyTable");
-    if (keyTable == null) {
-      LOG.error("Table keyTable not found in OM Metadata.");
-    }
+  private void printOMDBMetaInfo() throws IOException {
+    printTableCount("fileTable");
+    printTableCount("keyTable");
+  }
 
-    if (LOG.isDebugEnabled() && null != keyTable) {
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = keyTable.iterator()) {
+  private void printTableCount(String tableName) throws IOException {
+    Table table = omMetadataManager.getTable(tableName);
+    if (table == null) {
+      LOG.error("Table {} not found in OM Metadata.", tableName);
+      return;
+    }
+    if (LOG.isDebugEnabled()) {
+      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
         long count = Iterators.size(iterator);
-        LOG.debug("keyTable Table count: {}", count);
-      }
-    }
-
-    if (fileTable == null) {
-      LOG.error("Table fileTable not found in OM Metadata.");
-    }
-
-    if (LOG.isDebugEnabled() && null != fileTable) {
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = fileTable.iterator()) {
-        long count = Iterators.size(iterator);
-        LOG.debug("fileTable Table count: {}", count);
+        LOG.debug("{} Table count: {}", tableName, count);
       }
     }
   }
