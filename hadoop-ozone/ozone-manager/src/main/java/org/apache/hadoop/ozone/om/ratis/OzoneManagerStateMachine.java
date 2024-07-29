@@ -450,8 +450,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    if (readonlyMode.get()) {
-      return;
+    // resetting readonly mode when install checkpoint is done as recover from leader
+    if (readonlyMode.compareAndSet(true, false)) {
+      LOG.info("Moving OM state machine from read-only mode to normal");
     }
     LOG.info("OzoneManagerStateMachine is un-pausing");
     if (statePausedCount.decrementAndGet() == 0) {
@@ -599,7 +600,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         LOG.error("Failed to write, moving to readonly mode, request index: {}, Exception occurred ", termIndex, e);
         if (readonlyMode.compareAndSet(false, true)) {
           // update readonly mode, flush existing transaction and pause state machine
-          readonlyMode.set(true);
           try {
             awaitDoubleBufferFlush();
           } catch (InterruptedException ex) {
