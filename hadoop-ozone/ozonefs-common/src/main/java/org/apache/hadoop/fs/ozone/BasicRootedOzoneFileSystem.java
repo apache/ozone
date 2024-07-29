@@ -622,7 +622,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           ozoneConfiguration);
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
-      this.bucket = adapterImpl.getBucket(ofsPath, false);
+      this.bucket = getOrLoadBucket(ofsPath);
     }
 
     @Override
@@ -652,7 +652,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       OFSPath ofsPath = new OFSPath(f,
           ozoneConfiguration);
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
-      this.bucket = adapterImpl.getBucket(ofsPath, false);
+      this.bucket = getOrLoadBucket(ofsPath);
       LOG.debug("Deleting bucket with name {} is via DeleteIteratorWithFSO.",
           bucket.getName());
     }
@@ -688,8 +688,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     OzoneListingIterator getDeleteIterator()
         throws IOException {
       OzoneListingIterator deleteIterator;
-      if (ofsPath.isBucket() &&
-          isFSObucket(ofsPath.getVolumeName(), ofsPath.getBucketName())) {
+      if (ofsPath.isBucket() && isFSObucket(ofsPath)) {
         deleteIterator = new DeleteIteratorWithFSO(path, recursive);
       } else {
         deleteIterator = new DeleteIterator(path, recursive);
@@ -809,7 +808,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     OzoneBucket bucket;
     try {
-      bucket = adapterImpl.getBucket(ofsPath, false);
+      bucket = getOrLoadBucket(ofsPath);
     } catch (OMException ex) {
       if (ex.getResult() != BUCKET_NOT_FOUND && ex.getResult() != VOLUME_NOT_FOUND) {
         LOG.error("OMException while getting bucket information, considered it as false", ex);
@@ -895,11 +894,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  private boolean isFSObucket(String volumeName, String bucketName)
-      throws IOException {
-    OzoneVolume volume =
-        adapterImpl.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
+  private boolean isFSObucket(OFSPath ofsPath) throws IOException {
+    OzoneBucket bucket = getOrLoadBucket(ofsPath);
     return bucket.getBucketLayout().isFileSystemOptimized();
   }
 
