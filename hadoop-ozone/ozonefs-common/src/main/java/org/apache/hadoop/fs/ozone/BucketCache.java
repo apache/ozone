@@ -114,7 +114,7 @@ public class BucketCache {
     }
 
     public String getVolumeName() {
-      return bucketName;
+      return volumeName;
     }
 
     public String getBucketName() {
