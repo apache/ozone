@@ -553,10 +553,9 @@ public class OzoneManagerServiceProviderImpl
    * Based on current state of Recon's OM DB, we either get delta updates or
    * full snapshot from Ozone Manager.
    * @return true or false if sync operation between Recon and OM was successful or failed.
-   * @throws IOException
    */
   @VisibleForTesting
-  public boolean syncDataFromOM() throws IOException {
+  public boolean syncDataFromOM() {
     if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
       try {
         LOG.info("Syncing data from Ozone Manager.");
@@ -641,12 +640,12 @@ public class OzoneManagerServiceProviderImpl
     return true;
   }
 
-  private void printOMDBMetaInfo() throws IOException {
+  private void printOMDBMetaInfo() {
     printTableCount("fileTable");
     printTableCount("keyTable");
   }
 
-  private void printTableCount(String tableName) throws IOException {
+  private void printTableCount(String tableName) {
     Table table = omMetadataManager.getTable(tableName);
     if (table == null) {
       LOG.error("Table {} not found in OM Metadata.", tableName);
@@ -656,6 +655,8 @@ public class OzoneManagerServiceProviderImpl
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
         long count = Iterators.size(iterator);
         LOG.debug("{} Table count: {}", tableName, count);
+      } catch (IOException ioException) {
+        LOG.error("Unexpected error while iterating table for table count: {}", tableName);
       }
     }
   }
