@@ -1414,6 +1414,8 @@ function ozone_java_setup
 
   # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true)
   # to allow netty unsafe memory allocation in Java 9+.
+  RATIS_OPTS="${RATIS_OPTS:-}"
+
   if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
     RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
   fi
