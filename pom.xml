@@ -230,7 +230,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
-    <javac.version>8</javac.version>
+    <javac.version>1.8</javac.version>
 
     <!-- The java version enforced by the maven enforcer -->
     <!-- more complex patterns can be used here, such as
@@ -1296,6 +1296,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
+            <source>${javac.version}</source>
+            <target>${javac.version}</target>
             <useIncrementalCompilation>false</useIncrementalCompilation>
           </configuration>
         </plugin>
@@ -1961,28 +1963,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </plugins>
       </build>
     </profile>
-
-    <!-- Profiles for specific JDK versions -->
-    <profile>
-      <id>java8</id>
-      <activation>
-        <jdk>[,8]</jdk>
-      </activation>
-      <properties>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
-      </properties>
-    </profile>
-    <profile>
-      <id>java9-or-later</id>
-      <activation>
-        <jdk>[9,]</jdk>
-      </activation>
-      <properties>
-        <maven.compiler.release>${javac.version}</maven.compiler.release> <!-- supported since Java 9 -->
-      </properties>
-    </profile>
-
     <profile>
       <id>go-offline</id>
       <properties>
