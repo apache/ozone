@@ -102,7 +102,6 @@ public class DatanodeStateMachine implements Closeable {
   private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
   private final ReportManager reportManager;
-  private long commandsHandled;
   private final AtomicLong nextHB;
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
@@ -661,7 +660,6 @@ public class DatanodeStateMachine implements Closeable {
         SCMCommand<?> command = getContext().getNextCommand();
         if (command != null) {
           commandDispatcher.handle(command);
-          commandsHandled++;
         } else {
           try {
             // Sleep till the next HB + 1 second.
@@ -695,15 +693,6 @@ public class DatanodeStateMachine implements Closeable {
       getCommandHandlerThread(processCommandQueue).start();
     });
     return handlerThread;
-  }
-
-  /**
-   * Returns the number of commands handled  by the datanode.
-   * @return  count
-   */
-  @VisibleForTesting
-  public long getCommandHandled() {
-    return commandsHandled;
   }
 
   /**
