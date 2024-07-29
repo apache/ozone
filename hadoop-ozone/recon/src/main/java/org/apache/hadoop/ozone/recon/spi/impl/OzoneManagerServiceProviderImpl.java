@@ -271,7 +271,11 @@ public class OzoneManagerServiceProviderImpl
       // Update local Recon OM DB to new snapshot.
       try {
         boolean success = updateReconOmDBWithNewSnapshot();
-        LOG.info("Fetched full new snapshot from Ozone Manager: {}", success);
+        if (success) {
+          LOG.info("Successfully fetched a full snapshot from Ozone Manager");
+        } else {
+          LOG.error("Failed fetching a full snapshot from Ozone Manager");
+        }
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
