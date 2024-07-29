@@ -292,14 +292,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     map.get(volumeBucketPair).add(objectKey);
   }
 
-  protected void submitPurgePaths(List<PurgePathRequest> requests,
-                                  String snapTableKey) {
+  protected void submitPurgePaths(List<PurgePathRequest> requests) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
-
-    if (snapTableKey != null) {
-      purgeDirRequest.setSnapshotTableKey(snapTableKey);
-    }
     purgeDirRequest.addAllDeletedPath(requests);
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
@@ -412,8 +407,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
-      String snapTableKey, long startTime,
-      int remainingBufLimit, KeyManager keyManager) {
+      long startTime, int remainingBufLimit, KeyManager keyManager) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -453,7 +447,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey);
+      submitPurgePaths(purgePathRequestList);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {

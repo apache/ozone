@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
@@ -58,24 +57,16 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
-    String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
-        purgeDirsRequest.getSnapshotTableKey() : null;
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
-    SnapshotInfo fromSnapshotInfo = null;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
-      if (fromSnapshot != null) {
-        fromSnapshotInfo = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable()
-            .get(fromSnapshot);
-      }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
@@ -152,7 +143,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo);
+            getBucketLayout(), volBucketInfoMap);
 
     return omClientResponse;
   }

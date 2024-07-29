@@ -94,6 +94,6 @@ public @interface RequestFeatureValidator {
    * The type of the request handled by this validator method.
    * @return the requestType to whihc the validator shoudl be applied
    */
-  Type requestType();
+  Type[] requestType();
 
 }

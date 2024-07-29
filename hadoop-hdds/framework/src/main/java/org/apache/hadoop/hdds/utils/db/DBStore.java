@@ -46,7 +46,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @return - TableStore.
    * @throws IOException on Failure
    */
-  Table<byte[], byte[]> getTable(String name) throws IOException;
+  Table<byte[], byte[]> getTable(String name, boolean readOnlyTable) throws IOException;
 
 
   /**
@@ -60,7 +60,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @throws IOException on Failure
    */
   <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException;
+      Class<KEY> keyType, Class<VALUE> valueType, boolean readOnlyTable) throws IOException;
 
   /**
    * Gets an existing TableStore with implicit key/value conversion and
@@ -74,7 +74,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    */
   <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
       Class<KEY> keyType, Class<VALUE> valueType,
-      TableCache.CacheType cacheType) throws IOException;
+      TableCache.CacheType cacheType, boolean readOnlyTable) throws IOException;
 
   /**
    * Lists the Known list of Tables in a DB.

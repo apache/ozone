@@ -202,7 +202,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, purgePathRequestList, null, startTime,
+              allSubDirList, purgePathRequestList, startTime,
               ratisByteLimit - consumedSize,
               getOzoneManager().getKeyManager());
 

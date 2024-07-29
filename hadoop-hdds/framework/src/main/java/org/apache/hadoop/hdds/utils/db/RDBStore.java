@@ -286,26 +286,29 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public RDBTable getTable(String name) throws IOException {
+  public RDBTable getTable(String name, boolean readOnlyTable) throws IOException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
+    }
+    if (readOnlyTable) {
+      return new ReadOnlyRDBTable(this.db, handle, rdbMetrics);
     }
     return new RDBTable(this.db, handle, rdbMetrics);
   }
 
   @Override
   public <K, V> TypedTable<K, V> getTable(String name,
-      Class<K> keyType, Class<V> valueType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
+      Class<K> keyType, Class<V> valueType, boolean readOnlyTable) throws IOException {
+    return new TypedTable<>(getTable(name, readOnlyTable), codecRegistry, keyType,
         valueType);
   }
 
   @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
-      TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
+      TableCache.CacheType cacheType, boolean readOnlyTable) throws IOException {
+    return new TypedTable<>(getTable(name, readOnlyTable), codecRegistry, keyType,
         valueType, cacheType, threadNamePrefix);
   }
 

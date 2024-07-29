@@ -443,7 +443,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         remainNum = optimizeDirDeletesAndSubmitRequest(remainNum, dirNum,
             subDirNum, subFileNum, allSubDirList, purgePathRequestList,
-            snapInfo.getTableKey(), startTime, ratisByteLimit - consumedSize,
+            startTime, ratisByteLimit - consumedSize,
             omSnapshot.getKeyManager());
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files for " +

@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import java.util.UUID;
 
 import com.google.common.cache.RemovalListener;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -371,7 +372,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         try {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
               snapshotInfo.getCheckpointDirName(), isSnapshotInCache,
-              maxOpenSstFilesInSnapshotDb);
+              maxOpenSstFilesInSnapshotDb, Sets.newHashSet(OmMetadataManagerImpl.KEY_TABLE,
+              OmMetadataManagerImpl.FILE_TABLE));
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
           throw e;

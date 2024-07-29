@@ -61,46 +61,21 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
   private boolean isRatisEnabled;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
-  private SnapshotInfo fromSnapshotInfo;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
-      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo) {
+      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;
     this.volBucketInfoMap = volBucketInfoMap;
-    this.fromSnapshotInfo = fromSnapshotInfo;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager metadataManager,
       BatchOperation batchOp) throws IOException {
-    if (fromSnapshotInfo != null) {
-      OmSnapshotManager omSnapshotManager =
-          ((OmMetadataManagerImpl) metadataManager)
-              .getOzoneManager().getOmSnapshotManager();
-
-      try (ReferenceCounted<OmSnapshot>
-          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(
-              fromSnapshotInfo.getVolumeName(),
-              fromSnapshotInfo.getBucketName(),
-              fromSnapshotInfo.getName())) {
-        OmSnapshot fromSnapshot = rcFromSnapshotInfo.get();
-        DBStore fromSnapshotStore = fromSnapshot.getMetadataManager()
-            .getStore();
-        // Init Batch Operation for snapshot db.
-        try (BatchOperation writeBatch =
-            fromSnapshotStore.initBatchOperation()) {
-          processPaths(fromSnapshot.getMetadataManager(), writeBatch);
-          fromSnapshotStore.commitBatchOperation(writeBatch);
-        }
-      }
-    } else {
-      processPaths(metadataManager, batchOp);
-    }
+    processPaths(metadataManager, batchOp);
 
     // update bucket quota in active db
     for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {

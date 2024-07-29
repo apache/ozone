@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -104,7 +105,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
+      initializeOmTables(TableCache.CacheType.FULL_CACHE, true, Collections.emptySet());
       omTablesInitialized = true;
     }
   }
