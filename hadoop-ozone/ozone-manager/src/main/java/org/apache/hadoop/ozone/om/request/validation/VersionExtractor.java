@@ -33,7 +33,7 @@ public enum VersionExtractor {
     @Override
     public Version extractVersion(OMRequest req, ValidationContext ctx) {
       LayoutVersionManager layoutVersionManager = ctx.versionManager();
-      return ctx.versionManager().getFeature(layoutVersionManager.getSoftwareLayoutVersion());
+      return ctx.versionManager().getFeature(layoutVersionManager.getMetadataLayoutVersion());
     }
 
     @Override
