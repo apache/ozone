@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +88,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
   private final Supplier<ExecutorService> executorServiceSupplier;
+  // update blocks on OM
+  private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
   public BlockOutputStreamEntryPool(KeyOutputStream.Builder b) {
     this.config = b.getClientConfig();
@@ -167,7 +171,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .build();
   }
 
-  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+  private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
     streamEntries.add(createStreamEntry(subKeyInfo));
   }
@@ -244,7 +248,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * @param containerID id of the closed container
    * @param pipelineId id of the associated pipeline
    */
-  void discardPreallocatedBlocks(long containerID, PipelineID pipelineId) {
+  synchronized void discardPreallocatedBlocks(long containerID, PipelineID pipelineId) {
     // currentStreamIndex < streamEntries.size() signifies that, there are still
     // pre allocated blocks available.
 
@@ -279,7 +283,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return keyArgs.getKeyName();
   }
 
-  long getKeyLength() {
+  synchronized long getKeyLength() {
     return streamEntries.stream()
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
@@ -335,10 +339,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   void hsyncKey(long offset) throws IOException {
     if (keyArgs != null) {
       // in test, this could be null
-      long length = getKeyLength();
-      Preconditions.checkArgument(offset == length,
-              "Expected offset: " + offset + " expected len: " + length);
-      keyArgs.setDataSize(length);
+      keyArgs.setDataSize(offset);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not
       // commit the key, as this is not an actual key, this is a just a
@@ -346,7 +347,18 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
-        omClient.hsyncKey(keyArgs, openID);
+        if (keyArgs.getLocationInfoList().size() == 0) {
+          MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
+              () -> omClient.hsyncKey(keyArgs, openID));
+        } else {
+          ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
+              .getBlockID().getContainerBlockID();
+          if (!lastUpdatedBlockId.equals(lastBLockId)) {
+            MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
+                () -> omClient.hsyncKey(keyArgs, openID));
+            lastUpdatedBlockId = lastBLockId;
+          }
+        }
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");

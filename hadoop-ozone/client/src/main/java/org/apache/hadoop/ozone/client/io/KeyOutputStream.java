@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.MetricUtil;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
@@ -89,7 +90,7 @@ public class KeyOutputStream extends OutputStream
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -105,6 +106,7 @@ public class KeyOutputStream extends OutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+  private ContainerClientMetrics clientMetrics;
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -154,6 +156,7 @@ public class KeyOutputStream extends OutputStream
     this.clientID = b.getOpenHandler().getId();
     this.atomicKeyCreation = b.getAtomicKeyCreation();
     this.streamBufferArgs = b.getStreamBufferArgs();
+    this.clientMetrics = b.getClientMetrics();
   }
 
   /**
@@ -192,7 +195,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -205,8 +208,10 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    synchronized (this) {
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -358,7 +363,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  private void markStreamClosed() {
+  private synchronized void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
   }
@@ -432,7 +437,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -443,7 +448,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -454,10 +459,15 @@ public class KeyOutputStream extends OutputStream
     }
     checkNotClosed();
     final long hsyncPos = writeOffset;
+
     handleFlushOrClose(StreamAction.HSYNC);
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+
+    synchronized (this) {
+      Preconditions.checkState(offset >= hsyncPos,
+          "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
+          () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
+    }
   }
 
   /**
@@ -722,7 +732,7 @@ public class KeyOutputStream extends OutputStream
    * the last state of the volatile {@link #closed} field.
    * @throws IOException if the connection is closed.
    */
-  private void checkNotClosed() throws IOException {
+  private synchronized void checkNotClosed() throws IOException {
     if (closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "

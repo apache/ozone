@@ -145,6 +145,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT =
       "32KB";
 
+  public static final String OZONE_CHUNK_LIST_INCREMENTAL =
+      "ozone.incremental.chunk.list";
+  public static final boolean OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT = true;
+
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
 

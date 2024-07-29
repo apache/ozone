@@ -134,6 +134,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
       "7d";
 
+  public static final String OZONE_OM_LEASE_HARD_LIMIT =
+      "ozone.om.lease.hard.limit";
+  public static final String OZONE_OM_LEASE_HARD_LIMIT_DEFAULT =
+      "7d";
+
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
       "ozone.om.open.key.cleanup.limit.per.task";
   public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =

@@ -852,6 +852,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.incremental.chunk.list</name>
+    <value>true</value>
+    <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
+    <description>
+      By default, a writer client sends full chunk list of a block when it
+      sends PutBlock requests. Changing this configuration to true will send
+      only incremental chunk list which reduces metadata overhead and improves
+      hsync performance.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
@@ -1411,6 +1422,17 @@
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
       has been open longer than the value of this config entry, that open key is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.lease.hard.limit</name>
+    <value>7d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long an open hsync key is considered as active. Specifically, if a hsync key
+      has been open longer than the value of this config entry, that open hsync key is considered as
       expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
@@ -4143,10 +4165,18 @@
 
   <property>
     <name>ozone.fs.hsync.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
     <description>
       Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.lease.soft.limit</name>
+    <value>60s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Hsync soft limit lease period.
     </description>
   </property>
 

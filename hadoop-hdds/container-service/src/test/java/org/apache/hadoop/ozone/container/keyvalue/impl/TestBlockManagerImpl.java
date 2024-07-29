@@ -36,17 +36,23 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyLong;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.INCREMENTAL_CHUNK_LIST;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +84,7 @@ public class TestBlockManagerImpl {
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
+    config.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
     initilaze();
   }
 
@@ -221,5 +228,182 @@ public class TestBlockManagerImpl {
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
     assertEquals(10, listBlockData.size());
+  }
+
+  private BlockData createBlockData(long containerID, long blockNo,
+      int chunkID, long offset, long len, long bcsID)
+      throws IOException {
+    blockID1 = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID1);
+    List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
+    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+        .getLocalID(), chunkID), offset, len);
+    chunkList1.add(info1.getProtoBufMessage());
+    blockData.setChunks(chunkList1);
+    blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+
+    return blockData;
+  }
+
+  private BlockData createBlockDataWithOneFullChunk(long containerID,
+      long blockNo, int chunkID, long offset, long len, long bcsID)
+      throws IOException {
+    blockID1 = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID1);
+    List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
+    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+        .getLocalID(), 1), 0, 4 * 1024 * 1024);
+    info1.addMetadata(FULL_CHUNK, "");
+
+    ChunkInfo info2 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+        .getLocalID(), chunkID), offset, len);
+    chunkList1.add(info1.getProtoBufMessage());
+    chunkList1.add(info2.getProtoBufMessage());
+    blockData.setChunks(chunkList1);
+    blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+
+    return blockData;
+  }
+
+  private BlockData createBlockDataWithThreeFullChunks(long containerID,
+      long blockNo, long bcsID) throws IOException {
+    blockID1 = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID1);
+    List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
+    long chunkLimit = 4 * 1024 * 1024;
+    for (int i = 1; i < 4; i++) {
+      ChunkInfo info1 = new ChunkInfo(
+          String.format("%d_chunk_%d", blockID1.getLocalID(), i),
+          chunkLimit * i, chunkLimit);
+      info1.addMetadata(FULL_CHUNK, "");
+      chunkList1.add(info1.getProtoBufMessage());
+    }
+    blockData.setChunks(chunkList1);
+    blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+
+    return blockData;
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFlush1(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(
+        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    // simulates writing 1024 bytes, hsync,
+    // write another 1024 bytes, hsync
+    // write another 1024 bytes, hsync
+    long containerID = 1;
+    long blockNo = 2;
+    // put 1st chunk
+    blockData1 = createBlockData(containerID, blockNo, 1, 0, 1024,
+        1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
+    // put 2nd chunk
+    BlockData blockData2 = createBlockData(containerID, blockNo, 1, 0, 2048,
+        2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    assertEquals(2048, getBlockData.getSize());
+    assertEquals(2, getBlockData.getBlockCommitSequenceId());
+    List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
+    assertEquals(1, chunkInfos.size());
+    assertEquals(2048, chunkInfos.get(0).getLen());
+    assertEquals(0, chunkInfos.get(0).getOffset());
+
+    // put 3rd chunk, end-of-block
+    BlockData blockData3 = createBlockData(containerID, blockNo, 1, 0, 3072,
+        3);
+    blockManager.putBlock(keyValueContainer, blockData3, true);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+
+    getBlockData = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    assertEquals(3072, getBlockData.getSize());
+    assertEquals(3, getBlockData.getBlockCommitSequenceId());
+    chunkInfos = getBlockData.getChunks();
+    assertEquals(1, chunkInfos.size());
+    assertEquals(3072, chunkInfos.get(0).getLen());
+    assertEquals(0, chunkInfos.get(0).getOffset());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFlush2(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(
+        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    // simulates writing a full chunk + 1024 bytes, hsync,
+    // write another 1024 bytes, hsync
+    // write another 1024 bytes, hsync
+    long containerID = 1;
+    long blockNo = 2;
+    long chunkLimit = 4 * 1024 * 1024;
+    // first hsync (a full chunk + 1024 bytes)
+    blockData1 = createBlockDataWithOneFullChunk(containerID,
+        blockNo, 2, chunkLimit, 1024, 1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
+    // second hsync (1024 bytes)
+    BlockData blockData2 = createBlockData(containerID, blockNo, 2,
+        chunkLimit, 2048, 2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+    // third hsync (1024 bytes)
+    BlockData blockData3 = createBlockData(containerID, blockNo, 2,
+        chunkLimit, 3072, 3);
+    blockManager.putBlock(keyValueContainer, blockData3, false);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+
+    // verify that first chunk is full, second chunk is 3072 bytes
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    assertEquals(3072 + chunkLimit, getBlockData.getSize());
+    assertEquals(3, getBlockData.getBlockCommitSequenceId());
+    List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
+    assertEquals(2, chunkInfos.size());
+    assertEquals(chunkLimit, chunkInfos.get(0).getLen());
+    assertEquals(0, chunkInfos.get(0).getOffset());
+    assertEquals(3072, chunkInfos.get(1).getLen());
+    assertEquals(chunkLimit, chunkInfos.get(1).getOffset());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFlush3(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(
+        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    // simulates writing 1024 bytes, hsync,
+    // and then write till 4 chunks are full
+    long containerID = 1;
+    long blockNo = 2;
+    long chunkLimit = 4 * 1024 * 1024;
+    // first hsync (1024 bytes)
+    blockData1 = createBlockDataWithOneFullChunk(containerID, blockNo, 2,
+        chunkLimit, 1024, 1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
+    // full flush (4 chunks)
+    BlockData blockData2 = createBlockDataWithThreeFullChunks(
+        containerID, blockNo, 2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+
+    // verify that the four chunks are full
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    assertEquals(chunkLimit * 4, getBlockData.getSize());
+    assertEquals(2, getBlockData.getBlockCommitSequenceId());
+    List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
+    assertEquals(4, chunkInfos.size());
+    for (int i = 0; i < 4; i++) {
+      assertEquals(chunkLimit, chunkInfos.get(i).getLen());
+      assertEquals(chunkLimit * i, chunkInfos.get(i).getOffset());
+    }
   }
 }

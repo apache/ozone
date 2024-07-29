@@ -171,11 +171,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-      // We need to calculate the size of "Other objects" in two cases: 
-      // 1) If we have more subpaths listed, than the limit.  
+      // We need to calculate the size of "Other objects" in two cases:
+      // 1) If we have more subpaths listed, than the limit.
       // 2) If the limit is set to the maximum limit (30) and we have any number of subpaths. In this case we won't
       // necessarily have "Other objects", but later we check if the other objects's size is more than zero (we will have
-      // other objects if there are more than 30 subpaths, but we can't check on that, as the response will always have 
+      // other objects if there are more than 30 subpaths, but we can't check on that, as the response will always have
       // 30 subpaths, but from the total size and the subpaths size we can calculate it).
 
       if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
