@@ -547,9 +547,9 @@ class TestBlockOutputStream {
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
       // If the flushDelay was disabled, it sends PutBlock with the data in the buffer.
-      assertEquals(putBlockCount + (flushDelay ? 2 : 3) - (enablePiggybacking ? 1 : 0),
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + (flushDelay ? 5 : 6) - (enablePiggybacking ? 1 : 0),
+      assertEquals(totalOpCount + (flushDelay ? 5 : 6),
           metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
