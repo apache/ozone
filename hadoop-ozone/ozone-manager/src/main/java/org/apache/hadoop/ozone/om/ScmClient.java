@@ -55,6 +55,7 @@ public class ScmClient {
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
+  private static final Map<Integer, Set<Integer>> EC_DATA_INDEXES = new HashMap<>();
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
@@ -118,7 +119,7 @@ public class ScmClient {
     try {
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
       // Don't keep empty pipelines or insufficient EC pipelines in the cache.
-      List<Long> unsatisfiedCachePipelines = result.entrySet().stream()
+      List<Long> uncachePipelines = result.entrySet().stream()
           .filter(e -> {
             Pipeline pipeline = e.getValue();
             // filter empty pipelines
@@ -129,14 +130,15 @@ public class ScmClient {
             ReplicationConfig repConfig = pipeline.getReplicationConfig();
             if (repConfig instanceof ECReplicationConfig) {
               int d = ((ECReplicationConfig) repConfig).getData();
-              Set<Integer> dataIndexes = IntStream.rangeClosed(1, d).boxed().collect(Collectors.toSet());
+              Set<Integer> dataIndexes = EC_DATA_INDEXES.computeIfAbsent(d, k ->
+                  IntStream.rangeClosed(1, d).boxed().collect(Collectors.toSet()));
               return !pipeline.getReplicaIndexes().values().containsAll(dataIndexes);
             }
             return false;
           })
           .map(Map.Entry::getKey)
           .collect(Collectors.toList());
-      containerLocationCache.invalidateAll(unsatisfiedCachePipelines);
+      containerLocationCache.invalidateAll(uncachePipelines);
       return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
