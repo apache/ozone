@@ -39,6 +39,7 @@ public enum OMAction implements AuditAction {
   RENAME_KEYS,
   SET_OWNER,
   SET_QUOTA,
+  UPDATE_VOLUME,
   UPDATE_BUCKET,
   UPDATE_KEY,
   PURGE_KEYS,
