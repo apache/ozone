@@ -286,6 +286,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3;
@@ -1243,6 +1245,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
         OZONE_OM_HANDLER_COUNT_DEFAULT);
+    final int readThreads = conf.getInt(OZONE_OM_READ_THREADPOOL_KEY,
+        OZONE_OM_READ_THREADPOOL_DEFAULT);
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
@@ -1272,7 +1276,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             reconfigureServerProtocol);
 
     return startRpcServer(configuration, omNodeRpcAddr, omService,
-        omInterService, omAdminService, reconfigureService, handlerCount);
+        omInterService, omAdminService, reconfigureService, handlerCount, readThreads);
   }
 
   /**
@@ -1286,6 +1290,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param reconfigureProtocolService RPC protocol for reconfigure
    *    *                              (ReconfigureProtocolPB impl)
    * @param handlerCount RPC server handler count
+   * @param readThreads RPC server read thread pool size
    * @return RPC server
    * @throws IOException if there is an I/O error while creating RPC server
    */
@@ -1294,7 +1299,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       BlockingService interOMProtocolService,
       BlockingService omAdminProtocolService,
       BlockingService reconfigureProtocolService,
-      int handlerCount)
+      int handlerCount, int readThreads)
       throws IOException {
 
     RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
@@ -1303,6 +1308,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setBindAddress(addr.getHostString())
         .setPort(addr.getPort())
         .setNumHandlers(handlerCount)
+        .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(delegationTokenMgr)
         .build());

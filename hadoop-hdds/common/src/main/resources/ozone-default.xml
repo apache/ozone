@@ -594,6 +594,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.read.threadpool</name>
+    <value>10</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for OM service endpoints.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
