@@ -772,6 +772,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       bucket = adapterImpl.getBucket(ofsPath, false);
     } catch (Exception ex) {
+      LOG.error("Exception while getting bucket link information, " +
+          "considered it as false", ex);
       return false;
     }
     // check status of normal bucket
