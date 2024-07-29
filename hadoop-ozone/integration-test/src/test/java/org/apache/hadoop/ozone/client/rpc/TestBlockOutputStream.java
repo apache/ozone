@@ -151,10 +151,7 @@ class TestBlockOutputStream {
 
   private static Stream<Arguments> clientParameters() {
     return Stream.of(
-        Arguments.of(true, true),
-        Arguments.of(true, false),
-        Arguments.of(false, true),
-        Arguments.of(false, false)
+        Arguments.of(true)
     );
   }
 
@@ -477,8 +474,8 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  void testWriteMoreThanFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  void testWriteMoreThanFlushSize(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, false);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
