@@ -727,7 +727,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     // delete bucket
     if (ofsPath.isBucket()) {
-      return deleteBucket(f, recursive, bucket);
+      return deleteBucket(f, recursive, ofsPath);
     }
     
     // delete files and directory
