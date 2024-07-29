@@ -704,7 +704,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     String key = pathToKey(f);
     OFSPath ofsPath = new OFSPath(key,
         ozoneConfiguration);
-    OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
     // Handle rm root
     if (ofsPath.isRoot()) {
       // Intentionally drop support for rm root
