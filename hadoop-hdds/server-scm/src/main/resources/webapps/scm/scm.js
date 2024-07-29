@@ -34,13 +34,14 @@
             $scope.lastIndex = 0;
             $scope.statistics = {
                 nodes : {
-                    usages : {}
+                    usages : {
+                        min : "N/A",
+                        max : "N/A",
+                        median : "N/A",
+                        stdev : "N/A"
+                    }
                 }
             }
-            $scope.statistics.nodes.usages.min = "";
-            $scope.statistics.nodes.usages.max = "";
-            $scope.statistics.nodes.usages.median = "";
-            $scope.statistics.nodes.usages.stdev = "";
 
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
@@ -91,15 +92,15 @@
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
 
-                    ctrl.nodemanagermetrics.NodeStatistics.map(({ key, value }) => {
-                        if(key == "Min") {
-                            $scope.statistics.nodes.usages.min = value;
-                        } else if(key == "Max") {
-                            $scope.statistics.nodes.usages.max = value;
-                        } else if(key == "Median") {
-                            $scope.statistics.nodes.usages.median = value;
-                        } else if(key == "Stdev") {
-                            $scope.statistics.nodes.usages.stdev = value;
+                    ctrl.nodemanagermetrics.NodeStatistics.forEach(function(obj) {
+                        if(obj.key == "Min") {
+                            $scope.statistics.nodes.usages.min = obj.value;
+                        } else if(obj.key == "Max") {
+                            $scope.statistics.nodes.usages.max = obj.value;
+                        } else if(obj.key == "Median") {
+                            $scope.statistics.nodes.usages.median = obj.value;
+                        } else if(obj.key == "Stdev") {
+                            $scope.statistics.nodes.usages.stdev = obj.value;
                         }
                     });
                 });
