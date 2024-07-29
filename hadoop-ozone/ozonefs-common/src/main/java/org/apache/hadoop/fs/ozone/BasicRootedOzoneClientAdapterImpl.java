@@ -1394,6 +1394,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   public OzoneBucket toOzoneBucket(BucketKey key, BucketCacheInfo bucketInfo) {
     return OzoneBucket.newBuilder(config, proxy)
+        .setVolumeName(key.getVolumeName())
         .setName(key.getBucketName())
         .setBucketLayout(bucketInfo.getBucketLayout())
         .setSourceVolume(bucketInfo.getSourceVolume())
