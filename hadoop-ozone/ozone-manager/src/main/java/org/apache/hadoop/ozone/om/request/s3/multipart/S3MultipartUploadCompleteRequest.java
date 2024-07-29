@@ -436,7 +436,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         .replaceAll("\\n", " "));
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
         getOmRequest().getUserInfo()));
 

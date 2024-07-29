@@ -157,7 +157,7 @@ public class OMPrepareRequest extends OMClientRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.UPGRADE_PREPARE,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_PREPARE,
         new HashMap<>(), exception, userInfo));
     return response;
   }
