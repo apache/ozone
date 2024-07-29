@@ -91,6 +91,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * The minimal Rooted Ozone Filesystem implementation.
@@ -771,9 +773,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     OzoneBucket bucket;
     try {
       bucket = adapterImpl.getBucket(ofsPath, false);
+    } catch (OMException ex) {
+      if (ex.getResult() != BUCKET_NOT_FOUND && ex.getResult() != VOLUME_NOT_FOUND) {
+        LOG.error("OMException while getting bucket information, considered it as false", ex);
+      }
+      return false;
     } catch (Exception ex) {
-      LOG.error("Exception while getting bucket link information, " +
-          "considered it as false", ex);
+      LOG.error("Exception while getting bucket information, considered it as false", ex);
       return false;
     }
     // check status of normal bucket
