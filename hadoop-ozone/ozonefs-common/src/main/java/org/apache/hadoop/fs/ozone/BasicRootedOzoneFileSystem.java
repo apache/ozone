@@ -768,12 +768,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private boolean deleteBucket(Path f, boolean recursive, OFSPath ofsPath)
       throws IOException {
-      OzoneBucket bucket;
-      try {
-        bucket = adapterImpl.getBucket(ofsPath, false);
-      } catch (Exception ex) {
-        return false;
-      }
+    OzoneBucket bucket;
+    try {
+      bucket = adapterImpl.getBucket(ofsPath, false);
+    } catch (Exception ex) {
+      return false;
+    }
     // check status of normal bucket
     try {
       getFileStatus(f);
