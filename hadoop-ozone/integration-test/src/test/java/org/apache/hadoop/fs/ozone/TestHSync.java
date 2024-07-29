@@ -683,6 +683,7 @@ public class TestHSync {
           out.write(data);
           writes.incrementAndGet();
         } catch (Exception e) {
+          LOG.error("Error writing", e);
           writerException.set(e);
           throw new RuntimeException(e);
         }
@@ -694,6 +695,7 @@ public class TestHSync {
         try {
           out.hsync();
         } catch (Exception e) {
+          LOG.error("Error calling hsync", e);
           syncerException.set(e);
           throw new RuntimeException(e);
         }
@@ -715,11 +717,11 @@ public class TestHSync {
       sync.join();
     }
 
-    if (writerException.get() != null) {
-      throw writerException.get();
-    }
     if (syncerException.get() != null) {
       throw syncerException.get();
+    }
+    if (writerException.get() != null) {
+      throw writerException.get();
     }
     return writes.get();
   }

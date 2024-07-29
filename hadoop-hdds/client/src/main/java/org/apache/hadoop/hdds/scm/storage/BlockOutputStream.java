@@ -150,6 +150,7 @@ public class BlockOutputStream extends OutputStream {
   private boolean allowPutBlockPiggybacking;
 
   private CompletableFuture<Void> lastFlushFuture;
+  private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
 
   /**
    * Creates a new BlockOutputStream.
@@ -355,13 +356,23 @@ public class BlockOutputStream extends OutputStream {
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
-        this.lastFlushFuture = watchForCommitAsync(putBlockFuture);
+        recordWatchForCommitAsync(putBlockFuture);
       }
 
       if (bufferPool.isAtCapacity()) {
         handleFullBuffer();
       }
     }
+  }
+
+  private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
+    recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
+  }
+
+  private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
+    Preconditions.checkState(Thread.holdsLock(this));
+    this.lastFlushFuture = flushFuture;
+    this.allPendingFlushFutures = allPendingFlushFutures.thenCombine(flushFuture, (last, curr) -> null);
   }
 
   private void allocateNewBufferIfNeeded() throws IOException {
@@ -425,7 +436,7 @@ public class BlockOutputStream extends OutputStream {
         updateWriteChunkLength();
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
-        lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+        recordWatchForCommitAsync(putBlockResultFuture);
       }
       if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
         handleFullBuffer();
@@ -640,6 +651,11 @@ public class BlockOutputStream extends OutputStream {
       }
       LOG.debug("Flush done.");
     }
+
+    if (close) {
+      // When closing, must wait for all flush futures to complete.
+      allPendingFlushFutures.get();
+    }
   }
 
   private synchronized CompletableFuture<Void> handleFlushInternalSynchronized(boolean close) throws IOException {
@@ -682,7 +698,7 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Flushing without data");
     }
     if (putBlockResultFuture != null) {
-      this.lastFlushFuture = watchForCommitAsync(putBlockResultFuture);
+      recordWatchForCommitAsync(putBlockResultFuture);
     }
     return lastFlushFuture;
   }
