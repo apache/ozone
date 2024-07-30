@@ -277,7 +277,8 @@ public class OzoneManagerServiceProviderImpl
           LOG.error("Failed fetching a full snapshot from Ozone Manager");
         }
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        LOG.error("Unexpected IOException occurred while trying to fetch a full snapshot: {}", e);
+        throw new RuntimeException(runtimeException);
       }
     }
     reconTaskController.start();
