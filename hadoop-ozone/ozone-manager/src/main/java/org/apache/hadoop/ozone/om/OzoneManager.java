@@ -1243,10 +1243,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               OzoneNetUtils.getAddressWithHostNameLocal(omNodeRpcAddr);
     }
 
-    final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
-        OZONE_OM_HANDLER_COUNT_DEFAULT);
-    final int readThreads = conf.getInt(OZONE_OM_READ_THREADPOOL_KEY,
-        OZONE_OM_READ_THREADPOOL_DEFAULT);
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
@@ -1275,8 +1271,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(configuration, omNodeRpcAddr, omService,
-        omInterService, omAdminService, reconfigureService, handlerCount, readThreads);
+    return startRpcServer(conf, omNodeRpcAddr, omService,
+        omInterService, omAdminService, reconfigureService);
   }
 
   /**
@@ -1289,8 +1285,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *                               (OMInterServiceProtocolPB impl)
    * @param reconfigureProtocolService RPC protocol for reconfigure
    *    *                              (ReconfigureProtocolPB impl)
-   * @param handlerCount RPC server handler count
-   * @param readThreads RPC server read thread pool size
    * @return RPC server
    * @throws IOException if there is an I/O error while creating RPC server
    */
@@ -1298,9 +1292,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       InetSocketAddress addr, BlockingService clientProtocolService,
       BlockingService interOMProtocolService,
       BlockingService omAdminProtocolService,
-      BlockingService reconfigureProtocolService,
-      int handlerCount, int readThreads)
+      BlockingService reconfigureProtocolService)
       throws IOException {
+
+    final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
+        OZONE_OM_HANDLER_COUNT_DEFAULT);
+    final int readThreads = conf.getInt(OZONE_OM_READ_THREADPOOL_KEY,
+        OZONE_OM_READ_THREADPOOL_DEFAULT);
 
     RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
         .setProtocol(OzoneManagerProtocolPB.class)
