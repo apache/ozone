@@ -27,7 +27,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.TreeSet;
 
@@ -81,7 +83,7 @@ class TestContainerChecksumTreeManager {
   @Test
   public void testWriteEmptyBlockListToFile() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
-    checksumManager.markBlocksAsDeleted(container, new TreeSet<>());
+    checksumManager.markBlocksAsDeleted(container, Collections.emptySet());
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
@@ -114,7 +116,7 @@ class TestContainerChecksumTreeManager {
   public void testWriteOnlyDeletedBlocksToFile() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
+    checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().changed());
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
@@ -127,12 +129,38 @@ class TestContainerChecksumTreeManager {
   }
 
   @Test
+  public void testWriteDuplicateDeletedBlocks() throws Exception {
+    // Blocks are expected to appear in the file deduplicated in this order.
+    List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
+    // Pass a duplicate block, it should be filtered out.
+    checksumManager.markBlocksAsDeleted(container, Arrays.asList(1L, 2L, 2L, 3L));
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
+    assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
+
+    // Blocks are expected to appear in the file deduplicated in this order.
+    expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L, 4L);
+    // Pass another set of blocks. This and the previous list passed should be joined, deduplicated, and sorted.
+    checksumManager.markBlocksAsDeleted(container, Arrays.asList(2L, 2L, 3L, 4L));
+    checksumInfo = readChecksumFile(container);
+    assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
+  }
+
+  @Test
+  public void testWriteBlocksOutOfOrder() throws Exception {
+    // Blocks are expected to be written to the file in this order.
+    List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
+    checksumManager.markBlocksAsDeleted(container, Arrays.asList(3L, 1L, 2L));
+    ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
+    assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
+  }
+
+  @Test
   public void testDeletedBlocksPreservedOnTreeWrite() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
+    checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTree tree = buildTestTree();
     checksumManager.writeContainerDataTree(container, tree);
@@ -156,7 +184,7 @@ class TestContainerChecksumTreeManager {
     checksumManager.writeContainerDataTree(container, tree);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
+    checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
