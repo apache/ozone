@@ -58,8 +58,8 @@ public enum SignalLogger {
 
     Handler(Signal signal, Logger log) {
       this.log = log;
-      SignalHandler prevHandler = POSIX_IMPL.signal(signal, this);
-      this.prevHandler = prevHandler != null ? prevHandler : DEFAULT_HANDLER;
+      SignalHandler handler = POSIX_IMPL.signal(signal, this);
+      prevHandler = handler != null ? handler : DEFAULT_HANDLER;
     }
 
     /**
