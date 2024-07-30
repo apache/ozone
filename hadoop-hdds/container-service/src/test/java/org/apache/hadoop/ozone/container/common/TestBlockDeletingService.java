@@ -1103,8 +1103,8 @@ public class TestBlockDeletingService {
   }
 
   /**
-   * The container checksum file is updated with blocks that have been deleted after the file is removed from disk,
-   * but before the transaction is removed from the DB. If there is a failure partway through, the checksum file
+   * The container checksum tree file is updated with the blocks that have been deleted after the on disk block files are removed from disk,
+   * but before the transaction is removed from the DB. If there is a failure partway through, the checksum tree file
    * should still get updated when the transaction is retried, even if the block file is not present.
    */
   @ContainerTestVersionInfo.ContainerTest
