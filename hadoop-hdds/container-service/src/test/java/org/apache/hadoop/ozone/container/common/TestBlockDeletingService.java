@@ -107,6 +107,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -1210,12 +1211,11 @@ public class TestBlockDeletingService {
   }
 
   private void assertDeletionsInChecksumFile(ContainerData data, int numBlocks) {
-    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
     ContainerProtos.ContainerChecksumInfo checksumInfo = null;
-    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-      checksumInfo = ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+    try {
+      checksumInfo = readChecksumFile(data);
     } catch (IOException ex) {
-      fail("Failed to read container checksum tree file", ex);
+      fail("Failed to read container checksum tree file: " + ex.getMessage());
     }
     assertNotNull(checksumInfo);
 

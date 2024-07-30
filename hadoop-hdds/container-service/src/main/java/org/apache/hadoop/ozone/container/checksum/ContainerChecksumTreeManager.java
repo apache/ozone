@@ -175,10 +175,6 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
-  }
-
   @VisibleForTesting
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;
