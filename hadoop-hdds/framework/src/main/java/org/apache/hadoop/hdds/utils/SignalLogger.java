@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
 
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -46,6 +45,8 @@ public enum SignalLogger {
 
   private static final POSIX POSIX_IMPL = POSIXFactory.getJavaPOSIX();
 
+  private static final SignalHandler DEFAULT_HANDLER = System::exit;
+
   private boolean registered = false;
 
   /**
@@ -57,9 +58,8 @@ public enum SignalLogger {
 
     Handler(Signal signal, Logger log) {
       this.log = log;
-      prevHandler = Objects.requireNonNull(
-          POSIX_IMPL.signal(signal, this),
-          () -> "default handler missing for " + signal);
+      SignalHandler prevHandler = POSIX_IMPL.signal(signal, this);
+      this.prevHandler = prevHandler != null ? prevHandler : DEFAULT_HANDLER;
     }
 
     /**
