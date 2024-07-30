@@ -48,7 +48,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -775,7 +774,7 @@ public class TestOmMetadataManager {
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
     final long expiredMPUCreationTime =
-        Instant.now().minus(expireThreshold).toEpochMilli();
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
     // Add expired MPUs to multipartInfoTable.
     // The method under test does not check for expired open keys in the
@@ -783,7 +782,7 @@ public class TestOmMetadataManager {
     Set<String> expiredMPUs = new HashSet<>();
     for (int i = 0; i < numExpiredMPUs + numUnexpiredMPUs; i++) {
       final long creationTime = i < numExpiredMPUs ?
-          expiredMPUCreationTime : Instant.now().toEpochMilli();
+          expiredMPUCreationTime : Time.now();
 
       String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils
