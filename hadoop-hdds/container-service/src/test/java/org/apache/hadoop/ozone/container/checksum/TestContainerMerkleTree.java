@@ -97,7 +97,7 @@ class TestContainerMerkleTree {
   public void testBuildTreeWithMissingChunks() throws Exception {
     // These chunks will be used to seed both the expected and actual trees.
     final long blockID = 1;
-    ChunkInfo chunk1 = buildChunk(config,0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     // Chunk 2 is missing.
     ChunkInfo chunk3 = buildChunk(config, 2, ByteBuffer.wrap(new byte[]{4, 5, 6}));
 

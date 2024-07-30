@@ -18,7 +18,12 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ContainerMerkleTreeTestUtils {
+/**
+ * Helper methods for testing container checksum tree files and container reconciliation.
+ */
+public final class ContainerMerkleTreeTestUtils {
+  private ContainerMerkleTreeTestUtils() { }
+
   public static void assertTreesSortedAndMatch(ContainerProtos.ContainerMerkleTree expectedTree,
       ContainerProtos.ContainerMerkleTree actualTree) {
     assertEquals(expectedTree.getDataChecksum(), actualTree.getDataChecksum());
@@ -65,7 +70,8 @@ public class ContainerMerkleTreeTestUtils {
    *     "bytesPerChecksum" amount of data and are assumed to be contiguous.
    * @return The ChunkInfo proto object built from this information.
    */
-  public static ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock, ByteBuffer... chunkChecksums) throws IOException {
+  public static ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock, ByteBuffer... chunkChecksums)
+      throws IOException {
     final long chunkSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     final int bytesPerChecksum = config.getObject(OzoneClientConfig.class).getBytesPerChecksum();

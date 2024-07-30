@@ -80,7 +80,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -1104,9 +1103,10 @@ public class TestBlockDeletingService {
   }
 
   /**
-   * The container checksum tree file is updated with the blocks that have been deleted after the on disk block files are removed from disk,
-   * but before the transaction is removed from the DB. If there is a failure partway through, the checksum tree file
-   * should still get updated when the transaction is retried, even if the block file is not present.
+   * The container checksum tree file is updated with the blocks that have been deleted after the on disk block files
+   * are removed from disk, but before the transaction is removed from the DB. If there is a failure partway through,
+   * the checksum tree file should still get updated when the transaction is retried, even if the block file is not
+   * present.
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testChecksumFileUpdatedWhenDeleteRetried(ContainerTestVersionInfo versionInfo) throws Exception {
