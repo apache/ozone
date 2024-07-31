@@ -144,6 +144,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -914,6 +915,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   private ListOpenFilesResponse listOpenFiles(ListOpenFilesRequest req,
                                               int clientVersion)
       throws IOException {

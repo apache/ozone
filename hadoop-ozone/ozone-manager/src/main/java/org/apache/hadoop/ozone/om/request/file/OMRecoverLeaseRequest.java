@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMRecoverLeaseResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
@@ -46,6 +47,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -101,6 +103,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
     RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
