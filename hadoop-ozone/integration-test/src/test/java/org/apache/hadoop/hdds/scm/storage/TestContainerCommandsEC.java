@@ -621,7 +621,7 @@ public class TestContainerCommandsEC {
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWith(List<Integer> missingIndexes,
-     boolean isBlockGroupLengthWrong) throws Exception {
+      boolean isBlockGroupLengthWrong) throws Exception {
     testECReconstructionCoordinator(missingIndexes, 3, isBlockGroupLengthWrong, true);
   }
 
@@ -1036,7 +1036,7 @@ public class TestContainerCommandsEC {
     }
   }
 
-  public class MockECReconstructionCoordinator extends ECReconstructionCoordinator {
+  public static class MockECReconstructionCoordinator extends ECReconstructionCoordinator {
     private boolean isBlockGroupLengthWrong;
 
     public MockECReconstructionCoordinator(ConfigurationSource conf, CertificateClient certificateClient,
