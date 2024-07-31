@@ -74,7 +74,7 @@ public class SstFilteringService extends BackgroundService
   private static final int SST_FILTERING_CORE_POOL_SIZE = 1;
 
   public static final String SST_FILTERED_FILE = "sstFiltered";
-  private static final byte[] SST_FILTERED_FILE_CONTENT = StringUtils.string2Bytes("This directory holds information " +
+  private static final byte[] SST_FILTERED_FILE_CONTENT = StringUtils.string2Bytes("This file holds information " +
       "if a particular snapshot has filtered out the relevant sst files or not.\nDO NOT add, change or delete " +
       "any files in this directory unless you know what you are doing.\n");
   private final OzoneManager ozoneManager;
@@ -126,6 +126,10 @@ public class SstFilteringService extends BackgroundService
 
   private class SstFilteringTask implements BackgroundTask {
 
+    private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
+      return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+    }
+
 
     /**
      * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.
@@ -133,8 +137,8 @@ public class SstFilteringService extends BackgroundService
      * @throws IOException
      */
     private void markSSTFilteredFlagForSnapshot(SnapshotInfo snapshotInfo) throws IOException {
-      // Acquiring read lock to avoid race condition with the snapshot directory deletion occuring
-      // in OmSnapshotPurgeResponse. Any operation apart from delete can run in parallel along with operation.
+      // Acquiring read lock to avoid race condition with the snapshot directory deletion occurring
+      // in OmSnapshotPurgeResponse. Any operation apart from delete can run in parallel along with this operation.
       OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
           .acquireReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
               snapshotInfo.getName());
@@ -148,7 +152,7 @@ public class SstFilteringService extends BackgroundService
           }
         } finally {
           ozoneManager.getMetadataManager().getLock()
-              .releaseWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
+              .releaseReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
                   snapshotInfo.getBucketName(), snapshotInfo.getName());
         }
       }
@@ -174,10 +178,10 @@ public class SstFilteringService extends BackgroundService
         long snapshotLimit = snapshotLimitPerTask;
 
         while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
+          Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
+          String snapShotTableKey = keyValue.getKey();
+          SnapshotInfo snapshotInfo = keyValue.getValue();
           try {
-            Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-            String snapShotTableKey = keyValue.getKey();
-            SnapshotInfo snapshotInfo = keyValue.getValue();
             if (isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo)) {
               continue;
             }
@@ -215,8 +219,7 @@ public class SstFilteringService extends BackgroundService
                 SnapshotInfo snapshotInfoToCheck =
                     ozoneManager.getMetadataManager().getSnapshotInfoTable()
                         .get(snapShotTableKey);
-                if (snapshotInfoToCheck.getSnapshotStatus() ==
-                    SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+                if (isSnapshotDeleted(snapshotInfoToCheck)) {
                   LOG.info("Snapshot with name: '{}', id: '{}' has been " +
                           "deleted.", snapshotInfo.getName(), snapshotInfo
                       .getSnapshotId());
@@ -224,7 +227,14 @@ public class SstFilteringService extends BackgroundService
               }
             }
           } catch (RocksDBException | IOException e) {
-            LOG.error("Exception encountered while filtering a snapshot", e);
+            if (isSnapshotDeleted(snapshotInfoTable.get(snapShotTableKey))) {
+              LOG.info("Exception encountered while filtering a snapshot: {} since it was deleted midway",
+                  snapShotTableKey, e);
+            } else {
+              LOG.error("Exception encountered while filtering a snapshot", e);
+            }
+
+
           }
         }
       } catch (IOException e) {
