@@ -139,6 +139,7 @@ public class SstFilteringService extends BackgroundService
     private void markSSTFilteredFlagForSnapshot(SnapshotInfo snapshotInfo) throws IOException {
       // Acquiring read lock to avoid race condition with the snapshot directory deletion occurring
       // in OmSnapshotPurgeResponse. Any operation apart from delete can run in parallel along with this operation.
+      //TODO. Revisit other SNAPSHOT_LOCK and see if we can change write locks to read locks to further optimize it.
       OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
           .acquireReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
               snapshotInfo.getName());
