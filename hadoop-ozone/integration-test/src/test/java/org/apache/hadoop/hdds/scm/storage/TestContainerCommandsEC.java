@@ -363,7 +363,7 @@ public class TestContainerCommandsEC {
     }
 
     try (ECReconstructionCoordinator coordinator =
-             new ECReconstructionCoordinator(config, certClient.createClientTrustManager(),
+             new ECReconstructionCoordinator(config, certClient,
                  secretKeyClient, null,
                  ECReconstructionMetrics.create(), "")) {
 
@@ -673,7 +673,7 @@ public class TestContainerCommandsEC {
         XceiverClientManager xceiverClientManager =
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
-            new ECReconstructionCoordinator(config, certClient.createClientTrustManager(), secretKeyClient,
+            new ECReconstructionCoordinator(config, certClient, secretKeyClient,
                 null, ECReconstructionMetrics.create(), "2")) {
 
       ECReconstructionMetrics metrics =
@@ -723,7 +723,7 @@ public class TestContainerCommandsEC {
       List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
           blockDataArrList = new ArrayList<>();
       try (ECContainerOperationClient ecContainerOperationClient =
-               new ECContainerOperationClient(config, certClient.createClientTrustManager())) {
+               new ECContainerOperationClient(config, certClient)) {
         for (int j = 0; j < containerToDeletePipeline.size(); j++) {
           Pipeline p = containerToDeletePipeline.get(j);
           org.apache.hadoop.ozone.container.common.helpers.BlockData[]
@@ -869,7 +869,7 @@ public class TestContainerCommandsEC {
 
     assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
-               new ECReconstructionCoordinator(config, certClient.createClientTrustManager(),
+               new ECReconstructionCoordinator(config, certClient,
                    secretKeyClient,
                    null, ECReconstructionMetrics.create(), "")) {
         coordinator.reconstructECContainerGroup(conID,
@@ -881,7 +881,7 @@ public class TestContainerCommandsEC {
     StorageContainerException ex =
         assertThrows(StorageContainerException.class, () -> {
           try (ECContainerOperationClient client =
-                   new ECContainerOperationClient(config, certClient.createClientTrustManager())) {
+                   new ECContainerOperationClient(config, certClient)) {
             client.listBlock(conID, targetDNToCheckContainerCLeaned,
                 new ECReplicationConfig(3, 2), cToken);
           }

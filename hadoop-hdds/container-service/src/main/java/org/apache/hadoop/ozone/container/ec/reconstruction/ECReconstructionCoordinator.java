@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
-import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -39,6 +38,7 @@ import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -118,13 +118,13 @@ public class ECReconstructionCoordinator implements Closeable {
   private final OzoneClientConfig ozoneClientConfig;
 
   public ECReconstructionCoordinator(
-      ConfigurationSource conf, ClientTrustManager clientTrustManager,
+      ConfigurationSource conf, CertificateClient certClient,
       SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics,
       String threadNamePrefix) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
-        clientTrustManager);
+        certClient);
     this.byteBufferPool = new ElasticByteBufferPool();
     ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructReadExecutor = createThreadPoolExecutor(

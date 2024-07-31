@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -60,19 +62,22 @@ public class ECContainerOperationClient implements Closeable {
   }
 
   public ECContainerOperationClient(ConfigurationSource conf,
-      ClientTrustManager clientTrustManager) throws IOException {
-    this(createClientManager(conf, clientTrustManager));
+      CertificateClient certificateClient) throws IOException {
+    this(createClientManager(conf, certificateClient));
   }
 
   @Nonnull
-  private static XceiverClientManager createClientManager(
-      ConfigurationSource conf, ClientTrustManager clientTrustManager)
+  private static XceiverClientManager createClientManager(ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
+    ClientTrustManager trustManager = null;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      trustManager = certificateClient.createClientTrustManager();
+    }
     XceiverClientManager.ScmClientConfig scmClientConfig = new XceiverClientManager.XceiverClientManagerConfigBuilder()
         .setMaxCacheSize(256)
         .setStaleThresholdMs(10 * 1000)
         .build();
-    return new XceiverClientManager(conf, scmClientConfig, clientTrustManager);
+    return new XceiverClientManager(conf, scmClientConfig, trustManager);
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
