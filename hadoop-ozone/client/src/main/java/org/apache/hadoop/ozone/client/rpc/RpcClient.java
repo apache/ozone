@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -2682,6 +2683,24 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(obj.getBucketName())
         .setKeyName(keyName);
     ozoneManagerClient.setTimes(builder.build(), mtime, atime);
+  }
+
+  @Override
+  public LeaseKeyInfo recoverLease(String volumeName, String bucketName,
+                                   String keyName, boolean force)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new IOException("OzoneManager does not support lease recovery");
+    }
+    return ozoneManagerClient.recoverLease(volumeName, bucketName, keyName, force);
+  }
+
+  @Override
+  public void recoverKey(OmKeyArgs args, long clientID) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new IOException("OzoneManager does not support lease recovery");
+    }
+    ozoneManagerClient.recoverKey(args, clientID);
   }
 
   private static ExecutorService createThreadPoolExecutor(

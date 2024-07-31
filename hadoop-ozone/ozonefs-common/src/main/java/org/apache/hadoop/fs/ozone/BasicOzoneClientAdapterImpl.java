@@ -703,8 +703,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
     try {
-      return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-          volume.getName(), bucket.getName(), pathStr, force);
+      RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+      return rpcClient.recoverLease(volume.getName(), bucket.getName(), pathStr, force);
     } catch (OMException ome) {
       if (ome.getResult() == NOT_A_FILE) {
         throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
@@ -720,7 +720,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public void recoverFile(OmKeyArgs keyArgs) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
 
-    ozoneClient.getProxy().getOzoneManagerClient().recoverKey(keyArgs, 0L);
+    RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+    rpcClient.recoverKey(keyArgs, 0L);
   }
 
   @Override

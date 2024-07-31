@@ -1395,7 +1395,8 @@ public class BasicRootedOzoneClientAdapterImpl
 
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
+      RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+      return rpcClient.recoverLease(
           bucket.getVolumeName(), bucket.getName(), ofsPath.getKeyName(), force);
     } catch (OMException ome) {
       if (ome.getResult() == NOT_A_FILE) {
@@ -1414,7 +1415,8 @@ public class BasicRootedOzoneClientAdapterImpl
   public void recoverFile(OmKeyArgs keyArgs) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
 
-    ozoneClient.getProxy().getOzoneManagerClient().recoverKey(keyArgs, 0L);
+    RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+    rpcClient.recoverKey(keyArgs, 0L);
   }
 
   @Override
