@@ -5,8 +5,9 @@
     "healthyDatanodes": 24,
     "storageReport": {
       "capacity": 202114732032,
-      "used": 16384,
-      "remaining": 182447632384
+      "used": 4667099648,
+      "remaining": 182447632384,
+      "committed": 12000222315
     },
     "containers": 3230,
     "missingContainers": 1002,

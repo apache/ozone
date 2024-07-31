@@ -23,6 +23,7 @@ import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { routes } from '@/routes';
+import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
@@ -73,13 +74,13 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   }} />
               </div>
             </Header>
-            <Content style={{ margin: '0 16px 0', overflow: 'initial' }}>
+            <Content>
               <Switch>
                 <Route exact path='/'>
                   <Redirect to='/Overview' />
                 </Route>
                 {
-                  routes.map(
+                  routesV2.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )
                 }
