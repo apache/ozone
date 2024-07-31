@@ -35,7 +35,7 @@ public class ContainerMerkleTreeMetrics {
         new ContainerMerkleTreeMetrics());
   }
 
-  public void unregister() {
+  public static void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(METRICS_SOURCE_NAME);
   }

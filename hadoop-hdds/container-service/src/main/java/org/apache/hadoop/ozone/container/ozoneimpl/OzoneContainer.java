@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeMetrics;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -499,6 +500,8 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
+    // TODO: To properly shut down ContainerMerkleTreeMetrics
+    ContainerMerkleTreeMetrics.unregister();
   }
 
   public void handleVolumeFailures() {
