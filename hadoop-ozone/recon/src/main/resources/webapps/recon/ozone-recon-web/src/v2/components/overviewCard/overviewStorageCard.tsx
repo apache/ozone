@@ -77,9 +77,8 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
       color: '#FF595E'
     }
   }]
-  console.log(capacityData);
-  // Hacky fix because guage chart shows a dot if value is zero
-  // So remove all zero values
+  // Remove all zero values
+  // because guage chart shows a dot if value is zero
   capacityData = capacityData.filter((val) => val.value > 0)
 
   const eChartOptions = {
@@ -143,16 +142,20 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
 
   const cardChildren = (
     <Card
+      size='small'
       className={'overview-card'}
       loading={loading}
-      hoverable={true}
+      hoverable={false}
       title='Cluster Capacity'
-      style={{
-        boxSizing: 'border-box',
-        height: '100%'
+      headStyle={{
+        fontSize: '15px'
       }}
       bodyStyle={{
         padding: '5px'
+      }}
+      style={{
+        boxSizing: 'border-box',
+        height: '100%'
       }}>
       <Row justify='space-between'>
         <Col>

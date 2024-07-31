@@ -20,6 +20,7 @@ import React from 'react';
 import { Card, Row, Table } from 'antd';
 
 import { ColumnType } from 'antd/es/table';
+import { Link } from 'react-router-dom';
 
 // ------------- Types -------------- //
 
@@ -31,12 +32,13 @@ type TableData = {
 }
 
 type OverviewTableCardProps = {
-  data: string | React.ReactElement;
   title: string;
-  hoverable?: boolean;
-  loading?: boolean;
   columns: ColumnType<TableData>[];
   tableData: TableData[];
+  hoverable?: boolean;
+  loading?: boolean;
+  data?: string | React.ReactElement;
+  linkToUrl?: string;
 }
 
 // ------------- Component -------------- //
@@ -46,19 +48,42 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
   hoverable: false,
   loading: false,
   columns: [],
-  tableData: []
+  tableData: [],
+  linkToUrl: ''
 }) => {
-  let { data, title, loading, hoverable, tableData, columns } = props;
+  let { data, title, loading, hoverable, tableData, columns, linkToUrl } = props;
+
+  const titleElement = (linkToUrl)
+    ? (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between'
+      }}>
+        {title}
+        <Link
+          to={linkToUrl}
+          style={{
+            fontWeight: 400
+          }}>View Insights</Link>
+      </div> )
+    : title
 
   return (
     <Card
+      size='small'
       className={'overview-card'}
       loading={loading}
       hoverable={hoverable}
-      title={title}
+      title={titleElement}
+      headStyle={{
+        fontSize: '15px'
+      }}
       bodyStyle={{
-        padding: '5% 3%',
+        padding: '2% 3%',
         justifyTracks: 'space-between'
+      }}
+      style={{
+        height: '100%'
       }}>
       {(data)
         ? <Row gutter={[0, 25]}>

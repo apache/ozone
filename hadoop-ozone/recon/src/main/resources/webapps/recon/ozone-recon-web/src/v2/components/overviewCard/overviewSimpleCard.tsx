@@ -17,22 +17,10 @@
  */
 
 import React from 'react';
-import { Card, Row, Col } from 'antd';
-import {
-  ClusterOutlined,
-  DeploymentUnitOutlined,
-  DatabaseOutlined,
-  ContainerOutlined,
-  InboxOutlined,
-  FolderOpenOutlined,
-  FileTextOutlined,
-  QuestionCircleOutlined,
-  DeleteOutlined
-} from '@ant-design/icons';
+import { Card, Col, Row } from 'antd';
+import { Link } from 'react-router-dom';
+import { ClusterOutlined, ContainerOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, FileTextOutlined, FolderOpenOutlined, InboxOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 
-import StorageBar from '@/v2/components/storageBar/storageBar';
-import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
-import { StorageReport } from '@/v2/types/overview.types';
 
 // ------------- Types -------------- //
 type IconOptions = {
@@ -40,14 +28,12 @@ type IconOptions = {
 }
 
 type OverviewCardProps = {
-  data: string | React.ReactElement;
+  icon: string;
+  data: number | React.ReactElement;
   title: string;
-  icon?: string;
   hoverable?: boolean;
   loading?: boolean;
   linkToUrl?: string;
-  storageReport?: StorageReport;
-  error?: boolean;
 }
 
 
@@ -92,78 +78,61 @@ const IconSelector = ({
 
 
 // ------------- Component -------------- //
-const OverviewCard = (props: OverviewCardProps = {
+const OverviewSimpleCard = (props: OverviewCardProps = {
   icon: '',
-  data: '',
+  data: 0,
   title: '',
   hoverable: false,
   loading: false,
-  linkToUrl: '',
-  error: false
+  linkToUrl: ''
 }) => {
-  let { icon, data, title, loading, hoverable, storageReport, linkToUrl, error } = props;
-  let meta = <Card.Meta description={data} />
+  let { icon, data, title, loading, hoverable, linkToUrl } = props;
 
-  let errorClass = error ? 'card-error' : '';
-  if (typeof data === 'string' && data === 'N/A') {
-    errorClass = 'card-error';
-  }
-
-  if (storageReport) {
-    meta = (
-      <div className='ant-card-percentage'>
-        {meta}
-        <div className='storage-bar'>
-          <StorageBar
-            capacity={storageReport.capacity}
-            used={storageReport.used}
-            remaining={storageReport.remaining}
-            showMeta={false} />
-        </div>
-      </div>
-    );
-  }
-
-  const cardChildren = (
-    <Card
-      className={`overview-card ${errorClass}`}
-      loading={loading}
-      hoverable={hoverable}
-      title={title}
-      style={{
-        boxSizing: 'border-box'
-      }}
-      bodyStyle={{
-        padding: '5px'
-      }}
-      headStyle={{
-        height: '10px'
+  const titleElement = (linkToUrl)
+    ? (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between'
       }}>
-      <Row justify='space-between'>
-        <Col span={18}>
-          <Row>
-            {meta}
-          </Row>
-        </Col>
-        {(icon)
-          ? <Col span={6}>
-            <IconSelector iconType={icon} style={{
-              fontSize: '50px',
-              float: 'right'
-            }} />
-          </Col>
-          : <></>
-        }
-      </Row>
-    </Card>
-  )
+        {title}
+        <Link
+          to={linkToUrl}
+          style={{
+            fontWeight: 400
+          }} >View More</Link>
+      </div>)
+    : title
 
   return (
-    <OverviewCardWrapper
-      linkToUrl={linkToUrl as string}
-      title={title}
-      children={cardChildren} />
-  )
+    <Card
+      size='small'
+      className={'overview-card'}
+      loading={loading}
+      hoverable={hoverable}
+      title={(linkToUrl) ? titleElement : title}
+      headStyle={{
+        fontSize: '15px'
+      }}
+      bodyStyle={{
+        padding: '5% 6%',
+        justifyTracks: 'space-between'
+      }}>
+      <Row
+        align='middle'>
+        <Col span={4}>
+          <IconSelector iconType={icon} style={{
+            fontSize: '30px',
+            float: 'inline-start'
+          }} />
+        </Col>
+        <Col style={{
+          fontSize: '30px'
+        }}>
+          {data}
+        </Col>
+      </Row>
+    </Card>
+  );
 }
 
-export default OverviewCard;
+export default OverviewSimpleCard;
