@@ -508,7 +508,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
    // Currently supporting only two groups.
    // Group 2[lastEntry] contains just one record, while Group 1[firstEntry] has multiple records.
-   if (treeMap.size() == 2) {
+    if (treeMap.size() == 2) {
       Map.Entry<Long, List<Integer>> lastEntry = treeMap.lastEntry();
       Map.Entry<Long, List<Integer>> firstEntry = treeMap.firstEntry();
       if (lastEntry.getValue().size() == 1 && firstEntry.getValue().size() > 1) {

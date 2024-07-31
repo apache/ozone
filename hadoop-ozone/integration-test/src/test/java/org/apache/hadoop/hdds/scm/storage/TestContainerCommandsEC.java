@@ -642,7 +642,7 @@ public class TestContainerCommandsEC {
   @Test
   void testECReconstructionCoordinatorException() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-        testECReconstructionCoordinator(ImmutableList.of(4), 4, true, false);
+      testECReconstructionCoordinator(ImmutableList.of(4), 4, true, false);
     });
 
     String expectedMessage =
@@ -1036,6 +1036,9 @@ public class TestContainerCommandsEC {
     }
   }
 
+  /**
+   * Mock ECReconstructionCoordinator.
+   */
   public static class MockECReconstructionCoordinator extends ECReconstructionCoordinator {
     private boolean isBlockGroupLengthWrong;
 
