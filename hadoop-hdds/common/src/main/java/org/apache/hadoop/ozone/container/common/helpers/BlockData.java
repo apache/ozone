@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.client.BlockID;
 import com.google.common.base.Preconditions;
@@ -279,5 +280,13 @@ public class BlockData {
     blockID.appendTo(sb);
     sb.append(", size=").append(size);
     sb.append("]");
+  }
+
+  @VisibleForTesting
+  public void changeMetadata(String key, String value) throws
+      IOException {
+    if (metadata.containsKey(key)) {
+      metadata.put(key, value);
+    }
   }
 }

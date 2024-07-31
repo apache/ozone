@@ -370,6 +370,9 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
+  public static final String  HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE =
+      "hdds.datanode.ec.recover.extend.enable";
+  public static final boolean HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE_DEFAULT = false;
 
   public static final String OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX =
       "hdds.datanode.http.auth.";
