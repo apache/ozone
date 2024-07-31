@@ -78,8 +78,9 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
     if ( summaryData && summaryData.length !== 0 && summaryData !== null && summaryData !== undefined && summaryData.datanodeDetails) {   
       const { datanodeDetails, containers, metrics } = summaryData;
       content = (
-        <Descriptions size="small" bordered>
-          <Descriptions.Item label="Datanode:" span={3}> <b>{datanodeDetails.uuid}</b>&nbsp;&nbsp; ({datanodeDetails.networkLocation}/{datanodeDetails.ipAddress}/{datanodeDetails.hostname})</Descriptions.Item>
+        <Descriptions size="small" bordered column={1} title={`Decommission Status: DECOMMISSIONING`}>
+          <Descriptions.Item label="Datanode"> <b>{datanodeDetails.uuid}</b></Descriptions.Item>
+          <Descriptions.Item label="Location">({datanodeDetails.networkLocation}/{datanodeDetails.ipAddress}/{datanodeDetails.hostname})</Descriptions.Item>
           {metrics !== null && metrics !== undefined && Object.keys(metrics).length !== 0 &&
             <>
               {<Descriptions.Item label="Decommissioning Started at">{metrics.decommissionStartTime}</Descriptions.Item>}
@@ -91,8 +92,8 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
           {
             containers !== null && containers !== undefined && Object.keys(containers).length !== 0 &&
             <>
-              {containers.UnderReplicated && containers.UnderReplicated.length > 0 && <Descriptions.Item label="UnderReplicated">{containers.UnderReplicated}</Descriptions.Item>}
-              {containers.UnClosed && containers.UnClosed.length > 0 && <Descriptions.Item label="UnClosed">{containers.UnClosed}</Descriptions.Item>}
+              {containers.UnderReplicated && containers.UnderReplicated.length > 0 && <Descriptions.Item label="Under-Replicated">{containers.UnderReplicated}</Descriptions.Item>}
+              {containers.UnClosed && containers.UnClosed.length > 0 && <Descriptions.Item label="Unclosed">{containers.UnClosed}</Descriptions.Item>}
             </>
           }
         </Descriptions>
@@ -106,7 +107,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
             <Tooltip title="Detailed Summary of Decomssioned Records.">
               <InfoCircleOutlined />
             </Tooltip>
-            <Popover content={content} title="Decommission Status: DECOMMISSIONING" placement="top" trigger="hover">
+            <Popover content={content}  placement="top" trigger="hover">
               &nbsp;{uuid}
             </Popover>
           </> : uuid
