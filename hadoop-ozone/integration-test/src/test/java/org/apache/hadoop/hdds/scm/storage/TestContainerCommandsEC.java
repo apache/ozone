@@ -80,7 +80,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -623,32 +622,31 @@ public class TestContainerCommandsEC {
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWith(List<Integer> missingIndexes,
      boolean isBlockGroupLengthWrong) throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 3, isBlockGroupLengthWrong,true);
+    testECReconstructionCoordinator(missingIndexes, 3, isBlockGroupLengthWrong, true);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes,
       boolean isBlockGroupLengthWrong) throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 1, isBlockGroupLengthWrong,true);
+    testECReconstructionCoordinator(missingIndexes, 1, isBlockGroupLengthWrong, true);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes,
       boolean isBlockGroupLengthWrong) throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 4, isBlockGroupLengthWrong,true);
+    testECReconstructionCoordinator(missingIndexes, 4, isBlockGroupLengthWrong, true);
   }
 
   @Test
   void testECReconstructionCoordinatorException() {
-    IllegalArgumentException exception =
-        Assert.assertThrows(IllegalArgumentException.class, () -> {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
         testECReconstructionCoordinator(ImmutableList.of(4), 4, true, false);
-        });
+    });
 
     String expectedMessage =
-            "The chunk list has 1 entries, but the checksum chunks has 2 entries. They should be equal in size.";
+        "The chunk list has 1 entries, but the checksum chunks has 2 entries. They should be equal in size.";
     String actualMessage = exception.getMessage();
     assertEquals(expectedMessage, actualMessage);
   }
@@ -1040,6 +1038,7 @@ public class TestContainerCommandsEC {
 
   public class MockECReconstructionCoordinator extends ECReconstructionCoordinator {
     private boolean isBlockGroupLengthWrong;
+
     public MockECReconstructionCoordinator(ConfigurationSource conf, CertificateClient certificateClient,
         SecretKeySignerClient secretKeyClient, StateContext context, ECReconstructionMetrics metrics,
         String threadNamePrefix, boolean isBlockGroupLengthWrong) throws IOException {
@@ -1049,12 +1048,12 @@ public class TestContainerCommandsEC {
 
     @Override
     protected SortedMap<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> getBlockDataMap(
-        long containerID, ECReplicationConfig repConfig, Map<Integer, DatanodeDetails> sourceNodeMap)
+        long pContainerID, ECReplicationConfig pRepConfig, Map<Integer, DatanodeDetails> sourceNodeMap)
         throws IOException {
 
       // We call the parent class method to retrieve blockDataMap.
       SortedMap<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> blockDataMap =
-          super.getBlockDataMap(containerID, repConfig, sourceNodeMap);
+          super.getBlockDataMap(pContainerID, pRepConfig, sourceNodeMap);
 
       // If there's no need to simulate the BlockGroupLength error condition,
       // then simply return the result.
@@ -1084,18 +1083,18 @@ public class TestContainerCommandsEC {
       for (Map.Entry<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> entry :
               blockDataMap.entrySet()) {
 
-        org.apache.hadoop.ozone.container.common.helpers.BlockData[] values = entry.getValue();
+        org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockDatas = entry.getValue();
 
         List<org.apache.hadoop.ozone.container.common.helpers.BlockData> changeBlockList = new ArrayList<>();
 
-        for (org.apache.hadoop.ozone.container.common.helpers.BlockData value : values) {
+        for (org.apache.hadoop.ozone.container.common.helpers.BlockData blockData : blockDatas) {
           // For EC-3-2-1024, during data recovery, we require at least 3 data blocks,
           // so we can only attempt to reconstruct data when the number of DN (Data Node)
           // entries in our source map is greater than 3. Otherwise, we cannot recover the block.
-          if (value != null && sourceNodeMap.size() > 3) {
-            List<ContainerProtos.ChunkInfo> chunks = value.getChunks();
+          if (blockData != null && sourceNodeMap.size() > 3) {
+            List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
             if (chunks != null && chunks.size() > 1) {
-              changeBlockList.add(value);
+              changeBlockList.add(blockData);
             }
           }
         }
