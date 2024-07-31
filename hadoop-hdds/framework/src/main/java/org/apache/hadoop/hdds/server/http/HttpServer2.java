@@ -1673,8 +1673,7 @@ public final class HttpServer2 implements FilterContainer {
       String path = ((HttpServletRequest) request).getRequestURI();
       ServletContextHandler.Context sContext =
           (ServletContextHandler.Context) config.getServletContext();
-      String mime = sContext.getMimeType(path);
-      return (mime == null) ? null : mime;
+      return sContext.getMimeType(path);
     }
 
     private void initHttpHeaderMap() {

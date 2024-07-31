@@ -375,12 +375,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
     // Note auditMap contains volume creation info
-    auditLog(ozoneManager.getAuditLogger(),
+    markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_TENANT, auditMap, exception,
-            getOmRequest().getUserInfo()));
-    // Log CREATE_VOLUME as well since a volume is created
-    auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.CREATE_VOLUME, auditMap, exception,
             getOmRequest().getUserInfo()));
 
     if (exception == null) {

@@ -160,7 +160,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.KEY, getKeyName());
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(getModificationTime()));
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_TIMES, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_TIMES, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 

@@ -102,7 +102,6 @@ public class DatanodeStateMachine implements Closeable {
   private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
   private final ReportManager reportManager;
-  private long commandsHandled;
   private final AtomicLong nextHB;
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
@@ -279,10 +278,10 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   private int getEndPointTaskThreadPoolSize() {
-    // TODO(runzhiwang): current only support one recon, if support multiple
-    //  recon in future reconServerCount should be the real number of recon
-    int reconServerCount = 1;
-    int totalServerCount = reconServerCount;
+    // TODO(runzhiwang): The default totalServerCount here is set to 1,
+    //  which requires additional processing if want to increase
+    //  the number of recons.
+    int totalServerCount = 1;
 
     try {
       totalServerCount += HddsUtils.getSCMAddressForDatanodes(conf).size();
@@ -329,13 +328,11 @@ public class DatanodeStateMachine implements Closeable {
    * Runs the state machine at a fixed frequency.
    */
   private void startStateMachineThread() throws IOException {
-    long now;
-
     reportManager.init();
     initCommandHandlerThread(conf);
 
     upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
-
+    LOG.info("Ozone container server started.");
     while (context.getState() != DatanodeStates.SHUTDOWN) {
       try {
         LOG.debug("Executing cycle Number : {}", context.getExecutionCount());
@@ -352,7 +349,7 @@ public class DatanodeStateMachine implements Closeable {
         LOG.error("Unable to finish the execution.", e);
       }
 
-      now = Time.monotonicNow();
+      long now = Time.monotonicNow();
       if (now < nextHB.get()) {
         if (!Thread.interrupted()) {
           try {
@@ -542,7 +539,6 @@ public class DatanodeStateMachine implements Closeable {
   public void startDaemon() {
     Runnable startStateMachineTask = () -> {
       try {
-        LOG.info("Ozone container server started.");
         startStateMachineThread();
       } catch (Exception ex) {
         LOG.error("Unable to start the DatanodeState Machine", ex);
@@ -660,16 +656,14 @@ public class DatanodeStateMachine implements Closeable {
      * we have single command  queue process thread.
      */
     Runnable processCommandQueue = () -> {
-      long now;
       while (getContext().getState() != DatanodeStates.SHUTDOWN) {
         SCMCommand<?> command = getContext().getNextCommand();
         if (command != null) {
           commandDispatcher.handle(command);
-          commandsHandled++;
         } else {
           try {
             // Sleep till the next HB + 1 second.
-            now = Time.monotonicNow();
+            long now = Time.monotonicNow();
             if (nextHB.get() > now) {
               Thread.sleep((nextHB.get() - now) + 1000L);
             }
@@ -699,15 +693,6 @@ public class DatanodeStateMachine implements Closeable {
       getCommandHandlerThread(processCommandQueue).start();
     });
     return handlerThread;
-  }
-
-  /**
-   * Returns the number of commands handled  by the datanode.
-   * @return  count
-   */
-  @VisibleForTesting
-  public long getCommandHandled() {
-    return commandsHandled;
   }
 
   /**

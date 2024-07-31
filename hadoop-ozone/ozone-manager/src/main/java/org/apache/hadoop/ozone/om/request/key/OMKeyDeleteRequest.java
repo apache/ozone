@@ -207,7 +207,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.DELETE_KEY, auditMap, exception, userInfo));
 
     switch (result) {

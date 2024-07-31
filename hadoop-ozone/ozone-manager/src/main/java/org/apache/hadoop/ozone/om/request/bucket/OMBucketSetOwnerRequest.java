@@ -183,7 +183,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_OWNER,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_OWNER,
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.

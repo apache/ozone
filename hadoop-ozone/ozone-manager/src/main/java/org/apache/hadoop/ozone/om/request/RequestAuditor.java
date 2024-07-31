@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
-import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -47,8 +47,8 @@ public interface RequestAuditor {
    * @param userInfo
    * @return
    */
-  AuditMessage buildAuditMessage(AuditAction op,
-      Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);
+  OMAuditLogger.Builder buildAuditMessage(
+      AuditAction op, Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);
 
   /**
    * Build auditMap with specified volume.

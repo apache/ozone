@@ -135,7 +135,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeRemoveAclRequest: {}",
           getOmRequest());
     }
-    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
         ex, getOmRequest().getUserInfo()));
   }
 

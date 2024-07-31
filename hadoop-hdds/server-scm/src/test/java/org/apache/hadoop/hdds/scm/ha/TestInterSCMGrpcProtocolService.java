@@ -17,13 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -36,11 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509KeyManager;
-import javax.net.ssl.X509TrustManager;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -48,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
@@ -57,10 +55,10 @@ import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSe
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,10 +77,10 @@ class TestInterSCMGrpcProtocolService {
   private X509Certificate serviceCert;
   private X509Certificate clientCert;
 
-  private X509KeyManager serverKeyManager;
-  private X509TrustManager serverTrustManager;
-  private X509KeyManager clientKeyManager;
-  private X509TrustManager clientTrustManager;
+  private ReloadingX509KeyManager serverKeyManager;
+  private ReloadingX509TrustManager serverTrustManager;
+  private ReloadingX509KeyManager clientKeyManager;
+  private ReloadingX509TrustManager clientTrustManager;
 
   @TempDir
   private Path temp;
@@ -205,60 +203,23 @@ class TestInterSCMGrpcProtocolService {
     serviceCert = createSelfSignedCert(serviceKeys, "service");
     clientCert = createSelfSignedCert(clientKeys, "client");
 
-    serverKeyManager = aKeyManagerWith(serviceKeys, serviceCert);
-    serverTrustManager = aTrustManagerThatTrusts(clientCert);
-    KeyStoresFactory serverKeyStores =
-        aKeyStoresFactoryWith(serverKeyManager, serverTrustManager);
-
-    clientKeyManager = aKeyManagerWith(clientKeys, clientCert);
-    clientTrustManager = aTrustManagerThatTrusts(serviceCert);
-    KeyStoresFactory clientKeyStores =
-        aKeyStoresFactoryWith(clientKeyManager, clientTrustManager);
+    ReloadingX509TrustManager toSpyServerTrustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(),
+        ImmutableList.of(clientCert));
+    serverTrustManager = spy(toSpyServerTrustManager);
+    ReloadingX509TrustManager toSpyClientTrustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(),
+        ImmutableList.of(serviceCert));
+    clientTrustManager = spy(toSpyClientTrustManager);
+    ReloadingX509KeyManager toSpyServerKeyManager = new ReloadingX509KeyManager(KeyStore.getDefaultType(), "server",
+        serviceKeys.getPrivate(), ImmutableList.of(serviceCert));
+    ReloadingX509KeyManager toSpyClientKeyManager = new ReloadingX509KeyManager(KeyStore.getDefaultType(), "server",
+        clientKeys.getPrivate(), ImmutableList.of(clientCert));
+    clientKeyManager = spy(toSpyClientKeyManager);
+    serverKeyManager = spy(toSpyServerKeyManager);
 
     SCMCertificateClient scmCertClient = mock(SCMCertificateClient.class);
-    doReturn(serverKeyStores).when(scmCertClient).getServerKeyStoresFactory();
-    doReturn(clientKeyStores).when(scmCertClient).getClientKeyStoresFactory();
+    doReturn(serverKeyManager, clientKeyManager).when(scmCertClient).getKeyManager();
+    doReturn(serverTrustManager, clientTrustManager).when(scmCertClient).getTrustManager();
     return scmCertClient;
-  }
-
-  private KeyStoresFactory aKeyStoresFactoryWith(
-      X509KeyManager keyManager,
-      X509TrustManager trustManager
-  ) {
-    KeyStoresFactory serverKeyStores = mock(KeyStoresFactory.class);
-    doReturn(new KeyManager[]{keyManager})
-        .when(serverKeyStores).getKeyManagers();
-    doReturn(new TrustManager[]{trustManager})
-        .when(serverKeyStores).getTrustManagers();
-    return serverKeyStores;
-  }
-
-  private X509TrustManager aTrustManagerThatTrusts(X509Certificate certificate)
-      throws CertificateException {
-    X509TrustManager trustManager = mock(X509TrustManager.class);
-    doNothing().when(trustManager).checkServerTrusted(any(), any());
-    doNothing().when(trustManager).checkClientTrusted(any(), any());
-    doReturn(new X509Certificate[] {certificate})
-        .when(trustManager).getAcceptedIssuers();
-    return trustManager;
-  }
-
-  private X509KeyManager aKeyManagerWith(KeyPair keyPair,
-      X509Certificate certificate) {
-    X509KeyManager keyManager = mock(X509KeyManager.class);
-    doReturn("server")
-        .when(keyManager).chooseServerAlias(any(), any(), any());
-    doReturn("client")
-        .when(keyManager).chooseClientAlias(any(), any(), any());
-    doReturn(new String[] {"server"})
-        .when(keyManager).getServerAliases(any(), any());
-    doReturn(new String[] {"client"})
-        .when(keyManager).getClientAliases(any(), any());
-    doReturn(new X509Certificate[] {certificate})
-        .when(keyManager).getCertificateChain(any());
-    doReturn(keyPair.getPrivate())
-        .when(keyManager).getPrivateKey(any());
-    return keyManager;
   }
 
   private OzoneConfiguration setupConfiguration(int port) {
@@ -268,6 +229,5 @@ class TestInterSCMGrpcProtocolService {
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_ENABLED, true);
     return conf;
   }
-
 
 }

@@ -115,7 +115,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
-    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     if (operationResult) {

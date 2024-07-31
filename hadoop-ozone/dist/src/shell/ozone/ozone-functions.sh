@@ -1412,6 +1412,14 @@ function ozone_java_setup
   # Extract the major version number
   JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
 
+  # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true)
+  # to allow netty unsafe memory allocation in Java 9+.
+  RATIS_OPTS="${RATIS_OPTS:-}"
+
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 

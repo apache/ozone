@@ -245,7 +245,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     }
 
     auditMap = buildAuditMap(auditMap, renamedKeys, unRenamedKeys);
-    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEYS, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.RENAME_KEYS, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     switch (result) {

@@ -131,6 +131,11 @@ public final class ContainerBalancerMetrics {
     this.numContainerMovesScheduledInLatestIteration.incr(valueToAdd);
   }
 
+  public void resetNumContainerMovesScheduledInLatestIteration() {
+    numContainerMovesScheduledInLatestIteration.incr(
+            -getNumContainerMovesScheduledInLatestIteration());
+  }
+
   /**
    * Gets the amount of data moved by Container Balancer in the latest
    * iteration.

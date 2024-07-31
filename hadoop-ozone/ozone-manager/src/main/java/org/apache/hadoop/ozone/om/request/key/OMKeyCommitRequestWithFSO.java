@@ -289,7 +289,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 
     if (!isHSync) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+      markForAudit(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);

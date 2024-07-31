@@ -260,8 +260,8 @@ public class OzoneContainer {
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
       tlsClientConfig = new GrpcTlsConfig(
-          certClient.getClientKeyStoresFactory().getKeyManagers()[0],
-          certClient.getClientKeyStoresFactory().getTrustManagers()[0], true);
+          certClient.getKeyManager(),
+          certClient.getTrustManager(), true);
     } else {
       tlsClientConfig = null;
     }

@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -82,11 +81,10 @@ public class GrpcReplicationClient implements AutoCloseable {
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
-        KeyStoresFactory factory = certClient.getClientKeyStoresFactory();
         sslContextBuilder
-            .trustManager(factory.getTrustManagers()[0])
+            .trustManager(certClient.getTrustManager())
             .clientAuth(ClientAuth.REQUIRE)
-            .keyManager(factory.getKeyManagers()[0]);
+            .keyManager(certClient.getKeyManager());
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");

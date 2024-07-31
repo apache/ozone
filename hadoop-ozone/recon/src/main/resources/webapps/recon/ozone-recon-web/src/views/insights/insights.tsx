@@ -17,17 +17,17 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CanceledError, AxiosError } from 'axios';
 import filesize from 'filesize';
-import { Row, Col, Tabs } from 'antd';
+import { Row, Col, Tabs, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
-import { format, type EChartsOption } from 'echarts';
+import { graphic, type EChartsOption } from 'echarts';
 
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
-import { AxiosAllGetHelper } from '@/utils/axiosRequestHelper';
+import { PromiseAllSettledGetHelper, PromiseAllSettledError } from '@/utils/axiosRequestHelper';
 
 import './insights.less';
 
@@ -58,6 +58,8 @@ interface IInsightsState {
   bucketOptions: IOption[];
   volumeOptions: IOption[];
   isBucketSelectionDisabled: boolean;
+  fileCountError: string | undefined;
+  containerSizeError: string | undefined;
 }
 
 const allVolumesOption: IOption = {
@@ -86,7 +88,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       selectedVolumes: [],
       bucketOptions: [],
       volumeOptions: [],
-      isBucketSelectionDisabled: false
+      isBucketSelectionDisabled: false,
+      fileCountError: undefined,
+      containerSizeError: undefined
     };
   }
 
@@ -195,9 +199,81 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return (size(value));
       });
 
-      console.log(xyFileCountMap);
-      console.log(xContainerCountValues);
-      console.log(xyContainerCountMap);
+      let renderFileCountError = (this.state.fileCountError) ? {
+        type: 'group',
+        left: 'center',
+        top: 'middle',
+        z: 100,
+        children: [
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 40
+            },
+            style: {
+              fill: '#FC909B'
+            }
+          },
+          {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            style: {
+              text: `No data available. ${this.state.fileCountError}`,
+              font: '20px sans-serif'
+            }
+          }
+        ]
+      } : undefined
+      let renderContainerSizeError = (this.state.containerSizeError) ? {
+        type: 'group',
+        left: 'center',
+        top: 'middle',
+        z: 100,
+        children: [
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 500
+            },
+            style: {
+              fill: 'rgba(256, 256, 256, 0.5)'
+            }
+          },
+          {
+            type: 'rect',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            shape: {
+              width: 500,
+              height: 40
+            },
+            style: {
+              fill: '#FC909B'
+            }
+          },
+          {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            z: 100,
+            style: {
+              text: `No data available. ${this.state.containerSizeError}`,
+              font: '20px sans-serif'
+            }
+          }
+        ]
+      } : undefined
 
       this.setState({
         fileCountData: {
@@ -224,7 +300,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             },
             data: Array.from(xyFileCountMap.values()),
             type: 'bar'
-          }
+          },
+          graphic: renderFileCountError
         },
         containerCountData: {
           title: {
@@ -250,7 +327,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                 name: xContainerCountValues[idx]
               }
             }),
-          }
+          },
+          graphic: renderContainerSizeError
         }
       });
     }
@@ -261,15 +339,50 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.setState({
       isLoading: true
     });
-    const { requests, controller } = AxiosAllGetHelper([
+    const { requests, controller } = PromiseAllSettledGetHelper([
       '/api/v1/utilization/fileCount',
       '/api/v1/utilization/containerCount'
     ], cancelInsightSignal);
 
     cancelInsightSignal = controller;
-    requests.then(axios.spread((fileCountresponse, containerCountresponse) => {
-      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
-      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
+    requests.then(axios.spread((
+      fileCountresponse: Awaited<Promise<any>>,
+      containerCountresponse: Awaited<Promise<any>>
+    ) => {
+      let fileAPIError = undefined;
+      let containerAPIError = undefined;
+      let responseError = [
+        fileCountresponse,
+        containerCountresponse
+      ].filter((resp) => resp.status === 'rejected');
+
+      if (responseError.length !== 0) {
+        responseError.forEach((err) => {
+          if (err.reason.toString().includes("CanceledError")) {
+            throw new CanceledError('canceled', "ERR_CANCELED");
+          }
+          else {
+            if (err.reason.config.url.includes("fileCount")) {
+              fileAPIError = err.reason.toString();
+            }
+            else {
+              containerAPIError = err.reason.toString();
+            }
+          }
+        })
+      }
+
+      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.value?.data ?? [{
+        volume: '0',
+        bucket: '0',
+        fileSize: '0',
+        count: 0
+      }];
+      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.value?.data ?? [{
+        containerSize: 0,
+        count: 0
+      }];
+
       // Construct volume -> bucket[] map for populating filters
       // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
       const volumeBucketMap: Map<string, Set<string>> = fileCountsResponse.reduce(
@@ -280,7 +393,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             const buckets = Array.from(map.get(volume)!);
             map.set(volume, new Set([...buckets, bucket]));
           } else {
-            map.set(volume, new Set().add(bucket));
+            map.set(volume, new Set<string>().add(bucket));
           }
 
           return map;
@@ -297,7 +410,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         volumeBucketMap,
         fileCountsResponse,
         containerCountResponse,
-        volumeOptions
+        volumeOptions,
+        fileCountError: fileAPIError,
+        containerSizeError: containerAPIError
       }, () => {
         this.updatePlotData();
         // Select all volumes by default
@@ -305,7 +420,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
     })).catch(error => {
       this.setState({
-        isLoading: false
+        isLoading: false,
       });
       showDataFetchError(error.toString());
     });

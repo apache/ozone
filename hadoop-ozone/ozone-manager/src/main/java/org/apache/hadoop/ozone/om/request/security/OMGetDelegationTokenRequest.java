@@ -78,7 +78,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
       token = ozoneManager
           .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
     } catch (IOException ioe) {
-      auditLog(auditLogger,
+      markForAudit(auditLogger,
           buildAuditMessage(OMAction.GET_DELEGATION_TOKEN,
               new LinkedHashMap<>(), ioe, request.getUserInfo()));
       throw ioe;
@@ -195,7 +195,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     }
 
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.GET_DELEGATION_TOKEN, auditMap, exception,
             getOmRequest().getUserInfo()));
 

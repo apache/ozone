@@ -107,4 +107,15 @@ public class AccessHeatMapEndpoint {
       throw new WebApplicationException(Response.Status.NOT_FOUND);
     }
   }
+
+  /**
+   * This API do a health check for HeatMapProvider source if it is initialized
+   * and returning response.
+   * @return HealthCheckResponse wrapped in Response object.
+   */
+  @GET
+  @Path("/healthCheck")
+  public Response getReadAccessMetaData() {
+    return Response.ok(heatMapService.doHeatMapHealthCheck()).build();
+  }
 }

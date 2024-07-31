@@ -659,20 +659,19 @@ public class BasicRootedOzoneClientAdapterImpl
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
    */
-  private FileStatusAdapter getFileStatusForKeyOrSnapshot(
-      OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
+  private FileStatusAdapter getFileStatusForKeyOrSnapshot(OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
       throws IOException {
+    String volumeName = ofsPath.getVolumeName();
+    String bucketName = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
-        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-        return getFileStatusAdapterWithSnapshotIndicator(
-            volume, bucket, uri);
+        OzoneVolume volume = objectStore.getVolume(volumeName);
+        OzoneBucket bucket = getBucket(volumeName, bucketName, false);
+        return getFileStatusAdapterWithSnapshotIndicator(volume, bucket, uri);
       } else {
-        OzoneFileStatus status = bucket.getFileStatus(key);
-        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
-            ofsPath.getNonKeyPath());
+        OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, bucketName, key);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath, ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {

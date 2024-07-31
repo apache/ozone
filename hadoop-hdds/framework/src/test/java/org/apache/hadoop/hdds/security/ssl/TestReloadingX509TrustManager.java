@@ -46,9 +46,7 @@ public class TestReloadingX509TrustManager {
 
   @Test
   public void testReload() throws Exception {
-    ReloadingX509TrustManager tm =
-        (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
-            .getTrustManagers()[0];
+    ReloadingX509TrustManager tm = caClient.getTrustManager();
     X509Certificate cert1 = caClient.getRootCACertificate();
     assertThat(tm.getAcceptedIssuers()).containsOnly(cert1);
 
@@ -61,8 +59,7 @@ public class TestReloadingX509TrustManager {
     assertThat(reloaderLog.getOutput())
         .contains("ReloadingX509TrustManager is reloaded");
 
-    // Make sure there are two reload happened, one for server, one for client
-    assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),
-        "ReloadingX509TrustManager is reloaded"));
+    // Only one reload has to happen for the CertificateClient's trustManager.
+    assertEquals(1, StringUtils.countMatches(reloaderLog.getOutput(), "ReloadingX509TrustManager is reloaded"));
   }
 }

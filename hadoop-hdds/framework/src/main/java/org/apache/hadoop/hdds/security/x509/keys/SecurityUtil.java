@@ -18,8 +18,6 @@
  */
 package org.apache.hadoop.hdds.security.x509.keys;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -30,10 +28,6 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.ssl.PemFileBasedKeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 /**
  * Utility functions for Security modules for Ozone.
@@ -92,34 +86,5 @@ public final class SecurityUtil {
       return null;
     }
     return key;
-  }
-
-  public static KeyStoresFactory getServerKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
-    try {
-      factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
-    } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
-    }
-    return factory;
-  }
-
-  public static KeyStoresFactory getClientKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
-
-    try {
-      factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
-    } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
-    }
-    return factory;
   }
 }

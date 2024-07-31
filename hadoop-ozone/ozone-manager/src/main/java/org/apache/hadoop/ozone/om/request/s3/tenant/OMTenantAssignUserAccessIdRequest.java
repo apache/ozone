@@ -350,7 +350,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("user", userPrincipal);
     auditMap.put("accessId", accessId);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_ASSIGN_USER_ACCESSID, auditMap, exception,
             getOmRequest().getUserInfo()));
 

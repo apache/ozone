@@ -155,7 +155,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
         SslContextBuilder sslClientContextBuilder = SslContextBuilder.forServer(
-            caClient.getServerKeyStoresFactory().getKeyManagers()[0]);
+            caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder, secConf.getGrpcSslProvider());
         nettyServerBuilder.sslContext(sslContextBuilder.build());

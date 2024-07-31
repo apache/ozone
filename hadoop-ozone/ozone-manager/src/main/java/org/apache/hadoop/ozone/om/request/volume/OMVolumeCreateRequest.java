@@ -189,7 +189,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(ozoneManager.getAuditLogger(),
+    markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_VOLUME, auditMap, exception,
             getOmRequest().getUserInfo()));
 

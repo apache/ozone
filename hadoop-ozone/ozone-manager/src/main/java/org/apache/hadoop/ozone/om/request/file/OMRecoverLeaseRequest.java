@@ -175,7 +175,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.RECOVER_LEASE, auditMap, exception,
         getOmRequest().getUserInfo()));
 

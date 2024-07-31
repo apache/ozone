@@ -41,12 +41,14 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -130,6 +132,62 @@ public class TestContainerManagerImpl {
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.FORCE_CLOSE);
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
+  }
+
+  @Test
+  void testTransitionDeletingToClosedState() throws IOException, InvalidStateTransitionException {
+    // allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING
+    final ContainerInfo container = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "admin");
+    ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    final ContainerID cid = container.containerID();
+    final ContainerID ecCid = ecContainer.containerID();
+    assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
+
+    // OPEN -> CLOSING
+    containerManager.updateContainerState(cid,
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    containerManager.updateContainerState(ecCid, HddsProtos.LifeCycleEvent.FINALIZE);
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(ecCid).getState());
+
+    // CLOSING -> CLOSED
+    containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.CLOSE);
+    containerManager.updateContainerState(ecCid, HddsProtos.LifeCycleEvent.CLOSE);
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(ecCid).getState());
+
+    // CLOSED -> DELETING
+    containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.DELETE);
+    containerManager.updateContainerState(ecCid, HddsProtos.LifeCycleEvent.DELETE);
+    assertEquals(LifeCycleState.DELETING, containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.DELETING, containerManager.getContainer(ecCid).getState());
+
+    // DELETING -> CLOSED
+    containerManager.transitionDeletingToClosedState(cid);
+    containerManager.transitionDeletingToClosedState(ecCid);
+    // the containers should be back in CLOSED state now
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(ecCid).getState());
+  }
+
+  @Test
+  void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainers() throws IOException {
+    // test for RATIS container
+    final ContainerInfo container = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "admin");
+    final ContainerID cid = container.containerID();
+    assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(cid));
+
+    // test for EC container
+    final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    final ContainerID ecCid = ecContainer.containerID();
+    assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(ecCid));
   }
 
   @Test
