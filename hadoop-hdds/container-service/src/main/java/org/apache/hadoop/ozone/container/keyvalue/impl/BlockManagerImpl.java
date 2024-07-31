@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,7 +66,7 @@ public class BlockManagerImpl implements BlockManager {
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
-  private boolean incrementalEnabled;
+  private final AtomicBoolean incrementalEnabled;
 
   /**
    * Constructs a Block Manager.
@@ -81,15 +82,9 @@ public class BlockManagerImpl implements BlockManager {
     this.readMappedBufferThreshold = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
-    incrementalEnabled =
+    incrementalEnabled = new AtomicBoolean(
         config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
-            OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
-    if (incrementalEnabled && !VersionedDatanodeFeatures.isFinalized(
-        HDDSLayoutFeature.HBASE_SUPPORT)) {
-      LOG.warn("DataNode has not finalized upgrading to a version that " +
-          "supports incremental chunk list. Fallback to full chunk list");
-      incrementalEnabled = false;
-    }
+            OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT));
   }
 
   @Override
@@ -162,7 +157,13 @@ public class BlockManagerImpl implements BlockManager {
           }
         }
 
-        db.getStore().putBlockByID(batch, incrementalEnabled, localID, data,
+        if (incrementalEnabled.get() && !VersionedDatanodeFeatures.isFinalized(
+            HDDSLayoutFeature.HBASE_SUPPORT)) {
+          LOG.warn("DataNode has not finalized upgrading to a version that " +
+              "supports incremental chunk list. Fallback to full chunk list");
+          incrementalEnabled.set(false);
+        }
+        db.getStore().putBlockByID(batch, incrementalEnabled.get(), localID, data,
             containerData, endOfBlock);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
@@ -258,7 +259,7 @@ public class BlockManagerImpl implements BlockManager {
     if (blockData.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST)) {
       BlockData emptyBlockData = new BlockData(blockId);
       emptyBlockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
-      db.getStore().putBlockByID(batch, incrementalEnabled, localID,
+      db.getStore().putBlockByID(batch, incrementalEnabled.get(), localID,
           emptyBlockData, kvContainer.getContainerData(), true);
     }
   }
