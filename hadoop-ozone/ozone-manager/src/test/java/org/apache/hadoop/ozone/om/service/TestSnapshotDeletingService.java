@@ -67,26 +67,23 @@ public class TestSnapshotDeletingService {
     SnapshotInfo filteredSnapshot = SnapshotInfo.newBuilder().setSstFiltered(true).setName("snap1").build();
     SnapshotInfo unFilteredSnapshot = SnapshotInfo.newBuilder().setSstFiltered(false).setName("snap1").build();
     return Stream.of(
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, false),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, true),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true));
+        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true));
   }
 
   @ParameterizedTest
   @MethodSource("testCasesForIgnoreSnapshotGc")
   public void testProcessSnapshotLogicInSDS(SnapshotInfo snapshotInfo,
                                             SnapshotInfo.SnapshotStatus status,
-                                            boolean sstFilteringServiceEnabled,
                                             boolean expectedOutcome)
       throws IOException {
-    Mockito.when(keyManager.isSstFilteringSvcEnabled()).thenReturn(sstFilteringServiceEnabled);
     Mockito.when(omMetadataManager.getSnapshotChainManager()).thenReturn(chainManager);
-    Mockito.when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     Mockito.when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     Mockito.when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
