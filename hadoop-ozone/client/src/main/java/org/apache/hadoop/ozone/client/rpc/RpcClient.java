@@ -2563,7 +2563,8 @@ public class RpcClient implements ClientProtocol {
         .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
         .setExecutorServiceSupplier(writeExecutor)
-        .setStreamBufferArgs(streamBufferArgs);
+        .setStreamBufferArgs(streamBufferArgs)
+        .setOmVersion(omVersion);
   }
 
   @Override
