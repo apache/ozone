@@ -146,6 +146,9 @@ public class ECReconstructionCoordinator implements Closeable {
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
+
+    // Enabling this option will attempt additional EC recovery operations. Within specified rules,
+    // it will exclude one BlockGroupLength insufficient DN from participating in the recovery.
     this.isEcRecoverExtendEnabled = conf.getBoolean(
         HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE, HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE_DEFAULT);
   }
@@ -461,17 +464,22 @@ public class ECReconstructionCoordinator implements Closeable {
         Pipeline realPipeLine = pipeline;
 
         if (this.isEcRecoverExtendEnabled) {
-          Pair<Long, Integer> safeBlockGroupLen =
-              getSafeBlockGroupLen(blockGroup, pipeline.getReplicationConfig().getRequiredNodes());
+          Pair<Long, Integer> safeBlockGroupLen = getAppropriateBlockGroupLen(blockGroup,
+              pipeline.getReplicationConfig().getRequiredNodes());
           if (realBlockGroupLen != safeBlockGroupLen.getLeft().longValue()) {
             realBlockGroupLen = safeBlockGroupLen.getLeft();
-            int missingIndex = safeBlockGroupLen.getRight();
+            int excludeBlockIndex = safeBlockGroupLen.getRight();
             SortedMap<Integer, DatanodeDetails> newSourceNodeMap = new TreeMap<>(sourceNodeMap);
-            int missingDNIndex = missingIndex + 1;
-            blockGroup[missingIndex] = null;
-            newSourceNodeMap.remove(missingDNIndex);
-            LOG.info("ContainerID = {}, LocalID = {}, SafeBlockGroupLen = {}, CalcBlockGroupLen = {}, " +
-                "Missing Dn Index = {}.", containerID, localID, safeBlockGroupLen, blockGroupLen, missingDNIndex);
+            int excludeDNIndex = excludeBlockIndex + 1;
+            // We will exclude problematic blocks from the block group, which will prevent them from
+            // being selected during checksum verification.
+            blockGroup[excludeBlockIndex] = null;
+            // We will exclude this DN from the SourceNodeMap.
+            newSourceNodeMap.remove(excludeDNIndex);
+            LOG.info("containerID = {}, localID = {}, safeBlockGroupLen = {}, " +
+                "calcBlockGroupLen = {}, exclude Dn Index = {}, exclude Block Index = {}.",
+                containerID, localID, safeBlockGroupLen, blockGroupLen,
+                excludeDNIndex, excludeBlockIndex);
             Pipeline newPipeline = rebuildInputPipeline(repConfig, newSourceNodeMap);
             realPipeLine = newPipeline;
           }
@@ -489,12 +497,30 @@ public class ECReconstructionCoordinator implements Closeable {
     return blockInfoMap;
   }
 
-  public Pair<Long, Integer> getSafeBlockGroupLen(BlockData[] blockGroup,
+  /**
+   * We will attempt to find the most suitable BlockGroupLength possible.
+   *
+   * We cannot avoid encountering some special situations during data writes,
+   * which may lead to inaccuracies in the length of some BlockGroupLength values.
+   *
+   * However, in cases like the following, we can reasonably infer which BlockGroupLength is accurate:
+   * when only one DN has a different BlockGroupLength compared to the others,
+   * we can assume that the BlockGroupLength of the other DNs is more reasonable.
+   *
+   * Our approach is to group and count the BlockGroupLength values, and then sort these BlockGroupLengths.
+   * If there are only two groups and the group with the smallest value contains only one DN,
+   * we can use the BlockGroupLength from the other DNs.
+   *
+   * @param blockGroup BlockData Group Array
+   * @param replicaCount replica Count
+   * @return Pair leftValue: BlockGroupLength, rightValue: ExcludeIndex.
+   */
+  public Pair<Long, Integer> getAppropriateBlockGroupLen(BlockData[] blockGroup,
       int replicaCount) {
 
     Preconditions.checkState(blockGroup.length == replicaCount);
 
-    long blockGroupLen = Long.MAX_VALUE;
+    long blockGroupLen;
     TreeMap<Long, List<Integer>> treeMap = new TreeMap<>(Collections.reverseOrder());
 
     // We group data based on blockgrouplength

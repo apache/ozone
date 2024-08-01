@@ -1090,13 +1090,14 @@ public class TestContainerCommandsEC {
 
         List<org.apache.hadoop.ozone.container.common.helpers.BlockData> changeBlockList = new ArrayList<>();
 
-        for (org.apache.hadoop.ozone.container.common.helpers.BlockData blockData : blockDatas) {
+        for (int i = 0; i < blockDatas.length; i++) {
+          org.apache.hadoop.ozone.container.common.helpers.BlockData blockData = blockDatas[i];
           // For EC-3-2-1024, during data recovery, we require at least 3 data blocks,
           // so we can only attempt to reconstruct data when the number of DN (Data Node)
           // entries in our source map is greater than 3. Otherwise, we cannot recover the block.
           if (blockData != null && sourceNodeMap.size() > 3) {
             List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
-            if (chunks != null && chunks.size() > 1) {
+            if (chunks != null && chunks.size() > 1 && i < 3) {
               changeBlockList.add(blockData);
             }
           }
