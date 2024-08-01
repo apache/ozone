@@ -451,10 +451,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
 
     private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
-      if (!purgeSnapshotKeys.isEmpty()) {
+      for (String snapshotKey: purgeSnapshotKeys) {
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
-            .addAllSnapshotDBKeys(purgeSnapshotKeys)
+            .setSnapshotKey(snapshotKey)
             .build();
 
         OMRequest omRequest = OMRequest.newBuilder()

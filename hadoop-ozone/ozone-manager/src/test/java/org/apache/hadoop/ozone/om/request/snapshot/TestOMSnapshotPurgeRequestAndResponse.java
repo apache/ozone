@@ -56,7 +56,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -153,19 +152,17 @@ public class TestOMSnapshotPurgeRequestAndResponse {
    *
    * @return OMRequest
    */
-  private OMRequest createPurgeKeysRequest(List<String> purgeSnapshotKeys) {
+  private OMRequest createPurgeKeysRequest(String snapshotKey) {
     SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
         .newBuilder()
-        .addAllSnapshotDBKeys(purgeSnapshotKeys)
+        .setSnapshotKey(snapshotKey)
         .build();
 
-    OMRequest omRequest = OMRequest.newBuilder()
+    return OMRequest.newBuilder()
         .setCmdType(Type.SnapshotPurge)
         .setSnapshotPurgeRequest(snapshotPurgeRequest)
         .setClientId(UUID.randomUUID().toString())
         .build();
-
-    return omRequest;
   }
 
   /**
@@ -240,16 +237,65 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
-    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
-        snapshotDbKeysToPurge);
+    List<OMSnapshotPurgeResponse> omSnapshotPurgeResponses = new ArrayList<>();
+    long transactionLogIndex = 200;
 
-    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
+    for (String snapshotKey: snapshotDbKeysToPurge) {
+      OMRequest omPurgeRequest = createPurgeKeysRequest(snapshotKey);
+      OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(omPurgeRequest);
 
-    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
-        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
+      omSnapshotPurgeResponses.add((OMSnapshotPurgeResponse)
+          omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, transactionLogIndex++));
+    }
 
     for (String snapshotTableKey: snapshotDbKeysToPurge) {
       assertNull(omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey));
+    }
+
+    for (OMSnapshotPurgeResponse omSnapshotPurgeResponse: omSnapshotPurgeResponses) {
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        omSnapshotPurgeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      }
+    }
+
+    // Check if the entries are deleted.
+    assertTrue(omMetadataManager.getSnapshotInfoTable().isEmpty());
+
+    // Check if all the checkpoints are cleared.
+    for (Path checkpoint : checkpointPaths) {
+      assertFalse(Files.exists(checkpoint));
+    }
+    assertEquals(initialSnapshotPurgeCount + snapshotDbKeysToPurge.size(), omMetrics.getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount, omMetrics.getNumSnapshotPurgeFails());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithBatch() throws Exception {
+    long initialSnapshotPurgeCount = omMetrics.getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = omMetrics.getNumSnapshotPurgeFails();
+
+    List<String> snapshotDbKeysToPurge = createSnapshots(10);
+    assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
+
+    long transactionLogIndex = 200;
+
+    OMRequest omPurgeRequest = OMRequest.newBuilder()
+        .setCmdType(Type.SnapshotPurge)
+        .setSnapshotPurgeRequest(SnapshotPurgeRequest
+            .newBuilder()
+            .addAllSnapshotDBKeys(snapshotDbKeysToPurge)
+            .build())
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+
+    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(omPurgeRequest);
+
+    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, transactionLogIndex);
+
+    for (String snapshotDbKey: snapshotDbKeysToPurge) {
+      assertNull(omMetadataManager.getSnapshotInfoTable().get(snapshotDbKey));
     }
 
     try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
@@ -264,6 +310,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
     }
+
     assertEquals(initialSnapshotPurgeCount + 1, omMetrics.getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount, omMetrics.getNumSnapshotPurgeFails());
   }
@@ -285,15 +332,19 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
     when(ozoneManager.getMetadataManager()).thenReturn(mockedMetadataManager);
 
-    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(snapshotDbKeysToPurge);
-    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
+    for (String snapshotKey: snapshotDbKeysToPurge) {
+      OMRequest snapshotPurgeRequest = createPurgeKeysRequest(snapshotKey);
+      OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
 
-    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
-        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
+      OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+          omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
 
-    assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
+      assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
+    }
+
     assertEquals(initialSnapshotPurgeCount, omMetrics.getNumSnapshotPurges());
-    assertEquals(initialSnapshotPurgeFailCount + 1, omMetrics.getNumSnapshotPurgeFails());
+    assertEquals(initialSnapshotPurgeFailCount + snapshotDbKeysToPurge.size(),
+        omMetrics.getNumSnapshotPurgeFails());
   }
 
   // TODO: clean up: Do we this test after
@@ -342,10 +393,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     long rowsInTableBeforePurge = omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable());
-    // Purge Snapshot of the given index.
-    List<String> toPurgeList = Collections.singletonList(snapShotToPurge);
-    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
-        toPurgeList);
+
+    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(snapShotToPurge);
     purgeSnapshots(snapshotPurgeRequest);
 
     // After purge, check snapshot chain.
@@ -453,17 +502,15 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList);
 
-    List<String> purgeSnapshotKeys = new ArrayList<>();
     for (int i = fromIndex; i <= toIndex; i++) {
       SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(i);
       String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
           purgeSnapshotInfo.getBucketName(),
           purgeSnapshotInfo.getName());
-      purgeSnapshotKeys.add(purgeSnapshotKey);
+      OMRequest snapshotPurgeRequest = createPurgeKeysRequest(purgeSnapshotKey);
+      purgeSnapshots(snapshotPurgeRequest);
     }
 
-    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(purgeSnapshotKeys);
-    purgeSnapshots(snapshotPurgeRequest);
 
     List<SnapshotInfo> snapshotInfoListAfterPurge = new ArrayList<>();
     for (int i = 0; i < totalKeys; i++) {

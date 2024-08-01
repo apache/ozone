@@ -35,7 +35,6 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
@@ -45,22 +44,27 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT
  */
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotPurgeResponse extends OMClientResponse {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
-  private final List<String> snapshotDbKeys;
-  private final Map<String, SnapshotInfo> updatedSnapInfos;
-  private final Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos;
+  private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
 
-  public OMSnapshotPurgeResponse(
-      @Nonnull OMResponse omResponse,
-      @Nonnull List<String> snapshotDbKeys,
-      Map<String, SnapshotInfo> updatedSnapInfos,
-      Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos
-  ) {
+  private final OmPurgeResponse omPurgeResponse;
+
+  /**
+   * This is for the backward compatibility when OMSnapshotPurgeRequest has list of snapshots to purge.
+   */
+  @Deprecated
+  private final List<OmPurgeResponse> omPurgeResponses;
+
+  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse, OmPurgeResponse omPurgeResponse) {
     super(omResponse);
-    this.snapshotDbKeys = snapshotDbKeys;
-    this.updatedSnapInfos = updatedSnapInfos;
-    this.updatedPreviousAndGlobalSnapInfos = updatedPreviousAndGlobalSnapInfos;
+    this.omPurgeResponse = omPurgeResponse;
+    this.omPurgeResponses = null;
+  }
+
+  @Deprecated
+  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse, List<OmPurgeResponse> omPurgeResponses) {
+    super(omResponse);
+    this.omPurgeResponse = null;
+    this.omPurgeResponses = omPurgeResponses;
   }
 
   /**
@@ -70,45 +74,58 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
-    this.snapshotDbKeys = null;
-    this.updatedSnapInfos = null;
-    this.updatedPreviousAndGlobalSnapInfos = null;
+    this.omPurgeResponse = null;
+    this.omPurgeResponses = null;
   }
 
   @Override
-  protected void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
-
-    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-        omMetadataManager;
-    updateSnapInfo(metadataManager, batchOperation,
-        updatedPreviousAndGlobalSnapInfos);
-    updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
-    for (String dbKey: snapshotDbKeys) {
-      // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
-      SnapshotInfo snapshotInfo = omMetadataManager
-          .getSnapshotInfoTable().getSkipCache(dbKey);
-      // Even though snapshot existed when SnapshotDeletingService
-      // was running. It might be deleted in the previous run and
-      // the DB might not have been updated yet. So snapshotInfo
-      // can be null.
-      if (snapshotInfo == null) {
-        continue;
+  protected void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
+    if (omPurgeResponse != null) {
+      addToDbBatch(omPurgeResponse, omMetadataManager, batchOperation);
+    } else if (omPurgeResponses != null) {
+      for (OmPurgeResponse purgeResponse : omPurgeResponses) {
+        addToDbBatch(purgeResponse, omMetadataManager, batchOperation);
       }
+    } else {
+      throw new IllegalStateException("One of snapshotPurgeResponse or snapshotPurgeResponses should be present");
+    }
+  }
 
+  private void addToDbBatch(OmPurgeResponse purgeResponse,
+                            OMMetadataManager omMetadataManager,
+                            BatchOperation batchOperation) throws IOException {
+
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) omMetadataManager;
+    // Order of transactions is flush next path level snapshot updates followed by next global snapshot and
+    // next active snapshot. This order should not be changed unless the original order of the operations
+    // is changed in OmSnapshotPurgeRequest.
+    updateSnapInfo(metadataManager, batchOperation, purgeResponse.nextPathSnapshotInfo);
+    updateSnapInfo(metadataManager, batchOperation, purgeResponse.nextGlobalSnapshotInfo);
+    updateSnapInfo(metadataManager, batchOperation, purgeResponse.nextActiveSnapshotInfo);
+
+    // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
+    SnapshotInfo snapshotInfo = omMetadataManager.getSnapshotInfoTable()
+        .getSkipCache(purgeResponse.snapshotTableKey);
+
+    // Even though snapshot existed when SnapshotDeletingService was running.
+    // It might be deleted in the previous run and the DB might not have been updated yet.
+    if (snapshotInfo != null) {
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
-      omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
+      // Finally, delete the snapshot.
+      omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, purgeResponse.snapshotTableKey);
+    } else {
+      LOG.warn("Snapshot: '{}' is no longer exist in snapshot table. Might be removed in previous run.",
+          purgeResponse.snapshotTableKey);
     }
   }
 
   private void updateSnapInfo(OmMetadataManagerImpl metadataManager,
                               BatchOperation batchOp,
-                              Map<String, SnapshotInfo> snapshotInfos)
+                              SnapshotInfo snapshotInfo)
       throws IOException {
-    for (Map.Entry<String, SnapshotInfo> entry : snapshotInfos.entrySet()) {
-      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp,
-          entry.getKey(), entry.getValue());
+    if (snapshotInfo != null) {
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, snapshotInfo.getTableKey(), snapshotInfo);
     }
   }
 
@@ -135,6 +152,38 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
             snapshotInfo.getBucketName(), snapshotInfo.getName());
       }
+    }
+  }
+
+  /**
+   * POJO to maintain the order of transactions when purge API is called with batch.
+   */
+  public static final class OmPurgeResponse {
+    private final String snapshotTableKey;
+    private final SnapshotInfo nextPathSnapshotInfo;
+    private final SnapshotInfo nextGlobalSnapshotInfo;
+    private final SnapshotInfo nextActiveSnapshotInfo;
+
+    public OmPurgeResponse(@Nonnull String snapshotTableKey,
+                           SnapshotInfo nextPathSnapshotInfo,
+                           SnapshotInfo nextGlobalSnapshotInfo,
+                           SnapshotInfo nextActiveSnapshotInfo) {
+      this.snapshotTableKey = snapshotTableKey;
+      this.nextPathSnapshotInfo = nextPathSnapshotInfo;
+      this.nextGlobalSnapshotInfo = nextGlobalSnapshotInfo;
+      this.nextActiveSnapshotInfo = nextActiveSnapshotInfo;
+    }
+
+    @Override
+    public String toString() {
+      return "{snapshotTableKey: '" + snapshotTableKey + '\'' +
+          ", nextPathSnapshotInfo: '" +
+          (nextPathSnapshotInfo != null ? nextPathSnapshotInfo.getName() : null) + '\'' +
+          ", nextGlobalSnapshotInfo: '" +
+          (nextGlobalSnapshotInfo != null ? nextGlobalSnapshotInfo.getName() : null) + '\'' +
+          ", nextActiveSnapshotInfo: '" +
+          (nextActiveSnapshotInfo != null ? nextActiveSnapshotInfo.getName() : null) + '\'' +
+          '}';
     }
   }
 }

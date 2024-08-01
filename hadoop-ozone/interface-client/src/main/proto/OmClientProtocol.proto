@@ -1937,8 +1937,9 @@ message SnapshotMoveKeyInfos {
 }
 
 message SnapshotPurgeRequest {
-  repeated string snapshotDBKeys = 1;
+  repeated string snapshotDBKeys = 1 [deprecated = true];
   repeated string updatedSnapshotDBKey = 2 [deprecated = true];
+  optional string snapshotKey = 3;
 }
 
 message SetSnapshotPropertyRequest {
