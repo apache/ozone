@@ -470,10 +470,10 @@ public class HddsVolume extends StorageVolume {
       // Calculate number of files per level and size per level
       RawDB rawDB =
           DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
-      long start = Time.monotonicNow();
+      long start = Time.monotonicNowNanos();
       rawDB.getStore().compactionIfNeeded();
       volumeInfoMetrics.dbCompactTimesNanoSecondsIncr(
-          Time.monotonicNow() - start);
+          Time.monotonicNowNanos() - start);
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
