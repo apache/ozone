@@ -116,7 +116,7 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
           new ClientTrustManager(caCerts, null));

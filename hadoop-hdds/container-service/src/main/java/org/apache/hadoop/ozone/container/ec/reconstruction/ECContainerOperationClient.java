@@ -26,12 +26,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
@@ -69,21 +67,17 @@ public class ECContainerOperationClient implements Closeable {
   }
 
   @Nonnull
-  private static XceiverClientManager createClientManager(
-      ConfigurationSource conf, CertificateClient certificateClient)
+  private static XceiverClientManager createClientManager(ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
     ClientTrustManager trustManager = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider localCaCerts =
-          () -> HAUtils.buildCAX509List(certificateClient, conf);
-      CACertificateProvider remoteCacerts =
-          () -> HAUtils.buildCAX509List(null, conf);
-      trustManager = new ClientTrustManager(remoteCacerts, localCaCerts);
+      trustManager = certificateClient.createClientTrustManager();
     }
-    return new XceiverClientManager(conf,
-        new XceiverClientManager.XceiverClientManagerConfigBuilder()
-            .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
-        trustManager);
+    XceiverClientManager.ScmClientConfig scmClientConfig = new XceiverClientManager.XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(256)
+        .setStaleThresholdMs(10 * 1000)
+        .build();
+    return new XceiverClientManager(conf, scmClientConfig, trustManager);
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,

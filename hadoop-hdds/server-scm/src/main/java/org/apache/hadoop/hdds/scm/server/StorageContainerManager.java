@@ -1610,9 +1610,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // TODO: see if we can avoid doing this during every restart.
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
+      getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       List<String> pemEncodedCerts =
-          scmCertificateClient.listCA();
-
+          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
         X509Certificate x509Certificate = CertificateCodec.getX509Certificate(

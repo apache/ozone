@@ -118,13 +118,13 @@ public class ECReconstructionCoordinator implements Closeable {
   private final OzoneClientConfig ozoneClientConfig;
 
   public ECReconstructionCoordinator(
-      ConfigurationSource conf, CertificateClient certificateClient,
+      ConfigurationSource conf, CertificateClient certClient,
       SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics,
       String threadNamePrefix) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
-        certificateClient);
+        certClient);
     this.byteBufferPool = new ElasticByteBufferPool();
     ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructReadExecutor = createThreadPoolExecutor(
