@@ -184,7 +184,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;

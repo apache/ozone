@@ -194,7 +194,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
         exception, userInfo));
 
 

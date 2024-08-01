@@ -145,7 +145,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
-    <jnr-posix.version>3.1.19</jnr-posix.version>
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
@@ -179,7 +178,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <reload4j.version>1.2.25</reload4j.version>
 
     <kerby.version>1.0.1</kerby.version>
-    <kotlin.version>1.9.24</kotlin.version>
+    <kotlin.version>1.9.25</kotlin.version>
     <metainf-services.version>1.11</metainf-services.version>
     <picocli.version>4.7.6</picocli.version>
     <prometheus.version>0.16.0</prometheus.version>
@@ -230,7 +229,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
-    <javac.version>8</javac.version>
+    <javac.version>1.8</javac.version>
 
     <!-- The java version enforced by the maven enforcer -->
     <!-- more complex patterns can be used here, such as
@@ -267,7 +266,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-dependency-plugin.version>3.7.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <docker-maven-plugin.version>0.44.0</docker-maven-plugin.version>
-    <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
+    <exec-maven-plugin.version>3.3.0</exec-maven-plugin.version>
     <license-maven-plugin.version>2.4.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-M1</native-maven-plugin.version>
@@ -301,7 +300,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <vault.driver.version>5.1.0</vault.driver.version>
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
-    <maven.core.version>3.9.6</maven.core.version>
+    <maven.core.version>3.9.8</maven.core.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
     <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
@@ -479,11 +478,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>commons-validator</groupId>
         <artifactId>commons-validator</artifactId>
         <version>${commons-validator.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.jnr</groupId>
-        <artifactId>jnr-posix</artifactId>
-        <version>${jnr-posix.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.luben</groupId>
@@ -1296,6 +1290,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
+            <source>${javac.version}</source>
+            <target>${javac.version}</target>
             <useIncrementalCompilation>false</useIncrementalCompilation>
           </configuration>
         </plugin>
@@ -1961,28 +1957,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </plugins>
       </build>
     </profile>
-
-    <!-- Profiles for specific JDK versions -->
-    <profile>
-      <id>java8</id>
-      <activation>
-        <jdk>[,8]</jdk>
-      </activation>
-      <properties>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
-      </properties>
-    </profile>
-    <profile>
-      <id>java9-or-later</id>
-      <activation>
-        <jdk>[9,]</jdk>
-      </activation>
-      <properties>
-        <maven.compiler.release>${javac.version}</maven.compiler.release> <!-- supported since Java 9 -->
-      </properties>
-    </profile>
-
     <profile>
       <id>go-offline</id>
       <properties>

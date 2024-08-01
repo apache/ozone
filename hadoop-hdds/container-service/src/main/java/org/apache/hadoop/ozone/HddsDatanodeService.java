@@ -33,6 +33,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -171,7 +172,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public Void call() throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
-      HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+      StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
     }
     start(configuration);
