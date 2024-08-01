@@ -35,7 +35,7 @@ public class VolumeInfoMetrics {
 
   private String metricsSourceName = VolumeInfoMetrics.class.getSimpleName();
   private final HddsVolume volume;
-  private final AtomicLong dbCompactTimes = new AtomicLong();
+  private final AtomicLong dbCompactTimesNanoSeconds = new AtomicLong();
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -149,12 +149,12 @@ public class VolumeInfoMetrics {
   }
 
   @Metric("Returns the RocksDB compact times of the Volume")
-  public long getDbCompactTime() {
-    return dbCompactTimes.get();
+  public long getDbCompactTimesNanoSeconds() {
+    return dbCompactTimesNanoSeconds.get();
   }
 
-  public void dbCompactTimeIncr(long time) {
-    dbCompactTimes.addAndGet(time);
+  public void dbCompactTimesNanoSecondsIncr(long time) {
+    dbCompactTimesNanoSeconds.addAndGet(time);
   }
 
 }

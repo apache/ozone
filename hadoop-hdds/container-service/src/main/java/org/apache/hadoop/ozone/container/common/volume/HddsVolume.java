@@ -472,7 +472,8 @@ public class HddsVolume extends StorageVolume {
           DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
       long start = Time.monotonicNow();
       rawDB.getStore().compactionIfNeeded();
-      volumeInfoMetrics.dbCompactTimeIncr(Time.monotonicNow() - start);
+      volumeInfoMetrics.dbCompactTimesNanoSecondsIncr(
+          Time.monotonicNow() - start);
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
