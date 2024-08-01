@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -42,8 +41,6 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +63,6 @@ public class BlockManagerImpl implements BlockManager {
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
-  private final AtomicBoolean incrementalEnabled;
 
   /**
    * Constructs a Block Manager.
@@ -82,9 +78,6 @@ public class BlockManagerImpl implements BlockManager {
     this.readMappedBufferThreshold = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
-    incrementalEnabled = new AtomicBoolean(
-        config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
-            OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT));
   }
 
   @Override
@@ -157,13 +150,15 @@ public class BlockManagerImpl implements BlockManager {
           }
         }
 
-        if (incrementalEnabled.get() && !VersionedDatanodeFeatures.isFinalized(
-            HDDSLayoutFeature.HBASE_SUPPORT)) {
-          LOG.warn("DataNode has not finalized upgrading to a version that " +
-              "supports incremental chunk list. Fallback to full chunk list");
-          incrementalEnabled.set(false);
+        boolean incrementalEnabled = true;
+        if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+          if (isPartialChunkList(data)) {
+            throw new UnsupportedOperationException("DataNode has not finalized " +
+                "upgrading to a version that supports incremental chunk list.");
+          }
+          incrementalEnabled = false;
         }
-        db.getStore().putBlockByID(batch, incrementalEnabled.get(), localID, data,
+        db.getStore().putBlockByID(batch, incrementalEnabled, localID, data,
             containerData, endOfBlock);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
@@ -227,6 +222,10 @@ public class BlockManagerImpl implements BlockManager {
         "be null for finalizeBlock operation.");
     Preconditions.checkState(blockId.getContainerID() >= 0,
         "Container Id cannot be negative");
+    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+      throw new UnsupportedOperationException("DataNode has not finalized " +
+          "upgrading to a version that supports block finalization.");
+    }
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
     long localID = blockId.getLocalID();
@@ -259,7 +258,7 @@ public class BlockManagerImpl implements BlockManager {
     if (blockData.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST)) {
       BlockData emptyBlockData = new BlockData(blockId);
       emptyBlockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
-      db.getStore().putBlockByID(batch, incrementalEnabled.get(), localID,
+      db.getStore().putBlockByID(batch, true, localID,
           emptyBlockData, kvContainer.getContainerData(), true);
     }
   }
@@ -368,5 +367,9 @@ public class BlockManagerImpl implements BlockManager {
       KeyValueContainerData containerData) throws IOException {
     String blockKey = containerData.getBlockKey(blockID.getLocalID());
     return db.getStore().getBlockByID(blockID, blockKey);
+  }
+
+  private static boolean isPartialChunkList(BlockData data) {
+    return data.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST);
   }
 }
