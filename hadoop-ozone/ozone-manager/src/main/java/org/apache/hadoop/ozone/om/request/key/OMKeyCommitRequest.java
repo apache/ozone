@@ -545,9 +545,32 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return req;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitKey
+  )
+  public static OMRequest disallowHsync(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.HSYNC)) {
+      CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
+      boolean isHSync = commitKeyRequest.hasHsync() &&
+          commitKeyRequest.getHsync();
+      if (isHSync) {
+        throw new OMException("Cluster does not have the hsync support "
+            + "feature finalized yet, but the request contains"
+            + " an hsync field. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
   /**
    * Validates key commit requests.
-   * We do not want to allow clients to perform hsync or lease recovery requests
+   * We do not want to allow clients to perform lease recovery requests
    * until the cluster has finalized the HBase support feature.
    *
    * @param req - the request to validate
@@ -560,19 +583,18 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey
   )
-  public static OMRequest disallowHBase(
+
+  public static OMRequest disallowRecovery(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.HBASE_SUPPORT)) {
       CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
-      boolean isHSync = commitKeyRequest.hasHsync() &&
-          commitKeyRequest.getHsync();
       boolean isRecovery = commitKeyRequest.hasRecovery() &&
           commitKeyRequest.getRecovery();
-      if (isHSync || isRecovery) {
+      if (isRecovery) {
         throw new OMException("Cluster does not have the HBase support "
             + "feature finalized yet, but the request contains"
-            + " an hsync or a recovery field. Rejecting the request,"
+            + " an recovery field. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
