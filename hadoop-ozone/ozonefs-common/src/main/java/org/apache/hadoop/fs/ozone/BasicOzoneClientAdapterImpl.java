@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -703,8 +704,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
     try {
-      RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
-      return rpcClient.recoverLease(volume.getName(), bucket.getName(), pathStr, force);
+      ClientProtocol clientProtocol = ozoneClient.getProxy();
+      return clientProtocol.recoverLease(volume.getName(), bucket.getName(), pathStr, force);
     } catch (OMException ome) {
       if (ome.getResult() == NOT_A_FILE) {
         throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
@@ -720,8 +721,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public void recoverFile(OmKeyArgs keyArgs) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
 
-    RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
-    rpcClient.recoverKey(keyArgs, 0L);
+    ClientProtocol clientProtocol = ozoneClient.getProxy();
+    clientProtocol.recoverKey(keyArgs, 0L);
   }
 
   @Override

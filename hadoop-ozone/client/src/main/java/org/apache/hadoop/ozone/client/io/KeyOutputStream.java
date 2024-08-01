@@ -461,7 +461,9 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
-      throw new IOException("OzoneManager does not support hsync");
+      throw new UnsupportedOperationException("Hsync API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + ozoneManagerVersion);
     }
     checkNotClosed();
     final long hsyncPos = writeOffset;

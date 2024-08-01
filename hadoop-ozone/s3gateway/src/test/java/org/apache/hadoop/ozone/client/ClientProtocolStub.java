@@ -772,8 +772,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public LeaseKeyInfo recoverLease(String volumeName, String bucketName,
-                                   String keyName, boolean force)
-      throws IOException {
+      String keyName, boolean force) throws IOException {
     return null;
   }
 

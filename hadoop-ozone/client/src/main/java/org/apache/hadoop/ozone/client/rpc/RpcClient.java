@@ -2691,7 +2691,9 @@ public class RpcClient implements ClientProtocol {
                                    String keyName, boolean force)
       throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
-      throw new IOException("OzoneManager does not support lease recovery");
+      throw new UnsupportedOperationException("Lease recovery API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + omVersion);
     }
     return ozoneManagerClient.recoverLease(volumeName, bucketName, keyName, force);
   }
@@ -2699,7 +2701,9 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void recoverKey(OmKeyArgs args, long clientID) throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
-      throw new IOException("OzoneManager does not support lease recovery");
+      throw new UnsupportedOperationException("Lease recovery API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + omVersion);
     }
     ozoneManagerClient.recoverKey(args, clientID);
   }

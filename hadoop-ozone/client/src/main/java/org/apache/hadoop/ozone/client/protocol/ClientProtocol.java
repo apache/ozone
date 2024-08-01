@@ -1328,5 +1328,13 @@ public interface ClientProtocol {
    */
   LeaseKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) throws IOException;
 
+  /**
+   * Recovery and commit a key. This will make the change from the client visible. The client
+   * is identified by the clientID.
+   *
+   * @param args the key to commit
+   * @param clientID the client identification
+   * @throws IOException
+   */
   void recoverKey(OmKeyArgs args, long clientID) throws IOException;
 }
