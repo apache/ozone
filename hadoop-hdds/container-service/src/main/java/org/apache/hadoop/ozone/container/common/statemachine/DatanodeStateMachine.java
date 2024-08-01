@@ -254,7 +254,7 @@ public class DatanodeStateMachine implements Closeable {
             supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
-        .addHandler(new ReconcileContainerCommandHandler(threadNamePrefix))
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)

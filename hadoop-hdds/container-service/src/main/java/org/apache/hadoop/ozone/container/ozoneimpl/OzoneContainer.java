@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -494,6 +495,7 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
+    // TODO stop checksumManager which will unregister the metrics.
   }
 
   public void handleVolumeFailures() {
@@ -530,6 +532,11 @@ public class OzoneContainer {
 
   public ContainerController getController() {
     return controller;
+  }
+
+  public ContainerChecksumTreeManager getChecksumTreeManager() {
+    // TODO Need HDDS-10926 block delete merged first.
+    return checksumTreeManager;
   }
 
   /**

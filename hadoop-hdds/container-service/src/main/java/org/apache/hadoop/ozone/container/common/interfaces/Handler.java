@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -199,7 +200,8 @@ public abstract class Handler {
    * @param container container to be reconciled.
    * @param peers The other datanodes with a copy of this container whose data should be checked.
    */
-  public abstract void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException;
+  public abstract void reconcileContainer(DNContainerOperationClient dnClient, ContainerChecksumTreeManager checksumManager,
+                                          Container<?> container, List<DatanodeDetails> peers) throws IOException;
 
   /**
    * Deletes the given files associated with a block of the container.
