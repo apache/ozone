@@ -319,13 +319,13 @@ const Overview: React.FC<{}> = (props = {}) => {
 
   return (
     <>
-      <div className='page-header'>
+      <div className='page-header-v2'>
         Overview
         <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div className='overview-content'>
+      <div className='overview-content-v2'>
         <Row
           align='stretch'
           gutter={[
@@ -336,24 +336,25 @@ const Overview: React.FC<{}> = (props = {}) => {
               lg: 16,
               xl: 16
             }, 20]}>
-          <Col span={10}>
+          <Col xs={24} sm={24} md={24} lg={10} xl={10}>
             <OverviewTableCard
               title='Health'
               data={healthCardIndicators}
+              showHeader={true}
               columns={[
                 {
-                  title: 'Name',
+                  title: '',
                   dataIndex: 'name',
                   key: 'name'
                 },
                 {
-                  title: 'Value',
+                  title: 'Available',
                   dataIndex: 'value',
                   key: 'value',
                   align: 'right'
                 },
                 {
-                  title: 'Action',
+                  title: 'Actions',
                   dataIndex: 'action',
                   key: 'action',
                   align: 'right'
@@ -375,7 +376,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               ]}
             />
           </Col>
-          <Col span={14}>
+          <Col xs={24} sm={24} md={24} lg={14} xl={14}>
             <OverviewStorageCard storageReport={storageReport} loading={loading} />
           </Col>
         </Row>
@@ -434,7 +435,7 @@ const Overview: React.FC<{}> = (props = {}) => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <Col flex="1 0 50%">
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewTableCard
               title='Open Keys Summary'
               loading={loading}
@@ -470,7 +471,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               ]}
               linkToUrl='/Om' />
           </Col>
-          <Col flex="1 0 50%">
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
           <OverviewTableCard
               title='Delete Pending Keys Summary'
               loading={loading}

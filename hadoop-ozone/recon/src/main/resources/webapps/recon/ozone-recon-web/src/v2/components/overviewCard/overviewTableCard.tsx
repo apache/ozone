@@ -39,6 +39,7 @@ type OverviewTableCardProps = {
   loading?: boolean;
   data?: string | React.ReactElement;
   linkToUrl?: string;
+  showHeader?: boolean;
 }
 
 // ------------- Component -------------- //
@@ -49,10 +50,21 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
   loading: false,
   columns: [],
   tableData: [],
-  linkToUrl: ''
+  linkToUrl: '',
+  showHeader: false
 }) => {
-  let { data, title, loading, hoverable, tableData, columns, linkToUrl } = props;
+  let {
+    data,
+    title,
+    loading,
+    hoverable,
+    tableData,
+    columns,
+    linkToUrl,
+    showHeader
+  } = props;
 
+  console.log(showHeader);
   const titleElement = (linkToUrl)
     ? (
       <div style={{
@@ -76,23 +88,23 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
       hoverable={hoverable}
       title={titleElement}
       headStyle={{
-        fontSize: '15px'
+        fontSize: '14px'
       }}
       bodyStyle={{
-        padding: '2% 3%',
+        padding: '16px',
         justifyTracks: 'space-between'
       }}
       style={{
         height: '100%'
       }}>
       {(data)
-        ? <Row gutter={[0, 25]}>
+        ? <Row gutter={[0, 50]}>
           {data}
         </Row>
         : <></>}
       <Row>
         <Table
-          showHeader={false}
+          showHeader={showHeader||false}
           tableLayout='fixed'
           size="small"
           pagination={false}

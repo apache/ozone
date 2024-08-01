@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import filesize from 'filesize';
 import { Card, Row, Col, Table, Tag } from 'antd';
 
@@ -34,6 +34,27 @@ type OverviewStorageCardProps = {
 
 const size = filesize.partial({ round: 1 });
 
+function getUsagePercentages(
+  {used, remaining, capacity, committed} : StorageReport): ({
+    ozoneUsedPercentage: number,
+    nonOzoneUsedPercentage: number,
+    committedPercentage: number,
+    usagePercentage: number
+  }) {
+  return {
+    ozoneUsedPercentage: Math.floor(used / capacity * 100),
+    nonOzoneUsedPercentage: Math.floor(
+      ( capacity - remaining - used )
+      / capacity * 100
+    ),
+    committedPercentage: Math.floor(committed / capacity * 100),
+    usagePercentage: Math.floor(
+      ( capacity - remaining )
+      / capacity * 100
+    )
+  }
+}
+
 // ------------- Component -------------- //
 const OverviewStorageCard = (props: OverviewStorageCardProps = {
   loading: false,
@@ -46,20 +67,20 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
 }) => {
   const { loading, storageReport } = props;
 
-  const ozoneUsedPercentage = Math.floor(storageReport.used / storageReport.capacity * 100);
-  const nonOzoneUsedPercentage = Math.floor(
-    (storageReport.capacity
-      - storageReport.remaining
-      - storageReport.used)
-    / storageReport.capacity * 100
-  );
-  const committedPercentage = Math.floor(storageReport.committed / storageReport.capacity * 100)
-  const usagePercentage = Math.floor((
-    storageReport.capacity
-    - storageReport.remaining
+  const {
+    ozoneUsedPercentage,
+    nonOzoneUsedPercentage,
+    committedPercentage,
+    usagePercentage
+  } = useMemo(() => 
+    getUsagePercentages(storageReport),
+    [
+      storageReport.capacity,
+      storageReport.committed,
+      storageReport.remaining,
+      storageReport.used,
+    ]
   )
-    / storageReport.capacity * 100
-  );
 
   let capacityData = [{
     value: ozoneUsedPercentage,
@@ -148,29 +169,31 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
       hoverable={false}
       title='Cluster Capacity'
       headStyle={{
-        fontSize: '15px'
+        fontSize: '14px'
       }}
       bodyStyle={{
-        padding: '5px'
+        padding: '16px'
       }}
       style={{
         boxSizing: 'border-box',
         height: '100%'
       }}>
       <Row justify='space-between'>
-        <Col>
+        <Col
+          xs={24} sm={24} md={12} lg={12} xl={12}
+          style={{
+            justifyItems: 'center'
+          }}>
           <EChart
             option={eChartOptions}
             style={{
-              width: '200px',
+              width: '280px',
               height: '200px',
-              marginLeft: '40%'
             }} />
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={24} md={12} lg={12} xl={12}>
           <Table
-            tableLayout='unset'
-            size="small"
+            size='small'
             pagination={false}
             columns={[
               {

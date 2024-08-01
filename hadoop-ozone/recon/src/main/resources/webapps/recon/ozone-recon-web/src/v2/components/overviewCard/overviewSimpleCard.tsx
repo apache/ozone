@@ -111,22 +111,23 @@ const OverviewSimpleCard = (props: OverviewCardProps = {
       hoverable={hoverable}
       title={(linkToUrl) ? titleElement : title}
       headStyle={{
-        fontSize: '15px'
+        fontSize: '14px'
       }}
       bodyStyle={{
-        padding: '5% 6%',
+        padding: '16px',
         justifyTracks: 'space-between'
       }}>
       <Row
         align='middle'>
-        <Col span={4}>
+        <Col>
           <IconSelector iconType={icon} style={{
-            fontSize: '30px',
+            fontSize: '20px',
+            paddingRight: '4px',
             float: 'inline-start'
           }} />
         </Col>
         <Col style={{
-          fontSize: '30px'
+          fontSize: '24px'
         }}>
           {data}
         </Col>
