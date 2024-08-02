@@ -64,7 +64,6 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
     showHeader
   } = props;
 
-  console.log(showHeader);
   const titleElement = (linkToUrl)
     ? (
       <div style={{
@@ -77,7 +76,7 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
           style={{
             fontWeight: 400
           }}>View Insights</Link>
-      </div> )
+      </div>)
     : title
 
   return (
@@ -97,20 +96,19 @@ const OverviewTableCard = (props: OverviewTableCardProps = {
       style={{
         height: '100%'
       }}>
-      {(data)
-        ? <Row gutter={[0, 50]}>
+      {
+        (data) &&
+        <Row gutter={[0, 50]}>
           {data}
         </Row>
-        : <></>}
-      <Row>
-        <Table
-          showHeader={showHeader||false}
-          tableLayout='fixed'
-          size="small"
-          pagination={false}
-          dataSource={tableData}
-          columns={columns} />
-      </Row>
+      }
+      <Table
+        showHeader={showHeader || false}
+        tableLayout='fixed'
+        size="small"
+        pagination={false}
+        dataSource={tableData}
+        columns={columns} />
     </Card>
   )
 }

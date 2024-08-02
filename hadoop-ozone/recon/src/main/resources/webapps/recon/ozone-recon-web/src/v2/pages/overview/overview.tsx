@@ -23,7 +23,6 @@ import filesize from 'filesize';
 import { Row, Col, Card, Button } from 'antd';
 import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
 
-import OverviewCard from '@/v2/components/overviewCard/overviewCard';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { showDataFetchError, byteToSize } from '@/utils/common';
@@ -398,14 +397,6 @@ const Overview: React.FC<{}> = (props = {}) => {
           </Col>
           <Col flex="1 0 20%">
             <OverviewCardSimple
-              title='Pipelines'
-              icon='deployment-unit'
-              loading={loading}
-              data={pipelines}
-              linkToUrl='/Pipelines' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewCardSimple
               title='Buckets'
               icon='folder-open'
               loading={loading}
@@ -418,6 +409,14 @@ const Overview: React.FC<{}> = (props = {}) => {
               icon='file-text'
               loading={loading}
               data={keys} />
+          </Col>
+          <Col flex="1 0 20%">
+            <OverviewCardSimple
+              title='Pipelines'
+              icon='deployment-unit'
+              loading={loading}
+              data={pipelines}
+              linkToUrl='/Pipelines' />
           </Col>
           <Col flex="1 0 20%">
             <OverviewCardSimple
