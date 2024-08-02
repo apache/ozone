@@ -27,7 +27,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.TreeSet;
@@ -35,6 +38,8 @@ import java.util.TreeSet;
 import static org.apache.hadoop.ozone.container.checksum.TestContainerMerkleTree.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.TestContainerMerkleTree.buildChunk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -179,9 +184,60 @@ class TestContainerChecksumTreeManager {
   }
 
   @Test
+  public void testTmpFileOnWriteError() throws Exception {
+    File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
+    File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
+
+    assertFalse(tmpFile.exists());
+    assertFalse(finalFile.exists());
+    ContainerMerkleTree tree = buildTestTree();
+    checksumManager.writeContainerDataTree(container, tree);
+    assertFalse(tmpFile.exists());
+    assertTrue(finalFile.exists());
+
+    // Now do a write that is guaranteed to fail.
+    assertTrue(finalFile.setReadable(false));
+    assertFalse(tmpFile.exists());
+    assertThrows(IOException.class, () -> checksumManager.writeContainerDataTree(container, tree));
+    // TODO looks like exception was thrown, but file does not exist.
+    assertTrue(tmpFile.exists());
+
+    // Writing again after permission is restored should clear the file.
+    assertTrue(finalFile.setReadable(true));
+    checksumManager.writeContainerDataTree(container, tree);
+    assertFalse(tmpFile.exists());
+    assertTrue(finalFile.exists());
+  }
+
+  @Test
+  public void testCorruptedFile() throws Exception {
+    // Write file
+    File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
+    assertFalse(finalFile.exists());
+    ContainerMerkleTree tree = buildTestTree();
+    checksumManager.writeContainerDataTree(container, tree);
+    assertTrue(finalFile.exists());
+
+    // Corrupt the file so it is not a valid protobuf.
+    Files.write(finalFile.toPath(), new byte[]{1, 2, 3},
+        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+    // direct read should throw to verify the proto is not valid.
+    // TODO need to use new helper method to verify this.
+    assertThrows(IOException.class, this::readFile);
+
+    // The manager's read/modify/write cycle should account for the corruption and overwrite the entry.
+    // No exception should be thrown.
+    // TODO handle read exception. What to do about deleted blocks that are lost?
+    checksumManager.writeContainerDataTree(container, tree);
+    // TODO use the read helper to verify the file is accurate now.
+    assertTreesSortedAndMatch(tree.toProto(), readFile().getContainerMerkleTree());
+  }
+
+  @Test
   public void testChecksumTreeFilePath() {
     assertEquals(checksumFile.getAbsolutePath(),
-        checksumManager.getContainerChecksumFile(container).getAbsolutePath());
+        ContainerChecksumTreeManager.getContainerChecksumFile(container).getAbsolutePath());
   }
 
   private ContainerMerkleTree buildTestTree() throws Exception {
