@@ -118,7 +118,6 @@ public final class ReconContext {
     Map<String, Object> contextMap = new HashMap<>();
     contextMap.put("isHealthy", isHealthy.get());
     contextMap.put("errors", errors);
-    // Add other relevant fields as needed
     return contextMap;
   }
 

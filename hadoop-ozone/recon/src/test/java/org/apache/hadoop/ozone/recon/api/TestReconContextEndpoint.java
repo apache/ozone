@@ -30,14 +30,8 @@ public class TestReconContextEndpoint {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.metadata.dirs", temporaryFolder.toAbsolutePath().toString());
     conf.set("ozone.scm.names", "localhost");
-
-    // Initialize ReconUtils
     ReconUtils reconUtils = new ReconUtils();
-
-    // Initialize ReconContext
     reconContext = new ReconContext(conf, reconUtils);
-
-    // Initialize the endpoint with the reconContext
     endpoint = new ReconContextEndpoint(reconContext);
   }
 
