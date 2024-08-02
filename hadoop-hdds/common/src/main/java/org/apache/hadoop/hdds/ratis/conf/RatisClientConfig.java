@@ -207,7 +207,7 @@ public class RatisClientConfig {
       defaultValue =  "2147483647",
       type = ConfigType.INT,
       tags = { OZONE, CLIENT, PERFORMANCE },
-      description = "Max retry count for the  exponential backoff policy.")
+      description = "Client's max retry value for the exponential backoff policy.")
   private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
 
   public int getExponentialPolicyMaxRetries() {
