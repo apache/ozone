@@ -269,7 +269,7 @@ class TestContainerChecksumTreeManager {
 
     // The manager's read/modify/write cycle should account for the corruption and overwrite the entry.
     // No exception should be thrown.
-    // TODO handle read exception. What to do about deleted blocks that are lost?
+    // TODO What to do about deleted blocks that are lost?
     checksumManager.writeContainerDataTree(container, tree);
     // TODO use the read helper to verify the file is accurate now.
     assertTreesSortedAndMatch(tree.toProto(), readFile().getContainerMerkleTree());

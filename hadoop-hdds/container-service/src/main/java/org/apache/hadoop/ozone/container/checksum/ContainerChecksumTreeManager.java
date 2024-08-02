@@ -25,9 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.CopyOption;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -73,9 +71,16 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      // If the file is not present, we will create the data for the first time. This happens under a write lock.
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data)
-          .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
+      try {
+        // If the file is not present, we will create the data for the first time. This happens under a write lock.
+        checksumInfoBuilder = read(data)
+            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      } catch (IOException ex) {
+        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+            data.getContainerID(), ex);
+        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
+      }
 
       checksumInfoBuilder
           .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
@@ -95,9 +100,17 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      // If the file is not present, we will create the data for the first time. This happens under a write lock.
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data)
-          .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
+      try {
+        // If the file is not present, we will create the data for the first time. This happens under a write lock.
+        checksumInfoBuilder = read(data)
+            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      } catch (IOException ex) {
+        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+            data.getContainerID(), ex);
+        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
+      }
+
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
