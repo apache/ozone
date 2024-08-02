@@ -22,6 +22,8 @@ import java.io.IOException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
@@ -424,14 +426,24 @@ public class BlockDeletingTask implements BackgroundTask {
       List<DeletedBlocksTransaction> delBlocks, Handler handler,
       Table<String, BlockData> blockDataTable, Container container)
       throws IOException {
+
     int blocksProcessed = 0;
     int blocksDeleted = 0;
     long bytesReleased = 0;
     List<DeletedBlocksTransaction> deletedBlocksTxs = new ArrayList<>();
     Instant startTime = Instant.now();
 
+    // Track deleted blocks to avoid duplicate deletion
+    Set<Long> deletedBlockSet = new HashSet<>();
+
     for (DeletedBlocksTransaction entry : delBlocks) {
       for (Long blkLong : entry.getLocalIDList()) {
+        // Check if the block has already been deleted
+        if (deletedBlockSet.contains(blkLong)) {
+          LOG.debug("Skipping duplicate deletion for block {}", blkLong);
+          continue;
+        }
+
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
         LOG.debug("Deleting block {}", blkLong);
@@ -453,6 +465,8 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, blkInfo);
           blocksDeleted++;
           deleted = true;
+          // Track this block as deleted
+          deletedBlockSet.add(blkLong);
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,
