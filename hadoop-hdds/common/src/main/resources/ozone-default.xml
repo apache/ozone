@@ -2919,7 +2919,7 @@
   </property>
   <property>
     <name>hdds.datanode.handler.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The number of RPC handler threads for Datanode client
