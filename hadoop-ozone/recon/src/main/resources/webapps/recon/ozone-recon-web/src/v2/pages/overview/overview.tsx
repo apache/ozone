@@ -69,9 +69,8 @@ const getHealthIcon = (value: string): React.ReactElement => {
   )
 }
 
-const Overview: React.FC<{}> = (props = {}) => {
+const Overview: React.FC<{}> = (props) => {
 
-  let interval = 0;
   let cancelOverviewSignal: AbortController;
   let cancelOMDBSyncSignal: AbortController;
 

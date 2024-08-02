@@ -35,7 +35,7 @@ type OverviewStorageCardProps = {
 const size = filesize.partial({ round: 1 });
 
 function getUsagePercentages(
-  {used, remaining, capacity, committed} : StorageReport): ({
+  { used, remaining, capacity, committed }: StorageReport): ({
     ozoneUsedPercentage: number,
     nonOzoneUsedPercentage: number,
     committedPercentage: number,
@@ -44,35 +44,34 @@ function getUsagePercentages(
   return {
     ozoneUsedPercentage: Math.floor(used / capacity * 100),
     nonOzoneUsedPercentage: Math.floor(
-      ( capacity - remaining - used )
+      (capacity - remaining - used)
       / capacity * 100
     ),
     committedPercentage: Math.floor(committed / capacity * 100),
     usagePercentage: Math.floor(
-      ( capacity - remaining )
+      (capacity - remaining)
       / capacity * 100
     )
   }
 }
 
 // ------------- Component -------------- //
-const OverviewStorageCard = (props: OverviewStorageCardProps = {
-  loading: false,
-  storageReport: {
+const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
+  loading = false,
+  storageReport = {
     capacity: 0,
     used: 0,
     remaining: 0,
     committed: 0
   }
 }) => {
-  const { loading, storageReport } = props;
 
   const {
     ozoneUsedPercentage,
     nonOzoneUsedPercentage,
     committedPercentage,
     usagePercentage
-  } = useMemo(() => 
+  } = useMemo(() =>
     getUsagePercentages(storageReport),
     [
       storageReport.capacity,

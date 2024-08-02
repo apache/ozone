@@ -43,26 +43,16 @@ type OverviewTableCardProps = {
 }
 
 // ------------- Component -------------- //
-const OverviewTableCard = (props: OverviewTableCardProps = {
-  data: '',
-  title: '',
-  hoverable: false,
-  loading: false,
-  columns: [],
-  tableData: [],
-  linkToUrl: '',
-  showHeader: false
+const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
+  data = '',
+  title = '',
+  hoverable = false,
+  loading = false,
+  columns = [],
+  tableData = [],
+  linkToUrl = '',
+  showHeader = false
 }) => {
-  let {
-    data,
-    title,
-    loading,
-    hoverable,
-    tableData,
-    columns,
-    linkToUrl,
-    showHeader
-  } = props;
 
   const titleElement = (linkToUrl)
     ? (

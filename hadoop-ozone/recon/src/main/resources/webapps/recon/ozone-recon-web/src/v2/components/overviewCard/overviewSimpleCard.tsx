@@ -78,15 +78,14 @@ const IconSelector = ({
 
 
 // ------------- Component -------------- //
-const OverviewSimpleCard = (props: OverviewCardProps = {
-  icon: '',
-  data: 0,
-  title: '',
-  hoverable: false,
-  loading: false,
-  linkToUrl: ''
+const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
+  icon = '',
+  data = 0,
+  title = '',
+  hoverable = false,
+  loading = false,
+  linkToUrl = ''
 }) => {
-  let { icon, data, title, loading, hoverable, linkToUrl } = props;
 
   const titleElement = (linkToUrl)
     ? (
