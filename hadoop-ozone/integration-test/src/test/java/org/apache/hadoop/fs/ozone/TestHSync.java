@@ -113,7 +113,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -187,7 +186,6 @@ public class TestHSync {
     CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
-    CONF.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
     CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     CONF.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
