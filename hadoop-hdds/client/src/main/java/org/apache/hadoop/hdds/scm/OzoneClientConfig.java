@@ -128,6 +128,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long streamBufferMaxSize = 32 * 1024 * 1024;
 
+  @Config(key = "stream.readblock.enable",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow ReadBlock to stream all the readChunk in one request.",
+      tags = ConfigTag.CLIENT)
+  private boolean streamReadBlock = false;
+
   @Config(key = "max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -451,5 +458,13 @@ public class OzoneClientConfig {
 
   public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
     this.datastreamPipelineMode = datastreamPipelineMode;
+  }
+
+  public boolean isStreamReadBlock() {
+    return streamReadBlock;
+  }
+
+  public void setStreamReadBlock(boolean streamReadBlock) {
+    this.streamReadBlock = streamReadBlock;
   }
 }

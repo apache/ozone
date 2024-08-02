@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 
 import java.util.Map;
 
@@ -93,5 +94,16 @@ public interface ContainerDispatcher {
       ContainerCommandRequestProto msg) throws StorageContainerException {
     throw new UnsupportedOperationException(
         "getStreamDataChannel not supported.");
+  }
+
+  /**
+   * When reading data form client using stream, get StreamDataChannel.
+   */
+  default void streamDataReadOnly(
+       ContainerCommandRequestProto msg,
+       StreamObserver<ContainerCommandResponseProto> streamObserver,
+       DispatcherContext dispatcherContext) {
+    throw new UnsupportedOperationException(
+         "getStreamDataChannel not supported.");
   }
 }
