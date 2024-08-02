@@ -52,7 +52,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
   };
 
   render() {
-    const { collapsed } = this.state;
+    const { collapsed, enableNewUI } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
 
@@ -74,13 +74,16 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   }} />
               </div>
             </Header>
-            <Content>
+            <Content style={(enableNewUI) ? {} : { margin: '0 16px 0', overflow: 'initial' }}>
               <Switch>
                 <Route exact path='/'>
                   <Redirect to='/Overview' />
                 </Route>
-                {
-                  routesV2.map(
+                {(enableNewUI)
+                  ? routesV2.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                  )
+                  : routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )
                 }

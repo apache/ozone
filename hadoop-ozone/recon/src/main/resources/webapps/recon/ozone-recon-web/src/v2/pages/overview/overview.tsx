@@ -23,7 +23,6 @@ import filesize from 'filesize';
 import { Row, Col, Card, Button } from 'antd';
 import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
 
-import OverviewCard from '@/v2/components/overviewCard/overviewCard';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { showDataFetchError, byteToSize } from '@/utils/common';
@@ -36,7 +35,9 @@ import OverviewTableCard from '@/v2/components/overviewCard/overviewTableCard';
 import './overview.less';
 import { Link } from 'react-router-dom';
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
+import OverviewCardSimple from '@/v2/components/overviewCard/overviewSimpleCard';
 
+const size = filesize.partial({ round: 1 });
 
 const getHealthIcon = (value: string): React.ReactElement => {
   const values = value.split('/');
@@ -210,12 +211,12 @@ const Overview: React.FC<{}> = (props = {}) => {
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject?.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject?.lastUpdatedTimestamp,
-        openSummarytotalUnrepSize: openResponse?.data?.totalUnreplicatedDataSize,
-        openSummarytotalRepSize: openResponse?.data?.totalReplicatedDataSize,
-        openSummarytotalOpenKeys: openResponse?.data?.totalOpenKeys,
-        deletePendingSummarytotalUnrepSize: deletePendingResponse?.data?.totalUnreplicatedDataSize,
-        deletePendingSummarytotalRepSize: deletePendingResponse?.data?.totalReplicatedDataSize,
-        deletePendingSummarytotalDeletedKeys: deletePendingResponse?.data?.totalDeletedKeys,
+        openSummarytotalUnrepSize: openResponse?.value?.data?.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse?.value?.data?.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse?.value?.data?.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse?.value?.data?.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse?.value?.data?.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse?.value?.data?.totalDeletedKeys,
         scmServiceId: clusterState?.scmServiceId,
         omServiceId: clusterState?.omServiceId
       });
@@ -314,15 +315,16 @@ const Overview: React.FC<{}> = (props = {}) => {
         <Link to='/Containers'> View More</Link>
       </Button>
     )
+
   return (
     <>
-      <div className='page-header'>
+      <div className='page-header-v2'>
         Overview
         <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div className='overview-content'>
+      <div className='overview-content-v2'>
         <Row
           align='stretch'
           gutter={[
@@ -333,24 +335,25 @@ const Overview: React.FC<{}> = (props = {}) => {
               lg: 16,
               xl: 16
             }, 20]}>
-          <Col span={10}>
+          <Col xs={24} sm={24} md={24} lg={10} xl={10}>
             <OverviewTableCard
               title='Health'
               data={healthCardIndicators}
+              showHeader={true}
               columns={[
                 {
-                  title: 'Name',
+                  title: '',
                   dataIndex: 'name',
                   key: 'name'
                 },
                 {
-                  title: 'Value',
+                  title: 'Available',
                   dataIndex: 'value',
                   key: 'value',
                   align: 'right'
                 },
                 {
-                  title: 'Action',
+                  title: 'Actions',
                   dataIndex: 'action',
                   key: 'action',
                   align: 'right'
@@ -372,7 +375,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               ]}
             />
           </Col>
-          <Col span={14}>
+          <Col xs={24} sm={24} md={24} lg={14} xl={14}>
             <OverviewStorageCard storageReport={storageReport} loading={loading} />
           </Col>
         </Row>
@@ -385,19 +388,42 @@ const Overview: React.FC<{}> = (props = {}) => {
             xl: 16
           }, 20]}>
           <Col flex="1 0 20%">
-            <Card> A </Card>
+            <OverviewCardSimple
+              title='Volumes'
+              icon='inbox'
+              loading={loading}
+              data={volumes}
+              linkToUrl='/Volumes' />
           </Col>
           <Col flex="1 0 20%">
-            <Card> A </Card>
+            <OverviewCardSimple
+              title='Buckets'
+              icon='folder-open'
+              loading={loading}
+              data={buckets}
+              linkToUrl='/Buckets' />
           </Col>
           <Col flex="1 0 20%">
-            <Card> A </Card>
+            <OverviewCardSimple
+              title='Keys'
+              icon='file-text'
+              loading={loading}
+              data={keys} />
           </Col>
           <Col flex="1 0 20%">
-            <Card> A </Card>
+            <OverviewCardSimple
+              title='Pipelines'
+              icon='deployment-unit'
+              loading={loading}
+              data={pipelines}
+              linkToUrl='/Pipelines' />
           </Col>
           <Col flex="1 0 20%">
-            <Card> A </Card>
+            <OverviewCardSimple
+              title='Deleted Containers'
+              icon='delete'
+              loading={loading}
+              data={deletedContainers} />
           </Col>
         </Row>
         <Row gutter={[
@@ -408,11 +434,77 @@ const Overview: React.FC<{}> = (props = {}) => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <Col flex="1 0 50%">
-            <Card>Some card</Card>
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
+            <OverviewTableCard
+              title='Open Keys Summary'
+              loading={loading}
+              columns={[
+                {
+                  title: 'Name',
+                  dataIndex: 'name',
+                  key: 'name'
+                },
+                {
+                  title: 'Size',
+                  dataIndex: 'value',
+                  key: 'size',
+                  align: 'right'
+                }
+              ]}
+              tableData={[
+                {
+                  key: 'total-replicated-data',
+                  name: 'Total Replicated Data',
+                  value: size(openSummarytotalRepSize)
+                },
+                {
+                  key: 'total-unreplicated-data',
+                  name: 'Total Unreplicated Data',
+                  value: size(openSummarytotalUnrepSize)
+                },
+                {
+                  key: 'open-keys',
+                  name: 'Open Keys',
+                  value: String(openSummarytotalOpenKeys)
+                }
+              ]}
+              linkToUrl='/Om' />
           </Col>
-          <Col flex="1 0 50%">
-            <Card>Some card</Card>
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
+          <OverviewTableCard
+              title='Delete Pending Keys Summary'
+              loading={loading}
+              columns={[
+                {
+                  title: 'Name',
+                  dataIndex: 'name',
+                  key: 'name'
+                },
+                {
+                  title: 'Size',
+                  dataIndex: 'value',
+                  key: 'size',
+                  align: 'right'
+                }
+              ]}
+              tableData={[
+                {
+                  key: 'total-replicated-data',
+                  name: 'Total Replicated Data',
+                  value: size(deletePendingSummarytotalRepSize)
+                },
+                {
+                  key: 'total-unreplicated-data',
+                  name: 'Total Unreplicated Data',
+                  value: size(deletePendingSummarytotalUnrepSize)
+                },
+                {
+                  key: 'delete-pending-keys',
+                  name: 'Delete Pending Keys',
+                  value: String(deletePendingSummarytotalDeletedKeys)
+                }
+              ]}
+              linkToUrl='/Om' />
           </Col>
         </Row>
       </div>
