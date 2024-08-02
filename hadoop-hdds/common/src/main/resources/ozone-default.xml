@@ -599,6 +599,7 @@
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of threads in RPC server reading from the socket for OM service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for Ozone Manager.
     </description>
   </property>
   <property>
