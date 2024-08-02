@@ -223,10 +223,6 @@ public class BlockManagerImpl implements BlockManager {
         "be null for finalizeBlock operation.");
     Preconditions.checkState(blockId.getContainerID() >= 0,
         "Container Id cannot be negative");
-    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
-      throw new StorageContainerException("DataNode has not finalized " +
-          "upgrading to a version that supports block finalization.", UNSUPPORTED_REQUEST);
-    }
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
     long localID = blockId.getLocalID();
