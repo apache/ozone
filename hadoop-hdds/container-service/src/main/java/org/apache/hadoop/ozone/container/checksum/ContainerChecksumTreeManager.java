@@ -25,6 +25,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -36,6 +39,7 @@ import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
@@ -152,15 +156,23 @@ public class ContainerChecksumTreeManager {
   private void write(KeyValueContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
       throws IOException {
     File checksumFile = getContainerChecksumFile(data);
+    File tmpChecksumFile = getTmpContainerChecksumFile(data);
+
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
-    try (FileOutputStream outStream = new FileOutputStream(checksumFile)) {
-      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
-          () -> checksumInfo.writeTo(outStream));
+    try (FileOutputStream tmpOutputStream = new FileOutputStream(tmpChecksumFile)) {
+      // Write to a tmp file and rename it into place.
+      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
+        checksumInfo.writeTo(tmpOutputStream);
+        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), REPLACE_EXISTING);
+        // Best effort cleanup of the tmp file. If this fails it will be overwritten on the next write.
+        // No operations should read from the tmp file.
+        Files.deleteIfExists(tmpChecksumFile.toPath());
+      });
     } catch (IOException ex) {
       metrics.incrementMerkleTreeWriteFailures();
-      throw new IOException("Error occurred when reading container merkle tree for containerID "
-          + data.getContainerID() + " at path " + checksumFile, ex);
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -168,6 +180,10 @@ public class ContainerChecksumTreeManager {
 
   public static File getContainerChecksumFile(KeyValueContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  }
+
+  public static File getTmpContainerChecksumFile(KeyValueContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
   }
 
   @VisibleForTesting
