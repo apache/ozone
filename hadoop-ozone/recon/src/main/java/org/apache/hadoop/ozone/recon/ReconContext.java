@@ -110,6 +110,19 @@ public final class ReconContext {
   }
 
   /**
+   * Convert ReconContext data to a Map for JSON serialization.
+   *
+   * @return Map containing health status, errors, and other info.
+   */
+  public Map<String, Object> toMap() {
+    Map<String, Object> contextMap = new HashMap<>();
+    contextMap.put("isHealthy", isHealthy.get());
+    contextMap.put("errors", errors);
+    // Add other relevant fields as needed
+    return contextMap;
+  }
+
+  /**
    * Error codes to make it easy to decode these errors in Recon.
    */
   public enum ErrorCode {
