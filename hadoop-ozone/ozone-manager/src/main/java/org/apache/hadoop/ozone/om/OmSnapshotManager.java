@@ -101,7 +101,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -498,8 +497,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
-        volumeName, bucketName);
+    final String keyPrefix = omMetadataManager
+        .getOzonePathKeyForFso(volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
