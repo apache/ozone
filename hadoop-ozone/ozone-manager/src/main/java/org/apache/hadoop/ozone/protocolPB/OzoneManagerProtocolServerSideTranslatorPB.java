@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
@@ -258,7 +259,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws ServiceException {
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY ||
+    boolean readOnlyMachineMode = raftServerStatus == LEADER_AND_NOT_READY
+        && omRatisServer.getOmStateMachine().isReadOnly();
+    if (raftServerStatus == LEADER_AND_READY || readOnlyMachineMode ||
         request.getCmdType().equals(PrepareStatus)) {
       return handler.handleReadRequest(request);
     } else {

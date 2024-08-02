@@ -455,7 +455,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static UserGroupInformation testUgi;
 
   private final OzoneLockProvider ozoneLockProvider;
-  private final OMPerformanceMetrics perfMetrics;
+  private OMPerformanceMetrics perfMetrics;
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
@@ -4917,5 +4917,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       getOmServerProtocol().awaitDoubleBufferFlush();
     }
+  }
+
+  @VisibleForTesting
+  public void setPerfMetrics(OMPerformanceMetrics perfMetrics) {
+    this.perfMetrics = perfMetrics;
   }
 }

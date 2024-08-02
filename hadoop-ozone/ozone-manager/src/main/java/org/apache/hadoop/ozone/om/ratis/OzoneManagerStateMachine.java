@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.NettyMetrics;
@@ -102,6 +103,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
+  private final AtomicBoolean readonlyMode = new AtomicBoolean(false);
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
@@ -258,6 +260,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext startTransaction(
       RaftClientRequest raftClientRequest) throws IOException {
+    if (readonlyMode.get()) {
+      TransactionContext ctxt = TransactionContext.newBuilder()
+          .setClientRequest(raftClientRequest)
+          .setStateMachine(this)
+          .setServerRole(RaftProtos.RaftPeerRole.LEADER)
+          .build();
+      ctxt.setException(new OMException("OM is running in readonly mode due to internal error",
+          OMException.ResultCodes.READONLY_MODE));
+      return ctxt;
+    }
+
     ByteString messageContent = raftClientRequest.getMessage().getContent();
     OMRequest omRequest = OMRatisHelper.convertByteStringToOMRequest(
         messageContent);
@@ -290,6 +303,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       throws IOException {
     final OMRequest request = (OMRequest) trx.getStateMachineContext();
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
+
+    if (readonlyMode.get()) {
+      throw new StateMachineException("", new OMException("OM is running in readonly mode due to internal error",
+          OMException.ResultCodes.READONLY_MODE), false);
+    }
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
 
@@ -371,7 +389,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // In such cases, OM must be terminated instead of completing the future exceptionally,
       // Otherwise, OM may continue applying transactions which leads to an inconsistent state.
       if (omResponse.getStatus() == INTERNAL_ERROR) {
-        terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+        final boolean onFailureReadonlyEnable = ozoneManager.getConfiguration()
+            .getBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY,
+                OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
+        if (!onFailureReadonlyEnable) {
+          terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+        }
       } else if (omResponse.getStatus() == METADATA_ERROR) {
         terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
       }
@@ -427,6 +450,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
+    // resetting readonly mode when install checkpoint is done as recover from leader
+    if (readonlyMode.compareAndSet(true, false)) {
+      LOG.info("Moving OM state machine from read-only mode to normal");
+    }
     LOG.info("OzoneManagerStateMachine is un-pausing");
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
@@ -539,6 +566,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    if (readonlyMode.get()) {
+      // return failure without updating transaction index as double buffer is stopped
+      LOG.error("OM is running in readonly mode due to internal error, rejected apply transaction for index: {}",
+          termIndex);
+      // release transaction to avoid any blocking transaction waiting for lock in applyTransaction
+      // and request should fail as READONLY_MODE
+      ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
+      return createErrorResponse(request,
+          new OMException("OM is running in readonly mode due to internal error, request index: " + termIndex,
+              OMException.ResultCodes.READONLY_MODE), termIndex);
+    }
     try {
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, termIndex, ozoneManagerDoubleBuffer);
@@ -554,7 +592,24 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
-      // For any Runtime exceptions, terminate OM.
+      // For any Runtime exceptions, move to readonly mode or terminate OM based on configuration.
+      final boolean onFailureReadonlyEnable = ozoneManager.getConfiguration()
+          .getBoolean(OMConfigKeys.OZONE_OM_ONFAILURE_READONLY,
+              OMConfigKeys.OZONE_OM_ONFAILURE_READONLY_DEFAULT);
+      if (onFailureReadonlyEnable) {
+        LOG.error("Failed to write, moving to readonly mode, request index: {}, Exception occurred ", termIndex, e);
+        if (readonlyMode.compareAndSet(false, true)) {
+          // update readonly mode, flush existing transaction and pause state machine
+          try {
+            awaitDoubleBufferFlush();
+          } catch (InterruptedException ex) {
+            Thread.interrupted();
+          }
+          pause();
+        }
+        return createErrorResponse(request, new OMException("Exception occurred and moving to readonly mode",
+            e, OMException.ResultCodes.READONLY_MODE), termIndex);
+      }
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
@@ -641,5 +696,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
+  }
+
+  public boolean isReadOnly() {
+    return readonlyMode.get();
+  }
+
+  @VisibleForTesting
+  public void setReadOnly(boolean flag) {
+    readonlyMode.set(flag);
   }
 }
