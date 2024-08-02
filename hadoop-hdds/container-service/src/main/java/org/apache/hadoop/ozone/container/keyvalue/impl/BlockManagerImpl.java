@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,8 +154,8 @@ public class BlockManagerImpl implements BlockManager {
         boolean incrementalEnabled = true;
         if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
           if (isPartialChunkList(data)) {
-            throw new UnsupportedOperationException("DataNode has not finalized " +
-                "upgrading to a version that supports incremental chunk list.");
+            throw new StorageContainerException("DataNode has not finalized " +
+                "upgrading to a version that supports incremental chunk list.", UNSUPPORTED_REQUEST);
           }
           incrementalEnabled = false;
         }
@@ -223,8 +224,8 @@ public class BlockManagerImpl implements BlockManager {
     Preconditions.checkState(blockId.getContainerID() >= 0,
         "Container Id cannot be negative");
     if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
-      throw new UnsupportedOperationException("DataNode has not finalized " +
-          "upgrading to a version that supports block finalization.");
+      throw new StorageContainerException("DataNode has not finalized " +
+          "upgrading to a version that supports block finalization.", UNSUPPORTED_REQUEST);
     }
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
