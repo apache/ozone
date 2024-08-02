@@ -34,13 +34,14 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+
 /**
  * State represents persisted data of one specific datanode.
  */
 public class MockDatanodeStorage {
   public static final Logger LOG =
       LoggerFactory.getLogger(MockDatanodeStorage.class);
-  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final String FULL_CHUNK = "full";
   public static final ContainerProtos.KeyValue FULL_CHUNK_KV =
       ContainerProtos.KeyValue.newBuilder().setKey(FULL_CHUNK).build();
