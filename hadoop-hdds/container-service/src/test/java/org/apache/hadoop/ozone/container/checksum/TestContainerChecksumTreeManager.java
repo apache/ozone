@@ -23,6 +23,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -41,10 +43,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class TestContainerChecksumTreeManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerChecksumTreeManager.class);
 
   private static final long CONTAINER_ID = 1L;
   @TempDir
@@ -184,7 +189,7 @@ class TestContainerChecksumTreeManager {
   }
 
   @Test
-  public void testTmpFileOnWriteError() throws Exception {
+  public void testTmpFileWriteFailure() throws Exception {
     File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
 
@@ -195,18 +200,54 @@ class TestContainerChecksumTreeManager {
     assertFalse(tmpFile.exists());
     assertTrue(finalFile.exists());
 
-    // Now do a write that is guaranteed to fail.
-    assertTrue(finalFile.setReadable(false));
+    // Make the write to the tmp file fail by removing permissions on its parent.
+    assertTrue(finalFile.getParentFile().setWritable(false));
+    try {
+      checksumManager.writeContainerDataTree(container, tree);
+      fail();
+    } catch (IOException ex) {
+      LOG.info("Write to the tmp file failed as expected with the following exception: ", ex);
+    }
     assertFalse(tmpFile.exists());
-    assertThrows(IOException.class, () -> checksumManager.writeContainerDataTree(container, tree));
-    // TODO looks like exception was thrown, but file does not exist.
-    assertTrue(tmpFile.exists());
+    // The original file should still remain valid.
+    assertTrue(finalFile.exists());
+    assertTreesSortedAndMatch(tree.toProto(), readFile().getContainerMerkleTree());
+  }
 
-    // Writing again after permission is restored should clear the file.
-    assertTrue(finalFile.setReadable(true));
+  @Test
+  public void testFileRenameFailure() throws Exception {
+    File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
+    File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
+
+    assertFalse(tmpFile.exists());
+    assertFalse(finalFile.exists());
+    ContainerMerkleTree tree = buildTestTree();
     checksumManager.writeContainerDataTree(container, tree);
     assertFalse(tmpFile.exists());
     assertTrue(finalFile.exists());
+
+    // Remove write permissions on the final file destination. Write to the tmp file should succeed, but the rename
+    // should fail.
+    assertTrue(finalFile.setReadOnly());
+    // TODO the Files#move call is still overwriting this.
+    assertFalse(tmpFile.exists());
+    try {
+      checksumManager.writeContainerDataTree(container, tree);
+      fail("No exception thrown");
+    } catch (IOException ex) {
+      LOG.info("Write to the tmp file failed as expected with the following exception: ", ex);
+    }
+    assertTrue(tmpFile.exists());
+    // The original file should still remain valid.
+    assertTrue(finalFile.exists());
+    assertTreesSortedAndMatch(tree.toProto(), readFile().getContainerMerkleTree());
+
+    // Writing again after permission is restored should clear the file.
+    assertTrue(finalFile.setWritable(true));
+    checksumManager.writeContainerDataTree(container, tree);
+    assertFalse(tmpFile.exists());
+    assertTrue(finalFile.exists());
+    assertTreesSortedAndMatch(tree.toProto(), readFile().getContainerMerkleTree());
   }
 
   @Test
