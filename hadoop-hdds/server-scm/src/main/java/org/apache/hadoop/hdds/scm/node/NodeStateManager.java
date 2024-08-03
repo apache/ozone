@@ -19,12 +19,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.Closeable;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -477,6 +472,22 @@ public class NodeStateManager implements Runnable, Closeable {
     return getNodes(null, NodeState.DEAD);
   }
 
+  public List<DatanodeInfo> getDecommissioningNodes() {
+    return getNodes(NodeOperationalState.DECOMMISSIONING, null);
+  }
+
+  public int getDecommissioningNodeCount() {
+    return getDecommissioningNodes().size();
+  }
+
+  public List<DatanodeInfo> getEnteringMaintenanceNodes() {
+    return getNodes(NodeOperationalState.ENTERING_MAINTENANCE, null);
+  }
+
+  public int getEnteringMaintenanceNodeCount() {
+    return getEnteringMaintenanceNodes().size();
+  }
+
   /**
    * Returns all the nodes with the specified status.
    *
@@ -499,6 +510,26 @@ public class NodeStateManager implements Runnable, Closeable {
   public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
     return nodeStateMap.getDatanodeInfos(opState, health);
+  }
+
+  public List<DatanodeInfo> getVolumeFailuresNodes() {
+    List<DatanodeInfo> allNodes = nodeStateMap.getAllDatanodeInfos();
+    if (allNodes.size() < 1) {
+      return allNodes;
+    }
+
+    List<DatanodeInfo> failedVolumeNodes = new ArrayList<>();
+    for (DatanodeInfo dn : allNodes) {
+      if (dn.getFailedVolumeCount() > 0) {
+        failedVolumeNodes.add(dn);
+      }
+    }
+
+    return failedVolumeNodes;
+  }
+
+  public int getVolumeFailuresNodeCount() {
+    return getVolumeFailuresNodes().size();
   }
 
   /**
