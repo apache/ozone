@@ -21,9 +21,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
@@ -112,6 +115,13 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     OzoneManagerProtocol ozoneManagerClient =
         parent.createOmClient(omServiceId, omHost, false);
+    ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
+    final OzoneManagerVersion omVersion = RpcClient.getOmVersion(serviceInfoEx);
+    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      System.err.println("Error: This command requires OzoneManager version "
+          + OzoneManagerVersion.HBASE_SUPPORT.name() + " or later.");
+      return null;
+    }
 
     ListOpenFilesResult res =
         ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);

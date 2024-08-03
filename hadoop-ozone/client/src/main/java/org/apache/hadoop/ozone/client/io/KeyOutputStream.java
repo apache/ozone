@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -107,6 +108,7 @@ public class KeyOutputStream extends OutputStream
    */
   private boolean atomicKeyCreation;
   private ContainerClientMetrics clientMetrics;
+  private OzoneManagerVersion ozoneManagerVersion;
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -157,6 +159,7 @@ public class KeyOutputStream extends OutputStream
     this.atomicKeyCreation = b.getAtomicKeyCreation();
     this.streamBufferArgs = b.getStreamBufferArgs();
     this.clientMetrics = b.getClientMetrics();
+    this.ozoneManagerVersion = b.ozoneManagerVersion;
   }
 
   /**
@@ -457,6 +460,11 @@ public class KeyOutputStream extends OutputStream
       throw new UnsupportedOperationException("The replication factor = "
           + replication.getRequiredNodes() + " <= 1");
     }
+    if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new UnsupportedOperationException("Hsync API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + ozoneManagerVersion);
+    }
     checkNotClosed();
     final long hsyncPos = writeOffset;
 
@@ -599,6 +607,7 @@ public class KeyOutputStream extends OutputStream
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
+    private OzoneManagerVersion ozoneManagerVersion;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -719,6 +728,15 @@ public class KeyOutputStream extends OutputStream
 
     public Supplier<ExecutorService> getExecutorServiceSupplier() {
       return executorServiceSupplier;
+    }
+
+    public Builder setOmVersion(OzoneManagerVersion omVersion) {
+      this.ozoneManagerVersion = omVersion;
+      return this;
+    }
+
+    public OzoneManagerVersion getOmVersion() {
+      return ozoneManagerVersion;
     }
 
     public KeyOutputStream build() {

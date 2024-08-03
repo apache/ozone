@@ -203,6 +203,21 @@ public class RatisClientConfig {
     exponentialPolicyMaxSleep = duration;
   }
 
+  @Config(key = "client.exponential.backoff.max.retries",
+      defaultValue =  "2147483647",
+      type = ConfigType.INT,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Client's max retry value for the exponential backoff policy.")
+  private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
+
+  public int getExponentialPolicyMaxRetries() {
+    return exponentialPolicyMaxRetries;
+  }
+
+  public void setExponentialPolicyMaxRetries(int retry) {
+    exponentialPolicyMaxRetries = retry;
+  }
+
   @Config(key = "client.retrylimited.retry.interval",
       defaultValue = "1s",
       type = ConfigType.TIME,

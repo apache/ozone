@@ -594,6 +594,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.read.threadpool</name>
+    <value>10</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for OM service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for Ozone Manager.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
@@ -849,17 +858,6 @@
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read threshold to use memory mapped buffers.
-    </description>
-  </property>
-  <property>
-    <name>ozone.incremental.chunk.list</name>
-    <value>true</value>
-    <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
-    <description>
-      By default, a writer client sends full chunk list of a block when it
-      sends PutBlock requests. Changing this configuration to true will send
-      only incremental chunk list which reduces metadata overhead and improves
-      hsync performance.
     </description>
   </property>
   <property>
@@ -2930,7 +2928,7 @@
   </property>
   <property>
     <name>hdds.datanode.handler.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The number of RPC handler threads for Datanode client
