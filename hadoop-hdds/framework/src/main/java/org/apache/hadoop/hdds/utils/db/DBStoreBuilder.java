@@ -413,6 +413,10 @@ public final class DBStoreBuilder {
       dbOptions.setLogger(logger);
     }
 
+    // RocksDB log settings.
+    dbOptions.setMaxLogFileSize(rocksDBConfiguration.getMaxLogFileSize());
+    dbOptions.setKeepLogFileNum(rocksDBConfiguration.getKeepLogFileNum());
+
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
