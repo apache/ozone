@@ -17,25 +17,27 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import axios, { CanceledError } from 'axios';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Row, Col, Card, Button } from 'antd';
-import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
+import axios, { CanceledError } from 'axios';
+import { Row, Col, Button } from 'antd';
+import {
+  CheckCircleFilled,
+  WarningFilled
+} from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import OverviewTableCard from '@/v2/components/overviewCard/overviewTableCard';
+import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
+import OverviewCardSimple from '@/v2/components/overviewCard/overviewSimpleCard';
+
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { showDataFetchError, byteToSize } from '@/utils/common';
+import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
-import OverviewTableCard from '@/v2/components/overviewCard/overviewTableCard';
-
-import './overview.less';
-import { Link } from 'react-router-dom';
-import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
-import OverviewCardSimple from '@/v2/components/overviewCard/overviewSimpleCard';
 
 const size = filesize.partial({ round: 1 });
 
@@ -69,7 +71,7 @@ const getHealthIcon = (value: string): React.ReactElement => {
   )
 }
 
-const Overview: React.FC<{}> = (props) => {
+const Overview: React.FC<{}> = () => {
 
   let cancelOverviewSignal: AbortController;
   let cancelOMDBSyncSignal: AbortController;
@@ -323,7 +325,7 @@ const Overview: React.FC<{}> = (props) => {
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div className='overview-content-v2'>
+      <div style={{ padding: '24px' }}>
         <Row
           align='stretch'
           gutter={[
@@ -470,7 +472,7 @@ const Overview: React.FC<{}> = (props) => {
               linkToUrl='/Om' />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-          <OverviewTableCard
+            <OverviewTableCard
               title='Delete Pending Keys Summary'
               loading={loading}
               columns={[
