@@ -1486,6 +1486,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.test.GenericTestUtils</bannedImport>
                       <bannedImport>org.apache.hadoop.test.LambdaTestUtils</bannedImport>
+                      <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
+                      <bannedImport>org.apache.hadoop.classification.InterfaceAudience</bannedImport>
+                      <bannedImport>org.apache.hadoop.classification.InterfaceStability</bannedImport>
                     </bannedImports>
                     <exclusions>
                       <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
@@ -1494,16 +1497,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
-                    <reason>Use Ozone's version of the same class</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
-                    </bannedImports>
-                  </restrictImports>
-                  <restrictImports>
-                    <includeTestCode>true</includeTestCode>
                     <reason>Use Ozone's similar class</reason>
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
                     </bannedImports>
                   </restrictImports>
                   <restrictImports>
