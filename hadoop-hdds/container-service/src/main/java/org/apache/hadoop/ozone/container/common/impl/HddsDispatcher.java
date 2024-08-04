@@ -218,7 +218,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     long startTime = Time.monotonicNowNanos();
     Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
-    metrics.incContainerOpsMetrics(cmdType);
     Container container = getContainer(containerID);
     boolean isWriteStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
@@ -229,6 +228,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
+
+    if (dispatcherContext == null) {
+      // increase all op not through ratis
+      metrics.incContainerOpsMetrics(cmdType);
+    } else if (isWriteStage) {
+      // increase WriteChunk in only WRITE_STAGE
+      metrics.incContainerOpsMetrics(cmdType);
+    } else if (cmdType != Type.WriteChunk) {
+      metrics.incContainerOpsMetrics(cmdType);
+    }
 
     try {
       if (DispatcherContext.op(dispatcherContext).validateToken()) {

@@ -418,8 +418,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, isRecovery, omKeyInfo);
 
     if (!isHSync) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
-          exception, getOmRequest().getUserInfo()));
+      markForAudit(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+              exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
     }

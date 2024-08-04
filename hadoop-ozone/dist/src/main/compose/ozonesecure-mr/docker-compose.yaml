@@ -18,12 +18,14 @@ services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
     hostname: kdc
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
   kms:
     image: apache/hadoop:3
+    dns_search: .
     ports:
       - 9600:9600
     env_file:
@@ -34,6 +36,7 @@ services:
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -48,6 +51,7 @@ services:
   om:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -64,6 +68,7 @@ services:
   s3g:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -78,6 +83,7 @@ services:
   scm:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs

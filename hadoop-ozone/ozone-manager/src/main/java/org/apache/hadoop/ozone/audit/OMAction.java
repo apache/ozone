@@ -105,6 +105,10 @@ public enum OMAction implements AuditAction {
 
   ABORT_EXPIRED_MULTIPART_UPLOAD,
 
+  UPGRADE_PREPARE,
+  UPGRADE_CANCEL,
+  UPGRADE_FINALIZE,
+
   LIST_OPEN_FILES;
 
   @Override

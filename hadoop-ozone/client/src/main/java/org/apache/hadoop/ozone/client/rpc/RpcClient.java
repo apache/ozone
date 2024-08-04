@@ -710,7 +710,7 @@ public class RpcClient implements ClientProtocol {
 
   private static void verifyVolumeName(String volumeName) throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName, false);
+      HddsClientUtils.verifyResourceName(volumeName, "volume", false);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -719,7 +719,7 @@ public class RpcClient implements ClientProtocol {
 
   private static void verifyBucketName(String bucketName) throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName, false);
+      HddsClientUtils.verifyResourceName(bucketName, "bucket", false);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_BUCKET_NAME);
@@ -2157,6 +2157,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
       String bucketName, String keyName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
