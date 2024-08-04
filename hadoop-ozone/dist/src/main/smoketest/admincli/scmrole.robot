@@ -34,5 +34,4 @@ List scm roles as JSON
 
 List scm roles as TABLE
     ${output} =         Execute          ozone admin scm roles --table
-    ${leader} =         Execute          echo '${output}' | jq -r '.[] | select(.raftPeerRole == "LEADER")'
-                        Should Not Be Equal       ${leader}       ${EMPTY}
+                        Should contain   ${output}   LEADER
