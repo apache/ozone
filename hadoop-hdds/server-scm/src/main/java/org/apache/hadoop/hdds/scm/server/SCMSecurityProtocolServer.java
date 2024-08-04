@@ -69,7 +69,6 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
 import org.apache.hadoop.security.UserGroupInformation;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,6 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 
 /**
  * The protocol used to perform security related operations with SCM.
@@ -333,16 +331,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   /**
-   *  Request certificate for the specified role.
-   * @param certSignReq - Certificate signing request.
+   * Request certificate for the specified role.
+   *
+   * @param csr      - Certificate signing request.
    * @param nodeType - role OM/SCM/DATANODE
-   * @return String         - SCM signed pem encoded certificate.
+   * @return String  - SCM signed pem encoded certificate.
    * @throws IOException
    */
-  private synchronized String getEncodedCertToString(String certSignReq,
+  private synchronized String getEncodedCertToString(String csr,
       NodeType nodeType) throws IOException {
     Future<CertPath> future;
-    PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(csr,
           KERBEROS_TRUSTED, nodeType, getNextCertificateId());

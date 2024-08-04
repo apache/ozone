@@ -20,7 +20,6 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
 import java.security.PrivateKey;
@@ -39,7 +38,7 @@ public interface CertificateApprover {
    * @param csr - Certificate Signing Request.
    * @return - Future that will contain Void if the certificate is considered valid otherwise an exception.
    */
-  CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr);
+  CompletableFuture<Void> inspectCSR(String csr);
 
   /**
    * Sign function signs a Certificate.
@@ -63,7 +62,7 @@ public interface CertificateApprover {
       X509Certificate caCertificate,
       Date validFrom,
       Date validTill,
-      PKCS10CertificationRequest certificationRequest,
+      String certificationRequest,
       String scmId,
       String clusterId,
       String certSerialId)

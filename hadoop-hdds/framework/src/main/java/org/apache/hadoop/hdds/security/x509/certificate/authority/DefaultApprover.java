@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.pkcs.Attribute;
@@ -93,18 +94,18 @@ public class DefaultApprover implements CertificateApprover {
   /**
    * Sign function signs a Certificate.
    *
-   * @param config - Security Config.
-   * @param caPrivate - CAs private Key.
+   * @param config        - Security Config.
+   * @param caPrivate     - CAs private Key.
    * @param caCertificate - CA Certificate.
-   * @param validFrom - Begin Da te
-   * @param validTill - End Date
-   * @param certificationRequest - Certification Request.
-   * @param scmId - SCM id.
-   * @param clusterId - Cluster id.
-   * @param certSerialId - the new certificate id.
+   * @param validFrom     - Begin Da te
+   * @param validTill     - End Date
+   * @param encodedCSR    - Certification Request in encoded format.
+   * @param scmId         - SCM id.
+   * @param clusterId     - Cluster id.
+   * @param certSerialId  - the new certificate id.
    * @return Signed Certificate.
-   * @throws IOException - On Error
-   * @throws CertificateException - on Error.
+   * @throws IOException               - On Error
+   * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
   @Override
@@ -114,7 +115,7 @@ public class DefaultApprover implements CertificateApprover {
       X509Certificate caCertificate,
       Date validFrom,
       Date validTill,
-      PKCS10CertificationRequest certificationRequest,
+      String encodedCSR,
       String scmId,
       String clusterId,
       String certSerialId) throws IOException, CertificateException {
@@ -127,6 +128,7 @@ public class DefaultApprover implements CertificateApprover {
 
     AsymmetricKeyParameter asymmetricKP = PrivateKeyFactory.createKey(caPrivate
         .getEncoded());
+    PKCS10CertificationRequest certificationRequest = CertificateSignRequest.getCertificationRequest(encodedCSR);
     SubjectPublicKeyInfo keyInfo =
         certificationRequest.getSubjectPublicKeyInfo();
 
@@ -287,8 +289,7 @@ public class DefaultApprover implements CertificateApprover {
    * @throws OperatorCreationException - On Error.
    * @throws PKCSException             - on Error.
    */
-  @VisibleForTesting
-  boolean verifyPkcs10Request(PKCS10CertificationRequest pkcs10Request)
+  private boolean verifyPkcs10Request(PKCS10CertificationRequest pkcs10Request)
       throws OperatorCreationException, PKCSException {
     ContentVerifierProvider verifierProvider = new
         JcaContentVerifierProviderBuilder()
@@ -302,7 +303,7 @@ public class DefaultApprover implements CertificateApprover {
    * {@inheritDoc}
    */
   @Override
-  public CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr) {
+  public CompletableFuture<Void> inspectCSR(String encodedCSR) {
     /**
      * The base approver executes the following algorithm to verify that a
      * CSR meets the PKI Profile criteria.
@@ -333,6 +334,7 @@ public class DefaultApprover implements CertificateApprover {
 
       // Step 1: Let us verify that Certificate is indeed signed by someone
       // who has access to the private key.
+      PKCS10CertificationRequest csr = CertificateSignRequest.getCertificationRequest(encodedCSR);
       if (!verifyPkcs10Request(csr)) {
         LOG.error("Failed to verify the signature in CSR.");
         response.completeExceptionally(new SCMSecurityException("Failed to " +
@@ -356,7 +358,7 @@ public class DefaultApprover implements CertificateApprover {
             "verify extensions."));
       }
 
-    } catch (OperatorCreationException | PKCSException e) {
+    } catch (OperatorCreationException | PKCSException | IOException e) {
       LOG.error("Approval Failure.", e);
       response.completeExceptionally(new SCMSecurityException(e));
     }
