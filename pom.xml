@@ -1471,6 +1471,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
                     </bannedImports>
                   </restrictImports>
                   <restrictImports>
