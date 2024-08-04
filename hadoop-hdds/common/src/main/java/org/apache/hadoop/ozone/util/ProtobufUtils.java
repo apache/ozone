@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.util;
+package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
