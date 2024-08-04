@@ -145,6 +145,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
+    <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.19</jnr-posix.version>
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
@@ -200,6 +201,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
+    <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <joda.time.version>2.12.7</joda.time.version>
 
     <compile-testing.version>0.21.0</compile-testing.version>
@@ -291,6 +293,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj-plugin.version>1.15.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
+    <jgraphx.version>3.9.8.1</jgraphx.version>
 
     <spring.version>5.3.37</spring.version>
     <jooq.version>3.11.10</jooq.version>
@@ -482,6 +485,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-constants</artifactId>
+        <version>${jnr-constants.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
         <version>${jnr-posix.version}</version>
       </dependency>
@@ -668,6 +676,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-thirdparty-misc</artifactId>
+        <version>${ratis.thirdparty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-proto-shaded</artifactId>
         <version>${ratis.version}</version>
       </dependency>
@@ -687,6 +700,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${ratis.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-metrics-api</artifactId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
         <artifactId>ratis-metrics-dropwizard3</artifactId>
         <groupId>org.apache.ratis</groupId>
         <version>${ratis.version}</version>
@@ -699,6 +717,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <artifactId>ratis-grpc</artifactId>
         <groupId>org.apache.ratis</groupId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-proto</artifactId>
         <version>${ratis.version}</version>
       </dependency>
       <dependency>
@@ -1010,11 +1033,21 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>io.jaegertracing</groupId>
+        <artifactId>jaeger-core</artifactId>
+        <version>${jaeger.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-bom</artifactId>
         <version>${kotlin.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opentracing</groupId>
+        <artifactId>opentracing-api</artifactId>
+        <version>${opentracing.version}</version>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>
@@ -1039,6 +1072,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>simpleclient_tracer_otel_agent</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>simpleclient</artifactId>
+        <version>${prometheus.version}</version>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
@@ -1171,6 +1209,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${jakarta.annotation.version}</version>
       </dependency>
       <dependency>
+        <groupId>jakarta.ws.rs</groupId>
+        <artifactId>jakarta.ws.rs-api</artifactId>
+        <version>${jakarta.ws.rs-api.version}</version>
+      </dependency>
+      <dependency>
         <groupId>joda-time</groupId>
         <artifactId>joda-time</artifactId>
         <version>${joda.time.version}</version>
@@ -1214,6 +1257,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-guava</artifactId>
         <version>${hadoop-shaded-guava.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.vlsi.mxgraph</groupId>
+        <artifactId>jgraphx</artifactId>
+        <version>${jgraphx.version}</version>
       </dependency>
       <dependency>
         <groupId>com.nimbusds</groupId>
