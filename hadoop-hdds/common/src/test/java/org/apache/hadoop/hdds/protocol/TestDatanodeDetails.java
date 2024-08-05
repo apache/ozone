@@ -17,11 +17,15 @@
  */
 package org.apache.hadoop.hdds.protocol;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS;
@@ -46,6 +50,19 @@ public class TestDatanodeDetails {
     HddsProtos.DatanodeDetailsProto protoV1 =
         subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     assertPorts(protoV1, ALL_PORTS);
+  }
+  @Test
+  void testRequiredPortsProto() {
+    DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
+    Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
+        .collect(Collectors.toSet());
+    HddsProtos.DatanodeDetailsProto proto =
+        subject.toProto(subject.getCurrentVersion(), requiredPorts);
+    assertPorts(proto, ImmutableSet.copyOf(requiredPorts));
+
+    HddsProtos.DatanodeDetailsProto ioPortProto =
+        subject.toProto(subject.getCurrentVersion(), Name.IO_PORTS);
+    assertPorts(ioPortProto, ImmutableSet.copyOf(Name.IO_PORTS));
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,
