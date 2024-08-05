@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -138,8 +139,10 @@ public class TestSCMSafeModeManager {
 
     assertTrue(scmSafeModeManager.getInSafeMode());
     validateRuleStatus("DatanodeSafeModeRule", "registered datanodes 0");
-    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-        HddsTestUtils.createNodeRegistrationContainerReport(containers));
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+        HddsTestUtils.createNodeRegistrationContainerReport(containers);
+    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
 
     long cutOff = (long) Math.ceil(numContainers * config.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
@@ -180,7 +183,7 @@ public class TestSCMSafeModeManager {
 
     assertTrue(scmSafeModeManager.getInSafeMode());
     validateRuleStatus("ContainerSafeModeRule",
-        "% of containers with at least one reported");
+        "0.00% of [Ratis] Containers(0 / 100) with at least one reported");
     testContainerThreshold(containers.subList(0, 25), 0.25);
     assertEquals(25, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
@@ -330,6 +333,16 @@ public class TestSCMSafeModeManager {
     testContainerThreshold(containers, 1.0);
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
+
+    for (Pipeline pipeline : pipelines) {
+      List<DatanodeDetails> nodes = pipeline.getNodes();
+      for (DatanodeDetails node : nodes) {
+        SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+            new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(node, null);
+        queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
+            nodeRegistrationContainerReport);
+      }
+    }
 
     int healthyPipelineThresholdCount =
         scmSafeModeManager.getHealthyPipelineSafeModeRule()
@@ -522,8 +535,10 @@ public class TestSCMSafeModeManager {
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
     for (int i = 0; i < numOfDns - 1; i++) {
-      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-          HddsTestUtils.createNodeRegistrationContainerReport(containers));
+      SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+          HddsTestUtils.createNodeRegistrationContainerReport(containers);
+      queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertEquals(1, scmSafeModeManager.getCurrentContainerThreshold());
     }
@@ -543,8 +558,12 @@ public class TestSCMSafeModeManager {
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
       double expectedThreshold)
       throws Exception {
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+        HddsTestUtils.createNodeRegistrationContainerReport(dnContainers);
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-        HddsTestUtils.createNodeRegistrationContainerReport(dnContainers));
+        nodeRegistrationContainerReport);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
+        nodeRegistrationContainerReport);
     GenericTestUtils.waitFor(() -> {
       double threshold = scmSafeModeManager.getCurrentContainerThreshold();
       return threshold == expectedThreshold;
@@ -589,9 +608,17 @@ public class TestSCMSafeModeManager {
           config, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
 
-      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-          HddsTestUtils.createNodeRegistrationContainerReport(containers));
+      SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+          HddsTestUtils.createNodeRegistrationContainerReport(containers);
+      queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+
       assertTrue(scmSafeModeManager.getInSafeMode());
+
+      for (DatanodeDetails datanodeDetail : pipeline.getNodes()) {
+        SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationReport =
+            new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetail, null);
+        queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationReport);
+      }
 
       firePipelineEvent(pipelineManager, pipeline);
 
@@ -647,8 +674,9 @@ public class TestSCMSafeModeManager {
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
     for (int i = 0; i < numOfDns - 1; i++) {
-      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-          HddsTestUtils.createNodeRegistrationContainerReport(containers));
+      SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+          HddsTestUtils.createNodeRegistrationContainerReport(containers);
+      queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertFalse(scmSafeModeManager.getPreCheckComplete());
     }

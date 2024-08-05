@@ -1637,6 +1637,15 @@
   </property>
 
   <property>
+    <name>hdds.scm.safemode.reported.datanode.pct</name>
+    <value>0.90</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Percentage of successfully reported datanodes.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>

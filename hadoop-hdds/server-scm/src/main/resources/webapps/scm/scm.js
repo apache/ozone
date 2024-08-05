@@ -92,6 +92,14 @@
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
 
+                    $scope.formatValue = function(value) {
+                        if (value && value.includes(';')) {
+                            return $sce.trustAsHtml(value.replace(';', '<br>'));
+                        } else {
+                            return $sce.trustAsHtml(value);
+                        }
+                    };
+
                     ctrl.nodemanagermetrics.NodeStatistics.forEach(function(obj) {
                         if(obj.key == "Min") {
                             $scope.statistics.nodes.usages.min = obj.value;
