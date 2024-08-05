@@ -83,7 +83,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return totalAckDataLength;
   }
 
-  long addAckDataLength(long acked) {
+  synchronized long addAckDataLength(long acked) {
     totalAckDataLength += acked;
     return totalAckDataLength;
   }
