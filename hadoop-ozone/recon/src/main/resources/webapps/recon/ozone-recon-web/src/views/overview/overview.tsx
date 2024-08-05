@@ -288,8 +288,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       openKeysError = true;
     }
 
-    if ([
-      decommissionInfoCount].some(
+    if ([decommissionInfoCount].some(
         (data) => data === undefined
       )) {
       decommissionInfoError = true;

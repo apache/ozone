@@ -46,7 +46,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
     this.setState({
       isLoading: true
     });
-    if (this.state.record && this.state.summaryData !== 'null' && this.state.summaryData !== 'undefined') {
+    if (this.state?.record && this.state?.summaryData) {
       this.fetchDecommissionSummary(this.state.uuid);
     }
   }
@@ -56,7 +56,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
       const datanodeEndpoint = `/api/v1/datanodes/decommission/info/datanode?uuid=${selectedUuid}`;
       let infoDatanodeResponse = await axios.get(datanodeEndpoint);
       let DatanodesDecommissionInfo = [];
-      DatanodesDecommissionInfo = infoDatanodeResponse && infoDatanodeResponse.data && infoDatanodeResponse.data.DatanodesDecommissionInfo[0];
+      DatanodesDecommissionInfo = infoDatanodeResponse?.data?.DatanodesDecommissionInfo[0];
       this.setState({
         loading: false,
         summaryData: DatanodesDecommissionInfo
@@ -90,7 +90,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
             </>
           }
           {
-            containers !== null && containers !== undefined && Object.keys(containers).length !== 0 &&
+            containers && Object.keys(containers).length !== 0 &&
             <>
               {containers.UnderReplicated && containers.UnderReplicated.length > 0 && <Descriptions.Item label="Under-Replicated">{containers.UnderReplicated}</Descriptions.Item>}
               {containers.UnClosed && containers.UnClosed.length > 0 && <Descriptions.Item label="Unclosed">{containers.UnClosed}</Descriptions.Item>}
@@ -102,7 +102,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
     // Need to check summarydata is not empty 
     return (
       <>
-        { (summaryData !== 'null' && summaryData !== 'undefined' && summaryData && summaryData.length !== 0) ?
+        { (summaryData && summaryData.length !== 0) ?
           <>
             <Tooltip title="Detailed Summary of Decomssioned Records.">
               <InfoCircleOutlined />

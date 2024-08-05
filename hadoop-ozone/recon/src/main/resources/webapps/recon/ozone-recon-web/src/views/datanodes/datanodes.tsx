@@ -366,6 +366,14 @@ let cancelDecommissionSignal: AbortController;
 let decommissionUuids: string | string[] =[];
 const COLUMN_UPDATE_DECOMMISSIONING = 'DECOMMISSIONING';
 
+type DatanodeDetails = {
+  uuid: string;
+}
+
+type DatanodeDecomissionInfo = {
+datanodeDetails: DatanodeDetails
+}
+
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
 
@@ -403,9 +411,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     // update Operation State Column in table Manually before rendering
     try {
     let decomissionResponse = await this._loadDecommisionAPI();
-    decommissionUuids =  decomissionResponse && decomissionResponse.data &&
-    decomissionResponse.data.DatanodesDecommissionInfo &&
-    decomissionResponse.data.DatanodesDecommissionInfo.map((item: { datanodeDetails: { uuid: any; }; }) => item.datanodeDetails.uuid);
+    decommissionUuids =  decomissionResponse.data?.DatanodesDecommissionInfo?.map((item: DatanodeDecomissionInfo) => item.datanodeDetails.uuid);
     }
     catch (error: any)
     {
