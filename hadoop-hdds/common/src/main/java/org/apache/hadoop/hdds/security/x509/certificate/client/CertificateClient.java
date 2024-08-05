@@ -157,10 +157,11 @@ public interface CertificateClient extends Closeable {
       X509Certificate cert) throws CertificateException;
 
   /**
-   * Returns a CertificateSignRequest object, that can be used to retrieve
-   * a signed certificate from our CA server implementation.
+   * Returns a CertificateSignRequest Builder object, that can be used to configure the sign request
+   * which we use to get  a signed certificate from our CA server implementation.
    *
-   * @return CertificateSignRequest a CSR based on which the certificate can be issued.
+   * @return CertificateSignRequest.Builder a {@link CertificateSignRequest}
+   *           based on which the certificate may be issued to this client.
    */
   CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException;
 
