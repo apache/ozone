@@ -1273,11 +1273,11 @@ public class SCMNodeManager implements NodeManager {
     int decommissioningNodeCount = nodeStateManager.getDecommissioningNodeCount();
     int enteringMaintenanceNodeCount = nodeStateManager.getEnteringMaintenanceNodeCount();
     int volumeFailuresNodeCount = nodeStateManager.getVolumeFailuresNodeCount();
-    nodeStatics.put(StateStatics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
-    nodeStatics.put(StateStatics.DEAD.getLabel(), String.valueOf(deadNodeCount));
-    nodeStatics.put(StateStatics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
-    nodeStatics.put(StateStatics.ENTERING_MAINTENANCE.getLabel(), String.valueOf(enteringMaintenanceNodeCount));
-    nodeStatics.put(StateStatics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
+    nodeStatics.put(StateStatistics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
+    nodeStatics.put(StateStatistics.DEAD.getLabel(), String.valueOf(deadNodeCount));
+    nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
+    nodeStatics.put(StateStatistics.ENTERING_MAINTENANCE.getLabel(), String.valueOf(enteringMaintenanceNodeCount));
+    nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
   }
 
   /**
@@ -1361,7 +1361,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  private enum StateStatics {
+  private enum StateStatistics {
     HEALTHY("Healthy"),
     DEAD("Dead"),
     DECOMMISSIONING("Decommissioning"),
@@ -1371,7 +1371,7 @@ public class SCMNodeManager implements NodeManager {
     public String getLabel() {
       return label;
     }
-    StateStatics(String label) {
+    StateStatistics(String label) {
       this.label = label;
     }
   }
