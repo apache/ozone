@@ -59,6 +59,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
@@ -164,6 +165,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
+      OmKeyInfo deletedOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
@@ -173,8 +175,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          // Remove the open key by putting a tombstone entry
-          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
+          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -183,7 +186,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
               .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), dbOpenKey);
+          omBucketInfo.copyObject(), deletedOpenKeyInfo);
 
       result = Result.SUCCESS;
       long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
