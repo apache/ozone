@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -81,6 +82,8 @@ class TestChunkUtils {
 
   @Test
   void concurrentReadOfSameFile() throws Exception {
+    int threads = 10;
+    ChunkUtils.setStripedLock(Striped.readWriteLock(threads));
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
@@ -89,7 +92,6 @@ class TestChunkUtils {
     int offset = 0;
     File file = tempFile.toFile();
     ChunkUtils.writeData(file, data, offset, len, null, true);
-    int threads = 10;
     ExecutorService executor = new ThreadPoolExecutor(threads, threads,
         0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
     AtomicInteger processed = new AtomicInteger();
@@ -124,6 +126,8 @@ class TestChunkUtils {
       executor.shutdownNow();
     }
     assertFalse(failed.get());
+
+    ChunkUtils.clearStripedLock();
   }
 
   @Test
