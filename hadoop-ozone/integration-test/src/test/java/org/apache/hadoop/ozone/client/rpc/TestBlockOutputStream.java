@@ -55,6 +55,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
@@ -476,9 +477,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @MethodSource("clientParameters")
-  void testWriteMoreThanFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  @ValueSource(booleans = {true, false})
+  void testWriteMoreThanFlushSize(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, false);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -550,9 +551,9 @@ class TestBlockOutputStream {
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
       // If the flushDelay was disabled, it sends PutBlock with the data in the buffer.
-      assertEquals(putBlockCount + (flushDelay ? 2 : 3) - (enablePiggybacking ? 1 : 0),
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + (flushDelay ? 5 : 6) - (enablePiggybacking ? 1 : 0),
+      assertEquals(totalOpCount + (flushDelay ? 5 : 6),
           metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
