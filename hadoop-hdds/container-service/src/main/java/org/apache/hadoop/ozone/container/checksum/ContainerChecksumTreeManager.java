@@ -180,14 +180,13 @@ public class ContainerChecksumTreeManager {
         return ByteString.readFrom(inStream);
       } catch (FileNotFoundException ex) {
         // TODO: Build the container checksum tree when it doesn't exist.
-        LOG.error("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
+        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
             containerID, checksumFile, ex);
       } catch (IOException ex) {
         throw new IOException("Error occured when reading checksum file for container " + containerID +
             " at the path " + checksumFile, ex);
-
       }
-      return null;
+      return ByteString.EMPTY;
     } finally {
       readLock.unlock();
     }

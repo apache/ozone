@@ -48,7 +48,7 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 /**
- * This class wraps necessary container-level rpc calls for container reconcilitaion.
+ * This class wraps necessary container-level rpc calls for container reconciliation.
  *   - GetContainerMerkleTree
  */
 public class DNContainerOperationClient implements AutoCloseable {
@@ -104,7 +104,7 @@ public class DNContainerOperationClient implements AutoCloseable {
     }
   }
 
-  private Pipeline createSingleNodePipeline(DatanodeDetails dn) {
+  public static Pipeline createSingleNodePipeline(DatanodeDetails dn) {
     return Pipeline.newBuilder()
         .setNodes(ImmutableList.of(dn))
         .setId(PipelineID.valueOf(dn.getUuid()))

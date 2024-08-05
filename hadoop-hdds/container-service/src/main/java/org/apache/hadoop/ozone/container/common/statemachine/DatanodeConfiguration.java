@@ -115,7 +115,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
   public static final int CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT = 127;
   public static final int CONTAINER_CLIENT_CACHE_SIZE_DEFAULT = 100;
-  public static final int CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_DEFAULT = 10000;
+  public static final int
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT = 10000;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -587,7 +588,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "The stale threshold in ms for a client in cache. After this threshold the client " +
           "is evicted from cache."
   )
-  private int containerClientCacheStaleThreshold = CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_DEFAULT;
+  private int containerClientCacheStaleThreshold =
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
 
   @SuppressWarnings("checkstyle:MethodLength")
   @PostConstruct
@@ -738,8 +740,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
     if (containerClientCacheStaleThreshold < 1) {
       LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CLIENT_CACHE_STALE_THRESHOLD,
-          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_DEFAULT);
-      containerClientCacheStaleThreshold = CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_DEFAULT;
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT);
+      containerClientCacheStaleThreshold =
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
     }
   }
 

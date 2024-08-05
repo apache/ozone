@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -82,6 +85,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseContainer;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerSecureRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
+import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer.captureLogs;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
@@ -221,6 +225,64 @@ public class TestOzoneContainerWithTLS {
       if (client != null) {
         clientManager.releaseClient(client, true);
       }
+    }
+  }
+
+  @ParameterizedTest(name = "Container token enabled: {0}")
+  @ValueSource(booleans = {false, true})
+  public void testDNContainerOperationClient(boolean containerTokenEnabled)
+      throws Exception {
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
+        containerTokenEnabled);
+    OzoneContainer container = createAndStartOzoneContainerInstance();
+    DNContainerOperationClient dnClient =
+        new DNContainerOperationClient(conf, caClient, keyClient);
+    ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
+    XceiverClientManager clientManager =
+        new XceiverClientManager(conf, scmClientConf, aClientTrustManager());
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClient(pipeline);
+      long containerId = createAndCloseContainer(client, containerTokenEnabled);
+      ByteString containerMerkleTree =
+          dnClient.getContainerMerkleTree(containerId, dn);
+      // Getting container merkle tree with valid container token
+      assertEquals(containerMerkleTree, ByteString.EMPTY);
+
+      // Getting container merkle tree with invalid container token
+      if (containerTokenEnabled) {
+        assertThrows(IOException.class, () ->
+            getContainerMerkleTree(containerId, dn, "invalidToken", dnClient));
+      } else {
+        containerMerkleTree = getContainerMerkleTree(containerId, dn, "invalidToken", dnClient);
+        assertEquals(containerMerkleTree, ByteString.EMPTY);
+      }
+    } finally {
+      if (container != null) {
+        container.stop();
+      }
+      if (client != null) {
+        clientManager.releaseClient(client, true);
+      }
+      if (dnClient != null) {
+        dnClient.close();
+      }
+    }
+  }
+
+  public ByteString getContainerMerkleTree(long containerId,
+                                           DatanodeDetails datanodeDetails,
+                                           String invalidContainerToken,
+                                           DNContainerOperationClient dnClient) throws IOException {
+    XceiverClientSpi xceiverClient = dnClient.getXceiverClientManager()
+        .acquireClient(createSingleNodePipeline(datanodeDetails));
+    try {
+      ContainerProtos.GetContainerMerkleTreeResponseProto response =
+          ContainerProtocolCalls.getContainerMerkleTree(xceiverClient,
+              containerId, invalidContainerToken);
+      return response.getContainerMerkleTree();
+    } finally {
+      dnClient.getXceiverClientManager().releaseClient(xceiverClient, false);
     }
   }
 
