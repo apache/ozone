@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -40,28 +42,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Quota repair task.
@@ -71,33 +72,79 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   private static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
-  public static final long EPOCH_DEFAULT = -1L;
+  private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
+  private static final RepairStatus REPAIR_STATUS = new RepairStatus();
   private final OzoneManager om;
+  private final AtomicLong runCount = new AtomicLong(0);
   private ExecutorService executor;
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
 
-  public void repair() throws Exception {
-    LOG.info("Starting quota repair task");
+  public CompletableFuture<Boolean> repair() throws Exception {
+    // lock in progress operation and reject any other
+    if (!IN_PROGRESS.compareAndSet(false, true)) {
+      LOG.info("quota repair task already running");
+      return CompletableFuture.supplyAsync(() -> false);
+    }
+    REPAIR_STATUS.reset(runCount.get() + 1);
+    return CompletableFuture.supplyAsync(() -> repairTask());
+  }
+
+  public static String getStatus() {
+    return REPAIR_STATUS.toString();
+  }
+  private boolean repairTask() {
+    LOG.info("Starting quota repair task {}", REPAIR_STATUS);
+    OMMetadataManager activeMetaManager = null;
     try {
       // thread pool with 3 Table type * (1 task each + 3 thread each)
       executor = Executors.newFixedThreadPool(12);
-
+      OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
+          = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
-      OMMetadataManager activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
-      repairActiveDb(activeMetaManager);
-      // list all snapshot
-      // repair snapshot dbs
+      activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
+      repairActiveDb(activeMetaManager, builder);
 
-      updateOldVolumeQuotaSupport(om.getMetadataManager());
+      // TODO: repair snapshots for quota
+
+      // submit request to update
+      ClientId clientId = ClientId.randomId();
+      OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.QuotaRepair)
+          .setQuotaRepairRequest(builder.build())
+          .setClientId(clientId.toString())
+          .build();
+      OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest, clientId);
+      if (response != null && response.getSuccess()) {
+        LOG.error("update quota repair count response failed");
+        REPAIR_STATUS.updateStatus("Response for update DB is failed");
+      } else {
+        REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
+      }
+    } catch (Exception exp) {
+      LOG.error("quota repair count failed", exp);
+      REPAIR_STATUS.updateStatus(exp.toString());
+      return false;
     } finally {
-      LOG.info("Completed quota repair task");
+      LOG.info("Completed quota repair task {}", REPAIR_STATUS);
       executor.shutdown();
+      try {
+        if (null != activeMetaManager) {
+          activeMetaManager.stop();
+        }
+        cleanTempCheckPointPath(om.getMetadataManager());
+      } catch (Exception exp) {
+        LOG.error("failed to cleanup", exp);
+      }
+      IN_PROGRESS.set(false);
     }
+    return true;
   }
 
-  private void repairActiveDb(OMMetadataManager metadataManager) throws Exception {
+  private void repairActiveDb(
+      OMMetadataManager metadataManager,
+      OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder) throws Exception {
     Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
     Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
     Map<String, OmBucketInfo> oriBucketInfoMap = new HashMap<>();
@@ -105,34 +152,65 @@ public class QuotaRepairTask {
 
     repairCount(nameBucketInfoMap, idBucketInfoMap, metadataManager);
 
-    // update bucket count
-    updateOldBucketQuotaSupport(metadataManager, nameBucketInfoMap);
-    IOzoneManagerLock lock = metadataManager.getLock();
-    try {
-      nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
-          BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
-      try (BatchOperation batchOperation = metadataManager.getStore().initBatchOperation()) {
-        for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
-          if (!isChange(oriBucketInfoMap.get(entry.getKey()), entry.getValue())) {
-            continue;
-          }
-          String bucketKey = metadataManager.getBucketKey(entry.getValue().getVolumeName(),
-              entry.getValue().getBucketName());
-          metadataManager.getBucketTable().putWithBatch(batchOperation, bucketKey, entry.getValue());
-          metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-              CacheValue.get(EPOCH_DEFAULT, entry.getValue()));
-        }
-        metadataManager.getStore().commitBatchOperation(batchOperation);
+    // prepare and submit request to ratis
+    for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
+      OmBucketInfo oriBucketInfo = oriBucketInfoMap.get(entry.getKey());
+      OmBucketInfo updatedBuckedInfo = entry.getValue();
+      boolean oldQuota = oriBucketInfo.getQuotaInBytes() == OLD_QUOTA_DEFAULT
+          || oriBucketInfo.getQuotaInNamespace() == OLD_QUOTA_DEFAULT;
+      if (!(oldQuota || isChange(oriBucketInfo, updatedBuckedInfo))) {
+        continue;
       }
-    } finally {
-      nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
-          BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
+      OzoneManagerProtocolProtos.BucketQuotaCount.Builder bucketCountBuilder
+          = OzoneManagerProtocolProtos.BucketQuotaCount.newBuilder();
+      bucketCountBuilder.setVolName(updatedBuckedInfo.getVolumeName());
+      bucketCountBuilder.setBucketName(updatedBuckedInfo.getBucketName());
+      bucketCountBuilder.setDiffUsedBytes(updatedBuckedInfo.getUsedBytes() - oriBucketInfo.getUsedBytes());
+      bucketCountBuilder.setDiffUsedNamespace(
+          updatedBuckedInfo.getUsedNamespace() - oriBucketInfo.getUsedNamespace());
+      bucketCountBuilder.setSupportOldQuota(oldQuota);
+      builder.addBucketCount(bucketCountBuilder.build());
     }
+
+    // update volume to support quota
+    builder.setSupportVolumeOldQuota(true);
+  }
+
+  private OzoneManagerProtocolProtos.OMResponse submitRequest(
+      OzoneManagerProtocolProtos.OMRequest omRequest, ClientId clientId) {
+    try {
+      if (om.isRatisEnabled()) {
+        OzoneManagerRatisServer server = om.getOmRatisServer();
+        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+            .setClientId(clientId)
+            .setServerId(om.getOmRatisServer().getRaftPeerId())
+            .setGroupId(om.getOmRatisServer().getRaftGroupId())
+            .setCallId(runCount.getAndIncrement())
+            .setMessage(Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build();
+        return server.submitRequest(omRequest, raftClientRequest);
+      } else {
+        return om.getOmServerProtocol().submitRequest(
+            null, omRequest);
+      }
+    } catch (ServiceException e) {
+      LOG.error("repair quota count " + omRequest.getCmdType() + " request failed.", e);
+    }
+    return null;
   }
   
   private OMMetadataManager createActiveDBCheckpoint(
       OMMetadataManager omMetaManager, OzoneConfiguration conf) throws IOException {
     // cleanup
+    String parentPath = cleanTempCheckPointPath(omMetaManager);
+
+    // create snapshot
+    DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint(parentPath, true);
+    return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
+  }
+
+  private static String cleanTempCheckPointPath(OMMetadataManager omMetaManager) throws IOException {
     File dbLocation = omMetaManager.getStore().getDbLocation();
     if (dbLocation == null) {
       throw new NullPointerException("db location is null");
@@ -143,10 +221,8 @@ public class QuotaRepairTask {
     }
     File repairTmpPath = Paths.get(tempData, "temp-repair-quota").toFile();
     FileUtils.deleteDirectory(repairTmpPath);
-
-    // create snapshot
-    DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint("temp-repair-quota", true);
-    return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
+    FileUtils.forceMkdir(repairTmpPath);
+    return repairTmpPath.toString();
   }
 
   private void prepareAllBucketInfo(
@@ -171,48 +247,10 @@ public class QuotaRepairTask {
 
   private boolean isChange(OmBucketInfo lBucketInfo, OmBucketInfo rBucketInfo) {
     if (lBucketInfo.getUsedNamespace() != rBucketInfo.getUsedNamespace()
-        || lBucketInfo.getUsedBytes() != rBucketInfo.getUsedBytes()
-        || lBucketInfo.getQuotaInNamespace() != rBucketInfo.getQuotaInNamespace()
-        || lBucketInfo.getQuotaInBytes() != rBucketInfo.getQuotaInBytes()) {
+        || lBucketInfo.getUsedBytes() != rBucketInfo.getUsedBytes()) {
       return true;
     }
     return false;
-  }
-
-  private static void updateOldVolumeQuotaSupport(OMMetadataManager metadataManager) throws IOException {
-    LOG.info("Starting volume quota support update");
-    IOzoneManagerLock lock = metadataManager.getLock();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = metadataManager.getVolumeTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();
-        OmVolumeArgs omVolumeArgs = entry.getValue();
-        if (!(omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
-            || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT)) {
-          continue;
-        }
-        try {
-          lock.acquireReadLock(VOLUME_LOCK, omVolumeArgs.getVolume());
-          boolean isQuotaReset = false;
-          if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInBytes(QUOTA_RESET);
-            isQuotaReset = true;
-          }
-          if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInNamespace(QUOTA_RESET);
-            isQuotaReset = true;
-          }
-          if (isQuotaReset) {
-            metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(entry.getKey()), CacheValue.get(EPOCH_DEFAULT, omVolumeArgs));
-            metadataManager.getVolumeTable().put(entry.getKey(), omVolumeArgs);
-          }
-        } finally {
-          lock.releaseReadLock(VOLUME_LOCK, omVolumeArgs.getVolume());
-        }
-      }
-    }
-    LOG.info("Completed volume quota support update");
   }
   
   private static String buildNamePath(String volumeName, String bucketName) {
@@ -276,24 +314,6 @@ public class QuotaRepairTask {
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
     LOG.info("Completed quota repair counting for all keys, files and directories");
-  }
-
-  private static void updateOldBucketQuotaSupport(
-      OMMetadataManager metadataManager, Map<String, OmBucketInfo> nameBucketInfoMap) {
-    for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
-      if (entry.getValue().getQuotaInBytes() == OLD_QUOTA_DEFAULT
-          || entry.getValue().getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-        OmBucketInfo.Builder builder = entry.getValue().toBuilder();
-        if (entry.getValue().getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
-          builder.setQuotaInBytes(QUOTA_RESET);
-        }
-        if (entry.getValue().getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-          builder.setQuotaInNamespace(QUOTA_RESET);
-        }
-        OmBucketInfo bucketInfo = builder.build();
-        entry.setValue(bucketInfo);
-      }
-    }
   }
 
   private <VALUE> void recalculateUsages(
@@ -426,6 +446,68 @@ public class QuotaRepairTask {
 
     public long getNamespace() {
       return namespace.get();
+    }
+  }
+
+  /**
+   * Repair status for last run.
+   */
+  public static class RepairStatus {
+    private boolean isTriggered = false;
+    private long taskId = 0;
+    private long lastRunStartTime = 0;
+    private long lastRunFinishedTime = 0;
+    private String errorMsg = null;
+    private Map<String, Map<String, Long>> bucketCountDiffMap = new ConcurrentHashMap<>();
+
+    @Override
+    public String toString() {
+      if (!isTriggered) {
+        return "{}";
+      }
+      Map<String, Object> status = new HashMap<>();
+      status.put("taskId", taskId);
+      status.put("lastRunStartTime", lastRunStartTime);
+      status.put("lastRunFinishedTime", lastRunFinishedTime);
+      status.put("errorMsg", errorMsg);
+      status.put("bucketCountDiffMap", bucketCountDiffMap);
+      try {
+        return new ObjectMapper().writeValueAsString(status);
+      } catch (IOException e) {
+        LOG.error("error in generating status", e);
+        return "{}";
+      }
+    }
+
+    public void updateStatus(OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder,
+                             OMMetadataManager metadataManager) {
+      isTriggered = true;
+      lastRunFinishedTime = System.currentTimeMillis();
+      errorMsg = "";
+      bucketCountDiffMap.clear();
+      for (OzoneManagerProtocolProtos.BucketQuotaCount quotaCount : builder.getBucketCountList()) {
+        String bucketKey = metadataManager.getBucketKey(quotaCount.getVolName(), quotaCount.getBucketName());
+        ConcurrentHashMap<String, Long> diffCountMap = new ConcurrentHashMap<>();
+        diffCountMap.put("DiffUsedBytes", quotaCount.getDiffUsedBytes());
+        diffCountMap.put("DiffUsedNamespace", quotaCount.getDiffUsedNamespace());
+        bucketCountDiffMap.put(bucketKey, diffCountMap);
+      }
+    }
+
+    public void updateStatus(String errMsg) {
+      isTriggered = true;
+      lastRunFinishedTime = System.currentTimeMillis();
+      errorMsg = errMsg;
+      bucketCountDiffMap.clear();
+    }
+
+    public void reset(long tskId) {
+      isTriggered = true;
+      taskId = tskId;
+      lastRunStartTime = System.currentTimeMillis();
+      lastRunFinishedTime = 0;
+      errorMsg = "";
+      bucketCountDiffMap.clear();
     }
   }
 }

@@ -24,13 +24,12 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.QUOTA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 
 /**
- * Quota repair for usages action to be triggered during first upgrade.
+ * Quota repair for usages action to be triggered after upgrade.
  */
-@UpgradeActionOm(type = ON_FIRST_UPGRADE_START, feature =
-    QUOTA)
+@UpgradeActionOm(type = ON_FINALIZE, feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   @Override
   public void execute(OzoneManager arg) throws Exception {
@@ -38,6 +37,7 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE,
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT);
     if (enabled) {
+      // just trigger quota repair and status can be checked via CLI
       QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
       quotaRepairTask.repair();
     }
