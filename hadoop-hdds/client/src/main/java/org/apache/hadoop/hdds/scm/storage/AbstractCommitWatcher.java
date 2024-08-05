@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -62,7 +63,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
-  private long totalAckDataLength;
+  private final AtomicLong totalAckDataLength = new AtomicLong();
 
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
@@ -79,13 +80,12 @@ abstract class AbstractCommitWatcher<BUFFER> {
   }
 
   /** @return the total data which has been acknowledged. */
-  synchronized long getTotalAckDataLength() {
-    return totalAckDataLength;
+  long getTotalAckDataLength() {
+    return totalAckDataLength.get();
   }
 
   long addAckDataLength(long acked) {
-    totalAckDataLength += acked;
-    return totalAckDataLength;
+    return totalAckDataLength.addAndGet(acked);
   }
 
   /**
