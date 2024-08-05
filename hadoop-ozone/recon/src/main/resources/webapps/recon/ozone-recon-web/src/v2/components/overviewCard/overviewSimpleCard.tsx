@@ -19,7 +19,17 @@
 import React from 'react';
 import { Card, Col, Row } from 'antd';
 import { Link } from 'react-router-dom';
-import { ClusterOutlined, ContainerOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, FileTextOutlined, FolderOpenOutlined, InboxOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import {
+  ClusterOutlined,
+  ContainerOutlined,
+  DatabaseOutlined,
+  DeleteOutlined,
+  DeploymentUnitOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  InboxOutlined,
+  QuestionCircleOutlined
+} from '@ant-design/icons';
 
 
 // ------------- Types -------------- //
@@ -36,6 +46,23 @@ type OverviewCardProps = {
   linkToUrl?: string;
 }
 
+// ------------- Styles -------------- //
+const defaultIconStyle: React.CSSProperties = {
+  fontSize: '50px',
+  float: 'right'
+};
+const iconStyle: React.CSSProperties = {
+  fontSize: '20px',
+  paddingRight: '4px',
+  float: 'inline-start'
+};
+const cardHeadStyle: React.CSSProperties = { fontSize: '14px' };
+const cardBodyStyle: React.CSSProperties = {
+  padding: '16px',
+  justifyTracks: 'space-between'
+};
+const dataColStyle: React.CSSProperties = { fontSize: '24px' };
+const titleLinkStyle: React.CSSProperties = { fontWeight: 400 }
 
 // Since AntD no longer supports string icon component
 // we are using a utility function to map the strings to
@@ -59,10 +86,7 @@ const IconSelector = ({
 
   const selectIcon = (iconType: string): React.ReactElement => {
     // Setting the default Icon as a question mark in case no match found
-    let ico = <QuestionCircleOutlined style={{
-      fontSize: '50px',
-      float: 'right'
-    }} />
+    let ico = <QuestionCircleOutlined style={defaultIconStyle} />
 
     const found = Object.entries(Icons).find(
       ([k]) => k.toLowerCase() === iconType.toLowerCase()
@@ -89,45 +113,30 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
 
   const titleElement = (linkToUrl)
     ? (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between'
-      }}>
+      <div className='card-title-div'>
         {title}
         <Link
           to={linkToUrl}
-          style={{
-            fontWeight: 400
-          }} >View More</Link>
+          style={titleLinkStyle}>
+          View More
+        </Link>
       </div>)
     : title
 
   return (
     <Card
       size='small'
-      className={'overview-card'}
       loading={loading}
       hoverable={hoverable}
       title={(linkToUrl) ? titleElement : title}
-      headStyle={{
-        fontSize: '14px'
-      }}
-      bodyStyle={{
-        padding: '16px',
-        justifyTracks: 'space-between'
-      }}>
+      headStyle={cardHeadStyle}
+      bodyStyle={cardBodyStyle}>
       <Row
         align='middle'>
         <Col>
-          <IconSelector iconType={icon} style={{
-            fontSize: '20px',
-            paddingRight: '4px',
-            float: 'inline-start'
-          }} />
+          <IconSelector iconType={icon} style={iconStyle} />
         </Col>
-        <Col style={{
-          fontSize: '24px'
-        }}>
+        <Col style={dataColStyle}>
           {data}
         </Col>
       </Row>

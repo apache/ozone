@@ -23,7 +23,6 @@ import { ColumnType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
 
 // ------------- Types -------------- //
-
 type TableData = {
   key: React.Key;
   name: string;
@@ -42,6 +41,19 @@ type OverviewTableCardProps = {
   showHeader?: boolean;
 }
 
+// ------------- Styles -------------- //
+const cardStyle: React.CSSProperties = {
+  height: '100%'
+}
+const cardHeadStyle: React.CSSProperties = {
+  fontSize: '14px'
+}
+const cardBodyStyle: React.CSSProperties = {
+  padding: '16px',
+  justifyTracks: 'space-between'
+}
+
+
 // ------------- Component -------------- //
 const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
   data = '',
@@ -56,10 +68,7 @@ const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
 
   const titleElement = (linkToUrl)
     ? (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between'
-      }}>
+      <div className='card-title-div'>
         {title}
         <Link
           to={linkToUrl}
@@ -76,16 +85,9 @@ const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
       loading={loading}
       hoverable={hoverable}
       title={titleElement}
-      headStyle={{
-        fontSize: '14px'
-      }}
-      bodyStyle={{
-        padding: '16px',
-        justifyTracks: 'space-between'
-      }}
-      style={{
-        height: '100%'
-      }}>
+      headStyle={cardHeadStyle}
+      bodyStyle={cardBodyStyle}
+      style={cardStyle}>
       {
         (data) &&
         <Row gutter={[0, 50]}>

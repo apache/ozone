@@ -38,6 +38,8 @@ import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/ut
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
+import './overview.less';
+
 
 const size = filesize.partial({ round: 1 });
 
