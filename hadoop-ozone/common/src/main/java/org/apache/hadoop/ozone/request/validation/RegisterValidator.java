@@ -15,30 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds;
+package org.apache.hadoop.ozone.request.validation;
 
 import org.apache.hadoop.ozone.Version;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+
 /**
- * Base type for component version enums.
+ * Annotations to register a validator. {@link org.apache.ozone.annotations.RegisterValidatorProcessor}
+ * enforces other annotation to have the following methods:
+ * maxVersion : Returns an enum which implement {@link Version}
+ * requestType: Returns an Enum value.
+ * processingPhase: Returns {@link RequestProcessingPhase}
  */
-public interface ComponentVersion extends Version {
-
-  /**
-   * Returns the description of the version enum value.
-   * @return the description of the version enum value.
-   */
-  String description();
-
-  /**
-   * Returns the value that represents the enum in a protocol message
-   * transferred over the wire.
-   * @return the version associated with the enum value.
-   */
-  int toProtoValue();
-
-  @Override
-  default int getVersion() {
-    return toProtoValue();
-  }
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.ANNOTATION_TYPE)
+public @interface RegisterValidator {
+  String MAX_VERSION_METHOD_NAME = "maxVersion";
+  String REQUEST_TYPE_METHOD_NAME = "requestType";
+  String PROCESSING_PHASE_METHOD_NAME = "processingPhase";
 }

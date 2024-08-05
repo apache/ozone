@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -35,9 +36,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -161,10 +161,10 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
    * @return the validated request
    * @throws OMException if the request is invalid
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.SetAcl
+      requestType = Type.SetAcl,
+      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockSetAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

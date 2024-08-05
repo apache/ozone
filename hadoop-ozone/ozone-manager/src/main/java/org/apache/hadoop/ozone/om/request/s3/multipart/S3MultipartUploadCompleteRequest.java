@@ -32,9 +32,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -55,9 +57,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -709,10 +710,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CompleteMultiPartUpload
+      requestType = Type.CompleteMultiPartUpload,
+      maxVersion = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest
       disallowCompleteMultiPartUploadWithECReplicationConfig(
@@ -741,10 +742,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
    * @return the validated request
    * @throws OMException if the request is invalid
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CompleteMultiPartUpload
+      requestType = Type.CompleteMultiPartUpload,
+      maxVersion = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockMPUCompleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

@@ -28,12 +28,14 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.tools.Diagnostic;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -50,14 +52,11 @@ import java.util.Set;
  * META-INF/services/javax.annotation.processing.Processor file in the module's
  * resources folder.
  */
-@SupportedAnnotationTypes(
-    "org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator")
+@SupportedAnnotationTypes({
+    "org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator",
+    "org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class RequestFeatureValidatorProcessor extends AbstractProcessor {
-
-  public static final String ERROR_CONDITION_IS_EMPTY =
-      "RequestFeatureValidator has an empty condition list. Please define the"
-          + " ValidationCondition in which the validator has to be applied.";
+public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String ERROR_ANNOTATED_ELEMENT_IS_NOT_A_METHOD =
       "RequestFeatureValidator annotation is not applied to a method.";
   public static final String ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC =
@@ -90,21 +89,25 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String VALIDATION_CONTEXT_CLASS_NAME =
       "org.apache.hadoop.ozone.om.request.validation.ValidationContext";
 
-  public static final String ANNOTATION_SIMPLE_NAME = "RequestFeatureValidator";
+  private static final List<String> ANNOTATION_SIMPLE_NAMES = Arrays.asList("OMClientVersionValidator",
+      "OMLayoutVersionValidator");
   public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
   public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =
       "processingPhase";
+  public static final String ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME = "maxClientVersion";
 
   public static final String PROCESSING_PHASE_PRE_PROCESS = "PRE_PROCESS";
   public static final String PROCESSING_PHASE_POST_PROCESS = "POST_PROCESS";
   public static final String ERROR_NO_PROCESSING_PHASE_DEFINED =
       "RequestFeatureValidator has an invalid ProcessingPhase defined.";
 
+  public static final String MAX_CLIENT_VERSION_FUTURE_VERSION = "FUTURE_VERSION";
+
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
       RoundEnvironment roundEnv) {
     for (TypeElement annotation : annotations) {
-      if (!annotation.getSimpleName().contentEquals(ANNOTATION_SIMPLE_NAME)) {
+      if (!ANNOTATION_SIMPLE_NAMES.contains(annotation.getSimpleName().toString())) {
         continue;
       }
       processElements(roundEnv.getElementsAnnotatedWith(annotation));
@@ -172,7 +175,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       ExecutableElement elem, boolean isPreprocessor) {
     if (!isPreprocessor && !elem.getReturnType().toString()
         .equals(OM_RESPONSE_CLASS_NAME)) {
-      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE);
+      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE + " " + elem.getSimpleName());
     }
   }
 
@@ -201,14 +204,12 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     boolean isPreprocessor = false;
     for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
         entry : methodAnnotation.getElementValues().entrySet()) {
-      
-      if (hasInvalidValidationCondition(entry)) {
-        emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
-      }
+
       if (isProcessingPhaseValue(entry)) {
         isPreprocessor = evaluateProcessingPhase(entry);
       }
     }
+
     return isPreprocessor;
   }
 
@@ -223,15 +224,29 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     return false;
   }
 
+  private boolean hasValidMaxClientVersion(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    if (isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME)) {
+      Name maxClientVersion = visit(entry, new MaxClientVersionVisitor());
+      return !maxClientVersion.contentEquals(MAX_CLIENT_VERSION_FUTURE_VERSION);
+    }
+    return false;
+  }
+
   private boolean isProcessingPhaseValue(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
     return isPropertyNamedAs(entry, ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME);
   }
 
-  private boolean hasInvalidValidationCondition(
+  private boolean isMaxClientVersionValue(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    return isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME);
+  }
+
+  private boolean hasValidValidationCondition(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
     return isPropertyNamedAs(entry, ANNOTATION_CONDITIONS_PROPERTY_NAME)
-        && !visit(entry, new ConditionValidator());
+        && visit(entry, new ConditionValidator());
   }
 
   private boolean isPropertyNamedAs(
@@ -250,7 +265,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       extends SimpleAnnotationValueVisitor8<Boolean, Void> {
 
     ConditionValidator() {
-      super(Boolean.TRUE);
+      super(Boolean.FALSE);
     }
 
     @Override
@@ -262,6 +277,18 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       return Boolean.TRUE;
     }
 
+  }
+
+  private static class MaxClientVersionVisitor
+      extends SimpleAnnotationValueVisitor8<Name, Void> {
+
+    MaxClientVersionVisitor() {
+    }
+
+    @Override
+    public Name visitEnumConstant(VariableElement c, Void unused) {
+      return c.getSimpleName();
+    }
   }
 
   private static class ProcessingPhaseVisitor
