@@ -64,6 +64,7 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
@@ -1300,7 +1301,7 @@ public class TestSnapshotDiffManager {
 
     spy.loadJobsOnStartUp();
 
-    // Wait for sometime to make sure that job finishes.
+    // Wait for sometime to make sure that job run.
     attempt(() ->
         verify(spy, atLeast(1))
             .generateSnapshotDiffReport(anyString(), anyString(),
@@ -1308,6 +1309,12 @@ public class TestSnapshotDiffManager {
                 eq(snapshotInfoList.get(1).getName()), eq(false),
                 eq(false)),
         10, TimeDuration.ONE_SECOND, null, null);
+
+    // Wait for the job to finish
+    LambdaTestUtils.await(5000, 1000, () -> {
+      SnapshotDiffJob job = getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1));
+      return DONE.equals(job.getStatus());
+    });
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
