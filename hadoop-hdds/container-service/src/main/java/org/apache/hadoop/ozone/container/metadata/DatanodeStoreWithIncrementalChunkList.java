@@ -32,8 +32,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
-import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.INCREMENTAL_CHUNK_LIST;
 
 /**
  * Constructs a datanode store in accordance with schema version 2, which uses

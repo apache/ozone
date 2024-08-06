@@ -60,6 +60,8 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +87,6 @@ public class BlockOutputStream extends OutputStream {
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
-  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final KeyValue INCREMENTAL_CHUNK_LIST_KV =
       KeyValue.newBuilder().setKey(INCREMENTAL_CHUNK_LIST).build();
   public static final String FULL_CHUNK = "full";
