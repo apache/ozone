@@ -15,7 +15,9 @@
 name: xml-to-md
 
 on:
-  workflow_call:
+  push:
+    branches:
+      - HDDS-11072
 
 jobs:
   xml-to-md:
