@@ -18,15 +18,15 @@
 
 import React from 'react';
 
-import { Layout } from 'antd';
-import './app.less';
+import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
-import { routes } from './routes';
-import { MakeRouteWithSubRoutes } from './makeRouteWithSubRoutes';
+import { routes } from '@/routes';
+import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
+import './app.less';
 
 const {
   Header, Content, Footer
@@ -34,12 +34,16 @@ const {
 
 interface IAppState {
   collapsed: boolean;
+  enableNewUI: boolean;
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
   constructor(props = {}) {
     super(props);
-    this.state = { collapsed: false };
+    this.state = {
+      collapsed: false,
+      enableNewUI: false
+    };
   }
 
   onCollapse = (collapsed: boolean) => {
@@ -50,14 +54,23 @@ class App extends React.Component<Record<string, object>, IAppState> {
     const { collapsed } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
+
     return (
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
           <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
           <Layout className={layoutClass}>
             <Header>
-              <div style={{ margin: '16px 0' }}>
+              <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
+                <AntDSwitch
+                  disabled={true}
+                  checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                  onChange={(checked: boolean) => {
+                    this.setState({
+                      enableNewUI: checked
+                    });
+                  }} />
               </div>
             </Header>
             <Content style={{ margin: '0 16px 0', overflow: 'initial' }}>

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -76,6 +77,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   // service, not the client.
   private final ClientId clientId = ClientId.randomId();
   private final Duration expireThreshold;
+  private final Duration leaseThreshold;
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
@@ -95,6 +97,18 @@ public class OpenKeyCleanupService extends BackgroundService {
         OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.expireThreshold = Duration.ofMillis(expireMillis);
+
+    long leaseHardMillis = conf.getTimeDuration(OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT,
+        OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+    long leaseSoftMillis = conf.getTimeDuration(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT,
+        OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+
+    if (leaseHardMillis < leaseSoftMillis) {
+      String msg = "Hard lease limit cannot be less than Soft lease limit. "
+          + "LeaseHardLimit: " + leaseHardMillis +  " LeaseSoftLimit: " + leaseSoftMillis;
+      throw new IllegalArgumentException(msg);
+    }
+    this.leaseThreshold = Duration.ofMillis(leaseHardMillis);
 
     this.cleanupLimitPerTask = conf.getInt(
         OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
@@ -178,13 +192,12 @@ public class OpenKeyCleanupService extends BackgroundService {
       if (!shouldRun()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
-
       runCount.incrementAndGet();
       long startTime = Time.monotonicNow();
       final ExpiredOpenKeys expiredOpenKeys;
       try {
         expiredOpenKeys = keyManager.getExpiredOpenKeys(expireThreshold,
-            cleanupLimitPerTask, bucketLayout);
+            cleanupLimitPerTask, bucketLayout, leaseThreshold);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in next interval", e);
         return BackgroundTaskResult.EmptyTaskResult.newResult();

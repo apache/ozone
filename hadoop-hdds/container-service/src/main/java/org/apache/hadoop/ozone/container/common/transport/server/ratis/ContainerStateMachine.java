@@ -429,25 +429,45 @@ public class ContainerStateMachine extends BaseStateMachine {
     // once the token is verified, clear it from the proto
     final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
         .clearEncodedToken();
-    if (proto.getCmdType() == Type.WriteChunk) {
+    boolean blockAlreadyFinalized = false;
+    if (proto.getCmdType() == Type.PutBlock) {
+      blockAlreadyFinalized = shouldRejectRequest(proto.getPutBlock().getBlockData().getBlockID());
+    } else if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
-      Preconditions.checkArgument(write.hasData());
-      Preconditions.checkArgument(!write.getData().isEmpty());
-      // skipping the data field as it is already set in statemachine data proto
-      final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
-          .clearData();
-      protoBuilder.setWriteChunk(commitWriteChunkProto)
-          .setPipelineID(gid.getUuid().toString())
-          .setTraceID(proto.getTraceID());
+      blockAlreadyFinalized = shouldRejectRequest(write.getBlockID());
+      if (!blockAlreadyFinalized) {
+        Preconditions.checkArgument(write.hasData());
+        Preconditions.checkArgument(!write.getData().isEmpty());
+        final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
+            .clearData();
+        protoBuilder.setWriteChunk(commitWriteChunkProto)
+            .setPipelineID(gid.getUuid().toString())
+            .setTraceID(proto.getTraceID());
 
-      builder.setStateMachineData(write.getData());
+        builder.setStateMachineData(write.getData());
+      }
+    } else if (proto.getCmdType() == Type.FinalizeBlock) {
+      containerController.addFinalizedBlock(proto.getContainerID(),
+          proto.getFinalizeBlock().getBlockID().getLocalID());
     }
-    final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
-    TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
-        .setLogData(containerCommandRequestProto.toByteString())
-        .build();
-    metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
-    return txnContext;
+
+    if (blockAlreadyFinalized) {
+      TransactionContext transactionContext = builder.build();
+      transactionContext.setException(new StorageContainerException("Block already finalized",
+          ContainerProtos.Result.BLOCK_ALREADY_FINALIZED));
+      return transactionContext;
+    } else {
+      final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
+      TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
+          .setLogData(containerCommandRequestProto.toByteString())
+          .build();
+      metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
+      return txnContext;
+    }
+  }
+
+  private boolean shouldRejectRequest(ContainerProtos.DatanodeBlockID blockID) {
+    return containerController.isFinalizedBlockExist(blockID.getContainerID(), blockID.getLocalID());
   }
 
   private static ContainerCommandRequestProto getContainerCommandRequestProto(

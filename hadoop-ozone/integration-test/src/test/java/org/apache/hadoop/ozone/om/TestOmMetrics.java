@@ -360,7 +360,7 @@ public class TestOmMetrics {
 
     omMetrics = getMetrics("OMMetrics");
 
-    assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 8, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
@@ -426,7 +426,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeyOps + 28, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 31, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
@@ -856,6 +856,11 @@ public class TestOmMetrics {
 
     try {
       writeClient.initiateMultipartUpload(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.listOpenFiles("", 100, "");
     } catch (IOException ignored) {
     }
   }
