@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -228,6 +229,7 @@ public class TestOzoneContainerWithTLS {
       if (client != null) {
         clientManager.releaseClient(client, true);
       }
+      IOUtils.closeQuietly(clientManager);
     }
   }
 
@@ -238,16 +240,21 @@ public class TestOzoneContainerWithTLS {
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
         containerTokenEnabled);
     OzoneContainer container = createAndStartOzoneContainerInstance();
-    try (DNContainerOperationClient dnClient = new DNContainerOperationClient(
-        conf, caClient, keyClient)) {
-      XceiverClientSpi client =
-          dnClient.getXceiverClientManager().acquireClient(pipeline);
+    DNContainerOperationClient dnClient = null;
+    XceiverClientSpi client = null;
+    try {
+      dnClient = new DNContainerOperationClient(conf, caClient, keyClient);
+      client = dnClient.getXceiverClientManager().acquireClient(pipeline);
       long containerId = createAndCloseContainer(client, containerTokenEnabled);
       dnClient.getContainerMerkleTree(containerId, dn);
     } finally {
       if (container != null) {
         container.stop();
       }
+      if (client != null) {
+        dnClient.getXceiverClientManager().releaseClient(client, true);
+      }
+      IOUtils.closeQuietly(dnClient);
     }
   }
 
@@ -256,10 +263,11 @@ public class TestOzoneContainerWithTLS {
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
     OzoneContainer container = createAndStartOzoneContainerInstance();
     ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
-
-    try (XceiverClientManager clientManager =
-             new XceiverClientManager(conf, scmClientConf, aClientTrustManager())) {
-      XceiverClientSpi client = clientManager.acquireClient(pipeline);
+    XceiverClientManager clientManager =
+        new XceiverClientManager(conf, scmClientConf, aClientTrustManager());
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClient(pipeline);
       long containerId = createAndCloseContainer(client, true);
       TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), keyClient);
       String containerToken = encode(tokenHelper.getContainerToken(
@@ -271,12 +279,17 @@ public class TestOzoneContainerWithTLS {
       assertEquals(response.getContainerMerkleTree(), ByteString.EMPTY);
 
       // Getting container merkle tree with invalid container token
-      assertThrows(IOException.class, () -> ContainerProtocolCalls.getContainerMerkleTree(client,
-          containerId, "invalidContainerToken"));
+      XceiverClientSpi finalClient = client;
+      assertThrows(IOException.class, () -> ContainerProtocolCalls.getContainerMerkleTree(
+          finalClient, containerId, "invalidContainerToken"));
     } finally {
       if (container != null) {
         container.stop();
       }
+      if (client != null) {
+        clientManager.releaseClient(client, true);
+      }
+      IOUtils.closeQuietly(clientManager);
     }
   }
 
@@ -342,6 +355,7 @@ public class TestOzoneContainerWithTLS {
       if (container != null) {
         container.stop();
       }
+      IOUtils.closeQuietly(clientManager);
     }
   }
 
