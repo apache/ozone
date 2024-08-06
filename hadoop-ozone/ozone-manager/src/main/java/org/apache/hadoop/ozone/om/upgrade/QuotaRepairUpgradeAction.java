@@ -21,7 +21,11 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.QUOTA;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
@@ -31,6 +35,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
  */
 @UpgradeActionOm(type = ON_FINALIZE, feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
+  private static final Logger LOG = LoggerFactory.getLogger(QuotaRepairUpgradeAction.class);
   @Override
   public void execute(OzoneManager arg) throws Exception {
     boolean enabled = arg.getConfiguration().getBoolean(
@@ -38,8 +43,14 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT);
     if (enabled) {
       // just trigger quota repair and status can be checked via CLI
-      QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
-      quotaRepairTask.repair();
+      try {
+        arg.checkLeaderStatus();
+        QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
+        quotaRepairTask.repair();
+      } catch (OMNotLeaderException | OMLeaderNotReadyException ex) {
+        // on leader node, repair will be triggered where finalize is called
+        LOG.warn("Unable to start quota repair as this is not a leader node");
+      }
     }
   }
 }
