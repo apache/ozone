@@ -29,6 +29,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -79,12 +81,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
       ConfigurationSource ozoneConf) {
-    return newXceiverClientRatis(pipeline, ozoneConf, null);
+    return newXceiverClientRatis(pipeline, ozoneConf, null, null);
   }
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf, ClientTrustManager trustManager) {
+      ConfigurationSource ozoneConf, ClientTrustManager trustManager, ErrorInjector errorInjector) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -93,7 +95,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         SecurityConfig(ozoneConf), trustManager);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType),
-        retryPolicy, tlsConfig, ozoneConf);
+        retryPolicy, tlsConfig, ozoneConf, errorInjector);
   }
 
   private final Pipeline pipeline;
@@ -110,13 +112,14 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       = XceiverClientManager.getXceiverClientMetrics();
   private final RaftProtos.ReplicationLevel watchType;
   private final int majority;
+  private final ErrorInjector errorInjector;
 
   /**
    * Constructs a client.
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      ConfigurationSource configuration) {
+      ConfigurationSource configuration, ErrorInjector errorInjector) {
     super();
     this.pipeline = pipeline;
     this.majority = (pipeline.getReplicationConfig().getRequiredNodes() / 2) + 1;
@@ -142,6 +145,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       LOG.trace("new XceiverClientRatis for pipeline " + pipeline.getId(),
           new Throwable("TRACE"));
     }
+    this.errorInjector = errorInjector;
   }
 
   private long updateCommitInfosMap(RaftClientReply reply, RaftProtos.ReplicationLevel level) {
@@ -248,6 +252,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
+    if (errorInjector != null) {
+      RaftClientReply response = errorInjector.getResponse(request, getClient().getId(), pipeline);
+      if (response != null) {
+        return CompletableFuture.completedFuture(response);
+      }
+    }
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
         () -> {
