@@ -145,11 +145,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @param count The maximum number of expired open keys to return.
    * @param expireThreshold The threshold of open key expiration age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
+   * @param leaseThreshold The threshold of hsync key.
    * @return the expired open keys.
    * @throws IOException
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
-      BucketLayout bucketLayout) throws IOException;
+      BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
 
   /**
    * Returns the MPU infos of up to {@code count} whose age is greater

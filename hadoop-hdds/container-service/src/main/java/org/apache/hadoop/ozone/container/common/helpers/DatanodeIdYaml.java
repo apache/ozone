@@ -57,7 +57,7 @@ public final class DatanodeIdYaml {
   }
 
   /**
-   * Creates a yaml file using DatnodeDetails. This method expects the path
+   * Creates a yaml file using DatanodeDetails. This method expects the path
    * validation to be performed by the caller.
    *
    * @param datanodeDetails {@link DatanodeDetails}

@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.util.CacheMetrics;
+import org.apache.hadoop.ozone.util.CacheMetrics;
 import jakarta.annotation.Nonnull;
 
 import java.io.IOException;

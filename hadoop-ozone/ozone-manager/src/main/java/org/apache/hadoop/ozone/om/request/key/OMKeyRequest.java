@@ -234,7 +234,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /* Optimize ugi lookup for RPC operations to avoid a trip through
    * UGI.getCurrentUser which is synch'ed.
    */
-  private UserGroupInformation getRemoteUser() throws IOException {
+  protected UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }

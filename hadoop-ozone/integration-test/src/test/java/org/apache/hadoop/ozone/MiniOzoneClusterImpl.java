@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -91,6 +92,8 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,6 +126,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
+  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -347,6 +351,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return true;
       }
     }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
+    // FUTURE_VERSION (-1) is not a valid version for a datanode, using it as a marker when version is not overridden
+    if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
+    }
+    if (dnCurrentVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
+    }
   }
 
   @Override
@@ -734,6 +748,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected List<HddsDatanodeService> createHddsDatanodes()
         throws IOException {
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
+
+      // Override default datanode initial and current version if necessary
+      overrideDatanodeVersions(dnInitialVersion, dnCurrentVersion);
+
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
 

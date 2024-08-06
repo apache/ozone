@@ -245,6 +245,14 @@ public class TestKeyValueHandler {
         .dispatchRequest(handler, getSmallFileRequest, container, null);
     verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
+
+    // Test Finalize Block Request handling
+    ContainerCommandRequestProto finalizeBlock =
+        getDummyCommandRequestProto(ContainerProtos.Type.FinalizeBlock);
+    KeyValueHandler
+        .dispatchRequest(handler, finalizeBlock, container, null);
+    verify(handler, times(1)).handleFinalizeBlock(
+        any(ContainerCommandRequestProto.class), any());
   }
 
   @Test

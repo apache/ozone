@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 
 import com.codahale.metrics.Timer;
@@ -111,6 +110,7 @@ public class GeneratorDatanode extends BaseGenerator {
   private int overlap;
 
   private ChunkManager chunkManager;
+  private BlockManagerImpl blockManager;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
 
@@ -133,7 +133,7 @@ public class GeneratorDatanode extends BaseGenerator {
 
     config = createOzoneConfiguration();
 
-    BlockManager blockManager = new BlockManagerImpl(config);
+    blockManager = new BlockManagerImpl(config);
     chunkManager = ChunkManagerFactory
         .createChunkManager(config, blockManager, null);
 
@@ -286,7 +286,7 @@ public class GeneratorDatanode extends BaseGenerator {
           writtenBytes += currentChunkSize;
         }
 
-        BlockManagerImpl.persistPutBlock(container, blockData, config, true);
+        blockManager.persistPutBlock(container, blockData, true);
 
       }
 

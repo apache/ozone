@@ -1534,7 +1534,7 @@ public final class OMRequestTestUtils {
               OMRequestTestUtils.createOmDirectoryInfo(pathElement, ++objectId,
                       parentId);
       OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
-              volumeName, bucketName, txnID, omMetaMgr);
+              volumeName, bucketName, ++txnID, omMetaMgr);
       parentId = omDirInfo.getObjectID();
     }
     return parentId;

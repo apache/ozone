@@ -44,6 +44,7 @@ public final class OzonePathCapabilities {
     case CommonPathCapabilities.FS_ACLS:
     case CommonPathCapabilities.FS_CHECKSUMS:
     case CommonPathCapabilities.FS_SNAPSHOTS:
+    case CommonPathCapabilities.LEASE_RECOVERABLE:
       return true;
     default:
       return false;

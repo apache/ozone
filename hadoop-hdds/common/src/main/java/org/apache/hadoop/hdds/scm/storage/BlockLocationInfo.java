@@ -40,6 +40,8 @@ public class BlockLocationInfo {
 
   // PartNumber is set for Multipart upload Keys.
   private int partNumber;
+  // The block is under construction. Apply to hsynced file last block.
+  private boolean underConstruction;
 
   protected BlockLocationInfo(Builder builder) {
     this.blockID = builder.blockID;
@@ -109,6 +111,14 @@ public class BlockLocationInfo {
 
   public int getPartNumber() {
     return partNumber;
+  }
+
+  public void setUnderConstruction(boolean uc) {
+    this.underConstruction = uc;
+  }
+
+  public boolean isUnderConstruction() {
+    return this.underConstruction;
   }
 
   /**

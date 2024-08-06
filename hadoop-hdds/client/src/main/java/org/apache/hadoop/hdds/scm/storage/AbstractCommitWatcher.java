@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -62,7 +63,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
-  private long totalAckDataLength;
+  private final AtomicLong totalAckDataLength = new AtomicLong();
 
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
@@ -80,12 +81,11 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   /** @return the total data which has been acknowledged. */
   long getTotalAckDataLength() {
-    return totalAckDataLength;
+    return totalAckDataLength.get();
   }
 
   long addAckDataLength(long acked) {
-    totalAckDataLength += acked;
-    return totalAckDataLength;
+    return totalAckDataLength.addAndGet(acked);
   }
 
   /**
@@ -141,8 +141,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     try {
       final XceiverClientReply reply = client.watchForCommit(commitIndex);
       f.complete(reply);
-      final CompletableFuture<XceiverClientReply> removed
-          = replies.remove(commitIndex);
+      final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
       Preconditions.checkState(removed == f);
 
       final long index = reply != null ? reply.getLogIndex() : 0;
@@ -166,7 +165,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
   /** Release the buffers for the given index. */
   abstract void releaseBuffers(long index);
 
-  void adjustBuffers(long commitIndex) {
+  synchronized void adjustBuffers(long commitIndex) {
     commitIndexMap.keySet().stream()
         .filter(p -> p <= commitIndex)
         .forEach(this::releaseBuffers);

@@ -244,6 +244,7 @@ public final class OmUtils {
     case ListKeysLight:
     case ListTrash:
     case ServiceList:
+    case ListOpenFiles:
     case ListMultiPartUploadParts:
     case GetFileStatus:
     case LookupFile:

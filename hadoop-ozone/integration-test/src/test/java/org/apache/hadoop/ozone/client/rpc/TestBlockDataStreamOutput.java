@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -28,6 +30,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -45,6 +48,7 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -70,6 +74,7 @@ public class TestBlockDataStreamOutput {
   private static String volumeName;
   private static String bucketName;
   private static String keyString;
+  private static final int DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue();
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -105,6 +110,7 @@ public class TestBlockDataStreamOutput {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
+        .setDatanodeCurrentVersion(DN_OLD_VERSION)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -267,6 +273,27 @@ public class TestBlockDataStreamOutput {
     key.write(ByteBuffer.wrap(data));
     key.close();
     assertEquals(dataLength, stream.getTotalAckDataLength());
+  }
+
+  @Test
+  public void testDatanodeVersion() throws Exception {
+    // Verify all DNs internally have versions set correctly
+    List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
+    for (HddsDatanodeService dn : dns) {
+      DatanodeDetails details = dn.getDatanodeDetails();
+      assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+    }
+
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
+    KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
+    BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
+
+    // Now check 3 DNs in a random pipeline returns the correct DN versions
+    List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
+    for (DatanodeDetails details : streamDnDetails) {
+      assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+    }
   }
 
 }

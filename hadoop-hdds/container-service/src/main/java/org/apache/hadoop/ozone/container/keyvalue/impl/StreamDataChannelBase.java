@@ -130,11 +130,11 @@ abstract class StreamDataChannelBase
 
   final int writeFileChannel(ByteBuffer src) throws IOException {
     try {
-      final long startTime = Time.monotonicNow();
+      final long startTime = Time.monotonicNowNanos();
       final int writeBytes = getChannel().write(src);
       metrics.incContainerBytesStats(getType(), writeBytes);
       containerData.updateWriteStats(writeBytes, false);
-      metrics.incContainerOpsLatencies(getType(), Time.monotonicNow() - startTime);
+      metrics.incContainerOpsLatencies(getType(), Time.monotonicNowNanos() - startTime);
       return writeBytes;
     } catch (IOException e) {
       checkVolume();
