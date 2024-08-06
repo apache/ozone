@@ -20,7 +20,76 @@ on:
       - test-branch-2
 
 jobs:
+  build:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        java: [ 8 ]
+      fail-fast: false
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Cache for npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+      - name: Setup java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+      - name: Run a full build
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+      - name: Store binaries for tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-bin
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store source tarball for compilation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-src
+          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
   xml-to-md:
+    needs:
+      - build
     runs-on: ubuntu-20.04
 
     steps:
