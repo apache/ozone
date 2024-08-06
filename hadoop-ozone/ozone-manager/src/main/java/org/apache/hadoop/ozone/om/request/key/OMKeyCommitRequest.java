@@ -418,8 +418,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, isRecovery, omKeyInfo);
 
     if (!isHSync) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
-          exception, getOmRequest().getUserInfo()));
+      markForAudit(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+              exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
     }
@@ -561,6 +561,40 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Cluster does not have the hsync support "
             + "feature finalized yet, but the request contains"
             + " an hsync field. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates key commit requests.
+   * We do not want to allow clients to perform lease recovery requests
+   * until the cluster has finalized the HBase support feature.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitKey
+  )
+
+  public static OMRequest disallowRecovery(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.HBASE_SUPPORT)) {
+      CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
+      boolean isRecovery = commitKeyRequest.hasRecovery() &&
+          commitKeyRequest.getRecovery();
+      if (isRecovery) {
+        throw new OMException("Cluster does not have the HBase support "
+            + "feature finalized yet, but the request contains"
+            + " an recovery field. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }

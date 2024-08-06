@@ -226,15 +226,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
-    // Audit volume ref count update
-    if (decVolumeRefCount) {
-      auditLog(ozoneManager.getAuditLogger(),
-          buildAuditMessage(OMAction.UPDATE_VOLUME,
-              buildVolumeAuditMap(volumeName),
-              exception, getOmRequest().getUserInfo()));
-    }
     // Audit tenant deletion
-    auditLog(ozoneManager.getAuditLogger(),
+    markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.DELETE_TENANT,
             auditMap, exception, getOmRequest().getUserInfo()));
 

@@ -28,7 +28,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
@@ -163,9 +162,8 @@ public class GrpcOzoneManagerServer {
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
-        KeyStoresFactory factory = caClient.getServerKeyStoresFactory();
         SslContextBuilder sslClientContextBuilder =
-            SslContextBuilder.forServer(factory.getKeyManagers()[0]);
+            SslContextBuilder.forServer(caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder,
             SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,

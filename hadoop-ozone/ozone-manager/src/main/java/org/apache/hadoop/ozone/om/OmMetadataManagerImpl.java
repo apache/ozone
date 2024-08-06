@@ -22,7 +22,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -108,6 +107,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -561,7 +562,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         rocksDBConfiguration.setSyncOption(true);
       }
 
-      this.store = loadDB(configuration, metaDir);
+      int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
+          OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
+
+      this.store = loadDB(configuration, metaDir, Optional.of(maxOpenFiles));
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -571,8 +575,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
+    return loadDB(configuration, metaDir, Optional.empty());
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, Optional<Integer> maxOpenFiles)
+      throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty(), Optional.empty(), true, true);
+        java.util.Optional.empty(), maxOpenFiles, true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -1900,7 +1909,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
              mpuInfoTableIterator = getMultipartInfoTable().iterator()) {
 
       final long expiredCreationTimestamp =
-          Instant.now().minus(expireThreshold).toEpochMilli();
+          expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
       ExpiredMultipartUploadInfo.Builder builder =
           ExpiredMultipartUploadInfo.newBuilder();

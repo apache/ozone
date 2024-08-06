@@ -594,6 +594,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.read.threadpool</name>
+    <value>10</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for OM service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for Ozone Manager.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
@@ -849,17 +858,6 @@
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read threshold to use memory mapped buffers.
-    </description>
-  </property>
-  <property>
-    <name>ozone.incremental.chunk.list</name>
-    <value>true</value>
-    <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
-    <description>
-      By default, a writer client sends full chunk list of a block when it
-      sends PutBlock requests. Changing this configuration to true will send
-      only incremental chunk list which reduces metadata overhead and improves
-      hsync performance.
     </description>
   </property>
   <property>
@@ -2930,7 +2928,7 @@
   </property>
   <property>
     <name>hdds.datanode.handler.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The number of RPC handler threads for Datanode client
@@ -4243,6 +4241,20 @@
       held.  The actual number of cached instance could exceed this limit if
       more than this number of snapshot instances are still in-use by snapDiff
       or other tasks.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.db.max.open.files</name>
+    <value>-1</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files that OM RocksDB will open simultaneously
+      Essentially sets `max_open_files` config for the active OM RocksDB instance.
+      This will limit the total number of files opened by OM db.
+      Default is -1 which is unlimited and gives max performance.
+      If you are certain that your ulimit will always be bigger than number of files in the database,
+      set max_open_files to -1, or else set it to a value lesser than or equal to ulimit.
     </description>
   </property>
 

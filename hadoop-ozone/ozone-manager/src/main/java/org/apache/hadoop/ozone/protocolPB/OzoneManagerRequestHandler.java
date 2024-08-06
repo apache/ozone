@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -144,6 +145,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -160,11 +162,11 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -402,10 +404,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    return captureLatencyNs(
-        impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
-        () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
-            "omClientResponse returned by validateAndUpdateCache cannot be null"));
+    try {
+      OMClientResponse omClientResponse = captureLatencyNs(
+          impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
+          () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
+              "omClientResponse returned by validateAndUpdateCache cannot be null"));
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+      return omClientResponse;
+    } catch (Throwable th) {
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), termIndex, th);
+      throw th;
+    }
   }
 
   @VisibleForTesting
@@ -914,6 +923,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   private ListOpenFilesResponse listOpenFiles(ListOpenFilesRequest req,
                                               int clientVersion)
       throws IOException {

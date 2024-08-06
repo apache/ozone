@@ -15,11 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.util;
+package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 

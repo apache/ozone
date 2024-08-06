@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 
 import java.util.ArrayList;
 import java.util.Arrays;

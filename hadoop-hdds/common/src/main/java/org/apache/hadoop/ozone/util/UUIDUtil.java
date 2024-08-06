@@ -16,8 +16,31 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.util;
+
+import java.security.SecureRandom;
+
 /**
- * This package contains class that wrap private classes in hadoop-common
- * util.
+ * Helper methods to deal with random UUIDs.
  */
-package org.apache.hadoop.util;
+public final class UUIDUtil {
+
+  private UUIDUtil() {
+
+  }
+
+  private static final ThreadLocal<SecureRandom> GENERATOR =
+      ThreadLocal.withInitial(SecureRandom::new);
+
+  public static byte[] randomUUIDBytes() {
+    final byte[] bytes = new byte[16];
+    GENERATOR.get().nextBytes(bytes);
+    // See RFC 4122 section 4.4
+    bytes[6]  &= 0x0f;
+    bytes[6]  |= 0x40;
+    bytes[8]  &= 0x3f;
+    bytes[8]  |= 0x80;
+    return bytes;
+  }
+
+}

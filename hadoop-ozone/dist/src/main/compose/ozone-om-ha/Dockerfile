@@ -20,13 +20,14 @@ ARG OZONE_RUNNER_VERSION
 FROM ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
 
 # Install ssh
-RUN sudo yum install -y openssh-clients openssh-server
+RUN sudo dnf install -y openssh-clients openssh-server
 
 RUN sudo ssh-keygen -A
 RUN sudo mkdir -p /run/sshd
 RUN sudo sed -i "s/.*UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config
 RUN sudo sed -i "s/.*PermitUserEnvironment.*/PermitUserEnvironment yes/g" /etc/ssh/sshd_config
 RUN sudo sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+RUN sudo rm -f /etc/nologin /var/run/nologin
 
 #/opt/hadoop is mounted, we can't use it as a home
 RUN sudo usermod -d /opt hadoop
@@ -38,6 +39,8 @@ RUN sudo chmod 700 /opt/.ssh
 
 RUN echo "export JAVA_HOME=$JAVA_HOME" | sudo sh -c 'cat >> /etc/profile'
 RUN echo "JAVA_HOME=$JAVA_HOME" | sh -c 'cat >> /opt/.ssh/environment'
+RUN echo "OZONE_CONF_DIR=$OZONE_CONF_DIR" >> /opt/.ssh/environment
+RUN echo "OZONE_LOG_DIR=$OZONE_LOG_DIR" >> /opt/.ssh/environment
 
 # Install required robot framework libraries
 RUN sudo pip3 install robotframework-sshlibrary
