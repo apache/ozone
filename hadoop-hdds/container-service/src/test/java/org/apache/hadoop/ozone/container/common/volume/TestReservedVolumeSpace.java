@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -30,6 +32,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -177,6 +181,28 @@ public class TestReservedVolumeSpace {
     long reservedFromVolume = hddsVolume.getVolumeInfo().get().getReservedInBytes();
     assertEquals(500, reservedFromVolume);
   }
+
+  @Test
+  public void testMinFreeSpaceCalculator() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    double minSpace = 100.0;
+    conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        minSpace, StorageUnit.BYTES);
+    VolumeUsage.MinFreeSpaceCalculator calc = new VolumeUsage.MinFreeSpaceCalculator(conf);
+    long capacity = 1000;
+    assertEquals(minSpace, calc.get(capacity));
+
+    conf.setFloat(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.01f);
+    calc = new VolumeUsage.MinFreeSpaceCalculator(conf);
+    // default is 5GB
+    assertEquals(5L * 1024 * 1024 * 1024, calc.get(capacity));
+
+    // capacity * 1% = 10
+    conf.unset(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+    calc = new VolumeUsage.MinFreeSpaceCalculator(conf);
+    assertEquals(10, calc.get(capacity));
+  }
+
 
   private long getExpectedDefaultReserved(HddsVolume volume) {
     long totalCapacity = volume.getVolumeInfo().get().getUsageForTesting().realUsage().getCapacity();

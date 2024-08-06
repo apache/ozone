@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -30,6 +31,7 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.fs.ByteBufferReadable;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
@@ -44,7 +46,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OzoneFSInputStream extends FSInputStream
-    implements ByteBufferReadable, CanUnbuffer {
+    implements ByteBufferReadable, CanUnbuffer, ByteBufferPositionedReadable {
 
   private final InputStream inputStream;
   private final Statistics statistics;
@@ -159,6 +161,51 @@ public class OzoneFSInputStream extends FSInputStream
   public void unbuffer() {
     if (inputStream instanceof CanUnbuffer) {
       ((CanUnbuffer) inputStream).unbuffer();
+    }
+  }
+
+  /**
+   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param position offset
+   * @return the number of bytes read, possibly zero, or -1 if
+   *         reach end-of-stream
+   * @throws IOException if there is some error performing the read
+   */
+  @Override
+  public int read(long position, ByteBuffer buf) throws IOException {
+    if (!buf.hasRemaining()) {
+      return 0;
+    }
+    long oldPos = this.getPos();
+    int bytesRead;
+    try {
+      ((Seekable) inputStream).seek(position);
+      bytesRead = ((ByteBufferReadable) inputStream).read(buf);
+    } catch (EOFException e) {
+      // Either position is negative or it has reached EOF
+      return -1;
+    } finally {
+      ((Seekable) inputStream).seek(oldPos);
+    }
+    return bytesRead;
+  }
+
+  /**
+   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param position offset
+   * @return void
+   * @throws IOException if there is some error performing the read
+   * @throws EOFException if end of file reached before reading fully
+   */
+  @Override
+  public void readFully(long position, ByteBuffer buf) throws IOException {
+    int bytesRead;
+    for (int readCount = 0; buf.hasRemaining(); readCount += bytesRead) {
+      bytesRead = this.read(position + (long)readCount, buf);
+      if (bytesRead < 0) {
+        // Still buffer has space to read but stream has already reached EOF
+        throw new EOFException("End of file reached before reading fully.");
+      }
     }
   }
 }

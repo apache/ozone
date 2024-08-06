@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -214,6 +215,28 @@ public final class ContainerCommandResponseBuilders {
   }
 
   /**
+   * Gets a response for the WriteChunk RPC.
+   * @param msg - ContainerCommandRequestProto
+   * @return - ContainerCommandResponseProto
+   */
+  public static ContainerCommandResponseProto getWriteChunkResponseSuccess(
+      ContainerCommandRequestProto msg, BlockData blockData) {
+
+    WriteChunkResponseProto.Builder writeChunk =
+        WriteChunkResponseProto.newBuilder();
+    if (blockData != null) {
+      writeChunk.setCommittedBlockLength(
+          getCommittedBlockLengthResponseBuilder(
+              blockData.getSize(), blockData.getBlockID()));
+
+    }
+    return getSuccessResponseBuilder(msg)
+        .setCmdType(Type.WriteChunk)
+        .setWriteChunk(writeChunk)
+        .build();
+  }
+
+  /**
    * Gets a response to the read small file call.
    * @param request - Msg
    * @param dataBuffers  - Data
@@ -307,6 +330,18 @@ public final class ContainerCommandResponseBuilders {
 
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getFinalizeBlockResponse(
+      ContainerCommandRequestProto msg, BlockData data) {
+
+    ContainerProtos.FinalizeBlockResponseProto.Builder blockData =
+        ContainerProtos.FinalizeBlockResponseProto.newBuilder()
+        .setBlockData(data);
+
+    return getSuccessResponseBuilder(msg)
+        .setFinalizeBlock(blockData)
         .build();
   }
 

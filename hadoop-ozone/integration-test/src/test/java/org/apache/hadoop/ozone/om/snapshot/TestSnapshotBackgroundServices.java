@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -572,7 +573,7 @@ public class TestSnapshotBackgroundServices {
       } catch (IOException e) {
         fail();
       }
-      return snapshotInfo.isSstFiltered();
+      return SstFilteringService.isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo);
     }, 1000, 10000);
   }
 

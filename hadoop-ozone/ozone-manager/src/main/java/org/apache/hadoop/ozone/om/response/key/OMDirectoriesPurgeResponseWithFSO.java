@@ -62,17 +62,19 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private boolean isRatisEnabled;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
+  private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo) {
+      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;
     this.volBucketInfoMap = volBucketInfoMap;
     this.fromSnapshotInfo = fromSnapshotInfo;
+    this.openKeyInfoMap = openKeyInfoMap;
   }
 
   @Override
@@ -163,6 +165,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
+      }
+
+      if (!openKeyInfoMap.isEmpty()) {
+        for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+              batchOperation, entry.getKey(), entry.getValue());
+        }
       }
 
       // Delete the visited directory from deleted directory table

@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
@@ -52,8 +53,8 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       @Nonnull List<OmKeyInfo> keyDeleteList,
       @Nonnull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
-      @Nonnull List<String> dbOpenKeys) {
-    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo, dbOpenKeys);
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
+    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo, openKeyInfoMap);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }
@@ -95,9 +96,11 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
         omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
             getOmBucketInfo().getBucketName()), getOmBucketInfo());
 
-    for (String dbOpenKey : getDbOpenKeys()) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, dbOpenKey);
+    if (!getOpenKeyInfoMap().isEmpty()) {
+      for (Map.Entry<String, OmKeyInfo> entry : getOpenKeyInfoMap().entrySet()) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, entry.getKey(), entry.getValue());
+      }
     }
   }
 

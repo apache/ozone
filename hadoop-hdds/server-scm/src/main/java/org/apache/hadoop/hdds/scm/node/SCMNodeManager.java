@@ -1227,6 +1227,8 @@ public class SCMNodeManager implements NodeManager {
     Map<String, String> nodeStatistics = new HashMap<>();
     // Statistics node usaged
     nodeUsageStatistics(nodeStatistics);
+    // Statistics node states
+    nodeStateStatistics(nodeStatistics);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
@@ -1267,6 +1269,19 @@ public class SCMNodeManager implements NodeManager {
     DecimalFormat decimalFormat = new DecimalFormat("#0.00");
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
     nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+  }
+
+  private void nodeStateStatistics(Map<String, String> nodeStatics) {
+    int healthyNodeCount = nodeStateManager.getHealthyNodeCount();
+    int deadNodeCount = nodeStateManager.getDeadNodeCount();
+    int decommissioningNodeCount = nodeStateManager.getDecommissioningNodeCount();
+    int enteringMaintenanceNodeCount = nodeStateManager.getEnteringMaintenanceNodeCount();
+    int volumeFailuresNodeCount = nodeStateManager.getVolumeFailuresNodeCount();
+    nodeStatics.put(StateStatistics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
+    nodeStatics.put(StateStatistics.DEAD.getLabel(), String.valueOf(deadNodeCount));
+    nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
+    nodeStatics.put(StateStatistics.ENTERING_MAINTENANCE.getLabel(), String.valueOf(enteringMaintenanceNodeCount));
+    nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
   }
 
   /**
@@ -1346,6 +1361,21 @@ public class SCMNodeManager implements NodeManager {
       return label;
     }
     UsageStatics(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum StateStatistics {
+    HEALTHY("Healthy"),
+    DEAD("Dead"),
+    DECOMMISSIONING("Decommissioning"),
+    ENTERING_MAINTENANCE("EnteringMaintenance"),
+    VOLUME_FAILURES("VolumeFailures");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    StateStatistics(String label) {
       this.label = label;
     }
   }

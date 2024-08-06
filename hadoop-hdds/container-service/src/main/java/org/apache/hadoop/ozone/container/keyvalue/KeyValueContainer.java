@@ -76,6 +76,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_COMPACT_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
@@ -433,6 +434,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void close() throws StorageContainerException {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      containerData.clearFinalizedBlock(db);
+    } catch (IOException ex) {
+      LOG.error("Error in deleting entry from Finalize Block table", ex);
+      throw new StorageContainerException(ex, IO_EXCEPTION);
+    }
     closeAndFlushIfNeeded(containerData::closeContainer);
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),

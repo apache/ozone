@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.util.StringWithByteString;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.BYTE_STRING_ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;

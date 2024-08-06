@@ -223,6 +223,23 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
   }
 
+  @Override
+  public void finalizeWriteChunk(KeyValueContainer container,
+      BlockID blockId) throws IOException {
+    synchronized (container) {
+      File chunkFile = getChunkFile(container, blockId);
+      try {
+        if (files.isOpen(chunkFile)) {
+          files.close(chunkFile);
+        }
+        verifyChunkFileExists(chunkFile);
+      } catch (IOException e) {
+        onFailure(container.getContainerData().getVolume());
+        throw e;
+      }
+    }
+  }
+
   private void deleteChunk(Container container, BlockID blockID,
       ChunkInfo info, boolean verifyLength)
       throws StorageContainerException {
@@ -302,6 +319,11 @@ public class FilePerBlockStrategy implements ChunkManager {
       if (file != null) {
         files.invalidate(file.getPath());
       }
+    }
+
+    public boolean isOpen(File file) {
+      return file != null &&
+          files.getIfPresent(file.getPath()) != null;
     }
 
     private static void close(String filename, OpenFile openFile) {

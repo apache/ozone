@@ -56,7 +56,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
@@ -79,10 +82,19 @@ class TestBlockOutputStreamWithFailures {
     }
   }
 
+  private static Stream<Arguments> clientParameters() {
+    return Stream.of(
+        Arguments.of(true, true),
+        Arguments.of(true, false),
+        Arguments.of(false, true),
+        Arguments.of(false, false)
+    );
+  }
+
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testContainerClose(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testContainerClose(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWatchForCommitWithCloseContainerException(client);
       testWatchForCommitWithSingleNodeRatis(client);
@@ -174,10 +186,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @MethodSource("clientParameters")
   @Flaky("HDDS-6113")
-  void testWatchForCommitDatanodeFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  void testWatchForCommitDatanodeFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
@@ -259,9 +271,9 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void test2DatanodesFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
@@ -560,10 +572,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @MethodSource("clientParameters")
   @Flaky("HDDS-6113")
-  void testDatanodeFailureWithSingleNode(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  void testDatanodeFailureWithSingleNode(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =
@@ -650,10 +662,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testDatanodeFailureWithPreAllocation(boolean flushDelay)
+  @MethodSource("clientParameters")
+  void testDatanodeFailureWithPreAllocation(boolean flushDelay, boolean enablePiggybacking)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =

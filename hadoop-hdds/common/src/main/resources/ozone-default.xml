@@ -594,6 +594,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.read.threadpool</name>
+    <value>10</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for OM service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for Ozone Manager.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
@@ -1411,6 +1420,17 @@
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
       has been open longer than the value of this config entry, that open key is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.lease.hard.limit</name>
+    <value>7d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long an open hsync key is considered as active. Specifically, if a hsync key
+      has been open longer than the value of this config entry, that open hsync key is considered as
       expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
@@ -2908,7 +2928,7 @@
   </property>
   <property>
     <name>hdds.datanode.handler.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The number of RPC handler threads for Datanode client
@@ -4143,10 +4163,18 @@
 
   <property>
     <name>ozone.fs.hsync.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
     <description>
       Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.lease.soft.limit</name>
+    <value>60s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Hsync soft limit lease period.
     </description>
   </property>
 

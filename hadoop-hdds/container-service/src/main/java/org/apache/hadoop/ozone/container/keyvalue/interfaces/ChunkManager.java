@@ -106,6 +106,11 @@ public interface ChunkManager {
     // no-op
   }
 
+  default void finalizeWriteChunk(KeyValueContainer container,
+      BlockID blockId) throws IOException {
+    // no-op
+  }
+
   default String streamInit(Container container, BlockID blockID)
       throws StorageContainerException {
     return null;

@@ -396,7 +396,7 @@ public final class MetricsAsserts {
    */
   public static void assertQuantileGauges(String prefix,
       MetricsRecordBuilder rb) {
-    assertQuantileGauges(prefix, rb, "Latency");
+    assertQuantileGauges(prefix, rb, "LatencyNs");
   }
 
   /**

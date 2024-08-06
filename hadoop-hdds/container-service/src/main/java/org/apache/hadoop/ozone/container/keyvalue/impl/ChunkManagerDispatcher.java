@@ -98,6 +98,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
+  public void finalizeWriteChunk(KeyValueContainer kvContainer,
+      BlockID blockId) throws IOException {
+    selectHandler(kvContainer).finalizeWriteChunk(kvContainer, blockId);
+  }
+
+  @Override
   public ChunkBuffer readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {

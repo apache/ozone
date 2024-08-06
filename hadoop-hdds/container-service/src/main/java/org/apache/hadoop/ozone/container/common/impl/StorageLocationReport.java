@@ -189,7 +189,7 @@ public final class StorageLocationReport implements
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .setFreeSpaceToSpare(conf != null ?
-            VolumeUsage.getMinVolumeFreeSpace(conf, getCapacity()) : 0)
+            new VolumeUsage.MinFreeSpaceCalculator(conf).get(getCapacity()) : 0)
         .build();
   }
 
