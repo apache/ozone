@@ -112,7 +112,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-compress.version>1.26.0</commons-compress.version>
+    <commons-compress.version>1.26.2</commons-compress.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <zstd-jni.version>1.5.6-3</zstd-jni.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
@@ -1519,6 +1519,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
                     </bannedImports>
                   </restrictImports>
                   <restrictImports>
@@ -1534,6 +1535,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.test.GenericTestUtils</bannedImport>
                       <bannedImport>org.apache.hadoop.test.LambdaTestUtils</bannedImport>
+                      <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
+                      <bannedImport>org.apache.hadoop.classification.InterfaceAudience</bannedImport>
+                      <bannedImport>org.apache.hadoop.classification.InterfaceStability</bannedImport>
                     </bannedImports>
                     <exclusions>
                       <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
@@ -1542,16 +1546,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
-                    <reason>Use Ozone's version of the same class</reason>
-                    <bannedImports>
-                      <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
-                    </bannedImports>
-                  </restrictImports>
-                  <restrictImports>
-                    <includeTestCode>true</includeTestCode>
                     <reason>Use Ozone's similar class</reason>
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
+                      <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
                     </bannedImports>
                   </restrictImports>
                   <restrictImports>

@@ -140,37 +140,55 @@ public class VolumeUsage {
   }
 
   /**
-   * If 'hdds.datanode.volume.min.free.space' is defined,
-   * it will be honored first. If it is not defined and
-   * 'hdds.datanode.volume.min.free.space.' is defined,it will honor this
-   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   * Convenience class to calculate minimum free space.
    */
-  public static long getMinVolumeFreeSpace(ConfigurationSource conf,
-      long capacity) {
-    if (conf.isConfigured(
-        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE) && conf.isConfigured(
-        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
-      LOG.error(
-          "Both {} and {} are set. Set either one, not both. If both are set,"
-              + "it will use default value which is {} as min free space",
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
-    }
-
-    if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)) {
-      return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+  public static class MinFreeSpaceCalculator {
+    private final boolean minFreeSpaceConfigured;
+    private final boolean minFreeSpacePercentConfigured;
+    private final long freeSpace;
+    private float freeSpacePercent;
+    private final long defaultFreeSpace;
+    public MinFreeSpaceCalculator(ConfigurationSource conf) {
+      // cache these values to avoid repeated lookups
+      minFreeSpaceConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+      minFreeSpacePercentConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT);
+      freeSpace = (long)conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
-    } else if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
-      float volumeMinFreeSpacePercent = Float.parseFloat(
-          conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
-      return (long) (capacity * volumeMinFreeSpacePercent);
+      if (minFreeSpacePercentConfigured) {
+        freeSpacePercent = Float.parseFloat(
+            conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      }
+      StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+      double byteValue = measure.getUnit().toBytes(measure.getValue());
+      defaultFreeSpace = (long)StorageUnit.BYTES.fromBytes(byteValue);
     }
-    // either properties are not configured,then return
-    // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
-    return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
 
+    /**
+     * If 'hdds.datanode.volume.min.free.space' is defined,
+     * it will be honored first. If it is not defined and
+     * 'hdds.datanode.volume.min.free.space' is defined, it will honor this
+     * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+     */
+    public long get(long capacity) {
+      if (minFreeSpaceConfigured && minFreeSpacePercentConfigured) {
+        LOG.error(
+            "Both {} and {} are set. Set either one, not both. If both are set,"
+                + "it will use default value which is {} as min free space",
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+        return defaultFreeSpace;
+      }
+
+      if (minFreeSpaceConfigured) {
+        return freeSpace;
+      } else if (minFreeSpacePercentConfigured) {
+        return (long) (capacity * freeSpacePercent);
+      }
+      // either properties are not configured,then return
+      // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT
+      return defaultFreeSpace;
+    }
   }
 
   public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,

@@ -50,13 +50,13 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
@@ -874,7 +874,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     assertNotNull(omKeyInfo);
     assertNotNull(omMultipartKeyInfo);
-    assertEquals(OzoneFSUtils.getFileName(keyName), omKeyInfo.getKeyName());
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertEquals(OzoneFSUtils.getFileName(keyName), omKeyInfo.getFileName());
     assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
     for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
