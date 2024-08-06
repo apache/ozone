@@ -96,7 +96,7 @@ public final class ChunkUtils {
       ));
   public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
   public static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 512;
-  public static Striped<ReadWriteLock> fileStripedLock =
+  private static Striped<ReadWriteLock> fileStripedLock =
       Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
 
   /** Never constructed. **/
