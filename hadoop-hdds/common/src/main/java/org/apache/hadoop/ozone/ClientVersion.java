@@ -74,6 +74,10 @@ public enum ClientVersion implements ComponentVersion {
     return version;
   }
 
+  public int getVersion() {
+    return version;
+  }
+
   public static ClientVersion fromProtoValue(int value) {
     return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }

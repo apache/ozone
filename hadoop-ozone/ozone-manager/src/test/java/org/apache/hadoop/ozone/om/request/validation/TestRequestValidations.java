@@ -284,7 +284,8 @@ public class TestRequestValidations {
   }
 
   private int olderClientVersion() {
-    return ClientVersion.CURRENT_VERSION - 1;
+    // older than bucket type version
+    return ClientVersion.BUCKET_LAYOUT_SUPPORT.getVersion() - 1;
   }
 
   private int currentClientVersion() {

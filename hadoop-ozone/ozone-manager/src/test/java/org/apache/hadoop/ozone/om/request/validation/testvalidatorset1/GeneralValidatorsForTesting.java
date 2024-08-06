@@ -29,7 +29,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
@@ -109,7 +109,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS },
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest oldClientPreProcessCreateKeyValidator(
@@ -119,7 +119,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS },
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse oldClientPostProcessCreateKeyValidator(
@@ -129,7 +129,8 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS },
+      conditions = { CLUSTER_NEEDS_FINALIZATION,
+          OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume)
   public static OMRequest multiPurposePreProcessCreateVolumeValidator(
@@ -139,7 +140,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS, CLUSTER_NEEDS_FINALIZATION },
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS, CLUSTER_NEEDS_FINALIZATION },
       processingPhase = POST_PROCESS,
       requestType = CreateVolume)
   public static OMResponse multiPurposePostProcessCreateVolumeValidator(
@@ -149,7 +150,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS },
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse oldClientPostProcessCreateKeyValidator2(
@@ -159,7 +160,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {OLDER_CLIENT_REQUESTS},
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = DeleteKeys
   )
@@ -173,7 +174,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {OLDER_CLIENT_REQUESTS},
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = POST_PROCESS,
       requestType = DeleteKeys
   )

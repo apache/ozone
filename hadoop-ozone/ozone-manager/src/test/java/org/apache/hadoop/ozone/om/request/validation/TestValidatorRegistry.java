@@ -34,7 +34,7 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
@@ -107,7 +107,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS);
+            asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateKey, PRE_PROCESS);
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -121,7 +121,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateKey, POST_PROCESS);
+            asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateKey, POST_PROCESS);
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -138,7 +138,7 @@ public class TestValidatorRegistry {
             asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, PRE_PROCESS);
     List<Method> newClientValidators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateVolume, PRE_PROCESS);
+            asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateVolume, PRE_PROCESS);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, newClientValidators.size());
@@ -155,7 +155,7 @@ public class TestValidatorRegistry {
             asList(CLUSTER_NEEDS_FINALIZATION), CreateVolume, POST_PROCESS);
     List<Method> oldClientValidators =
         registry.validationsFor(
-            asList(OLDER_CLIENT_REQUESTS), CreateVolume, POST_PROCESS);
+            asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateVolume, POST_PROCESS);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
@@ -169,7 +169,8 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS),
+            asList(CLUSTER_NEEDS_FINALIZATION,
+                OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS),
             CreateKey, POST_PROCESS);
 
     assertEquals(3, validators.size());
@@ -185,7 +186,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE_WO_VALIDATORS);
 
     assertTrue(registry.validationsFor(
-        asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS).isEmpty());
+        asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateKey, PRE_PROCESS).isEmpty());
   }
 
   @Test
@@ -207,7 +208,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
 
     assertTrue(registry.validationsFor(
-        asList(OLDER_CLIENT_REQUESTS), CreateDirectory, null).isEmpty());
+        asList(OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS), CreateDirectory, null).isEmpty());
   }
 
 }

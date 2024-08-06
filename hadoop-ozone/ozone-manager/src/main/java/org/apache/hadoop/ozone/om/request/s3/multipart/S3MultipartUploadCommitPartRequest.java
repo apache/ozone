@@ -380,7 +380,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitMultiPartUpload
   )
