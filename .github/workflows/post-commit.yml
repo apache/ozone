@@ -25,3 +25,6 @@ jobs:
     if: github.event_name == 'pull_request' || !startsWith(github.ref_name, 'dependabot')
     uses: ./.github/workflows/ci.yml
     secrets: inherit
+  Generate-Docs:
+    uses: ./.github/workflows/doc.yml
+    secrets: inherit
