@@ -94,6 +94,15 @@ const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
   }
 }
 
+const getSummaryTableValue = (
+  value: number | string | undefined,
+  colType: 'value' | undefined = undefined
+): string => {
+  if (!value) return 'N/A';
+  if (colType === 'value') String(value as string)
+  return size(value as number)
+}
+
 const Overview: React.FC<{}> = () => {
 
   let cancelOverviewSignal: AbortController;
@@ -467,17 +476,20 @@ const Overview: React.FC<{}> = () => {
                 {
                   key: 'total-replicated-data',
                   name: 'Total Replicated Data',
-                  value: size(openSummarytotalRepSize)
+                  value: getSummaryTableValue(openSummarytotalRepSize)
                 },
                 {
                   key: 'total-unreplicated-data',
                   name: 'Total Unreplicated Data',
-                  value: size(openSummarytotalUnrepSize)
+                  value: getSummaryTableValue(openSummarytotalUnrepSize)
                 },
                 {
                   key: 'open-keys',
                   name: 'Open Keys',
-                  value: String(openSummarytotalOpenKeys)
+                  value: getSummaryTableValue(
+                    openSummarytotalOpenKeys,
+                    'value'
+                  )
                 }
               ]}
               linkToUrl='/Om' />
@@ -503,17 +515,20 @@ const Overview: React.FC<{}> = () => {
                 {
                   key: 'total-replicated-data',
                   name: 'Total Replicated Data',
-                  value: size(deletePendingSummarytotalRepSize)
+                  value: getSummaryTableValue(deletePendingSummarytotalRepSize)
                 },
                 {
                   key: 'total-unreplicated-data',
                   name: 'Total Unreplicated Data',
-                  value: size(deletePendingSummarytotalUnrepSize)
+                  value: getSummaryTableValue(deletePendingSummarytotalUnrepSize)
                 },
                 {
                   key: 'delete-pending-keys',
                   name: 'Delete Pending Keys',
-                  value: String(deletePendingSummarytotalDeletedKeys)
+                  value: getSummaryTableValue(
+                    deletePendingSummarytotalDeletedKeys,
+                    'value'
+                  )
                 }
               ]}
               linkToUrl='/Om' />

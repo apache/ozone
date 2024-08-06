@@ -81,7 +81,7 @@ const EChart = ({
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       loading === true ? chart!.showLoading() : chart!.hideLoading();
     }
-  }, [loading, theme]);
+  }, [loading, theme]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
 
   return <div ref={chartRef} style={{ width: "100em", height: "50em", margin: 'auto', ...style }} />;
 }
