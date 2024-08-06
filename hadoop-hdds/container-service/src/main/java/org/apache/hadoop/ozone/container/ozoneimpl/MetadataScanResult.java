@@ -1,52 +1,40 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
-import java.io.File;
+import java.util.Collections;
+import java.util.List;
 
+/**
+ * Represents the result of a container metadata scan.
+ * A metadata scan only checks the existence of container metadata files and the checksum of the .container file.
+ * It does not check the data in the container and therefore will not generate a ContainerMerkleTree.
+ */
 public class MetadataScanResult implements ScanResult {
 
   private final boolean healthy;
-  private final File unhealthyFile;
-  private final FailureType failureType;
-  private final Throwable exception;
+  private final ContainerScanError error;
+  private static final MetadataScanResult HEALTHY_RESULT = new MetadataScanResult(true, null);
 
-  protected MetadataScanResult(boolean healthy, FailureType failureType, File unhealthyFile, Throwable exception) {
+  protected MetadataScanResult(boolean healthy, ContainerScanError error) {
     this.healthy = healthy;
-    this.unhealthyFile = unhealthyFile;
-    this.failureType = failureType;
-    this.exception = exception;
-  }
-
-  protected MetadataScanResult(MetadataScanResult other) {
-    this.healthy = healthy;
-    this.unhealthyFile = unhealthyFile;
-    this.failureType = failureType;
-    this.exception = exception;
+    this.error = error;
   }
 
   public static MetadataScanResult healthy() {
-    return new ScanResult(true, null, null, null);
+    return HEALTHY_RESULT;
   }
 
-  public static MetadataScanResult unhealthy(FailureType type, File failingFile, Throwable exception) {
-    return new ScanResult(false, type, failingFile, exception);
+  public static MetadataScanResult unhealthy(ContainerScanError error) {
+    return new MetadataScanResult(false, error);
   }
 
   public boolean isHealthy() {
     return healthy;
   }
 
-  public File getUnhealthyFile() {
-    return unhealthyFile;
-  }
-
-  public FailureType getFailureType() {
-    return failureType;
-  }
-
-  public Throwable getException() {
-    return exception;
+  @Override
+  public List<ContainerScanError> getErrors() {
+    return Collections.singletonList(error);
   }
 }
