@@ -43,7 +43,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long committed = vol.getCommittedBytes();
     long available = free - committed;
     long volumeFreeSpaceToSpare =
-        VolumeUsage.getMinVolumeFreeSpace(vol.getConf(), volumeCapacity);
+        new VolumeUsage.MinFreeSpaceCalculator(vol.getConf()).get(volumeCapacity);
     boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
         requiredSpace, volumeFreeSpaceToSpare);
 

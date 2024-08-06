@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.SafeMode;
@@ -29,11 +30,18 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
 /**
  * The Rooted Ozone Filesystem (OFS) implementation.
@@ -49,9 +57,12 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
+  private boolean forceRecovery;
 
   public RootedOzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
+    String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
+    forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
   }
 
   @Override
@@ -131,17 +142,37 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
    */
   @Override
   public boolean recoverLease(final Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
     statistics.incrementWriteOps(1);
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
-    return getAdapter().recoverLease(key);
+    LeaseKeyInfo leaseKeyInfo;
+    try {
+      leaseKeyInfo = getAdapter().recoverFilePrepare(key, forceRecovery);
+    } catch (OMException e) {
+      if (e.getResult() == OMException.ResultCodes.KEY_ALREADY_CLOSED) {
+        // key is already closed, let's just return success
+        return true;
+      }
+      throw e;
+    }
+
+    // Get keyLocationInfo
+    List<OmKeyLocationInfo> keyLocationInfoList = LeaseRecoveryClientDNHandler.getOmKeyLocationInfos(
+        leaseKeyInfo, getAdapter(), forceRecovery);
+    // recover and commit file
+    long keyLength = keyLocationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(leaseKeyInfo.getKeyInfo().getVolumeName())
+        .setBucketName(leaseKeyInfo.getKeyInfo().getBucketName()).setKeyName(leaseKeyInfo.getKeyInfo().getKeyName())
+        .setReplicationConfig(leaseKeyInfo.getKeyInfo().getReplicationConfig()).setDataSize(keyLength)
+        .setLocationInfoList(keyLocationInfoList)
+        .build();
+    getAdapter().recoverFile(keyArgs);
+    return true;
   }
 
   @Override
   public boolean isFileClosed(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
     statistics.incrementReadOps(1);
     LOG.trace("isFileClosed() path:{}", f);
     Path qualifiedPath = makeQualified(f);
