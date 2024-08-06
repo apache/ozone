@@ -188,6 +188,12 @@ public abstract class ContainerData {
   public abstract String getContainerPath();
 
   /**
+   * Returns container metadata path.
+   * @return - Physical path where container file and checksum is stored.
+   */
+  public abstract String getMetadataPath();
+
+  /**
    * Returns the type of the container.
    * @return ContainerType
    */

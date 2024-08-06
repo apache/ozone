@@ -16,8 +16,10 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -25,6 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -52,8 +55,9 @@ public class ContainerChecksumTreeManager {
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
-  public ContainerChecksumTreeManager(DatanodeConfiguration dnConf) {
-    fileLock = SimpleStriped.readWriteLock(dnConf.getContainerChecksumLockStripes(), true);
+  public ContainerChecksumTreeManager(ConfigurationSource conf) {
+    fileLock = SimpleStriped.readWriteLock(
+        conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(), true);
     // TODO: TO unregister metrics on stop.
     metrics = ContainerMerkleTreeMetrics.create();
   }
@@ -64,7 +68,7 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(KeyValueContainerData data, ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -83,7 +87,7 @@ public class ContainerChecksumTreeManager {
    * All other content of the file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void markBlocksAsDeleted(KeyValueContainerData data, SortedSet<Long> deletedBlockIDs) throws IOException {
+  public void markBlocksAsDeleted(KeyValueContainerData data, Collection<Long> deletedBlockIDs) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -91,7 +95,6 @@ public class ContainerChecksumTreeManager {
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
-      // Since the provided list of block IDs is already sorted, this is a linear time addition.
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
       checksumInfoBuilder
@@ -113,6 +116,13 @@ public class ContainerChecksumTreeManager {
     return new ContainerDiff();
   }
 
+  /**
+   * Returns the container checksum tree file for the specified container without deserializing it.
+   */
+  public static File getContainerChecksumFile(ContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  }
+
   private Lock getReadLock(long containerID) {
     return fileLock.get(containerID).readLock();
   }
@@ -121,7 +131,7 @@ public class ContainerChecksumTreeManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -150,8 +160,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private void write(KeyValueContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
-      throws IOException {
+  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {
@@ -164,10 +173,6 @@ public class ContainerChecksumTreeManager {
     } finally {
       writeLock.unlock();
     }
-  }
-
-  public File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   @VisibleForTesting
