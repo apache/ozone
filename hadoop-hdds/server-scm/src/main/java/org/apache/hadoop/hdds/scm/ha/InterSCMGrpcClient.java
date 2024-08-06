@@ -69,7 +69,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-            .proxyDetector(uri->null);
+            .proxyDetector(uri -> null);
     SecurityConfig securityConfig = new SecurityConfig(conf);
     if (securityConfig.isSecurityEnabled()
         && securityConfig.isGrpcTlsEnabled()) {
