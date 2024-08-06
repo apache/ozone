@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
@@ -74,7 +75,12 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         OzoneManagerProtocolProtos.BucketQuotaCount bucketCountInfo = quotaRepairRequest.getBucketCount(i);
         updateBucketInfo(omMetadataManager, bucketCountInfo, transactionLogIndex, bucketMap);
       }
-      Map<String, OmVolumeArgs> volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, transactionLogIndex);
+      Map<String, OmVolumeArgs> volUpdateMap;
+      if (quotaRepairRequest.getSupportVolumeOldQuota()) {
+        volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, transactionLogIndex);
+      } else {
+        volUpdateMap = Collections.emptyMap();
+      }
       omResponse.setQuotaRepairResponse(
           OzoneManagerProtocolProtos.QuotaRepairResponse.newBuilder().build());
       omClientResponse = new OMQuotaRepairResponse(omResponse.build(), volUpdateMap, bucketMap);
