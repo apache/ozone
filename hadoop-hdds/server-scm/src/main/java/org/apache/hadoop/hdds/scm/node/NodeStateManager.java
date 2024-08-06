@@ -540,10 +540,6 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public List<DatanodeInfo> getVolumeFailuresNodes() {
     List<DatanodeInfo> allNodes = nodeStateMap.getAllDatanodeInfos();
-    if (allNodes.size() < 1) {
-      return allNodes;
-    }
-
     List<DatanodeInfo> failedVolumeNodes = allNodes.stream().
         filter(dn -> dn.getFailedVolumeCount() > 0).collect(Collectors.toList());
     return failedVolumeNodes;
