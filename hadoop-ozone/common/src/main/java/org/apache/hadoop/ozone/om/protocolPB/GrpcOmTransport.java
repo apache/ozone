@@ -145,6 +145,7 @@ public class GrpcOmTransport implements OmTransport {
       NettyChannelBuilder channelBuilder =
           NettyChannelBuilder.forAddress(hp.getHost(), hp.getPort())
               .usePlaintext()
+              .proxyDetector(uri -> null)
               .maxInboundMessageSize(maxSize);
 
       if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {

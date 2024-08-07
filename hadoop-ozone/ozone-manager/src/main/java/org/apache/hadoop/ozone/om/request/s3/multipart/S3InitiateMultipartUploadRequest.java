@@ -264,7 +264,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       Map<String, String> auditMap, String volumeName, String bucketName,
       String keyName, Exception exception, Result result) {
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 

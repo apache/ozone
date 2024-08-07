@@ -40,7 +40,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * This class coordinates reading and writing Container checksum information for all containers.
