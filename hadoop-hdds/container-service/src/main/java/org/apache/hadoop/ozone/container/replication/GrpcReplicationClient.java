@@ -75,7 +75,8 @@ public class GrpcReplicationClient implements AutoCloseable {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .proxyDetector(uri -> null);
 
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       channelBuilder.useTransportSecurity();

@@ -144,7 +144,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
         .build();
 
     NettyChannelBuilder channelBuilder =
-        NettyChannelBuilder.forTarget(serverAddress);
+        NettyChannelBuilder.forTarget(serverAddress).proxyDetector(uri -> null);
     channelBuilder.negotiationType(NegotiationType.PLAINTEXT);
     ManagedChannel build = channelBuilder.build();
     stub = RaftServerProtocolServiceGrpc.newStub(build);
