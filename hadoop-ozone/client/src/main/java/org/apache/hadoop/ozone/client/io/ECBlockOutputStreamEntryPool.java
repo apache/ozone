@@ -37,7 +37,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   }
 
   @Override
-  ECBlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+  ECBlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
     final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
     b.setBlockID(subKeyInfo.getBlockID())
             .setKey(getKeyName())
