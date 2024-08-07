@@ -288,7 +288,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
+      datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
@@ -618,6 +618,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       LOG.error(msg, ex);
       terminateDatanode();
     }
+  }
+
+  public boolean isStopped() {
+    return isStopped.get();
   }
 
   /**

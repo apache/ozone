@@ -137,7 +137,7 @@ class TestSecureOzoneContainer {
       conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      container = new OzoneContainer(dn, conf, ContainerTestUtils
+      container = new OzoneContainer(null, dn, conf, ContainerTestUtils
           .getMockContext(dn, conf), caClient, secretKeyClient);
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
