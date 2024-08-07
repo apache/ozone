@@ -370,14 +370,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>hdds.crl.status.report.interval</name>
-    <value>60000ms</value>
-    <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <description>Time interval of the datanode to send CRL status report. Each
-      datanode periodically sends CRL status report to SCM. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)</description>
-  </property>
-  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
@@ -599,6 +591,15 @@
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for OM service endpoints.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.read.threadpool</name>
+    <value>10</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for OM service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for Ozone Manager.
     </description>
   </property>
   <property>
@@ -1419,6 +1420,17 @@
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
       has been open longer than the value of this config entry, that open key is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.lease.hard.limit</name>
+    <value>7d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long an open hsync key is considered as active. Specifically, if a hsync key
+      has been open longer than the value of this config entry, that open hsync key is considered as
       expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
@@ -2916,7 +2928,7 @@
   </property>
   <property>
     <name>hdds.datanode.handler.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The number of RPC handler threads for Datanode client
@@ -3065,7 +3077,7 @@
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3073,7 +3085,7 @@
     <name>ozone.freon.http.auth.type</name>
     <value>simple</value>
     <tag>FREON, SECURITY</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3081,7 +3093,7 @@
     <name>ozone.om.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3089,7 +3101,7 @@
     <name>hdds.scm.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3097,7 +3109,7 @@
     <name>ozone.recon.http.auth.type</name>
     <value>simple</value>
     <tag>RECON, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3105,7 +3117,7 @@
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
     <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -4151,10 +4163,18 @@
 
   <property>
     <name>ozone.fs.hsync.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
     <description>
       Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.lease.soft.limit</name>
+    <value>60s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Hsync soft limit lease period.
     </description>
   </property>
 
@@ -4221,6 +4241,20 @@
       held.  The actual number of cached instance could exceed this limit if
       more than this number of snapshot instances are still in-use by snapDiff
       or other tasks.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.db.max.open.files</name>
+    <value>-1</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files that OM RocksDB will open simultaneously
+      Essentially sets `max_open_files` config for the active OM RocksDB instance.
+      This will limit the total number of files opened by OM db.
+      Default is -1 which is unlimited and gives max performance.
+      If you are certain that your ulimit will always be bigger than number of files in the database,
+      set max_open_files to -1, or else set it to a value lesser than or equal to ulimit.
     </description>
   </property>
 

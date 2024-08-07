@@ -42,7 +42,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 
-import org.apache.hadoop.util.CacheMetrics;
+import org.apache.hadoop.ozone.util.CacheMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

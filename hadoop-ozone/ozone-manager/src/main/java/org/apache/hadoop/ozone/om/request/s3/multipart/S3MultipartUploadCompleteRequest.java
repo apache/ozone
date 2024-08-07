@@ -246,7 +246,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // Add missing multi part info to open key table
           addMultiPartToCache(omMetadataManager, multipartOpenKey,
-              pathInfoFSO, keyInfoFromArgs, trxnLogIndex);
+              pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
         }
       }
 
@@ -436,7 +436,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         .replaceAll("\\n", " "));
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
         getOmRequest().getUserInfo()));
 
@@ -559,7 +559,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long transactionLogIndex
+      String keyName, long transactionLogIndex
   ) throws IOException {
     // FSO is disabled. Do nothing.
   }

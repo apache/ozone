@@ -46,6 +46,20 @@ public class RocksDBConfiguration {
       description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
   private String rocksdbLogLevel;
 
+  @Config(key = "rocksdb.max.log.file.size",
+      type = ConfigType.SIZE,
+      defaultValue = "0MB",
+      tags = {OM, SCM, DATANODE},
+      description = "Maximum size of RocksDB application log file.")
+  private long rocksdbMaxLogFileSize = 0;
+
+  @Config(key = "rocksdb.keep.log.file.num",
+      type = ConfigType.INT,
+      defaultValue = "1000",
+      tags = {OM, SCM, DATANODE},
+      description = "Maximum number of RocksDB application log files.")
+  private int rocksdbKeepLogFileNum = 1000;
+
   @Config(key = "rocksdb.writeoption.sync",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
@@ -109,5 +123,21 @@ public class RocksDBConfiguration {
 
   public long getWalSizeLimit() {
     return walSizeLimit;
+  }
+
+  public void setMaxLogFileSize(long fileSize) {
+    rocksdbMaxLogFileSize = fileSize;
+  }
+
+  public long getMaxLogFileSize() {
+    return rocksdbMaxLogFileSize;
+  }
+
+  public void setKeepLogFileNum(int fileNum) {
+    rocksdbKeepLogFileNum = fileNum;
+  }
+
+  public int getKeepLogFileNum() {
+    return rocksdbKeepLogFileNum;
   }
 }

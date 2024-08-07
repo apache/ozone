@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -31,13 +32,16 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
@@ -88,7 +92,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           OzoneManager ozoneManager, long trxnLogIndex,
           List<OmKeyInfo> omKeyInfoList,
           List<OmKeyInfo> dirList, OMMetadataManager omMetadataManager,
-          long quotaReleased, List<String> dbOpenKeys) throws IOException {
+          long quotaReleased, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
 
     // Mark all keys which can be deleted, in cache as deleted.
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
@@ -113,10 +117,10 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
         String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          // Remove the open key by putting a tombstone entry
-          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
-          // Append to the list of open keys to be deleted. The list is not expected to be large.
-          dbOpenKeys.add(dbOpenKey);
+          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          // Add to the map of open keys to be deleted.
+          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -146,15 +150,22 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
+      Map<String, ErrorInfo> keyToErrors,
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
     OMClientResponse omClientResponse;
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
+    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
+          .setKey(key.getKey()).setErrorCode(key.getValue().getCode())
+          .setErrorMsg(key.getValue().getMessage()).build());
+    }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
-                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject(), volumeId, dbOpenKeys);
+        omBucketInfo.copyObject(), volumeId, openKeyInfoMap);
     return omClientResponse;
   }
 }

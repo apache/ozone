@@ -138,7 +138,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
     if (ozoneAcls != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
     }
-    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 

@@ -402,6 +402,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext startTransaction(RaftClientRequest request)
       throws IOException {
+    long startTime = Time.monotonicNowNanos();
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
     Preconditions.checkArgument(request.getRaftGroupId().equals(gid));
@@ -410,6 +411,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setClientRequest(request)
         .setStateMachine(this)
         .setServerRole(RaftPeerRole.LEADER);
+
+    metrics.incPendingApplyTransactions();
 
     try {
       dispatcher.validateContainerCommand(proto);
@@ -426,23 +429,45 @@ public class ContainerStateMachine extends BaseStateMachine {
     // once the token is verified, clear it from the proto
     final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
         .clearEncodedToken();
-    if (proto.getCmdType() == Type.WriteChunk) {
+    boolean blockAlreadyFinalized = false;
+    if (proto.getCmdType() == Type.PutBlock) {
+      blockAlreadyFinalized = shouldRejectRequest(proto.getPutBlock().getBlockData().getBlockID());
+    } else if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
-      Preconditions.checkArgument(write.hasData());
-      Preconditions.checkArgument(!write.getData().isEmpty());
-      // skipping the data field as it is already set in statemachine data proto
-      final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
-          .clearData();
-      protoBuilder.setWriteChunk(commitWriteChunkProto)
-          .setPipelineID(gid.getUuid().toString())
-          .setTraceID(proto.getTraceID());
+      blockAlreadyFinalized = shouldRejectRequest(write.getBlockID());
+      if (!blockAlreadyFinalized) {
+        Preconditions.checkArgument(write.hasData());
+        Preconditions.checkArgument(!write.getData().isEmpty());
+        final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
+            .clearData();
+        protoBuilder.setWriteChunk(commitWriteChunkProto)
+            .setPipelineID(gid.getUuid().toString())
+            .setTraceID(proto.getTraceID());
 
-      builder.setStateMachineData(write.getData());
+        builder.setStateMachineData(write.getData());
+      }
+    } else if (proto.getCmdType() == Type.FinalizeBlock) {
+      containerController.addFinalizedBlock(proto.getContainerID(),
+          proto.getFinalizeBlock().getBlockID().getLocalID());
     }
-    final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
-    return builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
-        .setLogData(containerCommandRequestProto.toByteString())
-        .build();
+
+    if (blockAlreadyFinalized) {
+      TransactionContext transactionContext = builder.build();
+      transactionContext.setException(new StorageContainerException("Block already finalized",
+          ContainerProtos.Result.BLOCK_ALREADY_FINALIZED));
+      return transactionContext;
+    } else {
+      final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
+      TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
+          .setLogData(containerCommandRequestProto.toByteString())
+          .build();
+      metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
+      return txnContext;
+    }
+  }
+
+  private boolean shouldRejectRequest(ContainerProtos.DatanodeBlockID blockID) {
+    return containerController.isFinalizedBlockExist(blockID.getContainerID(), blockID.getLocalID());
   }
 
   private static ContainerCommandRequestProto getContainerCommandRequestProto(
@@ -521,6 +546,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
           try {
+            metrics.recordWriteStateMachineQueueingLatencyNs(
+                Time.monotonicNowNanos() - startTime);
             return dispatchCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
@@ -884,6 +911,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
+            long timeNow = Time.monotonicNowNanos();
+            long queueingDelay = timeNow - context.getStartTime();
+            metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);
+            // TODO: add a counter to track number of executing applyTransaction
+            // and queue size
             return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);
@@ -932,11 +964,13 @@ public class ContainerStateMachine extends BaseStateMachine {
           .setTerm(trx.getLogEntry().getTerm())
           .setLogIndex(index);
 
+      final Context context = (Context) trx.getStateMachineContext();
       long applyTxnStartTime = Time.monotonicNowNanos();
+      metrics.recordUntilApplyTransactionNs(applyTxnStartTime - context.getStartTime());
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
 
-      final Context context = (Context) trx.getStateMachineContext();
+
       Objects.requireNonNull(context, "context == null");
       final ContainerCommandRequestProto requestProto = context.getLogProto();
       final Type cmdType = requestProto.getCmdType();
@@ -1021,6 +1055,9 @@ public class ContainerStateMachine extends BaseStateMachine {
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletionNs(
             Time.monotonicNowNanos() - applyTxnStartTime);
+        if (trx.getServerRole() == RaftPeerRole.LEADER) {
+          metrics.decPendingApplyTransactions();
+        }
       });
       return applyTransactionFuture;
     } catch (InterruptedException e) {

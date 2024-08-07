@@ -30,8 +30,8 @@ ${TESTFILE}         testfile22
 Create volume bucket and put key
     Execute                 ozone sh volume create /${VOLUME}
     Execute                 ozone sh bucket create /${VOLUME}/${BUCKET}
-    Create File             ${TESTFILE}
-    Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} ${TESTFILE}
+    Create File             ${TEMP_DIR}/${TESTFILE}
+    Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
 *** Test Cases ***
 Test ozone debug recover for o3fs
