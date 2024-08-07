@@ -1,6 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
-import zipfile
+import tarfile
+import fnmatch
 
 class Property:
     def __init__(self, name, value, tag, description):
@@ -50,17 +51,17 @@ def find_xml_files(directory):
     xml_files = []
     for root, _, files in os.walk(directory):
         for file in files:
-            if file == 'ozone-default-generated.xml':
+            if file == 'ozone-default-generated.xml' and 'test-classes' not in root:
                 xml_files.append(os.path.join(root, file))
     return xml_files
 
 def main():
-    zip_file = 'ozone-src.zip'
+    tar_file = 'hadoop-ozone/dist/target/ozone-*.tar.gz'
     extract_dir = 'ozone-src'
 
-    # Extract the zip file
-    with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-        zip_ref.extractall(extract_dir)
+    # Extract the tar file
+    with tarfile.open(tar_file, 'r:gz') as tar_ref:
+        tar_ref.extractall(extract_dir)
 
     # Find all XML files
     xml_files = find_xml_files(extract_dir)

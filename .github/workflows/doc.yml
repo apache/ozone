@@ -42,7 +42,7 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -50,6 +50,7 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+
       - name: Download Ratis repo
         if: ${{ inputs.ratis_args != '' }}
         uses: actions/download-artifact@v4
@@ -57,15 +58,18 @@ jobs:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
+
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
+
       - name: Run a full build
         run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+
       - name: Store binaries for tests
         uses: actions/upload-artifact@v4
         with:
@@ -74,12 +78,14 @@ jobs:
             hadoop-ozone/dist/target/ozone-*.tar.gz
             !hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
+
       - name: Store source tarball for compilation
         uses: actions/upload-artifact@v4
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
+
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4
         with:
@@ -87,6 +93,7 @@ jobs:
           path: |
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
+
   xml-to-md:
     needs:
       - build
@@ -102,27 +109,29 @@ jobs:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-pip
+        run: sudo apt-get update && sudo apt-get install -y python3-pip unzip
 
       - name: Download the source tarball
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ozone-src
           path: .
 
       - name: Extract the source tarball
-        run: unzip ozone-src.zip -d ozone-src
+        run: |
+          mkdir -p ozone-src
+          tar -xzf hadoop-ozone/dist/target/ozone-*.tar.gz -C ozone-src
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
       - name: Upload the markdown file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Configurations.md
           path: hadoop-hdds/docs/content/tools/Configurations.md
 
       - name: Download the markdown file
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: Configurations.md
