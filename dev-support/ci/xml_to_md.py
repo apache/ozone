@@ -53,11 +53,13 @@ def main():
         for file_path in file_list:
             file_path = file_path.strip()
             if os.path.exists(file_path):
+                print(f"Parsing XML file: {file_path}")  # Debugging line
                 file_properties = parse_xml(file_path)
                 for prop in file_properties:
                     properties[prop.name] = prop
 
     sorted_properties = sorted(properties.values(), key=lambda p: p.name)
+    print(f"Total properties found: {len(sorted_properties)}")  # Debugging line
     write_markdown(sorted_properties, 'hadoop-hdds/docs/content/tools/Configurations.md')
 
 if __name__ == "__main__":

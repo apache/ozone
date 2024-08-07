@@ -109,15 +109,24 @@ jobs:
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-src
-          tar -xzf *.tar.gz -C ozone-src
+          tar -xzf ozone-src/*.tar.gz -C ozone-src
+
+      - name: List contents of extracted directory
+        run: ls -R ozone-src
 
       - name: Find all XML files
         run: |
           find ozone-src -name 'ozone-default-generated.xml' -not -path "*/test-classes/*" > xml_files.txt
           cat xml_files.txt
 
+      - name: Display the contents of xml_files.txt
+        run: cat xml_files.txt
+
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
+
+      - name: Display the contents of the generated Markdown file
+        run: cat hadoop-hdds/docs/content/tools/Configurations.md
 
       - name: Upload the markdown file
         uses: actions/upload-artifact@v4
