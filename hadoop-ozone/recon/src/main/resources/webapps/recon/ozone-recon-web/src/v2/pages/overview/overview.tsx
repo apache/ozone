@@ -39,7 +39,6 @@ import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/ut
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
 import './overview.less';
-import Loader from '@/v2/components/loader/loader';
 
 
 const size = filesize.partial({ round: 1 });
@@ -340,7 +339,6 @@ const Overview: React.FC<{}> = () => {
 
   return (
     <>
-      <Loader/>
       <div className='page-header-v2'>
         Overview
         <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
