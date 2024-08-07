@@ -109,6 +109,7 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
   private ContainerClientMetrics clientMetrics;
   private OzoneManagerVersion ozoneManagerVersion;
+  private final Object exceptionHandlingLock = new Object();
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
@@ -242,7 +243,7 @@ public class KeyOutputStream extends OutputStream
     while (len > 0) {
       try {
         BlockOutputStreamEntry current =
-            blockOutputStreamEntryPool.allocateBlockIfNeeded();
+            blockOutputStreamEntryPool.allocateBlockIfNeeded(retry);
         // length(len) will be in int range if the call is happening through
         // write API of blockOutputStream. Length can be in long range if it
         // comes via Exception path.
@@ -272,12 +273,18 @@ public class KeyOutputStream extends OutputStream
       boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
+      current.onCallReceived();
       if (retry) {
         current.writeOnRetry(len);
       } else {
+        current.waitForRetryHandling();
         current.write(b, off, writeLen);
         offset += writeLen;
       }
+      current.oncallFinished();
+    } catch (InterruptedException e) {
+      current.oncallFinished();
+      throw new InterruptedIOException();
     } catch (IOException ioe) {
       // for the current iteration, totalDataWritten - currentPos gives the
       // amount of data already written to the buffer
@@ -296,8 +303,17 @@ public class KeyOutputStream extends OutputStream
       }
       LOG.debug("writeLen {}, total len {}", writeLen, len);
       handleException(current, ioe);
+      if (current.oncallFinished()) {
+        blockOutputStreamEntryPool.getCurrentStreamEntry().finishRetryHandling();
+      }
     }
     return writeLen;
+  }
+
+  private void handleException(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
+    synchronized (exceptionHandlingLock) {
+      handleExceptionInternal(streamEntry, exception);
+    }
   }
 
   /**
@@ -310,8 +326,7 @@ public class KeyOutputStream extends OutputStream
    * @param exception   actual exception that occurred
    * @throws IOException Throws IOException if Write fails
    */
-  private synchronized void handleException(BlockOutputStreamEntry streamEntry,
-      IOException exception) throws IOException {
+  private void handleExceptionInternal(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
     boolean retryFailure = checkForRetryFailure(t);
@@ -338,8 +353,6 @@ public class KeyOutputStream extends OutputStream
     }
     Preconditions.checkArgument(
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
-    Preconditions.checkArgument(
-        offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
@@ -532,14 +545,27 @@ public class KeyOutputStream extends OutputStream
           BlockOutputStreamEntry entry =
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
+            // If the current block is to handle retries, wait until all the retries are done.
+            entry.waitForRetryHandling();
+            entry.onCallReceived();
             try {
               handleStreamAction(entry, op);
+              entry.oncallFinished();
             } catch (IOException ioe) {
               handleException(entry, ioe);
+              BlockOutputStreamEntry current = blockOutputStreamEntryPool.getCurrentStreamEntry();
+              if (entry.oncallFinished()) {
+                current.finishRetryHandling();
+              }
               continue;
+            } catch (Exception e) {
+              entry.oncallFinished();
+              throw e;
             }
           }
           return;
+        } catch (InterruptedException e) {
+          throw new InterruptedIOException();
         } catch (Exception e) {
           markStreamClosed();
           throw e;
