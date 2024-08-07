@@ -103,7 +103,7 @@ jobs:
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-src
-          tar -xzf ozone-src/*.tar.gz -C ozone-src
+          tar -xzf ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src
           mv ozone-src/* ozone-src/extracted
 
       - name: Find and list XML files
