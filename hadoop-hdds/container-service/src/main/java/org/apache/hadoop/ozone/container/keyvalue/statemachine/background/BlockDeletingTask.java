@@ -438,6 +438,9 @@ public class BlockDeletingTask implements BackgroundTask {
 
     for (DeletedBlocksTransaction entry : delBlocks) {
       for (Long blkLong : entry.getLocalIDList()) {
+        // Increment blocksProcessed for every block processed
+        blocksProcessed++;
+
         // Check if the block has already been deleted
         if (deletedBlockSet.contains(blkLong)) {
           LOG.debug("Skipping duplicate deletion for block {}", blkLong);
@@ -454,8 +457,6 @@ public class BlockDeletingTask implements BackgroundTask {
             LOG.error("Failed to delete files for unreferenced block {} of" +
                     " container {}", blkLong,
                 container.getContainerData().getContainerID(), e);
-          } finally {
-            blocksProcessed++;
           }
           continue;
         }
@@ -473,8 +474,6 @@ public class BlockDeletingTask implements BackgroundTask {
           //  otherwise invalid numPendingDeletionBlocks could accumulate
           //  beyond the limit and the following deletion will stop.
           LOG.error("Failed to delete files for block {}", blkLong, e);
-        } finally {
-          blocksProcessed++;
         }
 
         if (deleted) {
