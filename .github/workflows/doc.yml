@@ -104,6 +104,15 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-pip
 
+      - name: Download the source tarball
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-src
+          path: .
+
+      - name: Extract the source tarball
+        run: unzip ozone-src.zip -d ozone-src
+
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
