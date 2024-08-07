@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -31,6 +32,11 @@ public class ContainerMerkleTreeMetrics {
 
   public static ContainerMerkleTreeMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    // TODO: Remove when checksum manager is moved from KeyValueHandler.
+    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
+    if (source != null) {
+      ms.unregisterSource(METRICS_SOURCE_NAME);
+    }
     return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
         new ContainerMerkleTreeMetrics());
   }

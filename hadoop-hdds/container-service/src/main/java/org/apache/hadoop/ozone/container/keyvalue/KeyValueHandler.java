@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -110,6 +111,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetContainerMerkleTreeResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
@@ -143,6 +145,7 @@ public class KeyValueHandler extends Handler {
   private final boolean validateChunkChecksumData;
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
+  private final ContainerChecksumTreeManager checksumManager;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -156,6 +159,7 @@ public class KeyValueHandler extends Handler {
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
+    checksumManager = new ContainerChecksumTreeManager(config);
     try {
       volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
@@ -281,6 +285,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     case Echo:
       return handler.handleEcho(request, kvContainer);
+    case GetContainerMerkleTree:
+      return handler.handleGetContainerMerkleTree(request, kvContainer);
     default:
       return null;
     }
@@ -294,6 +300,11 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  @VisibleForTesting
+  public ContainerChecksumTreeManager getChecksumManager() {
+    return this.checksumManager;
   }
 
   ContainerCommandResponseProto handleStreamInit(
@@ -572,6 +583,33 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleEcho(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
     return getEchoResponse(request);
+  }
+
+  ContainerCommandResponseProto handleGetContainerMerkleTree(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    if (!request.hasGetContainerMerkleTree()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Container Merkle tree request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    KeyValueContainerData containerData = kvContainer.getContainerData();
+    ByteString checksumTree = null;
+    try {
+      checksumTree = checksumManager.getContainerChecksumInfo(containerData);
+    } catch (IOException ex) {
+      return ContainerCommandResponseProto.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setTraceID(request.getTraceID())
+          .setResult(IO_EXCEPTION)
+          .setMessage(ex.getMessage())
+          .build();
+    }
+
+    return getGetContainerMerkleTreeResponse(request, checksumTree);
   }
 
   /**

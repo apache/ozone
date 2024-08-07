@@ -727,6 +727,40 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * Gets the Container merkle tree for a container from a datanode.
+   * @param client - client that communicates with the container
+   * @param containerID - Container Id of the container
+   * @param encodedContainerID - Encoded token if security is enabled
+   */
+  public static ContainerProtos.GetContainerMerkleTreeResponseProto getContainerMerkleTree(
+      XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
+    ContainerProtos.GetContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
+        ContainerProtos.GetContainerMerkleTreeRequestProto
+            .newBuilder()
+            .setContainerID(containerID)
+            .build();
+    String id = client.getPipeline().getClosestNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(Type.GetContainerMerkleTree)
+        .setContainerID(containerID)
+        .setDatanodeUuid(id)
+        .setGetContainerMerkleTree(containerMerkleTreeRequestProto);
+    if (encodedContainerID != null) {
+      builder.setEncodedToken(encodedContainerID);
+    }
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        client.sendCommand(request, getValidatorList());
+    return response.getGetContainerMerkleTree();
+  }
+
+  /**
    * Validates a response from a container protocol call.  Any non-successful
    * return code is mapped to a corresponding exception and thrown.
    *

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collection;
@@ -35,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +174,30 @@ public class ContainerChecksumTreeManager {
           + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
+    }
+  }
+
+  public ByteString getContainerChecksumInfo(KeyValueContainerData data)
+      throws IOException {
+    long containerID = data.getContainerID();
+    Lock readLock = getReadLock(containerID);
+    readLock.lock();
+    try {
+      File checksumFile = getContainerChecksumFile(data);
+
+      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+        return ByteString.readFrom(inStream);
+      } catch (FileNotFoundException ex) {
+        // TODO: Build the container checksum tree when it doesn't exist.
+        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
+            containerID, checksumFile, ex);
+      } catch (IOException ex) {
+        throw new IOException("Error occured when reading checksum file for container " + containerID +
+            " at the path " + checksumFile, ex);
+      }
+      return ByteString.EMPTY;
+    } finally {
+      readLock.unlock();
     }
   }
 
