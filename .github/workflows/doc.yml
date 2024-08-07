@@ -89,17 +89,21 @@ jobs:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-pip unzip
+        run: sudo apt-get update && sudo apt-get install -y python3-pip
 
-      - name: Download the source zip
+      - name: Download the source artifact
         uses: actions/download-artifact@v4
         with:
           name: ozone-src
           path: .
 
-      - name: Extract the source zip
+      - name: List current directory contents for debugging
+        run: ls -al
+
+      - name: Extract the source tarball
         run: |
-          unzip ozone-src.zip -d ozone-src
+          mkdir -p ozone-src
+          tar -xzf ozone-src/*.tar.gz -C ozone-src
           mv ozone-src/* ozone-src/extracted
 
       - name: Find and list XML files
