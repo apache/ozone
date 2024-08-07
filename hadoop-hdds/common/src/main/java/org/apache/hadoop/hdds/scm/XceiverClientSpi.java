@@ -110,8 +110,7 @@ public abstract class XceiverClientSpi implements Closeable {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandAsync(request);
+      XceiverClientReply reply = sendCommandAsync(request);
       return reply.getResponse().get();
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
@@ -134,8 +133,7 @@ public abstract class XceiverClientSpi implements Closeable {
       List<Validator> validators)
       throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandAsync(request);
+      XceiverClientReply reply = sendCommandAsync(request);
       ContainerCommandResponseProto responseProto = reply.getResponse().get();
       for (Validator function : validators) {
         function.accept(request, responseProto);
