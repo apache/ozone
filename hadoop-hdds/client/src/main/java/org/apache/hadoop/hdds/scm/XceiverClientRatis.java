@@ -29,8 +29,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -66,6 +64,7 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -295,46 +294,39 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   }
 
   @Override
-  public XceiverClientReply watchForCommit(long index)
-      throws InterruptedException, ExecutionException, TimeoutException,
-      IOException {
+  public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
     final long replicatedMin = getReplicatedMinCommitIndex();
     if (replicatedMin >= index) {
-      return newWatchReply(index, "replicatedMin", replicatedMin);
+      return CompletableFuture.completedFuture(newWatchReply(index, "replicatedMin", replicatedMin));
     }
 
-    try {
-      CompletableFuture<RaftClientReply> replyFuture = getClient().async().watch(index, watchType);
-      final RaftClientReply reply = replyFuture.get();
+    final CompletableFuture<XceiverClientReply> replyFuture = new CompletableFuture<>();
+    getClient().async().watch(index, watchType).thenAccept(reply -> {
       final long updated = updateCommitInfosMap(reply, watchType);
-      Preconditions.checkState(updated >= index, "Returned index " + updated + " is smaller than expected " + index);
-      return newWatchReply(index, watchType, updated);
-    } catch (Exception e) {
+      Preconditions.checkState(updated >= index, "Returned index " + updated + " < expected " + index);
+      replyFuture.complete(newWatchReply(index, watchType, updated));
+    }).exceptionally(e -> {
       LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);
-      Throwable t =
-          HddsClientUtils.containsException(e, GroupMismatchException.class);
-      if (t != null) {
-        throw e;
-      }
-      if (watchType == ReplicationLevel.ALL_COMMITTED) {
-        Throwable nre =
-            HddsClientUtils.containsException(e, NotReplicatedException.class);
-        Collection<CommitInfoProto> commitInfoProtoList;
+      final boolean isGroupMismatch = HddsClientUtils.containsException(e, GroupMismatchException.class) != null;
+      if (!isGroupMismatch && watchType == ReplicationLevel.ALL_COMMITTED) {
+        final Throwable nre = HddsClientUtils.containsException(e, NotReplicatedException.class);
         if (nre instanceof NotReplicatedException) {
           // If NotReplicatedException is thrown from the Datanode leader
           // we can save one watch request round trip by using the CommitInfoProto
           // in the NotReplicatedException
-          commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
+          final Collection<CommitInfoProto> commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
+          replyFuture.complete(handleFailedAllCommit(index, commitInfoProtoList));
         } else {
-          final RaftClientReply reply = getClient().async()
-              .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-              .get();
-          commitInfoProtoList = reply.getCommitInfos();
+          getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
+              .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()))
+              .whenComplete(JavaUtils.asBiConsumer(replyFuture));
         }
-        return handleFailedAllCommit(index, commitInfoProtoList);
+      } else {
+        replyFuture.completeExceptionally(e);
       }
-      throw e;
-    }
+      return null;
+    });
+    return replyFuture;
   }
 
   private XceiverClientReply handleFailedAllCommit(long index, Collection<CommitInfoProto> commitInfoProtoList) {
@@ -374,8 +366,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
         raftClientReply.whenComplete((reply, e) -> {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("received reply {} for request: cmdType={} containerID={}"
-                    + " pipelineID={} traceID={} exception: {}", reply,
+            LOG.debug("received reply {} for request: cmdType={}, containerID={}, pipelineID={}, traceID={}", reply,
                 request.getCmdType(), request.getContainerID(),
                 request.getPipelineID(), request.getTraceID(), e);
           }
