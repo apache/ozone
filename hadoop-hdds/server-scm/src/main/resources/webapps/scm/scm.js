@@ -32,6 +32,23 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
+            $scope.statistics = {
+                nodes : {
+                    usages : {
+                        min : "N/A",
+                        max : "N/A",
+                        median : "N/A",
+                        stdev : "N/A"
+                    },
+                    state : {
+                        healthy : "N/A",
+                        dead : "N/A",
+                        decommissioning : "N/A",
+                        enteringmaintenance : "N/A",
+                        volumefailures : "N/A"
+                    }
+                }
+            }
 
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
@@ -81,6 +98,28 @@
                     $scope.totalItems = nodeStatusCopy.length;
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+
+                    ctrl.nodemanagermetrics.NodeStatistics.forEach(({key, value}) => {
+                        if(key == "Min") {
+                            $scope.statistics.nodes.usages.min = value;
+                        } else if(key == "Max") {
+                            $scope.statistics.nodes.usages.max = value;
+                        } else if(key == "Median") {
+                            $scope.statistics.nodes.usages.median = value;
+                        } else if(key == "Stdev") {
+                            $scope.statistics.nodes.usages.stdev = value;
+                        } else if(key == "Healthy") {
+                            $scope.statistics.nodes.state.healthy = value;
+                        } else if(key == "Dead") {
+                            $scope.statistics.nodes.state.dead = value;
+                        } else if(key == "Decommissioning") {
+                            $scope.statistics.nodes.state.decommissioning = value;
+                        } else if(key == "EnteringMaintenance") {
+                            $scope.statistics.nodes.state.enteringmaintenance = value;
+                        } else if(key == "VolumeFailures") {
+                            $scope.statistics.nodes.state.volumefailures = value;
+                        }
+                    });
                 });
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {

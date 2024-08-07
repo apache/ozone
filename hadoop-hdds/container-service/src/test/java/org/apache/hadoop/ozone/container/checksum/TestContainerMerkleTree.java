@@ -16,11 +16,11 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,20 +28,27 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildChunk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestContainerMerkleTree {
-  private static final long CHUNK_SIZE = (long) new OzoneConfiguration().getStorageSize(
-      ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-  private static final int BYTES_PER_CHECKSUM = new OzoneClientConfig().getBytesPerChecksum();
+  private ConfigurationSource config;
+  private long chunkSize;
+
+  @BeforeEach
+  public void init() {
+    config = new OzoneConfiguration();
+    chunkSize = (long) config.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+  }
 
   @Test
   public void testBuildEmptyTree() {
@@ -55,7 +62,7 @@ class TestContainerMerkleTree {
   public void testBuildOneChunkTree() throws Exception {
     // Seed the expected and actual trees with the same chunk.
     final long blockID = 1;
-    ChunkInfo chunk = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo chunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
 
     // Build the expected tree proto using the test code.
     ContainerProtos.ChunkMerkleTree chunkTree = buildExpectedChunkTree(chunk);
@@ -82,7 +89,7 @@ class TestContainerMerkleTree {
 
     ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
     assertEquals(0, actualChunkTree.getOffset());
-    assertEquals(CHUNK_SIZE, actualChunkTree.getLength());
+    assertEquals(chunkSize, actualChunkTree.getLength());
     assertNotEquals(0, actualChunkTree.getChunkChecksum());
   }
 
@@ -90,9 +97,9 @@ class TestContainerMerkleTree {
   public void testBuildTreeWithMissingChunks() throws Exception {
     // These chunks will be used to seed both the expected and actual trees.
     final long blockID = 1;
-    ChunkInfo chunk1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     // Chunk 2 is missing.
-    ChunkInfo chunk3 = buildChunk(2, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    ChunkInfo chunk3 = buildChunk(config, 2, ByteBuffer.wrap(new byte[]{4, 5, 6}));
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
@@ -116,10 +123,10 @@ class TestContainerMerkleTree {
     // Seed the expected and actual trees with the same chunks.
     final long blockID1 = 1;
     final long blockID3 = 3;
-    ChunkInfo b1c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b3c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b1c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b1c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b3c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
@@ -146,13 +153,13 @@ class TestContainerMerkleTree {
     final long blockID1 = 1;
     final long blockID2 = 2;
     final long blockID3 = 3;
-    ChunkInfo b1c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2}));
-    ChunkInfo b1c3 = buildChunk(2, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b2c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b2c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b3c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1}));
-    ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{2, 3, 4}));
+    ChunkInfo b1c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b1c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2}));
+    ChunkInfo b1c3 = buildChunk(config, 2, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b2c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b2c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1}));
+    ChunkInfo b3c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{2, 3, 4}));
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
@@ -179,41 +186,6 @@ class TestContainerMerkleTree {
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
-  }
-
-  public static void assertTreesSortedAndMatch(ContainerProtos.ContainerMerkleTree expectedTree,
-      ContainerProtos.ContainerMerkleTree actualTree) {
-    assertEquals(expectedTree.getDataChecksum(), actualTree.getDataChecksum());
-    assertEquals(expectedTree.getBlockMerkleTreeCount(), actualTree.getBlockMerkleTreeCount());
-
-    long prevBlockID = -1;
-    for (int blockIndex = 0; blockIndex < expectedTree.getBlockMerkleTreeCount(); blockIndex++) {
-      ContainerProtos.BlockMerkleTree expectedBlockTree = expectedTree.getBlockMerkleTree(blockIndex);
-      ContainerProtos.BlockMerkleTree actualBlockTree = actualTree.getBlockMerkleTree(blockIndex);
-
-      // Blocks should be sorted by block ID.
-      long currentBlockID = actualBlockTree.getBlockID();
-      assertTrue(prevBlockID < currentBlockID);
-      prevBlockID = currentBlockID;
-
-      assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
-      assertEquals(expectedBlockTree.getBlockChecksum(), actualBlockTree.getBlockChecksum());
-
-      long prevChunkOffset = -1;
-      for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
-        ContainerProtos.ChunkMerkleTree expectedChunkTree = expectedBlockTree.getChunkMerkleTree(chunkIndex);
-        ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(chunkIndex);
-
-        // Chunks should be sorted by offset.
-        long currentChunkOffset = actualChunkTree.getOffset();
-        assertTrue(prevChunkOffset < currentChunkOffset);
-        prevChunkOffset = currentChunkOffset;
-
-        assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
-        assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
-        assertEquals(expectedChunkTree.getChunkChecksum(), actualChunkTree.getChunkChecksum());
-      }
-    }
   }
 
   private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
@@ -244,36 +216,6 @@ class TestContainerMerkleTree {
         .setLength(chunk.getLen())
         .setChunkChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksums()))
         .build();
-  }
-
-  /**
-   * Builds a ChunkInfo object using the provided information. No new checksums are calculated, so this can be used
-   * as either the leaves of pre-computed merkle trees that serve as expected values, or as building blocks to pass
-   * to ContainerMerkleTree to have it build the whole tree from this information.
-   *
-   * @param indexInBlock Which chunk number within a block this is. The chunk's offset is automatically calculated
-   *     from this based on a fixed length.
-   * @param chunkChecksums The checksums within the chunk. Each is assumed to apply to a fixed value
-   *     "bytesPerChecksum" amount of data and are assumed to be contiguous.
-   * @return The ChunkInfo proto object built from this information.
-   */
-  public static ChunkInfo buildChunk(int indexInBlock, ByteBuffer... chunkChecksums) throws IOException {
-    // Each chunk checksum is added under the same ChecksumData object.
-    ContainerProtos.ChecksumData checksumData = ContainerProtos.ChecksumData.newBuilder()
-        .setType(ContainerProtos.ChecksumType.CRC32)
-        .setBytesPerChecksum(BYTES_PER_CHECKSUM)
-        .addAllChecksums(Arrays.stream(chunkChecksums)
-            .map(ByteString::copyFrom)
-            .collect(Collectors.toList()))
-        .build();
-
-    return ChunkInfo.getFromProtoBuf(
-        ContainerProtos.ChunkInfo.newBuilder()
-        .setChecksumData(checksumData)
-        .setChunkName("chunk")
-        .setOffset(indexInBlock * CHUNK_SIZE)
-        .setLen(CHUNK_SIZE)
-        .build());
   }
 
   private long computeExpectedChecksum(List<Long> checksums) {

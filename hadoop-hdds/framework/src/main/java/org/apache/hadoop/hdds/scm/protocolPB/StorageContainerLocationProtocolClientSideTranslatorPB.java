@@ -125,7 +125,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;

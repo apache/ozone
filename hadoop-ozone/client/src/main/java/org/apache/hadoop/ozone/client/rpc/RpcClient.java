@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -336,7 +337,7 @@ public class RpcClient implements ClientProtocol {
     return xceiverClientManager;
   }
 
-  private OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
+  public static OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
     OzoneManagerVersion version = OzoneManagerVersion.CURRENT;
     for (ServiceInfo si : info.getServiceInfoList()) {
       if (si.getNodeType() == HddsProtos.NodeType.OM) {
@@ -2156,6 +2157,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
       String bucketName, String keyName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2169,6 +2172,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2562,7 +2567,8 @@ public class RpcClient implements ClientProtocol {
         .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
         .setExecutorServiceSupplier(writeExecutor)
-        .setStreamBufferArgs(streamBufferArgs);
+        .setStreamBufferArgs(streamBufferArgs)
+        .setOmVersion(omVersion);
   }
 
   @Override
@@ -2682,6 +2688,28 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(obj.getBucketName())
         .setKeyName(keyName);
     ozoneManagerClient.setTimes(builder.build(), mtime, atime);
+  }
+
+  @Override
+  public LeaseKeyInfo recoverLease(String volumeName, String bucketName,
+                                   String keyName, boolean force)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new UnsupportedOperationException("Lease recovery API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + omVersion);
+    }
+    return ozoneManagerClient.recoverLease(volumeName, bucketName, keyName, force);
+  }
+
+  @Override
+  public void recoverKey(OmKeyArgs args, long clientID) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new UnsupportedOperationException("Lease recovery API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + omVersion);
+    }
+    ozoneManagerClient.recoverKey(args, clientID);
   }
 
   private static ExecutorService createThreadPoolExecutor(

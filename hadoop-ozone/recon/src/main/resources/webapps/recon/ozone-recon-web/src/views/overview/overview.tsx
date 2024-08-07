@@ -73,6 +73,7 @@ interface IOverviewState {
   deletePendingSummarytotalUnrepSize: number | string;
   deletePendingSummarytotalRepSize: number | string;
   deletePendingSummarytotalDeletedKeys: number | string;
+  decommissionInfoCount: number | string;
   scmServiceId: string;
   omServiceId: string;
 }
@@ -111,7 +112,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       openSummarytotalOpenKeys: 0,
       deletePendingSummarytotalUnrepSize: 0,
       deletePendingSummarytotalRepSize: 0,
-      deletePendingSummarytotalDeletedKeys: 0
+      deletePendingSummarytotalDeletedKeys: 0,
+      decommissionInfoCount: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -131,7 +133,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       '/api/v1/clusterState',
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
-      '/api/v1/keys/deletePending/summary'
+      '/api/v1/keys/deletePending/summary',
+      '/api/v1/datanodes/decommission/info'
     ], cancelOverviewSignal);
     cancelOverviewSignal = controller;
 
@@ -139,13 +142,15 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       clusterStateResponse: Awaited<Promise<any>>,
       taskstatusResponse: Awaited<Promise<any>>,
       openResponse: Awaited<Promise<any>>,
-      deletePendingResponse: Awaited<Promise<any>>
+      deletePendingResponse: Awaited<Promise<any>>,
+      decommissionResponse: Awaited<Promise<any>>
     ) => {
       let responseError = [
         clusterStateResponse,
         taskstatusResponse,
         openResponse,
-        deletePendingResponse
+        deletePendingResponse,
+        decommissionResponse
       ].filter((resp) => resp.status === 'rejected');
 
       if (responseError.length !== 0) {
@@ -186,8 +191,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         taskName: 'N/A', lastUpdatedTimestamp: 0, lastUpdatedSeqNumber: 0
       }];
       const missingContainersCount = clusterState.missingContainers;
-      const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
-      const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
+      const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
+      const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
 
       this.setState({
         loading: false,
@@ -212,6 +217,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         deletePendingSummarytotalUnrepSize: deletePendingResponse.value?.data?.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse.value?.data?.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse.value?.data?.totalDeletedKeys,
+        decommissionInfoCount: decommissionResponse.value?.data?.DatanodesDecommissionInfo.length,
         scmServiceId: clusterState.scmServiceId,
         omServiceId: clusterState.omServiceId
       });
@@ -267,10 +273,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const { loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
       deletePendingSummarytotalUnrepSize, deletePendingSummarytotalRepSize, deletePendingSummarytotalDeletedKeys,
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
-      omStatus, openContainers, deletedContainers, scmServiceId, omServiceId } = this.state;
+      omStatus, openContainers, deletedContainers, scmServiceId, omServiceId, decommissionInfoCount } = this.state;
 
     let openKeysError: boolean = false;
     let pendingDeleteKeysError: boolean = false;
+    let decommissionInfoError: boolean = false;
+
     if ([
       openSummarytotalRepSize,
       openSummarytotalUnrepSize,
@@ -278,6 +286,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         (data) => data === undefined
       )) {
       openKeysError = true;
+    }
+
+    if ([decommissionInfoCount].some(
+        (data) => data === undefined
+      )) {
+      decommissionInfoError = true;
     }
 
     if ([
@@ -427,6 +441,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
               <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
             </Col>
           }
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount !== undefined ? decommissionInfoCount.toString() : 'NA'} icon='hourglass'
+              linkToUrl='/Datanodes' error={decommissionInfoError} />
+          </Col>
         </Row>
       </div>
     );

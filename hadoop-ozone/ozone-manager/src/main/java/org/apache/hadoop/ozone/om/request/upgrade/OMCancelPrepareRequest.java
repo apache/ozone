@@ -96,7 +96,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
           createErrorOMResponse(responseBuilder, e));
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.UPGRADE_CANCEL,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_CANCEL,
         new HashMap<>(), exception, userInfo));
     return response;
   }
