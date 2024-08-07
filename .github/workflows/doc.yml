@@ -100,17 +100,6 @@ jobs:
       - name: List current directory contents for debugging
         run: ls -al
 
-      - name: Extract the source tarball
-        run: |
-          mkdir -p ozone-src
-          tar -xzf ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src
-          mv ozone-src/* ozone-src/extracted
-
-      - name: Find and list XML files
-        run: |
-          find ozone-src/extracted -name 'ozone-default-generated.xml' | grep -v '/test-classes/' > xml_files.txt
-          cat xml_files.txt
-
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
