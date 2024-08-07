@@ -10,5 +10,7 @@ import java.util.List;
 public interface ScanResult {
   boolean isHealthy();
 
+  boolean isDeleted();
+
   List<ContainerScanError> getErrors();
 }

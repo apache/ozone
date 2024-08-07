@@ -92,26 +92,28 @@ public class BackgroundContainerDataScanner extends
     logScanStart(containerData);
     DataScanResult result = c.scanData(throttler, canceler);
 
-    // Metrics for skipped containers should not be updated.
-    if (result.getFailureType() == DELETED_CONTAINER) {
-      LOG.error("Container [{}] has been deleted.",
-          containerId, result.getException());
-      return;
-    }
-    if (!result.isHealthy()) {
-      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
-          containerId, result.getException());
-      boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerId, result);
-      if (containerMarkedUnhealthy) {
-        metrics.incNumUnHealthyContainers();
+    if (result.isDeleted()) {
+      LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
+    } else {
+      if (!result.isHealthy()) {
+        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. The first error encountered was: {}",
+            containerId, result);
+        // Only increment the number of unhealthy containers if the container was not already unhealthy.
+        if (controller.markContainerUnhealthy(containerId, result)) {
+          metrics.incNumUnHealthyContainers();
+        }
       }
+      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
     }
 
-    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+    // Even if the container was deleted, mark the scan as completed.
     metrics.incNumContainersScanned();
     Instant now = Instant.now();
     logScanCompleted(containerData, now);
-    controller.updateDataScanTimestamp(containerId, now);
+
+    if (!result.isDeleted()) {
+      controller.updateDataScanTimestamp(containerId, now);
+    }
   }
 
   @Override

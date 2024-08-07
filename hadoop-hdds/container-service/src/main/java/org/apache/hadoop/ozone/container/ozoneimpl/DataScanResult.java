@@ -13,56 +13,39 @@ import java.util.List;
  * The result will contain all the errors seen while scanning the container, and a ContainerMerkleTree representing
  * the data that the scan saw on the disk when it ran.
  */
-public class DataScanResult implements ScanResult {
+public class DataScanResult extends MetadataScanResult {
 
-  private final boolean healthy;
-  private final List<ContainerScanError> errors;
   private final ContainerMerkleTree dataTree;
+  private static final DataScanResult DELETED = new DataScanResult(Collections.emptyList(),
+      new ContainerMerkleTree(), true);
 
-  private DataScanResult(boolean healthy, List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
-    this.healthy = healthy;
-    this.errors = errors;
+  private DataScanResult(List<ContainerScanError> errors, ContainerMerkleTree dataTree, boolean deleted) {
+    super(errors, deleted);
     this.dataTree = dataTree;
-  }
-
-  /**
-   * Constructs a healthy data scan result with the provided container merkle tree representing the data that was
-   * scanned. A healthy data scan implies a healthy metadata scan.
-   */
-  public static DataScanResult healthy(ContainerMerkleTree dataTree) {
-    return new DataScanResult(true, Collections.emptyList(), dataTree);
   }
 
   /**
    * Constructs an unhealthy data scan result which was aborted before scanning any data due to a metadata error.
    * This data scan result will have an empty data tree with a zero checksum to indicate that no data was scanned.
    */
-  public static DataScanResult unhealthy(MetadataScanResult result) {
+  public static DataScanResult unhealthyMetadata(MetadataScanResult result) {
     Preconditions.checkArgument(!result.isHealthy());
-    return new DataScanResult(false, result.getErrors(), new ContainerMerkleTree());
+    return new DataScanResult(result.getErrors(), new ContainerMerkleTree(), false);
+  }
+
+  public static DataScanResult deleted() {
+    return DELETED;
   }
 
   /**
    * Constructs an unhealthy data scan result which had a successful metadata scan but unhealthy data scan.
    * Failure types should be
    */
-  public static DataScanResult unhealthy(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
-    return new DataScanResult(false, errors, dataTree);
+  public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
+    return new DataScanResult(errors, dataTree, false);
   }
 
   public ContainerMerkleTree getDataTree() {
     return dataTree;
-  }
-
-  @Override
-  public boolean isHealthy() {
-    return healthy;
-  }
-
-  /**
-   * Returns a list of failures in the order that they were encountered by the scanner.
-   */
-  public List<ContainerScanError> getErrors() {
-    return errors;
   }
 }

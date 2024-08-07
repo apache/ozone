@@ -2,6 +2,9 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.File;
 
+/**
+ * This class is used to identify any error that may be seen while scanning a container.
+ */
 public class ContainerScanError {
   /**
    * Represents the reason a container scan failed and a container should
@@ -18,7 +21,6 @@ public class ContainerScanError {
     INCONSISTENT_CHUNK_LENGTH,
     INACCESSIBLE_DB,
     WRITE_FAILURE,
-    DELETED_CONTAINER
   }
 
   private final File unhealthyFile;
@@ -41,5 +43,11 @@ public class ContainerScanError {
 
   public Throwable getException() {
     return exception;
+  }
+
+  @Override
+  public String toString() {
+    // TODO
+    return "";
   }
 }

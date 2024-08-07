@@ -78,12 +78,14 @@ public class BackgroundContainerMetadataScanner extends
 
     ScanResult result = container.scanMetaData();
     if (!result.isHealthy()) {
-      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
-          containerID, result.getException());
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. The first error encountered was: {}",
+          containerID, result);
       boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
       if (containerMarkedUnhealthy) {
         metrics.incNumUnHealthyContainers();
       }
+    } else if (result.isDeleted()) {
+      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
     }
 
     // Do not update the scan timestamp after the scan since this was just a
