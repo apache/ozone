@@ -39,10 +39,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
 import com.google.common.util.concurrent.Striped;
@@ -78,8 +75,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class ChunkUtils {
 
-  private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
-
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkUtils.class);
 
@@ -95,7 +90,7 @@ public final class ChunkUtils {
           StandardOpenOption.READ
       ));
   public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
-  public static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 512;
+  public static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 2048;
   private static Striped<ReadWriteLock> fileStripedLock =
       Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
 
@@ -108,13 +103,8 @@ public final class ChunkUtils {
     fileStripedLock = stripedLock;
   }
 
-  @VisibleForTesting
-  public static void clearStripedLock() {
-    fileStripedLock = Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
-  }
-
-  private static ReentrantReadWriteLock getFileLock(Path filePath) {
-    return (ReentrantReadWriteLock) fileStripedLock.get(filePath);
+  private static ReadWriteLock getFileLock(Path filePath) {
+    return fileStripedLock.get(filePath);
   }
 
   private static AutoCloseableLock getFileReadLock(Path filePath) {
@@ -402,29 +392,6 @@ public final class ChunkUtils {
       throw new StorageContainerException(
           "Chunk file not found: " + file.getPath(),
           UNABLE_TO_FIND_CHUNK);
-    }
-  }
-
-  @VisibleForTesting
-  static <T> T processFileExclusively(Path path, Supplier<T> op)
-      throws InterruptedException {
-    long period = 1;
-    for (;;) {
-      if (LOCKS.add(path)) {
-        break;
-      } else {
-        Thread.sleep(period);
-        // exponentially backoff until the sleep time is over 1 second.
-        if (period < 1000) {
-          period *= 2;
-        }
-      }
-    }
-
-    try {
-      return op.get();
-    } finally {
-      LOCKS.remove(path);
     }
   }
 
