@@ -2136,6 +2136,23 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
   }
 
+  @Override
+  public List<List<String>> getRatisRoles() {
+    final SCMRatisServer server = getScmHAManager().getRatisServer();
+    List<String> ratisRoles = server.getRatisRoles();
+    List<List<String>> result = new ArrayList<>();
+    for (String role : ratisRoles) {
+      String[] roleArr = role.split(":");
+      List<String> scmInfo = new ArrayList<>();
+      scmInfo.add(roleArr[0]);
+      scmInfo.add(roleArr[3]);
+      scmInfo.add(roleArr[1]);
+      scmInfo.add(roleArr[2]);
+      result.add(scmInfo);
+    }
+    return result;
+  }
+
   /**
    * @return hostname of primordialNode
    */
