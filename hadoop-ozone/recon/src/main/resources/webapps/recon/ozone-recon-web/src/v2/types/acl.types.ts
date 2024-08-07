@@ -15,18 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+export const ACLIdentityTypeList = [
+  'USER',
+  'GROUP',
+  'WORLD',
+  'ANONYMOUS',
+  'CLIENT_IP'
+] as const;
+export type ACLIdentity = typeof ACLIdentityTypeList[number];
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  }
-];
+export const ACLRightList = [
+  'READ',
+  'WRITE',
+  'CREATE',
+  'LIST',
+  'DELETE',
+  'READ_ACL',
+  'WRITE_ACL',
+  'ALL',
+  'NONE'
+] as const;
+export type ACLRight = typeof ACLRightList[number];
+
+
+export type Acl = {
+  type: string;
+  name: string;
+  scope: string;
+  aclList: string[];
+}
