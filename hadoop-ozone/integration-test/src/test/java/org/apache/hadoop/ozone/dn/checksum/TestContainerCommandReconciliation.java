@@ -60,8 +60,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.container.checksum.TestContainerMerkleTree.assertTreesSortedAndMatch;
-import static org.apache.hadoop.ozone.container.checksum.TestContainerMerkleTree.buildChunk;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildChunk;
 
 /**
  * This class tests container commands for reconciliation.
@@ -180,12 +180,12 @@ public class TestContainerCommandReconciliation {
     final long blockID1 = 1;
     final long blockID2 = 2;
     final long blockID3 = 3;
-    ChunkInfo b1c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
-    ChunkInfo b2c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
-    ChunkInfo b2c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
-    ChunkInfo b3c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
-    ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
+    ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
+    ChunkInfo b2c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
+    ChunkInfo b3c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
+    ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
 
     ContainerMerkleTree tree = new ContainerMerkleTree();
     tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));

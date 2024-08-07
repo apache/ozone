@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -73,10 +73,12 @@ public class BlockDeletingTask implements BackgroundTask {
   private final OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
   private Duration blockDeletingMaxLockHoldingTime;
+  private final ContainerChecksumTreeManager checksumTreeManager;
 
   public BlockDeletingTask(
       BlockDeletingService blockDeletingService,
       BlockDeletingService.ContainerBlockInfo containerBlockInfo,
+      ContainerChecksumTreeManager checksumTreeManager,
       int priority) {
     this.ozoneContainer = blockDeletingService.getOzoneContainer();
     this.metrics = blockDeletingService.getMetrics();
@@ -87,25 +89,26 @@ public class BlockDeletingTask implements BackgroundTask {
     this.containerData =
         (KeyValueContainerData) containerBlockInfo.getContainerData();
     this.blocksToDelete = containerBlockInfo.getNumBlocksToDelete();
+    this.checksumTreeManager = checksumTreeManager;
   }
 
   private static class ContainerBackgroundTaskResult
       implements BackgroundTaskResult {
-    private List<String> deletedBlockIds;
+    private final List<Long> deletedBlockIds;
 
     ContainerBackgroundTaskResult() {
       deletedBlockIds = new LinkedList<>();
     }
 
-    public void addBlockId(String blockId) {
+    public void addBlockId(Long blockId) {
       deletedBlockIds.add(blockId);
     }
 
-    public void addAll(List<String> blockIds) {
+    public void addAll(List<Long> blockIds) {
       deletedBlockIds.addAll(blockIds);
     }
 
-    public List<String> getDeletedBlocks() {
+    public List<Long> getDeletedBlocks() {
       return deletedBlockIds;
     }
 
@@ -195,7 +198,8 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      List<String> succeedBlocks = new LinkedList<>();
+      List<Long> succeedBlockIDs = new LinkedList<>();
+      List<String> succeedBlockDBKeys = new LinkedList<>();
       LOG.debug("Container : {}, To-Delete blocks : {}",
           containerData.getContainerID(), toDeleteBlocks.size());
 
@@ -216,7 +220,8 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, entry.getValue());
           releasedBytes += KeyValueContainerUtil.getBlockLength(
               entry.getValue());
-          succeedBlocks.add(blockName);
+          succeedBlockIDs.add(entry.getValue().getLocalID());
+          succeedBlockDBKeys.add(blockName);
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
         } catch (IOException e) {
@@ -224,12 +229,17 @@ public class BlockDeletingTask implements BackgroundTask {
         }
       }
 
+      // Mark blocks as deleted in the container checksum tree.
+      // Data for these blocks does not need to be copied during container reconciliation if container replicas diverge.
+      // Do this before the delete transactions are removed from the database.
+      checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlockIDs);
+
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
       try (BatchOperation batch = meta.getStore().getBatchHandler()
           .initBatchOperation()) {
-        for (String entry : succeedBlocks) {
-          blockDataTable.deleteWithBatch(batch, entry);
+        for (String key: succeedBlockDBKeys) {
+          blockDataTable.deleteWithBatch(batch, key);
         }
 
         // Handler.deleteBlock calls deleteChunk to delete all the chunks
@@ -237,7 +247,7 @@ public class BlockDeletingTask implements BackgroundTask {
         // updated with decremented used bytes during deleteChunk. This is
         // done here so that all the DB update for block delete can be
         // batched together while committing to DB.
-        int deletedBlocksCount = succeedBlocks.size();
+        int deletedBlocksCount = succeedBlockDBKeys.size();
         containerData.updateAndCommitDBCounters(meta, batch,
             deletedBlocksCount, releasedBytes);
         // Once DB update is persisted, check if there are any blocks
@@ -257,13 +267,13 @@ public class BlockDeletingTask implements BackgroundTask {
         metrics.incrSuccessBytes(releasedBytes);
       }
 
-      if (!succeedBlocks.isEmpty()) {
+      if (!succeedBlockDBKeys.isEmpty()) {
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            succeedBlocks.size(), releasedBytes,
+            succeedBlockDBKeys.size(), releasedBytes,
             Time.monotonicNow() - startTime);
       }
-      crr.addAll(succeedBlocks);
+      crr.addAll(succeedBlockIDs);
       return crr;
     } catch (IOException exception) {
       LOG.warn("Deletion operation was not successful for container: " +
@@ -363,9 +373,12 @@ public class BlockDeletingTask implements BackgroundTask {
       List<DeletedBlocksTransaction> deletedBlocksTxs =
           deleteBlocksResult.deletedBlocksTxs();
       deleteBlocksResult.deletedBlocksTxs().forEach(
-          tx -> crr.addAll(tx.getLocalIDList().stream()
-              .map(String::valueOf).collect(Collectors.toList()))
-      );
+          tx -> crr.addAll(tx.getLocalIDList()));
+
+      // Mark blocks as deleted in the container checksum tree.
+      // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
+      // Do this before the delete transactions are removed from the database.
+      checksumTreeManager.markBlocksAsDeleted(containerData, crr.getDeletedBlocks());
 
       // Once blocks are deleted... remove the blockID from blockDataTable
       // and also remove the transactions from txnTable.
