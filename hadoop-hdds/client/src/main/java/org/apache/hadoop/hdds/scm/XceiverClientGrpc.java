@@ -174,10 +174,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
-    // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}, connecting to server : {}",
-          pipeline.getNodes(), dn.getIpAddress());
+      LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ",
+          dn, pipeline.getNodes());
     }
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub asyncStub =
