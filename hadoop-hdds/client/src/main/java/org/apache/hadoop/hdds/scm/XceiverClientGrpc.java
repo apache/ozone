@@ -176,8 +176,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
-      LOG.debug("Connecting to server : {}", dn.getIpAddress());
+      LOG.debug("Nodes in pipeline : {}, connecting to server : {}",
+          pipeline.getNodes(), dn.getIpAddress());
     }
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub asyncStub =
@@ -320,7 +320,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   /**
    * @param request
    * @param dn
-   * @param pipeline
    * In case of getBlock for EC keys, it is required to set replicaIndex for
    * every request with the replicaIndex for that DN for which the request is
    * sent to. This method unpacks proto and reconstructs request after setting
@@ -345,8 +344,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandWithTraceIDAndRetry(request, validators);
+      XceiverClientReply reply = sendCommandWithTraceIDAndRetry(request, validators);
       return reply.getResponse().get();
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
