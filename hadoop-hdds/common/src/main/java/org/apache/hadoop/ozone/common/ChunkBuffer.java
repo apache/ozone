@@ -136,12 +136,10 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
   List<ByteBuffer> asByteBufferList();
 
   /**
-   * Write the contents of the buffer from the current position to the limit
+   * Write all the contents of the buffer from the current position to the limit
    * to {@code channel}.
-   *
-   * @return The number of bytes written, possibly zero
    */
-  long writeTo(GatheringByteChannel channel) throws IOException;
+  void writeFully(GatheringByteChannel channel) throws IOException;
 
   /**
    * Convert this buffer to a {@link ByteString}.
