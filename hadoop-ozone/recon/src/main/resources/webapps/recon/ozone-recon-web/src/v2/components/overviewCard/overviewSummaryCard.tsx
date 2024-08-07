@@ -55,7 +55,7 @@ const cardBodyStyle: React.CSSProperties = {
 
 
 // ------------- Component -------------- //
-const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
+const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   data = '',
   title = '',
   hoverable = false,
@@ -105,4 +105,4 @@ const OverviewTableCard: React.FC<OverviewTableCardProps> = ({
   )
 }
 
-export default OverviewTableCard;
+export default OverviewSummaryCard;

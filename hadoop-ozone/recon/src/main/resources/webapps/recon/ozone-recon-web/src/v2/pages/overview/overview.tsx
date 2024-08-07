@@ -28,9 +28,9 @@ import {
 import { Link } from 'react-router-dom';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
-import OverviewTableCard from '@/v2/components/overviewCard/overviewTableCard';
+import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
-import OverviewCardSimple from '@/v2/components/overviewCard/overviewSimpleCard';
+import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { showDataFetchError } from '@/utils/common';
@@ -39,6 +39,7 @@ import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/ut
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
 import './overview.less';
+import Loader from '@/v2/components/loader/loader';
 
 
 const size = filesize.partial({ round: 1 });
@@ -339,6 +340,7 @@ const Overview: React.FC<{}> = () => {
 
   return (
     <>
+      <Loader/>
       <div className='page-header-v2'>
         Overview
         <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
@@ -357,7 +359,7 @@ const Overview: React.FC<{}> = () => {
               xl: 16
             }, 20]}>
           <Col xs={24} sm={24} md={24} lg={10} xl={10}>
-            <OverviewTableCard
+            <OverviewSummaryCard
               title='Health'
               data={healthCardIndicators}
               showHeader={true}
@@ -409,7 +411,7 @@ const Overview: React.FC<{}> = () => {
             xl: 16
           }, 20]}>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Volumes'
               icon='inbox'
               loading={loading}
@@ -417,7 +419,7 @@ const Overview: React.FC<{}> = () => {
               linkToUrl='/Volumes' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Buckets'
               icon='folder-open'
               loading={loading}
@@ -425,14 +427,14 @@ const Overview: React.FC<{}> = () => {
               linkToUrl='/Buckets' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Keys'
               icon='file-text'
               loading={loading}
               data={keys} />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Pipelines'
               icon='deployment-unit'
               loading={loading}
@@ -440,7 +442,7 @@ const Overview: React.FC<{}> = () => {
               linkToUrl='/Pipelines' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Deleted Containers'
               icon='delete'
               loading={loading}
@@ -456,7 +458,7 @@ const Overview: React.FC<{}> = () => {
             xl: 16
           }, 20]}>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-            <OverviewTableCard
+            <OverviewSummaryCard
               title='Open Keys Summary'
               loading={loading}
               columns={[
@@ -495,7 +497,7 @@ const Overview: React.FC<{}> = () => {
               linkToUrl='/Om' />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-            <OverviewTableCard
+            <OverviewSummaryCard
               title='Delete Pending Keys Summary'
               loading={loading}
               columns={[
