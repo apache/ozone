@@ -449,6 +449,8 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+        } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -508,6 +510,18 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return ipChanged || hostNameChanged;
+  }
+
+  /**
+   * Check if the version has been updated.
+   *
+   * @param oldVersion datanode oldVersion
+   * @param newVersion datanode newVersion
+   * @return true means replacement is needed, while false means replacement is not needed.
+   */
+  private boolean isVersionChange(String oldVersion, String newVersion) {
+    final boolean ipChanged = !Objects.equals(oldVersion, newVersion);
+    return ipChanged;
   }
 
   /**
