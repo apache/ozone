@@ -28,6 +28,62 @@
     </tbody>
 </table>
 
+<h2>Usage Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode Usage</th>
+        <th>in percentage (%)</th>
+    </tr>
+    <tr>
+        <td>Min</td>
+        <td>{{statistics.nodes.usages.min}}</td>
+    </tr>
+    <tr>
+        <td>Median</td>
+        <td>{{statistics.nodes.usages.median}}</td>
+    </tr>
+    <tr>
+        <td>Max</td>
+        <td>{{statistics.nodes.usages.max}}</td>
+    </tr>
+    <tr>
+        <td>Standard Deviation</td>
+        <td>{{statistics.nodes.usages.stdev}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>State Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode State</th>
+        <th>Count</th>
+    </tr>
+    <tr>
+        <td>Healthy Nodes</td>
+        <td>{{statistics.nodes.state.healthy}}</td>
+    </tr>
+    <tr>
+        <td>Dead Nodes</td>
+        <td>{{statistics.nodes.state.dead}}</td>
+    </tr>
+    <tr>
+        <td>Decommissioning Nodes</td>
+        <td>{{statistics.nodes.state.decommissioning}}</td>
+    </tr>
+    <tr>
+        <td>Entering Maintenance Nodes</td>
+        <td>{{statistics.nodes.state.enteringmaintenance}}</td>
+    </tr>
+    <tr>
+        <td>Volume Failures Nodes</td>
+        <td>{{statistics.nodes.state.volumefailures}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Node Status</h2>
 <div class="row">
     <div class="col-md-6 text-left">

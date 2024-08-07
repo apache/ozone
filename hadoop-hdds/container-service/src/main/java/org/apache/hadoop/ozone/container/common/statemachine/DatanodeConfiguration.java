@@ -75,6 +75,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONTAINER_SCHEMA_V3_ENABLED =
       "hdds.datanode.container.schema.v3.enabled";
   public static final String CONTAINER_CHECKSUM_LOCK_STRIPES_KEY = "hdds.datanode.container.checksum.lock.stripes";
+  public static final String CONTAINER_CLIENT_CACHE_SIZE = "hdds.datanode.container.client.cache.size";
+  public static final String CONTAINER_CLIENT_CACHE_STALE_THRESHOLD =
+      "hdds.datanode.container.client.cache.stale.threshold";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -111,6 +114,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final Boolean
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
   public static final int CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT = 127;
+  public static final int CONTAINER_CLIENT_CACHE_SIZE_DEFAULT = 100;
+  public static final int
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT = 10000;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -567,6 +573,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
 
+  @Config(key = "container.client.cache.size",
+      type = ConfigType.INT,
+      defaultValue = "100",
+      tags = { DATANODE },
+      description = "The maximum number of clients to be cached by the datanode client manager"
+  )
+  private int containerClientCacheSize = CONTAINER_CLIENT_CACHE_SIZE_DEFAULT;
+
+  @Config(key = "container.client.cache.stale.threshold",
+      type = ConfigType.INT,
+      defaultValue = "10000",
+      tags = { DATANODE },
+      description = "The stale threshold in ms for a client in cache. After this threshold the client " +
+          "is evicted from cache."
+  )
+  private int containerClientCacheStaleThreshold =
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
+
+  @SuppressWarnings("checkstyle:MethodLength")
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -705,6 +730,19 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CHECKSUM_LOCK_STRIPES_KEY,
           CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT);
       containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
+    }
+
+    if (containerClientCacheSize < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CLIENT_CACHE_SIZE,
+          CONTAINER_CLIENT_CACHE_SIZE_DEFAULT);
+      containerClientCacheSize = CONTAINER_CLIENT_CACHE_SIZE_DEFAULT;
+    }
+
+    if (containerClientCacheStaleThreshold < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CLIENT_CACHE_STALE_THRESHOLD,
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT);
+      containerClientCacheStaleThreshold =
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
     }
   }
 
@@ -936,5 +974,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getContainerChecksumLockStripes() {
     return containerChecksumLockStripes;
+  }
+
+  public int getContainerClientCacheSize() {
+    return containerClientCacheSize;
+  }
+
+  public int getContainerClientCacheStaleThreshold() {
+    return containerClientCacheStaleThreshold;
   }
 }

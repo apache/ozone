@@ -247,7 +247,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("accessId", accessId);
     auditMap.put("userPrincipal", userPrincipal);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_USER_ACCESSID, auditMap, exception,
         getOmRequest().getUserInfo()));
 

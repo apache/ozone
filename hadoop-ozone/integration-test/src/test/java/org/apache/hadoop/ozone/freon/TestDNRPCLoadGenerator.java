@@ -70,7 +70,7 @@ public class TestDNRPCLoadGenerator {
         .setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
-            180000);
+        180000);
 
     StorageContainerLocationProtocolClientSideTranslatorPB
         storageContainerLocationClient = cluster
