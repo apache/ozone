@@ -27,16 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -74,6 +65,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -177,6 +169,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean shouldDeleteRatisLogDirectory;
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
+  private static final ExecutorService timeoutExecutor = HadoopExecutors.newCachedThreadPool(
+      new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("XceiverServerRatisTimeoutThread-%d").build());
 
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -597,6 +592,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         for (ExecutorService executor : chunkExecutors) {
           executor.shutdown();
         }
+        HadoopExecutors.shutdown(timeoutExecutor, LOG, 5, TimeUnit.SECONDS);
         isStarted = false;
       } catch (IOException e) {
         LOG.error("XceiverServerRatis Could not be stopped gracefully.", e);
@@ -667,8 +663,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
               RaftClientRequest.writeRequestType());
       RaftClientReply reply;
       try {
-        reply = server.submitClientRequestAsync(raftClientRequest)
-            .get(requestTimeout, TimeUnit.MILLISECONDS);
+        Future<RaftClientReply> futureReply = timeoutExecutor.submit(() ->
+            server.submitClientRequestAsync(raftClientRequest).join());
+        reply = futureReply.get(requestTimeout, TimeUnit.MILLISECONDS);
       } catch (ExecutionException | TimeoutException e) {
         throw new IOException(e.getMessage(), e);
       } catch (InterruptedException e) {
