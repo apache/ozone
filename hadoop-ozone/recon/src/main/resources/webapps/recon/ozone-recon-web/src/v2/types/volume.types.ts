@@ -41,6 +41,6 @@ export type VolumesState = {
   totalCount: number;
   lastUpdated: number;
   columnOptions: Option[];
-  currentRow?: Volume;
+  currentRow: Volume | Record<string, never>;
   showPanel: boolean;
 }

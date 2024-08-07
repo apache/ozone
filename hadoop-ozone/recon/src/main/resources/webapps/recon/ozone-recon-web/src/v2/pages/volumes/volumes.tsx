@@ -148,7 +148,7 @@ const Volumes: React.FC<{}> = () => {
     lastUpdated: 0,
     columnOptions: defaultColumns,
     showPanel: false,
-    currentRow: undefined
+    currentRow: {}
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
@@ -308,7 +308,7 @@ const Volumes: React.FC<{}> = () => {
             />
           </div>
         </div>
-        <AclPanel visible={showPanel} acls={currentRow!.acls} objName={currentRow!.volume} objType='Volume' />
+        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume' />
       </div>
     </>
   );
