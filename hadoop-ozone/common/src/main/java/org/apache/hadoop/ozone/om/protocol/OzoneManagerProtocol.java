@@ -1153,4 +1153,17 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   OzoneFsServerDefaults getServerDefaults() throws IOException;
+
+  /**
+   * Get status of last triggered quota repair in OM.
+   * @return String
+   * @throws IOException
+   */
+  String getQuotaRepairStatus() throws IOException;
+
+  /**
+   * trigger quota repair in OM.
+   * @throws IOException
+   */
+  void triggerQuotaRepair(List<String> buckets) throws IOException;
 }

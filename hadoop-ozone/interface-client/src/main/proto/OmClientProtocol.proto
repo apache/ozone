@@ -151,6 +151,8 @@ enum Type {
   ListOpenFiles = 132;
   QuotaRepair = 133;
   GetServerDefaults = 134;
+  QuotaRepairStatus = 135;
+  QuotaRepairTrigger = 136;
 }
 
 enum SafeMode {
@@ -291,6 +293,8 @@ message OMRequest {
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
+  optional QuotaRepairStatusRequest         QuotaRepairStatusRequest       = 133;
+  optional QuotaRepairTriggerRequest        QuotaRepairTriggerRequest      = 134;
 }
 
 message OMResponse {
@@ -419,6 +423,8 @@ message OMResponse {
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
   optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
+  optional QuotaRepairStatusResponse            QuotaRepairStatusResponse        = 136;
+  optional QuotaRepairTriggerResponse            QuotaRepairTriggerResponse        = 137;
 }
 
 enum Status {
@@ -2224,6 +2230,17 @@ message FsServerDefaultsProto {
 
 message ServerDefaultsResponse {
   required FsServerDefaultsProto serverDefaults = 1;
+}
+
+message QuotaRepairStatusRequest {
+}
+message QuotaRepairStatusResponse {
+    optional string status = 1;
+}
+message QuotaRepairTriggerRequest {
+    repeated string buckets = 1;
+}
+message QuotaRepairTriggerResponse {
 }
 
 message OMLockDetailsProto {

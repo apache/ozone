@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -4749,6 +4750,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OzoneFsServerDefaults getServerDefaults() {
     return serverDefaults;
+  }
+
+  @Override
+  public String getQuotaRepairStatus() throws IOException {
+    return QuotaRepairTask.getStatus();
+  }
+
+  @Override
+  public void triggerQuotaRepair(List<String> buckets) throws IOException {
+    new QuotaRepairTask(this).repair(buckets);
   }
 
   /**

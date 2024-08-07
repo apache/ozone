@@ -2579,6 +2579,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         serverDefaultsResponse.getServerDefaults());
   }
 
+  @Override
+  public String getQuotaRepairStatus() throws IOException {
+    OzoneManagerProtocolProtos.QuotaRepairStatusRequest quotaRepairStatusRequest =
+        OzoneManagerProtocolProtos.QuotaRepairStatusRequest.newBuilder()
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.QuotaRepairStatus)
+        .setQuotaRepairStatusRequest(quotaRepairStatusRequest).build();
+
+    OzoneManagerProtocolProtos.QuotaRepairStatusResponse quotaRepairStatusResponse
+        = handleError(submitRequest(omRequest)).getQuotaRepairStatusResponse();
+    return quotaRepairStatusResponse.getStatus();
+  }
+
+  @Override
+  public void triggerQuotaRepair(List<String> buckets) throws IOException {
+    OzoneManagerProtocolProtos.QuotaRepairTriggerRequest quotaRepairTriggerRequest =
+        OzoneManagerProtocolProtos.QuotaRepairTriggerRequest.newBuilder()
+            .build();
+    OMRequest omRequest = createOMRequest(Type.QuotaRepairTrigger)
+        .setQuotaRepairTriggerRequest(quotaRepairTriggerRequest).build();
+    handleError(submitRequest(omRequest)).getQuotaRepairTriggerResponse();
+  }
+
   private SafeMode toProtoBuf(SafeModeAction action) {
     switch (action) {
     case ENTER:
