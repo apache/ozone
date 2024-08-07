@@ -861,6 +861,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.chunk.read.mapped.buffer.max.count</name>
+    <value>0</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default max count of memory mapped buffers allowed for a DN.
+      Default 0 means no mapped buffers allowed for data read.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
