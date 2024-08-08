@@ -179,7 +179,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean shouldDeleteRatisLogDirectory;
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
-  private static final ExecutorService timeoutExecutor = HadoopExecutors.newCachedThreadPool(
+  private final ExecutorService timeoutExecutor = HadoopExecutors.newCachedThreadPool(
       new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("XceiverServerRatisTimeoutThread-%d").build());
 
