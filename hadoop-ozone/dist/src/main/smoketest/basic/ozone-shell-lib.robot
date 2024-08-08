@@ -101,7 +101,7 @@ Test ozone shell errors
                     Should contain      ${result}       INVALID_BUCKET_NAME
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --space-quota 1.5GB    255
                     Should contain      ${result}       1.5GB is invalid
-    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --namespace-quota 1.5GB    255
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --namespace-quota 1.5    255
                     Should contain      ${result}       1.5 is invalid
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --layout Invalid   2
                     Should contain      ${result}       Usage
