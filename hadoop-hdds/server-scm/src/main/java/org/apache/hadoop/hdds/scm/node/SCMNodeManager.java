@@ -1155,29 +1155,37 @@ public class SCMNodeManager implements NodeManager {
       }
     }
 
-    double ua = capacityByte;
+    return convertUnit(capacityByte);
+  }
+
+  /**
+   * Convert byte value to other units, such as KB, MB, GB, TB.
+   * @param value Original value, in byte.
+   * @return
+   */
+  private static String convertUnit(double value) {
     StringBuilder unit = new StringBuilder("B");
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 1, "KB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "MB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "GB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "TB");
     }
 
     DecimalFormat decimalFormat = new DecimalFormat("#0.0");
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    String capacity = decimalFormat.format(ua);
-    return capacity + unit.toString();
+    String newValue = decimalFormat.format(value);
+    return newValue + unit.toString();
   }
 
   /**
@@ -1225,6 +1233,8 @@ public class SCMNodeManager implements NodeManager {
     nodeUsageStatistics(nodeStatistics);
     // Statistics node states
     nodeStateStatistics(nodeStatistics);
+    // Statistics node space
+    nodeSpaceStatistics(nodeStatistics);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
@@ -1278,6 +1288,38 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
     nodeStatics.put(StateStatistics.ENTERING_MAINTENANCE.getLabel(), String.valueOf(enteringMaintenanceNodeCount));
     nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
+  }
+
+  private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
+    if (nodeStateManager.getAllNodes().size() < 1) {
+      return;
+    }
+    long capacityByte = 0;
+    long scmUsedByte = 0;
+    long remainingByte = 0;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      List<StorageReportProto> storageReports = dni.getStorageReports();
+      if (storageReports != null && !storageReports.isEmpty()) {
+        for (StorageReportProto storageReport : storageReports) {
+          capacityByte += storageReport.getCapacity();
+          scmUsedByte += storageReport.getScmUsed();
+          remainingByte += storageReport.getRemaining();
+        }
+      }
+    }
+
+    long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
+    if (nonScmUsedByte < 0) {
+      nonScmUsedByte = 0;
+    }
+    String capacity = convertUnit(capacityByte);
+    String scmUsed = convertUnit(scmUsedByte);
+    String remaining = convertUnit(remainingByte);
+    String nonScmUsed = convertUnit(nonScmUsedByte);
+    nodeStatics.put(SpaceStatistics.CAPACITY.getLabel(), capacity);
+    nodeStatics.put(SpaceStatistics.SCM_USED.getLabel(), scmUsed);
+    nodeStatics.put(SpaceStatistics.REMAINING.getLabel(), remaining);
+    nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
   /**
@@ -1372,6 +1414,20 @@ public class SCMNodeManager implements NodeManager {
       return label;
     }
     StateStatistics(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum SpaceStatistics {
+    CAPACITY("Capacity"),
+    SCM_USED("Scmused"),
+    NON_SCM_USED("NonScmused"),
+    REMAINING("Remaining");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    SpaceStatistics(String label) {
       this.label = label;
     }
   }

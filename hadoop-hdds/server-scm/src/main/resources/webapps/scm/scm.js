@@ -46,6 +46,12 @@
                         decommissioning : "N/A",
                         enteringmaintenance : "N/A",
                         volumefailures : "N/A"
+                    },
+                    space : {
+                        capacity : "N/A",
+                        scmused : "N/A",
+                        remaining : "N/A",
+                        nonscmused : "N/A"
                     }
                 }
             }
@@ -118,6 +124,14 @@
                             $scope.statistics.nodes.state.enteringmaintenance = value;
                         } else if(key == "VolumeFailures") {
                             $scope.statistics.nodes.state.volumefailures = value;
+                        } else if(key == "Capacity") {
+                            $scope.statistics.nodes.space.capacity = value;
+                        } else if(key == "Scmused") {
+                            $scope.statistics.nodes.space.scmused = value;
+                        } else if(key == "Remaining") {
+                            $scope.statistics.nodes.space.remaining = value;
+                        } else if(key == "NonScmused") {
+                            $scope.statistics.nodes.space.nonscmused = value;
                         }
                     });
                 });
