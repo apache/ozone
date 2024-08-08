@@ -53,3 +53,15 @@ List om roles as JSON without OM service ID passed
                                     Assert Leader Present in JSON   ${output_without_id_passed}
     ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --json
                                     Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified
+
+List om roles as TABLE with OM service ID passed
+    ${output_without_id_passed} =   Execute                         ozone admin om roles --table
+                                    Should contain                  ${output_without_id_passed}   LEADER
+    ${output_without_id_passed} =   Execute                         ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice --table
+                                    Should contain                  ${output_without_id_passed}   LEADER
+
+List om roles as TABLE without OM service ID passed
+    ${output_without_id_passed} =   Execute                         ozone admin om roles --table
+                                    Assert Leader Present           ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --table
+                                    Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified
