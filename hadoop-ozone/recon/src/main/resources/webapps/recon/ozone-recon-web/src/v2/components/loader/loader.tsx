@@ -15,18 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+import React from "react"
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  }
-];
+const Loader: React.FC = () => {
+  return (
+    <div className="loader-container">
+      <div className="loader-circle"></div>
+      <div className="loader-circle"></div>
+      <div className="loader-circle"></div>
+    </div>
+  )
+}
+
+export default Loader;
