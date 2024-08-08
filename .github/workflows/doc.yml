@@ -100,16 +100,12 @@ jobs:
       - name: List current directory contents for debugging
         run: ls -al
 
-      - name: Extract the downloaded zip
-        run: unzip ozone-src/ozone-src.zip -d ozone-src/extracted
+      - name: Extract the downloaded tar.gz
+        run: |
+          mkdir -p ozone-src/extracted
+          tar -xzf ozone-src/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src/extracted
 
       - name: List extracted files for debugging
-        run: ls -al ozone-src/extracted
-
-      - name: Extract the tar.gz inside the extracted directory
-        run: tar -xzf ozone-src/extracted/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src/extracted
-
-      - name: List final extracted files for debugging
         run: ls -al ozone-src/extracted
 
       - name: Run the Python script to convert XML properties into Markdown
