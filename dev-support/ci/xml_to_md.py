@@ -1,10 +1,21 @@
-import os
-import tarfile
-import fnmatch
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-def extract_tarball(tarball_path, extract_path):
-    with tarfile.open(tarball_path, 'r:gz') as tar:
-        tar.extractall(path=extract_path)
+import os
+import fnmatch
+import xml.etree.ElementTree as ET
 
 def find_xml_files(base_path, pattern):
     xml_files = []
@@ -34,13 +45,9 @@ def generate_markdown(properties, output_file):
             f.write(f"**Value**: {value}\n\n")
 
 if __name__ == "__main__":
-    tarball_path = 'ozone-1.5.0-SNAPSHOT-src.tar.gz'
     extract_path = 'ozone-src/extracted'
     xml_pattern = 'ozone-default-generated.xml'
     output_file = 'hadoop-hdds/docs/content/tools/Configurations.md'
-
-    # Extract the tarball
-    extract_tarball(tarball_path, extract_path)
 
     # Find all XML files
     xml_files = find_xml_files(extract_path, xml_pattern)
