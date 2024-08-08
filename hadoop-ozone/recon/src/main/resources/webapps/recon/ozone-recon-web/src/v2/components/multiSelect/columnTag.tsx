@@ -34,13 +34,12 @@ const ColumnTag: React.FC<TagProps> = ({
   onClose = () => {}
 }) => {
   const onPreventMouseDown = (event: React.MouseEvent<HTMLSpanElement>) => {
+    // By default when clickin on the tags the text will get selected
+    // which might interfere with user experience as people would want to close tags
+    // but accidentally select tag text. Hence we prevent this behaviour.
     event.preventDefault();
     event.stopPropagation();
   };
-
-  const handleClose = (label: string) => {
-    return onClose(label);
-  }
 
   if (!tagRef?.current) return null;
 
@@ -49,7 +48,7 @@ const ColumnTag: React.FC<TagProps> = ({
       key={label}
       onMouseDown={onPreventMouseDown}
       closable={closable}
-      onClose={() => handleClose(label)}
+      onClose={() => (onClose(label))}
       style={{marginRight: 3}}>
         {label}
     </Tag>,

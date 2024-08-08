@@ -40,6 +40,7 @@ const EChart = ({
 }: EChartProps): JSX.Element => {
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    console.log("theme")
     // Initialize chart
     let chart: ECharts | undefined;
     if (chartRef.current !== null) {
@@ -64,6 +65,7 @@ const EChart = ({
   }, [theme]);
 
   useEffect(() => {
+    console.log("option, settings, theme")
     // Update chart
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
@@ -75,15 +77,16 @@ const EChart = ({
   }, [option, settings, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
 
   useEffect(() => {
+    console.log("loading, theme")
     // Update chart
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       loading === true ? chart!.showLoading() : chart!.hideLoading();
     }
-  }, [loading, theme]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
+  }, [loading]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
 
-  return <div ref={chartRef} style={{ width: "100em", height: "50em", margin: 'auto', ...style }} />;
+  return <div ref={chartRef} style={{ width: "50vw", height: "25vh", margin: 'auto', ...style }} />;
 }
 
 export default EChart;
