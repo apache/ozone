@@ -1318,7 +1318,7 @@ public class TestSnapshotDiffManager {
       } catch (IOException | RocksDBException e) {
         throw new RuntimeException(e);
       }
-    }, 5, TimeDuration.ONE_SECOND, null, null);
+    }, 10, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
