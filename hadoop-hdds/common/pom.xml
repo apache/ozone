@@ -65,12 +65,24 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
@@ -92,6 +104,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
 
     <dependency>
@@ -115,12 +131,28 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-common</artifactId>
+    </dependency>
+    <dependency>
       <artifactId>ratis-netty</artifactId>
       <groupId>org.apache.ratis</groupId>
     </dependency>
     <dependency>
       <artifactId>ratis-grpc</artifactId>
       <groupId>org.apache.ratis</groupId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-proto</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.errorprone</groupId>
@@ -135,6 +167,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-validator</groupId>
       <artifactId>commons-validator</artifactId>
     </dependency>
@@ -143,8 +183,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jaeger-client</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.jaegertracing</groupId>
+      <artifactId>jaeger-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-stdlib</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentracing</groupId>
+      <artifactId>opentracing-api</artifactId>
     </dependency>
     <dependency>
       <groupId>io.opentracing</groupId>
@@ -157,6 +205,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
