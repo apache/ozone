@@ -426,6 +426,11 @@ public class DeletedBlockLogImpl
 
     DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
     UUID dnId = details.getUuid();
+    UUID dnIdLocal = UUID.fromString(dnId.toString());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("remoteId = {}, localDnId = {}, remoteDnId == localDnId[{}]",
+          dnId, dnIdLocal, (dnId == dnIdLocal));
+    }
     for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
       CommandStatus.Status status = commandStatus.getStatus();
       lock.lock();
@@ -434,17 +439,17 @@ public class DeletedBlockLogImpl
           ContainerBlocksDeletionACKProto ackProto =
               commandStatus.getBlockDeletionAck();
           getSCMDeletedBlockTransactionStatusManager()
-              .commitTransactions(ackProto.getResultsList(), dnId);
+              .commitTransactions(ackProto.getResultsList(), dnIdLocal);
           metrics.incrBlockDeletionCommandSuccess();
         } else if (status == CommandStatus.Status.FAILED) {
           metrics.incrBlockDeletionCommandFailure();
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-              " {}.", commandStatus.getCmdId(), dnId);
+              " {}.", commandStatus.getCmdId(), dnIdLocal);
         }
 
         getSCMDeletedBlockTransactionStatusManager()
-            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
+            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnIdLocal);
       } finally {
         lock.unlock();
       }
