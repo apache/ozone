@@ -37,7 +37,11 @@ public class SafeModeMetrics {
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
+      numContainerWithECDataReplicaReportedThreshold;
+  private @Metric MutableCounterLong
       currentContainersWithOneReplicaReportedCount;
+  private @Metric MutableCounterLong
+      currentContainersWithECDataReplicaReportedCount;
 
   // When hdds.scm.safemode.pipeline-availability.check is set then only
   // below metrics will have some values, otherwise they will be zero.
@@ -75,8 +79,16 @@ public class SafeModeMetrics {
     this.numContainerWithOneReplicaReportedThreshold.set(val);
   }
 
+  public void setNumContainerWithECDataReplicaReportedThreshold(long val) {
+    this.numContainerWithECDataReplicaReportedThreshold.incr(val);
+  }
+
   public void incCurrentContainersWithOneReplicaReportedCount() {
     this.currentContainersWithOneReplicaReportedCount.incr();
+  }
+
+  public void incCurrentContainersWithECDataReplicaReportedCount() {
+    this.currentContainersWithECDataReplicaReportedCount.incr();
   }
 
   MutableGaugeLong getNumHealthyPipelinesThreshold() {
@@ -98,6 +110,10 @@ public class SafeModeMetrics {
 
   MutableGaugeLong getNumContainerWithOneReplicaReportedThreshold() {
     return numContainerWithOneReplicaReportedThreshold;
+  }
+
+  public MutableCounterLong getNumContainerWithECDataReplicaReportedThreshold() {
+    return numContainerWithECDataReplicaReportedThreshold;
   }
 
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
