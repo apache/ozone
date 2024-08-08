@@ -92,18 +92,43 @@ Test ozone shell
 
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
-    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota invalid      255
-                    Should contain      ${result}       invalid
+    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota 1.5GB      255
+                    Should contain      ${result}       1.5GB is invalid
+    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --namespace-quota 1.5      255
+                    Should contain      ${result}       1.5 is invalid
                     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume}                            0
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket_1                   255
                     Should contain      ${result}       INVALID_BUCKET_NAME
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --space-quota 1.5GB    255
+                    Should contain      ${result}       1.5GB is invalid
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --namespace-quota 1.5    255
+                    Should contain      ${result}       1.5 is invalid
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --layout Invalid   2
                     Should contain      ${result}       Usage
                     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    0
     ${result} =     Execute and checkrc    ozone sh key info ${protocol}${server}/${volume}/bucket1/non-existing           255
                     Should contain      ${result}       KEY_NOT_FOUND
     ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 unexisting --type invalid    2
+    ${result} =     Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --space-quota 1.5                     255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --namespace-quota 1.5                 255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1.5                             255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --namespace-quota 1.5                         255
+                    Should contain      ${result}       1.5 is invalid
+                    Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --space-quota 2KB                     0
+    ${result} =     Execute and checkrc    ozone sh key put ${volume}/bucket1/key1 /opt/hadoop/NOTICE.txt                   255
+                    Should contain      ${result}       QUOTA_EXCEEDED
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1KB                             255
+                    Should contain      ${result}       QUOTA_EXCEEDED
+                    Execute and checkrc    ozone sh bucket clrquota ${volume}/bucket1 --space-quota                         0
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1GB                             255
+                    Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh bucket delete ${protocol}${server}/${volume}/bucket1                    0
+                    Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1GB                             0
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
+                    Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
 
 
