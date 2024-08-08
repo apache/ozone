@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -56,6 +57,8 @@ public class Gateway extends GenericCli {
   private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
 
   private S3GatewayHttpServer httpServer;
+  /** Servlets and static content on separate port. */
+  private BaseHttpServer contentServer;
   private S3GatewayMetrics metrics;
   private OzoneConfiguration ozoneConfiguration;
 
@@ -78,6 +81,7 @@ public class Gateway extends GenericCli {
     loginS3GUser(ozoneConfiguration);
     setHttpBaseDir(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
+    contentServer = new S3GatewayWebContentServer(ozoneConfiguration, "s3g-web");
     metrics = S3GatewayMetrics.create(ozoneConfiguration);
     start();
 
@@ -101,11 +105,13 @@ public class Gateway extends GenericCli {
     HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
     jvmPauseMonitor.start();
     httpServer.start();
+    contentServer.start();
   }
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
     httpServer.stop();
+    contentServer.stop();
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
   }
