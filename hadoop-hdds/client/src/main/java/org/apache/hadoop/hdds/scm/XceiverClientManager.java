@@ -64,6 +64,13 @@ import org.slf4j.LoggerFactory;
 public class XceiverClientManager implements XceiverClientFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientManager.class);
+
+  private static ErrorInjector errorInjector;
+
+  public static void enableErrorInjection(ErrorInjector injector) {
+    errorInjector = injector;
+  }
+
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
   private final Cache<String, XceiverClientSpi> clientCache;
@@ -241,7 +248,7 @@ public class XceiverClientManager implements XceiverClientFactory {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  trustManager);
+                  trustManager, errorInjector);
               break;
             case STAND_ALONE:
               client = new XceiverClientGrpc(pipeline, conf, trustManager);
