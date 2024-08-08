@@ -64,7 +64,6 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
@@ -149,6 +148,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 import static org.apache.ratis.util.JavaUtils.attempt;
+import static org.apache.ratis.util.JavaUtils.attemptUntilTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1311,10 +1311,14 @@ public class TestSnapshotDiffManager {
         10, TimeDuration.ONE_SECOND, null, null);
 
     // Wait for the job to finish
-    LambdaTestUtils.await(5000, 1000, () -> {
-      SnapshotDiffJob job = getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1));
-      return DONE.equals(job.getStatus());
-    });
+    attemptUntilTrue(() -> {
+      try {
+        SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1));
+        return snapDiffJob != null && snapDiffJob.getStatus() == DONE;
+      } catch (IOException | RocksDBException e) {
+        throw new RuntimeException(e);
+      }
+    }, 5, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
