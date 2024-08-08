@@ -58,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -258,6 +259,19 @@ public class TestOzoneManagerStateMachine {
     } catch (Exception ex) {
       // do nothing
     }
+  }
+
+  @Test
+  public void testEpochFailureDoNotCauseTermination() throws Exception {
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setEchoRPCRequest(OzoneManagerProtocolProtos.EchoRPCRequest.newBuilder().build())
+        .setCmdType(Type.EchoRPC).setClientId("123")
+        .setUserInfo(UserInfo.newBuilder().setUserName("user").setHostName("localhost").setRemoteAddress("127.0.0.1"))
+        .build();
+    TransactionContext submittedTrx = mockTransactionContext(omRequest);
+    CompletableFuture<Message> messageCompletableFuture = ozoneManagerStateMachine.applyTransaction(submittedTrx);
+    Message message = messageCompletableFuture.get();
+    assertTrue(message.getContent().toString().contains("java.lang.NullPointerException"));
   }
 
   private TransactionContext mockTransactionContext(OMRequest request) {
