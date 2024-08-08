@@ -121,7 +121,7 @@ Test ozone shell errors
     ${result} =     Execute and checkrc    ozone sh key put ${volume}/bucket1/key1 /opt/hadoop/NOTICE.txt                   255
                     Should contain      ${result}       QUOTA_EXCEEDED
     ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1KB                             255
-                    Should contain      ${result}       QUOTA_ERROR
+                    Should contain      ${result}       QUOTA_EXCEEDED
                     Execute and checkrc    ozone sh bucket clrquota ${volume}/bucket1 --space-quota                         0
     ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1GB                             255
                     Should contain      ${result}       QUOTA_ERROR
