@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,6 +60,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -76,6 +78,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE_DEFAULT;
 import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
 
 /**
@@ -116,6 +120,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
+  private final boolean isEcRecoverExtendEnabled;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -141,6 +146,11 @@ public class ECReconstructionCoordinator implements Closeable {
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
+
+    // Enabling this option will attempt additional EC recovery operations. Within specified rules,
+    // it will exclude one BlockGroupLength insufficient DN from participating in the recovery.
+    this.isEcRecoverExtendEnabled = conf.getBoolean(
+        HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE, HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE_DEFAULT);
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -154,7 +164,9 @@ public class ECReconstructionCoordinator implements Closeable {
         getBlockDataMap(containerID, repConfig, sourceNodeMap);
 
     SortedMap<Long, BlockLocationInfo> blockLocationInfoMap =
-        calcBlockLocationInfoMap(containerID, blockDataMap, pipeline);
+        calcBlockLocationInfoMap(containerID, blockDataMap, pipeline,
+        repConfig, sourceNodeMap);
+
     ContainerID cid = ContainerID.valueOf(containerID);
 
     // 1. create target recovering containers.
@@ -434,7 +446,8 @@ public class ECReconstructionCoordinator implements Closeable {
   }
 
   SortedMap<Long, BlockLocationInfo> calcBlockLocationInfoMap(long containerID,
-      SortedMap<Long, BlockData[]> blockDataMap, Pipeline pipeline) {
+      SortedMap<Long, BlockData[]> blockDataMap, Pipeline pipeline, ECReplicationConfig repConfig,
+      SortedMap<Integer, DatanodeDetails> sourceNodeMap) {
 
     SortedMap<Long, BlockLocationInfo> blockInfoMap = new TreeMap<>();
 
@@ -444,18 +457,97 @@ public class ECReconstructionCoordinator implements Closeable {
 
       long blockGroupLen = calcEffectiveBlockGroupLen(blockGroup,
           pipeline.getReplicationConfig().getRequiredNodes());
+
       if (blockGroupLen > 0) {
         BlockID blockID = new BlockID(containerID, localID);
+        long realBlockGroupLen = blockGroupLen;
+        Pipeline realPipeLine = pipeline;
+
+        if (this.isEcRecoverExtendEnabled) {
+          Pair<Long, Integer> safeBlockGroupLen = getAppropriateBlockGroupLen(blockGroup,
+              pipeline.getReplicationConfig().getRequiredNodes());
+          if (realBlockGroupLen != safeBlockGroupLen.getLeft().longValue()) {
+            realBlockGroupLen = safeBlockGroupLen.getLeft();
+            int excludeBlockIndex = safeBlockGroupLen.getRight();
+            SortedMap<Integer, DatanodeDetails> newSourceNodeMap = new TreeMap<>(sourceNodeMap);
+            int excludeDNIndex = excludeBlockIndex + 1;
+            // We will exclude problematic blocks from the block group, which will prevent them from
+            // being selected during checksum verification.
+            blockGroup[excludeBlockIndex] = null;
+            // We will exclude this DN from the SourceNodeMap.
+            newSourceNodeMap.remove(excludeDNIndex);
+            LOG.info("containerID = {}, localID = {}, safeBlockGroupLen = {}, " +
+                "calcBlockGroupLen = {}, exclude Dn Index = {}, exclude Block Index = {}.",
+                containerID, localID, safeBlockGroupLen, blockGroupLen,
+                excludeDNIndex, excludeBlockIndex);
+            Pipeline newPipeline = rebuildInputPipeline(repConfig, newSourceNodeMap);
+            realPipeLine = newPipeline;
+          }
+        }
+
         BlockLocationInfo blockLocationInfo = new BlockLocationInfo.Builder()
             .setBlockID(blockID)
-            .setLength(blockGroupLen)
-            .setPipeline(pipeline)
+            .setLength(realBlockGroupLen)
+            .setPipeline(realPipeLine)
             .setToken(tokenHelper.getBlockToken(blockID, blockGroupLen))
             .build();
         blockInfoMap.put(localID, blockLocationInfo);
       }
     }
     return blockInfoMap;
+  }
+
+  /**
+   * We will attempt to find the most suitable BlockGroupLength possible.
+   *
+   * We cannot avoid encountering some special situations during data writes,
+   * which may lead to inaccuracies in the length of some BlockGroupLength values.
+   *
+   * However, in cases like the following, we can reasonably infer which BlockGroupLength is accurate:
+   * when only one DN has a different BlockGroupLength compared to the others,
+   * we can assume that the BlockGroupLength of the other DNs is more reasonable.
+   *
+   * Our approach is to group and count the BlockGroupLength values, and then sort these BlockGroupLengths.
+   * If there are only two groups and the group with the smallest value contains only one DN,
+   * we can use the BlockGroupLength from the other DNs.
+   *
+   * @param blockGroup BlockData Group Array
+   * @param replicaCount replica Count
+   * @return Pair leftValue: BlockGroupLength, rightValue: ExcludeIndex.
+   */
+  public Pair<Long, Integer> getAppropriateBlockGroupLen(BlockData[] blockGroup,
+      int replicaCount) {
+
+    Preconditions.checkState(blockGroup.length == replicaCount);
+
+    long blockGroupLen;
+    TreeMap<Long, List<Integer>> treeMap = new TreeMap<>(Collections.reverseOrder());
+
+    // We group data based on blockgrouplength
+    for (int i = 0; i < replicaCount; i++) {
+      if (blockGroup[i] == null) {
+        continue;
+      }
+      long putBlockLen = getBlockDataLength(blockGroup[i]);
+      treeMap.computeIfAbsent(putBlockLen, k -> new ArrayList<>()).add(i);
+    }
+
+   // Currently supporting only two groups.
+   // Group 2[lastEntry] contains just one record, while Group 1[firstEntry] has multiple records.
+    if (treeMap.size() == 2) {
+      Map.Entry<Long, List<Integer>> lastEntry = treeMap.lastEntry();
+      Map.Entry<Long, List<Integer>> firstEntry = treeMap.firstEntry();
+      if (lastEntry.getValue().size() == 1 && firstEntry.getValue().size() > 1) {
+        blockGroupLen = firstEntry.getKey();
+        List<Integer> values = lastEntry.getValue();
+        int index = values.get(0);
+        return Pair.of(blockGroupLen, index);
+      }
+    }
+
+    //  In other cases, calculations should proceed using the original method.
+    blockGroupLen = calcEffectiveBlockGroupLen(blockGroup, replicaCount);
+    return Pair.of(blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen, -1);
   }
 
   @Override
@@ -489,7 +581,7 @@ public class ECReconstructionCoordinator implements Closeable {
         .build();
   }
 
-  private SortedMap<Long, BlockData[]> getBlockDataMap(long containerID,
+  protected SortedMap<Long, BlockData[]> getBlockDataMap(long containerID,
       ECReplicationConfig repConfig,
       Map<Integer, DatanodeDetails> sourceNodeMap) throws IOException {
 

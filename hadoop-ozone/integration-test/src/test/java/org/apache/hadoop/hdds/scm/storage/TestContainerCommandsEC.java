@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableE
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -69,6 +71,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -83,6 +86,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
@@ -91,6 +95,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -108,6 +113,7 @@ import java.util.stream.Stream;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
@@ -117,6 +123,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * This class tests container commands on EC containers.
@@ -613,30 +620,48 @@ public class TestContainerCommandsEC {
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
-      throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 3);
+  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes,
+      boolean isBlockGroupLengthWrong) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 3, isBlockGroupLengthWrong, true);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes)
-      throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 1);
+  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes,
+      boolean isBlockGroupLengthWrong) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 1, isBlockGroupLengthWrong, true);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes)
-      throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 4);
+  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes,
+      boolean isBlockGroupLengthWrong) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 4, isBlockGroupLengthWrong, true);
   }
 
-  static Stream<List<Integer>> recoverableMissingIndexes() {
-    return Stream
-        .concat(IntStream.rangeClosed(1, 5).mapToObj(ImmutableList::of), Stream
-            .of(ImmutableList.of(2, 3), ImmutableList.of(2, 4),
-                ImmutableList.of(3, 5), ImmutableList.of(4, 5)));
+  @Test
+  void testECReconstructionCoordinatorException() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+      testECReconstructionCoordinator(ImmutableList.of(4), 4, true, false);
+    });
+
+    String expectedMessage =
+        "The chunk list has 1 entries, but the checksum chunks has 2 entries. They should be equal in size.";
+    String actualMessage = exception.getMessage();
+    assertEquals(expectedMessage, actualMessage);
+  }
+
+  static Stream<Arguments> recoverableMissingIndexes() {
+    Stream<Arguments> arguments1 = IntStream.rangeClosed(1, 5).mapToObj(i ->
+        arguments(ImmutableList.of(i), true));
+    Stream<Arguments> arguments2 = IntStream.rangeClosed(1, 5).mapToObj(i ->
+        arguments(ImmutableList.of(i), false));
+    Stream<Arguments> arguments3 =  Stream.of(arguments(ImmutableList.of(2, 3), true),
+        arguments(ImmutableList.of(2, 4), true), arguments(ImmutableList.of(3, 5), true));
+    Stream<Arguments> arguments4 =  Stream.of(arguments(ImmutableList.of(2, 3), false),
+        arguments(ImmutableList.of(2, 4), false), arguments(ImmutableList.of(3, 5), false));
+    return Stream.concat(Stream.concat(arguments1, arguments2),
+        Stream.concat(arguments3, arguments4));
   }
 
   /**
@@ -647,7 +672,7 @@ public class TestContainerCommandsEC {
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
         assertThrows(InsufficientLocationsException.class, () -> {
-          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3, false, true);
         });
 
     String expectedMessage =
@@ -658,7 +683,8 @@ public class TestContainerCommandsEC {
   }
 
   private void testECReconstructionCoordinator(List<Integer> missingIndexes,
-      int numInputChunks) throws Exception {
+      int numInputChunks, boolean isBlockGroupLengthWrong,
+      boolean isEcRecoverExtendEnable) throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
@@ -669,12 +695,18 @@ public class TestContainerCommandsEC {
     OzoneBucket bucket = volume.getBucket(bucketName);
     createKeyAndWriteData(keyString, bucket, numInputChunks);
 
+    if (isEcRecoverExtendEnable) {
+      config.setBoolean(HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE, true);
+    } else {
+      config.setBoolean(HDDS_DATANODE_EC_RECOVER_EXTEND_ENABLE, false);
+    }
+
     try (
         XceiverClientManager xceiverClientManager =
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
-            new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-                null, ECReconstructionMetrics.create(), "2")) {
+            new MockECReconstructionCoordinator(config, certClient, secretKeyClient,
+                null, ECReconstructionMetrics.create(), "2", isBlockGroupLengthWrong)) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
@@ -1004,4 +1036,84 @@ public class TestContainerCommandsEC {
     }
   }
 
+  /**
+   * Mock ECReconstructionCoordinator.
+   */
+  public static class MockECReconstructionCoordinator extends ECReconstructionCoordinator {
+    private boolean isBlockGroupLengthWrong;
+
+    public MockECReconstructionCoordinator(ConfigurationSource conf, CertificateClient certificateClient,
+        SecretKeySignerClient secretKeyClient, StateContext context, ECReconstructionMetrics metrics,
+        String threadNamePrefix, boolean isBlockGroupLengthWrong) throws IOException {
+      super(conf, certificateClient, secretKeyClient, context, metrics, threadNamePrefix);
+      this.isBlockGroupLengthWrong = isBlockGroupLengthWrong;
+    }
+
+    @Override
+    protected SortedMap<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> getBlockDataMap(
+        long pContainerID, ECReplicationConfig pRepConfig, Map<Integer, DatanodeDetails> sourceNodeMap)
+        throws IOException {
+
+      // We call the parent class method to retrieve blockDataMap.
+      SortedMap<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> blockDataMap =
+          super.getBlockDataMap(pContainerID, pRepConfig, sourceNodeMap);
+
+      // If there's no need to simulate the BlockGroupLength error condition,
+      // then simply return the result.
+      if (!isBlockGroupLengthWrong) {
+        return blockDataMap;
+      }
+
+      // We simulate the scenario of retrieving erroneous data (currently it's difficult to reproduce
+      // the issue encountered online by shutting down the Container).
+      // Here, we select block with chunksize > 1, modify the metadata and chunklist of these blocks,
+      // so that we can recreate an erroneous block.
+      //
+      // Example:
+      //
+      // Before Modification:
+      // replica Index: 1 block length: 3145728 block group length: 18874368
+      // chunk list:
+      //    chunkNum: 1 length: 1048576 offset: 0
+      //    chunkNum: 2 length: 1048576 offset: 1048576
+      //    chunkNum: 3 length: 1048576 offset: 2097152
+      //
+      // After Modification:
+      // replica Index: 1 block length: 3145728 block group length: 1048576
+      // chunk list:
+      //    chunkNum: 1 length: 1048576 offset: 0
+
+      for (Map.Entry<Long, org.apache.hadoop.ozone.container.common.helpers.BlockData[]> entry :
+              blockDataMap.entrySet()) {
+
+        org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockDatas = entry.getValue();
+
+        List<org.apache.hadoop.ozone.container.common.helpers.BlockData> changeBlockList = new ArrayList<>();
+
+        for (int i = 0; i < blockDatas.length; i++) {
+          org.apache.hadoop.ozone.container.common.helpers.BlockData blockData = blockDatas[i];
+          // For EC-3-2-1024, during data recovery, we require at least 3 data blocks,
+          // so we can only attempt to reconstruct data when the number of DN (Data Node)
+          // entries in our source map is greater than 3. Otherwise, we cannot recover the block.
+          if (blockData != null && sourceNodeMap.size() > 3) {
+            List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+            if (chunks != null && chunks.size() > 1 && i < 3) {
+              changeBlockList.add(blockData);
+            }
+          }
+        }
+
+        if (changeBlockList != null && changeBlockList.size() > 0) {
+          Collections.shuffle(changeBlockList);
+          org.apache.hadoop.ozone.container.common.helpers.BlockData blockData = changeBlockList.get(0);
+          List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+          blockData.changeMetadata("blockGroupLen", String.valueOf(EC_CHUNK_SIZE));
+          blockData.addMetadata("localID", String.valueOf(entry));
+          blockData.setChunks(Collections.singletonList(chunks.get(0)));
+          break;
+        }
+      }
+      return blockDataMap;
+    }
+  }
 }
