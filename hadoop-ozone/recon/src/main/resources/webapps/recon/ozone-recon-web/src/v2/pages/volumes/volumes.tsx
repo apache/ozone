@@ -29,7 +29,7 @@ import { ValueType } from 'react-select/src/types';
 import QuotaBar from '@/components/quotaBar/quotaBar';
 import { AclPanel } from '@/components/aclDrawer/aclDrawer';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
-import MultiSelect, { Option } from '@/v2/components/multiSelect/multiSelect';
+import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
@@ -38,7 +38,26 @@ import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
 import { Volume, VolumesState, VolumesResponse } from '@/v2/types/volume.types';
 
 import './volumes.less';
-import SingleSelect from '@/v2/components/multiSelect/singleSelect';
+import SingleSelect from '@/v2/components/select/singleSelect';
+import Search from '@/v2/components/search/search';
+
+const SearchableColumnOpts = [
+  {
+    label: 'Volume',
+    value: 'volume'
+  },
+  {
+    label: 'Owner',
+    value: 'owner'
+  }
+]
+
+const LIMIT_OPTIONS: Option[] = [
+  { label: '1000', value: '1000' },
+  { label: '5000', value: "5000" },
+  { label: '10000', value: "10000" },
+  { label: '20000', value: "20000" }
+]
 
 const Volumes: React.FC<{}> = () => {
 
@@ -50,7 +69,8 @@ const Volumes: React.FC<{}> = () => {
       dataIndex: 'volume',
       key: 'volume',
       sorter: (a: Volume, b: Volume) => a.volume.localeCompare(b.volume),
-      defaultSortOrder: 'ascend' as const
+      defaultSortOrder: 'ascend' as const,
+      width: '15%'
     },
     {
       title: 'Owner',
@@ -135,13 +155,6 @@ const Volumes: React.FC<{}> = () => {
     value: column.key as string,
   }));
 
-  const LIMIT_OPTIONS: Option[] = [
-    { label: '1000', value: '1000' },
-    { label: '5000', value: "5000" },
-    { label: '10000', value: "10000" },
-    { label: '20000', value: "20000" }
-  ]
-
   const [state, setState] = useState<VolumesState>({
     data: [],
     totalCount: 0,
@@ -153,8 +166,8 @@ const Volumes: React.FC<{}> = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
-  const filterBlock = useRef<HTMLDivElement>(null);
-  const tagBlock = useRef<HTMLDivElement>(null);
+  const [searchColumn, setSearchColumn] = useState<'volume' | 'owner'>('volume');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadData = () => {
     setLoading(true);
@@ -251,6 +264,11 @@ const Volumes: React.FC<{}> = () => {
     )
   }
 
+  function getFilteredData(data: Volume[]) {
+    return data.filter((volume: Volume) => volume[searchColumn].includes(searchTerm))
+  }
+
+
   const paginationConfig: TablePaginationConfig = {
     showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} volumes`,
     showSizeChanger: true
@@ -275,30 +293,36 @@ const Volumes: React.FC<{}> = () => {
       </div>
       <div style={{ padding: '24px' }}>
         <div className='content-div'>
-          <div className='table-filter-section' ref={filterBlock}>
-            <MultiSelect
-              parentRef={filterBlock}
-              tagRef={tagBlock}
-              options={columnOptions}
-              defaultValue={selectedColumns}
-              selected={selectedColumns}
-              placeholder='Columns'
-              onChange={handleColumnChange}
-              onTagClose={handleTagClose}
-              fixedColumn='Volume'
-              isOptionDisabled={(option) => option.value === 'volume'}
-              columnLength={COLUMNS.length} />
-            <SingleSelect
-              parentRef={filterBlock}
-              options={LIMIT_OPTIONS}
-              defaultValue={selectedLimit}
-              placeholder='Limit'
-              onChange={handleLimitChange} />
+          <div className='table-header-section'>
+            <div className='table-filter-section'>
+              <MultiSelect
+                options={columnOptions}
+                defaultValue={selectedColumns}
+                selected={selectedColumns}
+                placeholder='Columns'
+                onChange={handleColumnChange}
+                onTagClose={handleTagClose}
+                fixedColumn='Volume'
+                isOptionDisabled={(option) => option.value === 'volume'}
+                columnLength={COLUMNS.length} />
+              <SingleSelect
+                options={LIMIT_OPTIONS}
+                defaultValue={selectedLimit}
+                placeholder='Limit'
+                onChange={handleLimitChange} />
+            </div>
+            <Search
+              searchOptions={SearchableColumnOpts}
+              searchColumn={searchColumn}
+              onSearch={(value) => setSearchTerm(value)}
+              onChange={(value) => {
+                setSearchTerm('');
+                setSearchColumn(value as 'volume' | 'owner');
+              }} />
           </div>
-          <div ref={tagBlock} className='tag-block' />
           <div>
             <Table
-              dataSource={data}
+              dataSource={getFilteredData(data)}
               columns={filterSelectedColumns()}
               loading={loading}
               rowKey='volume'

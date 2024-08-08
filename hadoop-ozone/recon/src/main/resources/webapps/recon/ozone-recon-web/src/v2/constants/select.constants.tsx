@@ -17,7 +17,7 @@
 */
 
 import { StylesConfig } from "react-select";
-import { Option } from "@/v2/components/multiSelect/multiSelect";
+import { Option } from "@/v2/components/select/multiSelect";
 
 export const selectStyles: StylesConfig<Option, true> = {
   control: (baseStyles, state) => ({

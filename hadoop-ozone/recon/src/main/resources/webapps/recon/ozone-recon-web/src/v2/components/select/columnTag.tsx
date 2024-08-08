@@ -20,6 +20,12 @@ import React from "react";
 import { Tag } from "antd";
 import { createPortal } from "react-dom";
 
+
+/**
+ *  Due to design decisions we are currently not using the Tags
+ * Until we reach a concensus on a better way to display the filter
+ * Keeping the code in case we require it in the future
+ */
 export type TagProps = {
   label: string;
   closable: boolean;

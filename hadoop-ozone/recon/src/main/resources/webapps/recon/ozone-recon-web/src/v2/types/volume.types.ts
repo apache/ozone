@@ -17,7 +17,7 @@
 */
 
 import { Acl } from "@/v2/types/acl.types";
-import { Option } from "@/v2/components/multiSelect/multiSelect";
+import { Option } from "@/v2/components/select/multiSelect";
 
 export type Volume = {
   volume: string;

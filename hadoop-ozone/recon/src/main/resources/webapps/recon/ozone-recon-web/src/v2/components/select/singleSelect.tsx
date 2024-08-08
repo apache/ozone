@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useMemo } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
 import Select, {
   Props as ReactSelectProps,
   components,
@@ -37,15 +36,12 @@ export type Option = {
 interface SingleSelectProps extends ReactSelectProps<Option, false> {
   options: Option[];
   placeholder: string;
-  parentRef: React.RefObject<HTMLDivElement>;
   onChange: (arg0: ValueType<Option, false>) => void;
 }
-
 
 const SingleSelect: React.FC<SingleSelectProps> = ({
   options = [],
   placeholder = 'Limit',
-  parentRef,
   onChange = () => { },
   ...props
 }) => {
@@ -60,26 +56,22 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
     );
   };
 
-
-  if (!parentRef?.current) return null;
-
-  return createPortal(
-    <>
-      <Select
-        {...props}
-        isClearable={false}
-        isSearchable={false}
-        classNamePrefix='single-select'
-        options={options}
-        components={{
-          ValueContainer
-        }}
-        placeholder={placeholder}
-        onChange={(selected: ValueType<Option, false>) => {
-          return onChange!(selected);
-        }}
-        styles={selectStyles as StylesConfig<Option, false>} />
-    </>, parentRef.current
+  return (
+    <Select
+      {...props}
+      isClearable={false}
+      closeMenuOnSelect={true}
+      isSearchable={false}
+      classNamePrefix='single-select'
+      options={options}
+      components={{
+        ValueContainer
+      }}
+      placeholder={placeholder}
+      onChange={(selected: ValueType<Option, false>) => {
+        return onChange!(selected);
+      }}
+      styles={selectStyles as StylesConfig<Option, false>} />
   );
 }
 

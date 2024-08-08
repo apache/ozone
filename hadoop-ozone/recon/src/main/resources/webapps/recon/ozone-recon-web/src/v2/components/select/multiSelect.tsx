@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useMemo } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
 import {
   default as ReactSelect,
   Props as ReactSelectProps,
@@ -26,7 +25,6 @@ import {
   ValueType
 } from 'react-select';
 
-import ColumnTag from "@/v2/components/multiSelect/columnTag";
 import { selectStyles } from "@/v2/constants/select.constants";
 
 
@@ -41,28 +39,8 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   placeholder: string;
   fixedColumn: string;
   columnLength: number;
-  parentRef: React.RefObject<HTMLDivElement>;
-  tagRef: React.RefObject<HTMLDivElement>;
   onChange: (arg0: ValueType<Option, true>) => void;
   onTagClose: (arg0: string) => void;
-}
-
-function getColumnTags(
-  options: Option[],
-  tagRef: React.RefObject<HTMLDivElement>,
-  fixedColumn: string,
-  onClose: (arg0: string) => void) {
-  let tagsEl: React.ReactElement[] = [];
-  options.forEach((option) => {
-    tagsEl.push(
-      <ColumnTag
-        tagRef={tagRef}
-        label={option.label}
-        closable={(option.label === fixedColumn) ? false : true}
-        onClose={onClose} />
-    )
-  });
-  return tagsEl;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -72,22 +50,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   placeholder = 'Columns',
   fixedColumn,
   columnLength,
-  parentRef,
   tagRef,
   onTagClose = () => { },
   onChange = () => { },
   ...props
 }) => {
-
-  const columnTags = useMemo(() =>
-    getColumnTags(
-      selected,
-      tagRef,
-      fixedColumn,
-      onTagClose,
-    ),
-    [selected]
-  );
 
   const Option: React.FC<OptionProps<Option, true>> = (props) => {
     return (
@@ -108,34 +75,28 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     )
   }
 
-
-  if (!parentRef?.current) return null;
-
-  return createPortal(
-    <>
-      <ReactSelect
-        {...props}
-        isMulti={true}
-        closeMenuOnSelect={false}
-        hideSelectedOptions={false}
-        isClearable={false}
-        isSearchable={false}
-        controlShouldRenderValue={false}
-        classNamePrefix='multi-select'
-        options={options}
-        components={{
-          Option
-        }}
-        placeholder={placeholder}
-        value={selected}
-        onChange={(selected: ValueType<Option, true>) => {
-          if (selected?.length === options.length) return onChange!(options);
-          return onChange!(selected);
-        }}
-        styles={selectStyles} />
-      {...columnTags}
-    </>, parentRef.current
-  );
+  return (
+    <ReactSelect
+    {...props}
+    isMulti={true}
+    closeMenuOnSelect={false}
+    hideSelectedOptions={false}
+    isClearable={false}
+    isSearchable={false}
+    controlShouldRenderValue={false}
+    classNamePrefix='multi-select'
+    options={options}
+    components={{
+      Option
+    }}
+    placeholder={placeholder}
+    value={selected}
+    onChange={(selected: ValueType<Option, true>) => {
+      if (selected?.length === options.length) return onChange!(options);
+      return onChange!(selected);
+    }}
+    styles={selectStyles} />
+  )
 }
 
 export default MultiSelect;
