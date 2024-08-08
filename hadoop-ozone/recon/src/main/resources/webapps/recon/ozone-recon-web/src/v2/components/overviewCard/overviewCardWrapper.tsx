@@ -27,8 +27,11 @@ type OverviewCardWrapperProps = {
 }
 
 // ------------- Component -------------- //
-const OverviewCardWrapper = (props: OverviewCardWrapperProps) => {
-  const { linkToUrl, title, children } = props;
+const OverviewCardWrapper: React.FC<OverviewCardWrapperProps> = ({
+  linkToUrl = '/',
+  title = '',
+  children = <></>
+}) => {
 
   const setCurrentActiveTab = (title: string): { active: string } => {
     if (title === 'Open Keys Summary') {

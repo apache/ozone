@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -74,16 +75,16 @@ final class DummyBlockInputStreamWithRetry
   }
 
   @Override
-  protected List<ChunkInfo> getChunkInfoList() throws IOException {
+  protected ContainerProtos.BlockData getBlockData() throws IOException {
     if (getChunkInfoCount == 0) {
       getChunkInfoCount++;
       if (ioException != null) {
-        throw  ioException;
+        throw ioException;
       }
       throw new StorageContainerException("Exception encountered",
           CONTAINER_NOT_FOUND);
     } else {
-      return super.getChunkInfoList();
+      return super.getBlockData();
     }
   }
 }

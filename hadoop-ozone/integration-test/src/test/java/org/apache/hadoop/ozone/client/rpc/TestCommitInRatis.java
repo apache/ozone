@@ -163,7 +163,7 @@ public class TestCommitInRatis {
     reply.getResponse().get();
     assertEquals(3, ratisClient.getCommitInfoMap().size());
     // wait for the container to be created on all the nodes
-    xceiverClient.watchForCommit(reply.getLogIndex());
+    xceiverClient.watchForCommit(reply.getLogIndex()).get();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
       if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
@@ -175,7 +175,7 @@ public class TestCommitInRatis {
         .getCloseContainer(pipeline,
             container1.getContainerInfo().getContainerID()));
     reply.getResponse().get();
-    xceiverClient.watchForCommit(reply.getLogIndex());
+    xceiverClient.watchForCommit(reply.getLogIndex()).get();
 
     if (watchType == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
       // commitInfo Map will be reduced to 2 here

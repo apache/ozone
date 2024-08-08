@@ -156,7 +156,7 @@ public final class OzoneTestUtils {
       throws IOException, TimeoutException, InterruptedException {
     Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().closePipeline(pipeline, false);
+    scm.getPipelineManager().closePipeline(pipeline, true);
     GenericTestUtils.waitFor(() ->
             container.getState() == HddsProtos.LifeCycleState.CLOSED,
         200, 30000);

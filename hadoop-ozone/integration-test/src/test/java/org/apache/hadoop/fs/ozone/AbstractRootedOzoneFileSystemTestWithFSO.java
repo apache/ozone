@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Test;
@@ -30,6 +29,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -217,7 +217,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
     try {
-      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      assertThrows(FileNotFoundException.class, () -> fs.isFileClosed(source));
       stream.write(1);
       stream.hsync();
       assertFalse(fs.isFileClosed(source));

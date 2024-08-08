@@ -26,7 +26,6 @@ import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrappe
 import { StorageReport } from '@/v2/types/overview.types';
 
 // ------------- Types -------------- //
-
 type OverviewStorageCardProps = {
   loading?: boolean;
   storageReport: StorageReport;
@@ -35,7 +34,7 @@ type OverviewStorageCardProps = {
 const size = filesize.partial({ round: 1 });
 
 function getUsagePercentages(
-  {used, remaining, capacity, committed} : StorageReport): ({
+  { used, remaining, capacity, committed }: StorageReport): ({
     ozoneUsedPercentage: number,
     nonOzoneUsedPercentage: number,
     committedPercentage: number,
@@ -43,36 +42,42 @@ function getUsagePercentages(
   }) {
   return {
     ozoneUsedPercentage: Math.floor(used / capacity * 100),
-    nonOzoneUsedPercentage: Math.floor(
-      ( capacity - remaining - used )
-      / capacity * 100
-    ),
+    nonOzoneUsedPercentage: Math.floor((capacity - remaining - used) / capacity * 100),
     committedPercentage: Math.floor(committed / capacity * 100),
-    usagePercentage: Math.floor(
-      ( capacity - remaining )
-      / capacity * 100
-    )
+    usagePercentage: Math.floor((capacity - remaining) / capacity * 100)
   }
 }
 
+// ------------- Styles -------------- //
+const cardHeadStyle: React.CSSProperties = { fontSize: '14px' };
+const cardBodyStyle: React.CSSProperties = { padding: '16px' };
+const cardStyle: React.CSSProperties = {
+  boxSizing: 'border-box',
+  height: '100%'
+}
+const eChartStyle: React.CSSProperties = {
+  width: '280px',
+  height: '200px'
+}
+
+
 // ------------- Component -------------- //
-const OverviewStorageCard = (props: OverviewStorageCardProps = {
-  loading: false,
-  storageReport: {
+const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
+  loading = false,
+  storageReport = {
     capacity: 0,
     used: 0,
     remaining: 0,
     committed: 0
   }
 }) => {
-  const { loading, storageReport } = props;
 
   const {
     ozoneUsedPercentage,
     nonOzoneUsedPercentage,
     committedPercentage,
     usagePercentage
-  } = useMemo(() => 
+  } = useMemo(() =>
     getUsagePercentages(storageReport),
     [
       storageReport.capacity,
@@ -168,28 +173,16 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
       loading={loading}
       hoverable={false}
       title='Cluster Capacity'
-      headStyle={{
-        fontSize: '14px'
-      }}
-      bodyStyle={{
-        padding: '16px'
-      }}
-      style={{
-        boxSizing: 'border-box',
-        height: '100%'
-      }}>
+      headStyle={cardHeadStyle}
+      bodyStyle={cardBodyStyle}
+      style={cardStyle}>
       <Row justify='space-between'>
         <Col
-          xs={24} sm={24} md={12} lg={12} xl={12}
-          style={{
-            justifyItems: 'center'
-          }}>
+          className='echart-col'
+          xs={24} sm={24} md={12} lg={12} xl={12}>
           <EChart
             option={eChartOptions}
-            style={{
-              width: '280px',
-              height: '200px',
-            }} />
+            style={eChartStyle} />
         </Col>
         <Col xs={24} sm={24} md={12} lg={12} xl={12}>
           <Table
@@ -217,9 +210,7 @@ const OverviewStorageCard = (props: OverviewStorageCardProps = {
               {
                 key: 'non-ozone-used',
                 usage: <Tag key='non-ozone-used' color='blue'>Non Ozone Used</Tag>,
-                size: size(storageReport.capacity
-                  - storageReport.remaining
-                  - storageReport.used)
+                size: size(storageReport.capacity - storageReport.remaining - storageReport.used)
               },
               {
                 key: 'remaining',

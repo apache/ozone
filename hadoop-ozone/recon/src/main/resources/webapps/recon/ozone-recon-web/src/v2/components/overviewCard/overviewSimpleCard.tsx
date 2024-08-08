@@ -19,7 +19,21 @@
 import React from 'react';
 import { Card, Col, Row } from 'antd';
 import { Link } from 'react-router-dom';
+<<<<<<< HEAD
 import { ClusterOutlined, ContainerOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, FileTextOutlined, FolderOpenOutlined, InboxOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+=======
+import {
+  ClusterOutlined,
+  ContainerOutlined,
+  DatabaseOutlined,
+  DeleteOutlined,
+  DeploymentUnitOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  InboxOutlined,
+  QuestionCircleOutlined
+} from '@ant-design/icons';
+>>>>>>> master
 
 
 // ------------- Types -------------- //
@@ -36,6 +50,26 @@ type OverviewCardProps = {
   linkToUrl?: string;
 }
 
+<<<<<<< HEAD
+=======
+// ------------- Styles -------------- //
+const defaultIconStyle: React.CSSProperties = {
+  fontSize: '50px',
+  float: 'right'
+};
+const iconStyle: React.CSSProperties = {
+  fontSize: '20px',
+  paddingRight: '4px',
+  float: 'inline-start'
+};
+const cardHeadStyle: React.CSSProperties = { fontSize: '14px' };
+const cardBodyStyle: React.CSSProperties = {
+  padding: '16px',
+  justifyTracks: 'space-between'
+};
+const dataColStyle: React.CSSProperties = { fontSize: '24px' };
+const titleLinkStyle: React.CSSProperties = { fontWeight: 400 }
+>>>>>>> master
 
 // Since AntD no longer supports string icon component
 // we are using a utility function to map the strings to
@@ -59,10 +93,14 @@ const IconSelector = ({
 
   const selectIcon = (iconType: string): React.ReactElement => {
     // Setting the default Icon as a question mark in case no match found
+<<<<<<< HEAD
     let ico = <QuestionCircleOutlined style={{
       fontSize: '50px',
       float: 'right'
     }} />
+=======
+    let ico = <QuestionCircleOutlined style={defaultIconStyle} />
+>>>>>>> master
 
     const found = Object.entries(Icons).find(
       ([k]) => k.toLowerCase() === iconType.toLowerCase()
@@ -78,6 +116,7 @@ const IconSelector = ({
 
 
 // ------------- Component -------------- //
+<<<<<<< HEAD
 const OverviewSimpleCard = (props: OverviewCardProps = {
   icon: '',
   data: 0,
@@ -100,12 +139,33 @@ const OverviewSimpleCard = (props: OverviewCardProps = {
           style={{
             fontWeight: 400
           }} >View More</Link>
+=======
+const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
+  icon = '',
+  data = 0,
+  title = '',
+  hoverable = false,
+  loading = false,
+  linkToUrl = ''
+}) => {
+
+  const titleElement = (linkToUrl)
+    ? (
+      <div className='card-title-div'>
+        {title}
+        <Link
+          to={linkToUrl}
+          style={titleLinkStyle}>
+          View More
+        </Link>
+>>>>>>> master
       </div>)
     : title
 
   return (
     <Card
       size='small'
+<<<<<<< HEAD
       className={'overview-card'}
       loading={loading}
       hoverable={hoverable}
@@ -129,6 +189,19 @@ const OverviewSimpleCard = (props: OverviewCardProps = {
         <Col style={{
           fontSize: '24px'
         }}>
+=======
+      loading={loading}
+      hoverable={hoverable}
+      title={(linkToUrl) ? titleElement : title}
+      headStyle={cardHeadStyle}
+      bodyStyle={cardBodyStyle}>
+      <Row
+        align='middle'>
+        <Col>
+          <IconSelector iconType={icon} style={iconStyle} />
+        </Col>
+        <Col style={dataColStyle}>
+>>>>>>> master
           {data}
         </Col>
       </Row>

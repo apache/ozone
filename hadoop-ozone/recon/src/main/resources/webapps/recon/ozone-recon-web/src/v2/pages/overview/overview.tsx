@@ -17,25 +17,29 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import axios, { CanceledError } from 'axios';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Row, Col, Card, Button } from 'antd';
-import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
+import axios, { CanceledError } from 'axios';
+import { Row, Col, Button } from 'antd';
+import {
+  CheckCircleFilled,
+  WarningFilled
+} from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
+import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
+import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
+
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { showDataFetchError, byteToSize } from '@/utils/common';
+import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
-import OverviewTableCard from '@/v2/components/overviewCard/overviewTableCard';
-
 import './overview.less';
-import { Link } from 'react-router-dom';
-import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
-import OverviewCardSimple from '@/v2/components/overviewCard/overviewSimpleCard';
+
 
 const size = filesize.partial({ round: 1 });
 
@@ -69,9 +73,38 @@ const getHealthIcon = (value: string): React.ReactElement => {
   )
 }
 
-const Overview: React.FC<{}> = (props = {}) => {
+const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
+  const responseError = responses.filter(
+    (resp) => resp.status === 'rejected'
+  );
 
-  let interval = 0;
+  if (responseError.length !== 0) {
+    responseError.forEach((err) => {
+      if (err.reason.toString().includes("CanceledError")) {
+        throw new CanceledError('canceled', "ERR_CANCELED");
+      }
+      else {
+        const reqMethod = err.reason.config.method;
+        const reqURL = err.reason.config.url
+        showDataFetchError(
+          `Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`
+        );
+      }
+    })
+  }
+}
+
+const getSummaryTableValue = (
+  value: number | string | undefined,
+  colType: 'value' | undefined = undefined
+): string => {
+  if (!value) return 'N/A';
+  if (colType === 'value') String(value as string)
+  return size(value as number)
+}
+
+const Overview: React.FC<{}> = () => {
+
   let cancelOverviewSignal: AbortController;
   let cancelOMDBSyncSignal: AbortController;
 
@@ -146,25 +179,13 @@ const Overview: React.FC<{}> = (props = {}) => {
       openResponse: Awaited<Promise<any>>,
       deletePendingResponse: Awaited<Promise<any>>
     ) => {
-      let responseError = [
+
+      checkResponseError([
         clusterStateResponse,
         taskstatusResponse,
         openResponse,
         deletePendingResponse
-      ].filter((resp) => resp.status === 'rejected');
-
-      if (responseError.length !== 0) {
-        responseError.forEach((err) => {
-          if (err.reason.toString().includes("CanceledError")) {
-            throw new CanceledError('canceled', "ERR_CANCELED");
-          }
-          else {
-            const reqMethod = err.reason.config.method;
-            const reqURL = err.reason.config.url
-            showDataFetchError(`Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`);
-          }
-        })
-      }
+      ]);
 
       const clusterState: ClusterStateResponse = clusterStateResponse.value?.data ?? {
         missingContainers: 'N/A',
@@ -324,7 +345,7 @@ const Overview: React.FC<{}> = (props = {}) => {
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div className='overview-content-v2'>
+      <div style={{ padding: '24px' }}>
         <Row
           align='stretch'
           gutter={[
@@ -336,7 +357,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               xl: 16
             }, 20]}>
           <Col xs={24} sm={24} md={24} lg={10} xl={10}>
-            <OverviewTableCard
+            <OverviewSummaryCard
               title='Health'
               data={healthCardIndicators}
               showHeader={true}
@@ -388,7 +409,7 @@ const Overview: React.FC<{}> = (props = {}) => {
             xl: 16
           }, 20]}>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Volumes'
               icon='inbox'
               loading={loading}
@@ -396,7 +417,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               linkToUrl='/Volumes' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Buckets'
               icon='folder-open'
               loading={loading}
@@ -404,14 +425,14 @@ const Overview: React.FC<{}> = (props = {}) => {
               linkToUrl='/Buckets' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Keys'
               icon='file-text'
               loading={loading}
               data={keys} />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Pipelines'
               icon='deployment-unit'
               loading={loading}
@@ -419,7 +440,7 @@ const Overview: React.FC<{}> = (props = {}) => {
               linkToUrl='/Pipelines' />
           </Col>
           <Col flex="1 0 20%">
-            <OverviewCardSimple
+            <OverviewSimpleCard
               title='Deleted Containers'
               icon='delete'
               loading={loading}
@@ -435,7 +456,7 @@ const Overview: React.FC<{}> = (props = {}) => {
             xl: 16
           }, 20]}>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-            <OverviewTableCard
+            <OverviewSummaryCard
               title='Open Keys Summary'
               loading={loading}
               columns={[
@@ -455,23 +476,26 @@ const Overview: React.FC<{}> = (props = {}) => {
                 {
                   key: 'total-replicated-data',
                   name: 'Total Replicated Data',
-                  value: size(openSummarytotalRepSize)
+                  value: getSummaryTableValue(openSummarytotalRepSize)
                 },
                 {
                   key: 'total-unreplicated-data',
                   name: 'Total Unreplicated Data',
-                  value: size(openSummarytotalUnrepSize)
+                  value: getSummaryTableValue(openSummarytotalUnrepSize)
                 },
                 {
                   key: 'open-keys',
                   name: 'Open Keys',
-                  value: String(openSummarytotalOpenKeys)
+                  value: getSummaryTableValue(
+                    openSummarytotalOpenKeys,
+                    'value'
+                  )
                 }
               ]}
               linkToUrl='/Om' />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-          <OverviewTableCard
+            <OverviewSummaryCard
               title='Delete Pending Keys Summary'
               loading={loading}
               columns={[
@@ -491,17 +515,20 @@ const Overview: React.FC<{}> = (props = {}) => {
                 {
                   key: 'total-replicated-data',
                   name: 'Total Replicated Data',
-                  value: size(deletePendingSummarytotalRepSize)
+                  value: getSummaryTableValue(deletePendingSummarytotalRepSize)
                 },
                 {
                   key: 'total-unreplicated-data',
                   name: 'Total Unreplicated Data',
-                  value: size(deletePendingSummarytotalUnrepSize)
+                  value: getSummaryTableValue(deletePendingSummarytotalUnrepSize)
                 },
                 {
                   key: 'delete-pending-keys',
                   name: 'Delete Pending Keys',
-                  value: String(deletePendingSummarytotalDeletedKeys)
+                  value: getSummaryTableValue(
+                    deletePendingSummarytotalDeletedKeys,
+                    'value'
+                  )
                 }
               ]}
               linkToUrl='/Om' />
