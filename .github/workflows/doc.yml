@@ -95,18 +95,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ozone-src
-          path: .
+          path: ozone-src
 
-      - name: List current directory contents for debugging
-        run: ls -al
+      - name: List contents of ozone-src directory
+        run: ls -al ozone-src
 
-      - name: Extract the downloaded tar.gz
+      - name: Extract the source tarball
         run: |
           mkdir -p ozone-src/extracted
           tar -xzf ozone-src/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src/extracted
 
-      - name: List extracted files for debugging
-        run: ls -al ozone-src/extracted
+      - name: List contents of ozone-src/extracted
+        run: ls -alR ozone-src/extracted
+
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
