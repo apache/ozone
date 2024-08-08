@@ -75,12 +75,12 @@ public abstract class Handler {
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender) {
+      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, metrics,
-          icrSender);
+          icrSender, checksumManager);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");

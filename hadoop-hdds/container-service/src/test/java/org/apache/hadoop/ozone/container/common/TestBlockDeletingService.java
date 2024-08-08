@@ -481,9 +481,7 @@ public class TestBlockDeletingService {
     // runs so we can trigger it manually.
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
@@ -550,9 +548,7 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
@@ -684,9 +680,7 @@ public class TestBlockDeletingService {
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
@@ -792,9 +786,7 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 100, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     service.start();
@@ -822,9 +814,7 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     // set timeout value as 1ns to trigger timeout behavior
     long timeout  = 1;
     OzoneContainer ozoneContainer =
@@ -929,9 +919,7 @@ public class TestBlockDeletingService {
         chunksPerBlock);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     service.start();
@@ -988,9 +976,7 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, containerCount, blocksPerContainer,
         chunksPerBlock);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            ContainerMetrics.create(conf), c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     service.start();
@@ -1047,9 +1033,7 @@ public class TestBlockDeletingService {
     ContainerSet containerSet = new ContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     int containerCount = 5;
     int blocksPerContainer = 3;
     createToDeleteBlocks(containerSet, containerCount,
@@ -1118,8 +1102,7 @@ public class TestBlockDeletingService {
     conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet(1000);
     KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
-    KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
+    KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();

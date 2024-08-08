@@ -183,21 +183,8 @@ public class TestSecureContainerServer {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, conf,
-              dd.getUuid().toString(),
-              containerSet, volumeSet, metrics,
-              c -> { }));
-    }
-    HddsDispatcher hddsDispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, context, metrics,
+    return ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context,
         TokenVerifier.create(new SecurityConfig(conf), secretKeyClient));
-    hddsDispatcher.setClusterId(scmId.toString());
-    return hddsDispatcher;
   }
 
   @Test

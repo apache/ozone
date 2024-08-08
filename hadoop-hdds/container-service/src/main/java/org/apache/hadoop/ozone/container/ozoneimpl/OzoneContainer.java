@@ -188,12 +188,13 @@ public class OzoneContainer {
       }
     };
 
+    // TODO add checksum manager here
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics, icrSender));
+              containerSet, volumeSet, metrics, icrSender, ));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);

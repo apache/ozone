@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -193,7 +194,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               volumeSet,
               metrics,
               containerReplicaProto -> {
-              });
+              },
+              new ContainerChecksumTreeManager(conf));
       handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);
     }

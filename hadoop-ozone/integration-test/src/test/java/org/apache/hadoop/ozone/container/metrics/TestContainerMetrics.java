@@ -148,18 +148,7 @@ public class TestContainerMetrics {
     ContainerSet containerSet = new ContainerSet(1000);
     StateContext context = ContainerTestUtils.getMockContext(
         dd, CONF);
-    ContainerMetrics metrics = ContainerMetrics.create(CONF);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, CONF,
-              context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
-              c -> { }));
-    }
-    HddsDispatcher dispatcher = new HddsDispatcher(CONF, containerSet,
-        volumeSet, handlers, context, metrics, null);
+    HddsDispatcher dispatcher = ContainerTestUtils.getHddsDispatcher(CONF, containerSet, volumeSet, context);
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     dispatcher.setClusterId(UUID.randomUUID().toString());

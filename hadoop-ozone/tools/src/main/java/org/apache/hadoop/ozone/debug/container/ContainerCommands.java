@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -151,7 +152,8 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
               volumeSet,
               metrics,
               containerReplicaProto -> {
-              });
+              },
+              new ContainerChecksumTreeManager(conf));
       handler.setClusterID(clusterId);
       handlers.put(containerType, handler);
     }

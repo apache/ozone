@@ -39,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
@@ -62,19 +63,7 @@ public class TestHandler {
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(
-              containerType, conf,
-              context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
-    }
-    this.dispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, null, metrics, null);
+    this.dispatcher = ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context);
   }
 
   @AfterEach

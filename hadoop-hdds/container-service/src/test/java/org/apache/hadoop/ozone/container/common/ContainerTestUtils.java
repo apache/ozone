@@ -17,16 +17,19 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -36,9 +39,12 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -54,8 +60,10 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -73,6 +81,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -177,6 +186,46 @@ public final class ContainerTestUtils {
             UUID.randomUUID().toString(), UUID.randomUUID().toString());
     kvData.setState(state);
     return new KeyValueContainer(kvData, new OzoneConfiguration());
+  }
+
+  /**
+   * Constructs an instance of KeyValueHandler that can be used for testing.
+   * This instance can be used for tests that do not need an ICR sender or {@link ContainerChecksumTreeManager}.
+   */
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics) {
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> {},
+        new ContainerChecksumTreeManager(config));
+  }
+
+  /**
+   * Constructs an instance of KeyValueHandler that can be used for testing.
+   * This instance can be used for tests that do not need an ICR sender, metrics, or a
+   * {@link ContainerChecksumTreeManager}.
+   */
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet) {
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, ContainerMetrics.create(config));
+  }
+
+  public static HddsDispatcher getHddsDispatcher(OzoneConfiguration conf,
+                                                 ContainerSet contSet,
+                                                 VolumeSet volSet,
+                                                 StateContext context) {
+    return getHddsDispatcher(conf, contSet, volSet, context, null);
+  }
+
+  public static HddsDispatcher getHddsDispatcher(OzoneConfiguration conf,
+                                                 ContainerSet contSet,
+                                                 VolumeSet volSet,
+                                                 StateContext context, TokenVerifier verifier) {
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    Map<ContainerType, Handler> handlers = Maps.newHashMap();
+    handlers.put(ContainerType.KeyValueContainer, ContainerTestUtils.getKeyValueHandler(conf,
+        context.getParent().getDatanodeDetails().getUuidString(), contSet, volSet, metrics));
+    assertEquals(1, ContainerType.values().length, "Tests only cover KeyValueContainer type");
+    return new HddsDispatcher(
+        conf, contSet, volSet, handlers, context, metrics, verifier);
   }
 
   public static void enableSchemaV3(OzoneConfiguration conf) {

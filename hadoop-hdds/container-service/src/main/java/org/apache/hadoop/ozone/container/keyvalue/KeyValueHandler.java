@@ -159,14 +159,15 @@ public class KeyValueHandler extends Handler {
                          ContainerSet contSet,
                          VolumeSet volSet,
                          ContainerMetrics metrics,
-                         IncrementalReportSender<Container> icrSender) {
+                         IncrementalReportSender<Container> icrSender,
+                         ContainerChecksumTreeManager checksumManager) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
-    checksumManager = new ContainerChecksumTreeManager(config);
+    this.checksumManager = checksumManager;
     try {
       volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
