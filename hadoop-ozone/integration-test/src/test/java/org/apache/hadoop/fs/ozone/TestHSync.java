@@ -302,6 +302,29 @@ public class TestHSync {
   }
 
   @Test
+  public void testEmptyHsync() throws Exception {
+    // Check that deletedTable should not have keys with the same block as in
+    // keyTable's when a key is hsync()'ed then close()'d.
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    String data = "random data";
+    final Path file = new Path(dir, "file-hsync-empty");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.write(new byte[0], 0, 0);
+        outputStream.hsync();
+      }
+    }
+  }
+
+  @Test
   public void testKeyHSyncThenClose() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.

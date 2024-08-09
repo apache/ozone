@@ -69,7 +69,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     if (blockData == null || blockData.getChunks().isEmpty()) {
       if (lastChunk == null) {
         throw new StorageContainerException(
-            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
+            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID + " key: " + blockKey, NO_SUCH_BLOCK);
       } else {
         if (LOG.isDebugEnabled()) {
           LOG.debug("blockData=(null), lastChunk={}", lastChunk.getChunks());
@@ -140,6 +140,18 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
   public void putBlockByID(BatchOperation batch, boolean incremental,
       long localID, BlockData data, KeyValueContainerData containerData,
       boolean endOfBlock) throws IOException {
+    if (data.getChunks().isEmpty()) {
+      //LOG.error("null chunk list " + data);
+      data.addChunk(ContainerProtos.ChunkInfo
+          .newBuilder()
+              .setChunkName("")
+              .setOffset(0)
+              .setLen(0)
+              .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                  .setType(ContainerProtos.ChecksumType.NONE)
+                  .setBytesPerChecksum(0).build())
+          .build());
+    }
     if (!incremental || !isPartialChunkList(data)) {
       // Case (1) old client: override chunk list.
       getBlockDataTable().putWithBatch(
