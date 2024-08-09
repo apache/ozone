@@ -52,11 +52,6 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   download_hadoop_aws "${HADOOP_AWS_DIR}"
 fi
 
-if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
-  install_virtualenv
-  install_robot
-fi
-
 export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
 
 cd "$DIST_DIR/compose" || exit 1
