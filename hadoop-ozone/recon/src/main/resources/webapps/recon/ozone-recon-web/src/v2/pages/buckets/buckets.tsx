@@ -16,18 +16,3 @@
  * limitations under the License.
  */
 
-import { lazy } from 'react';
-
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'))
-
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Buckets',
-    component: Buckets
-  }
-];

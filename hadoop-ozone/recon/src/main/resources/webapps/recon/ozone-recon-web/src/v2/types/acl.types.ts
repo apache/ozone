@@ -16,18 +16,32 @@
  * limitations under the License.
  */
 
-import { lazy } from 'react';
+export const ACLIdentityTypeList = [
+  'USER',
+  'GROUP',
+  'WORLD',
+  'ANONYMOUS',
+  'CLIENT_IP'
+] as const;
+export type ACLIdentity = typeof ACLIdentityTypeList[number];
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'))
+export const ACLRightList = [
+  'READ',
+  'WRITE',
+  'CREATE',
+  'LIST',
+  'DELETE',
+  'READ_ACL',
+  'WRITE_ACL',
+  'ALL',
+  'NONE'
+] as const;
+export type ACLRight = typeof ACLRightList[number];
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Buckets',
-    component: Buckets
-  }
-];
+
+export type Acl = {
+  type: string;
+  name: string;
+  scope: string;
+  aclList: string[];
+}
