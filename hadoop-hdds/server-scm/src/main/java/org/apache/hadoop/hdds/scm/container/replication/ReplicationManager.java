@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import com.google.gson.JsonArray;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -80,7 +81,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +96,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -425,8 +430,16 @@ public class ReplicationManager implements SCMService {
     // dead. Therefore we simply count the number of healthy nodes and include
     // those which are not in service.
     int healthyNodes = nodeManager.getNodeCount(null, HEALTHY);
+    double inflightOffPeakRatio = isOffPeakHour() ? rmConf.getInflightOffPeakRatio() : 1;
+    LOG.debug("Replication inflight limit, time:{}, inflightOffPeakRatio:{}", LocalDateTime.now(), inflightOffPeakRatio);
     return (long) Math.ceil(healthyNodes * rmConf.getDatanodeReplicationLimit()
-        * factor);
+        * factor * inflightOffPeakRatio);
+  }
+
+  public boolean isOffPeakHour() {
+    List<String> offPeakHours = Arrays.stream(rmConf.getInflightOffPeakHour().split(","))
+            .map(String::trim).collect(Collectors.toList());
+    return offPeakHours.contains(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH")));
   }
 
   /**
@@ -1312,6 +1325,42 @@ public class ReplicationManager implements SCMService {
       return inflightReplicationLimitFactor;
     }
 
+    @Config(key = "inflight.off-peak.hour",
+            type = ConfigType.STRING,
+            defaultValue = "-1",
+            reconfigurable = true,
+            tags = { SCM },
+            description = "Set the time information of the replication off-peak period. " +
+                    "The default value -1 means turning off this parameter. The normal" +
+                    " start time is 0 to 23 hours, separated by commas. For example, '0,1,8,9,12'"
+    )
+    private String inflightOffPeakHour = "-1";
+
+    public String getInflightOffPeakHour() {
+      return inflightOffPeakHour;
+    }
+
+    public void setInflightOffPeakHour(String hour) {
+      this.inflightOffPeakHour = hour;
+    }
+
+    @Config(key = "inflight.off-peak.ratio",
+            type = ConfigType.DOUBLE,
+            defaultValue = "1",
+            reconfigurable = true,
+            tags = { SCM },
+            description = "Control the ratio of replication during off-peak hours to peak hours."
+    )
+    private double inflightOffPeakRatio = 1;
+
+    public double getInflightOffPeakRatio() {
+      return inflightOffPeakRatio;
+    }
+
+    public void setInflightOffPeakRatio(double ratio) {
+      this.inflightOffPeakRatio = ratio;
+    }
+
     public void setInflightReplicationLimitFactor(double factor) {
       this.inflightReplicationLimitFactor = factor;
     }
@@ -1390,6 +1439,12 @@ public class ReplicationManager implements SCMService {
         throw new IllegalArgumentException(
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
+      }
+      if(inflightOffPeakRatio <= 0) {
+        throw new IllegalArgumentException(
+            "inflight.off-peak.ratio is set to " + inflightOffPeakRatio
+                + " and must be > 0");
+
       }
     }
   }
