@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import moment from 'moment';
 import { Table } from 'antd';
 import { Link } from 'react-router-dom';

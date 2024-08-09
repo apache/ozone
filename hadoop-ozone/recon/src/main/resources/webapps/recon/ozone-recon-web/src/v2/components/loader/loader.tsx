@@ -17,13 +17,20 @@
  */
 
 import React from "react"
+import { Spin } from "antd"
+import { LoadingOutlined } from "@ant-design/icons"
+
+const loaderStyle: React.CSSProperties = {
+  height: '100%',
+  width: '100%',
+  textAlign: 'center',
+  paddingTop: '25%'
+}
 
 const Loader: React.FC = () => {
   return (
-    <div className="loader-container">
-      <div className="loader-circle"></div>
-      <div className="loader-circle"></div>
-      <div className="loader-circle"></div>
+    <div style={loaderStyle}>
+      <Spin indicator={<LoadingOutlined style={{ color: '#1AA57A', fontSize: 48}} spin/>}/>
     </div>
   )
 }

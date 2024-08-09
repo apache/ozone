@@ -27,9 +27,9 @@ import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
-import './app.less';
-import { GenerateRoutes } from '@/v2/generateRoutes';
 import Loader from '@/v2/components/loader/loader';
+
+import './app.less';
 
 const {
   Header, Content, Footer
@@ -81,7 +81,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {(enableNewUI)
-                  ? <Suspense fallback={<span>Loading...</span>}>
+                  ? <Suspense fallback={<Loader/>}>
                     {routesV2.map(
                       (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                     )}
