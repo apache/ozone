@@ -83,7 +83,7 @@ const EChart = ({
     }
   }, [loading, theme]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
 
-  return <div ref={chartRef} style={{ width: "100em", height: "50em", margin: 'auto', ...style }} />;
+  return <div ref={chartRef} style={{ width: "50vw", height: "25vh", margin: 'auto', ...style }} />;
 }
 
 export default EChart;
