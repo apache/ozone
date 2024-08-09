@@ -42,6 +42,7 @@ import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,6 @@ public class BlockManagerImpl implements BlockManager {
   private ConfigurationSource config;
 
   private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
-  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final String FULL_CHUNK = "full";
 
   // Default Read Buffer capacity when Checksum is not present

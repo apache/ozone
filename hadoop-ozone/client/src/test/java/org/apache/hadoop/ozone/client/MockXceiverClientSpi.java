@@ -188,11 +188,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   }
 
   @Override
-  public XceiverClientReply watchForCommit(long index) {
-    return null;
-  }
-
-  @Override
   public long getReplicatedMinCommitIndex() {
     return 0;
   }

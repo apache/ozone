@@ -36,7 +36,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -117,8 +118,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     try (StorageContainerLocationProtocol scmLocationClient =
                createStorageContainerLocationClient(ozoneConf);
-         XceiverClientManager xceiverClientManager =
-             new XceiverClientManager(ozoneConf)) {
+         XceiverClientFactory xceiverClientManager =
+             new XceiverClientCreator(ozoneConf)) {
       List<Pipeline> pipelinesFromSCM = scmLocationClient.listPipelines();
       Pipeline firstPipeline;
       init();
@@ -246,8 +247,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       if (async) {
         XceiverClientReply xceiverClientReply =
             xceiverClientSpi.sendCommandAsync(request);
-        xceiverClientSpi
-            .watchForCommit(xceiverClientReply.getLogIndex());
+        xceiverClientSpi.watchForCommit(xceiverClientReply.getLogIndex()).get();
 
       } else {
         xceiverClientSpi.sendCommand(request);

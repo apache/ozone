@@ -275,25 +275,11 @@ public class TestFinalizeBlock {
 
   @Nonnull
   private ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
-      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList,
-      ContainerInfo container) {
-    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.FinalizeBlock)
-            .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes()
-            .get(0).getDatanodeDetails().getUuidString());
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList, ContainerInfo container) {
+    String uuidString = cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString();
+    long localID = omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID();
 
-    final ContainerProtos.DatanodeBlockID blockId =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(container.getContainerID()).setLocalID(
-                omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())
-            .setBlockCommitSequenceId(0).build();
-
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
-        .newBuilder().setBlockID(blockId).build());
-    return builder.build();
+    return ContainerTestHelper.getFinalizeBlockRequest(localID, container, uuidString);
   }
 
   /**
