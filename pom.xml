@@ -173,7 +173,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.16</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>2.0.13</slf4j.version>
+    <slf4j.version>2.0.15</slf4j.version>
     <log4j2.version>2.23.1</log4j2.version>
     <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
