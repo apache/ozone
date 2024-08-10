@@ -152,6 +152,8 @@ public class StateContext {
 
   private final String threadNamePrefix;
 
+  private RunningDatanodeState runningDatanodeState;
+
   /**
    * Constructs a StateContext.
    *
@@ -612,9 +614,11 @@ public class StateContext {
           parentDatanodeStateMachine.getConnectionManager(),
           this);
     case RUNNING:
-      return new RunningDatanodeState(this.conf,
-          parentDatanodeStateMachine.getConnectionManager(),
-          this);
+      if (runningDatanodeState == null) {
+        runningDatanodeState = new RunningDatanodeState(this.conf,
+            parentDatanodeStateMachine.getConnectionManager(), this);
+      }
+      return runningDatanodeState;
     case SHUTDOWN:
       return null;
     default:
@@ -654,7 +658,11 @@ public class StateContext {
     // Adding not null check, in a case where datanode is still starting up, but
     // we called stop DatanodeStateMachine, this sets state to SHUTDOWN, and
     // there is a chance of getting task as null.
-    if (task != null) {
+    if (task == null) {
+      return;
+    }
+
+    try {
       if (this.isEntering()) {
         task.onEnter();
       }
@@ -691,6 +699,8 @@ public class StateContext {
         // that we can terminate the datanode.
         setShutdownOnError();
       }
+    } finally {
+      task.clear();
     }
   }
 

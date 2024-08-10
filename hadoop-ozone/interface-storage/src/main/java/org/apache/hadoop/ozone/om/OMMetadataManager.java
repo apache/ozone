@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -47,14 +47,15 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
-import org.apache.hadoop.ozone.storage.proto.
-    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * OM metadata manager interface.
@@ -126,6 +127,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
+   * Get DB key for a key or prefix in an FSO bucket given existing
+   * volume and bucket names.
+   */
+  String getOzoneKeyFSO(String volumeName,
+                        String bucketName,
+                        String keyPrefix)
+      throws IOException;
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB directory
    * key.
    *
@@ -164,6 +174,17 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOpenKey(String volume, String bucket, String key, String clientId);
 
   /**
+   * Returns client ID in Long of an OpenKeyTable DB Key String.
+   * @param dbOpenKeyName An OpenKeyTable DB Key String.
+   * @return Client ID (Long)
+   */
+  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
+    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
+    return Long.parseLong(clientIdString);
+  }
+
+  /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
    *
    * @param volume - Volume name
@@ -200,6 +221,24 @@ public interface OMMetadataManager extends DBStoreHAManager {
   List<OmBucketInfo> listBuckets(String volumeName, String startBucket,
                                  String bucketPrefix, int maxNumOfBuckets,
                                  boolean hasSnapshot)
+      throws IOException;
+
+  /**
+   * Inner implementation of listOpenFiles. Called after all the arguments are
+   * checked and processed by Ozone Manager.
+   * @param bucketLayout
+   * @param maxKeys
+   * @param dbOpenKeyPrefix
+   * @param hasContToken
+   * @param dbContTokenPrefix
+   * @return ListOpenFilesResult
+   * @throws IOException
+   */
+  ListOpenFilesResult listOpenFiles(BucketLayout bucketLayout,
+                                    int maxKeys,
+                                    String dbOpenKeyPrefix,
+                                    boolean hasContToken,
+                                    String dbContTokenPrefix)
       throws IOException;
 
   /**
@@ -293,6 +332,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
+   * Get total open key count (estimated, due to the nature of RocksDB impl)
+   * of both OpenKeyTable and OpenFileTable.
+   */
+  long getTotalOpenKeyCount() throws IOException;
+
+  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
@@ -303,7 +348,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @throws IOException
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
-      BucketLayout bucketLayout) throws IOException;
+      BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
 
   /**
    * Returns the names of up to {@code count} MPU key whose age is greater
@@ -321,13 +366,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
-
-  /**
-   * Retrieve RWLock for the table.
-   * @param tableName table name.
-   * @return ReentrantReadWriteLock
-   */
-  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.

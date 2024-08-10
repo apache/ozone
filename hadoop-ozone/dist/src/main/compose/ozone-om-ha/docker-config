@@ -38,6 +38,7 @@ OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 ASYNC_PROFILER_HOME=/opt/profiler

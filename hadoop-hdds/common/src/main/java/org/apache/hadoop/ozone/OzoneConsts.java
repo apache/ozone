@@ -115,6 +115,8 @@ public final class OzoneConsts {
   public static final String CHUNK_OVERWRITE = "OverWriteRequested";
 
   public static final int CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
+  // for client and DataNode to label a block contains a incremental chunk list.
+  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final long KB = 1024L;
   public static final long MB = KB * 1024L;
   public static final long GB = MB * 1024L;
@@ -386,6 +388,10 @@ public final class OzoneConsts {
 
   /** Metadata stored in OmKeyInfo. */
   public static final String HSYNC_CLIENT_ID = "hsyncClientId";
+  public static final String LEASE_RECOVERY = "leaseRecovery";
+  public static final String DELETED_HSYNC_KEY = "deletedHsyncKey";
+  public static final String OVERWRITTEN_HSYNC_KEY = "overwrittenHsyncKey";
+  public static final String FORCE_LEASE_RECOVERY_ENV = "OZONE.CLIENT.RECOVER.LEASE.FORCE";
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -542,14 +541,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      KeyStoresFactory managerFactory =
-          caClient.getServerKeyStoresFactory();
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          managerFactory.getKeyManagers()[0],
-          managerFactory.getTrustManagers()[0], true);
+          caClient.getKeyManager(),
+          caClient.getTrustManager(), true);
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
-          managerFactory.getKeyManagers()[0],
-          managerFactory.getTrustManagers()[0], false);
+          caClient.getKeyManager(),
+          caClient.getTrustManager(), false);
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 

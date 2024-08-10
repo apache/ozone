@@ -133,7 +133,7 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
           getOmRequest());
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
         ex, getOmRequest().getUserInfo()));
   }
 

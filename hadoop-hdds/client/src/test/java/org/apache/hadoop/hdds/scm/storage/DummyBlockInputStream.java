@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -50,7 +51,8 @@ class DummyBlockInputStream extends BlockInputStream {
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks,
       OzoneClientConfig config) throws IOException {
-    super(blockId, blockLen, pipeline, token,
+    super(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
+        pipeline, token,
         xceiverClientManager, refreshFunction, config);
     this.chunkDataMap = chunks;
     this.chunks = chunkList;
@@ -58,8 +60,10 @@ class DummyBlockInputStream extends BlockInputStream {
   }
 
   @Override
-  protected List<ChunkInfo> getChunkInfoList() throws IOException {
-    return chunks;
+  protected ContainerProtos.BlockData getBlockData() throws IOException {
+    BlockID blockID = getBlockID();
+    ContainerProtos.DatanodeBlockID datanodeBlockID = blockID.getDatanodeBlockIDProtobuf();
+    return ContainerProtos.BlockData.newBuilder().addAllChunks(chunks).setBlockID(datanodeBlockID).build();
   }
 
   @Override

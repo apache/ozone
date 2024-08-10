@@ -30,7 +30,7 @@ import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.scm.net.NetUtils;
-import org.apache.hadoop.util.StringWithByteString;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -386,6 +386,9 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setPersistedOpStateExpiry(
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
+    if (datanodeDetailsProto.hasCurrentVersion()) {
+      builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+    }
     return builder;
   }
 
@@ -490,6 +493,8 @@ public class DatanodeDetails extends NodeImpl implements
       }
     }
 
+    builder.setCurrentVersion(currentVersion);
+
     return builder;
   }
 
@@ -517,6 +522,7 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Note: Datanode initial version is not passed to the client due to no use case. See HDDS-9884
    * @return the version this datanode was initially created with
    */
   public int getInitialVersion() {

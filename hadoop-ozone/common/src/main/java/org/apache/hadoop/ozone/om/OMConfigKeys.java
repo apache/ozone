@@ -52,6 +52,14 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
   public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 100;
+  public static final String OZONE_OM_READ_THREADPOOL_KEY =
+      "ozone.om.read.threadpool";
+  public static final int OZONE_OM_READ_THREADPOOL_DEFAULT = 10;
+
+  public static final String OZONE_OM_DB_MAX_OPEN_FILES
+      = "ozone.om.db.max.open.files";
+  public static final int OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT
+      = -1;
 
   public static final String OZONE_OM_INTERNAL_SERVICE_ID =
       "ozone.om.internal.service.id";
@@ -127,6 +135,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
       "ozone.om.open.key.expire.threshold";
   public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
+      "7d";
+
+  public static final String OZONE_OM_LEASE_HARD_LIMIT =
+      "ozone.om.lease.hard.limit";
+  public static final String OZONE_OM_LEASE_HARD_LIMIT_DEFAULT =
       "7d";
 
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =

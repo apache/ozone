@@ -244,6 +244,7 @@ public final class OmUtils {
     case ListKeysLight:
     case ListTrash:
     case ServiceList:
+    case ListOpenFiles:
     case ListMultiPartUploadParts:
     case GetFileStatus:
     case LookupFile:
@@ -522,7 +523,7 @@ public final class OmUtils {
   public static void validateVolumeName(String volumeName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName, isStrictS3);
+      HddsClientUtils.verifyResourceName(volumeName, "volume", isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid volume name: " + volumeName,
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -535,7 +536,7 @@ public final class OmUtils {
   public static void validateBucketName(String bucketName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName, isStrictS3);
+      HddsClientUtils.verifyResourceName(bucketName, "bucket", isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);
@@ -571,9 +572,9 @@ public final class OmUtils {
       return;
     }
     try {
-      HddsClientUtils.verifyResourceName(snapshotName);
+      HddsClientUtils.verifyResourceName(snapshotName, "snapshot");
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid snapshot name: " + snapshotName,
+      throw new OMException("Invalid snapshot name: " + snapshotName + "\n" + e.getMessage(),
           OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
     }
   }
