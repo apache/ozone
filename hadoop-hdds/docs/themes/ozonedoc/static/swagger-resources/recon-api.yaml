@@ -25,6 +25,10 @@ servers:
 tags:
   - name: Containers
     description: APIs to fetch information about the available containers. **Admin Only**
+  - name: Volumes
+    description: APIs to fetch information about the available volumes. **Admin Only**
+  - name: Buckets
+    description: APIs to fetch information about the available buckets. **Admin Only**
   - name: Keys
     description: APIs to fetch information about the available keys. **Admin Only**
   - name: Containers and Keys
@@ -229,6 +233,229 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/responses/DeletedMismatchedContainers'
+
+  /volumes:
+    get:
+      tags:
+        - Volumes
+      summary: Fetches all volumes in the cluster.
+      operationId: getVolumes
+      parameters:
+        - name: prevKey
+          in: query
+          description: Only returns the volume after the given prevKey.
+          required: false
+          schema:
+            type: string
+            example: vol1
+        - name: limit
+          in: query
+          description: Only returns the limited number of results. The default limit is 1000.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount:
+                    type: integer
+                    example: 4
+                  volumes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        volume:
+                          type: string
+                          example: vol1
+                        owner:
+                          type: string
+                          example: testuser
+                        admin:
+                          type: string
+                          example: ozone
+                        creationTime:
+                          type: integer
+                          example: 1665588176660
+                        modificationTime:
+                          type: integer
+                          example: 1665590397315
+                        quotaInNamespace:
+                          type: integer
+                          example: 2048
+                        quotaInBytes:
+                          type: integer
+                          example: 1073741824
+                        usedNamespace:
+                          type: integer
+                          example: 10
+                        acls:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              type:
+                                type: string
+                                example: USER
+                              name:
+                                type: string
+                                example: testuser
+                              scope:
+                                type: string
+                                example: ACCESS
+                              aclList:
+                                type: array
+                                items:
+                                  type: string
+                                  example: WRITE
+              example:
+                totalCount: 4
+                volumes:
+                  - volume: vol1
+                    owner: testuser
+                    admin: ozone
+                    creationTime: 1665588176660
+                    modificationTime: 1665590397315
+                    quotaInNamespace: 2048
+                    quotaInBytes: 1073741824
+                    usedNamespace: 10
+                    acls:
+                      - type: USER
+                        name: testuser
+                        scope: ACCESS
+                        aclList:
+                          - WRITE
+                          - READ
+                          - DELETE
+
+  /buckets:
+    get:
+      tags:
+        - Buckets
+      summary: Fetches all buckets in the cluster.
+      operationId: getBuckets
+      parameters:
+        - name: volume
+          in: query
+          description: The volume in string without any protocol prefix.
+          required: false
+          schema:
+            type: string
+        - name: prevKey
+          in: query
+          description: Only returns the bucket after the given prevKey. prevKey is ignored if volume is not specified.
+          required: false
+          schema:
+            type: string
+            example: bucket1
+        - name: limit
+          in: query
+          description: Only returns the limited number of results. The default limit is 1000.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount:
+                    type: integer
+                    example: 5
+                  buckets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        volumeName:
+                          type: string
+                          example: vol1
+                        bucketName:
+                          type: string
+                          example: buck1
+                        versioning:
+                          type: boolean
+                          example: false
+                        storageType:
+                          type: string
+                          example: DISK
+                        creationTime:
+                          type: integer
+                          example: 1665588176616
+                        modificationTime:
+                          type: integer
+                          example: 1665590392293
+                        usedBytes:
+                          type: integer
+                          example: 943718400
+                        usedNamespace:
+                          type: integer
+                          example: 40000
+                        quotaInBytes:
+                          type: integer
+                          example: 1073741824
+                        quotaInNamespace:
+                          type: integer
+                          example: 50000
+                        owner:
+                          type: string
+                          example: testuser
+                        bucketLayout:
+                          type: string
+                          example: OBJECT_STORE
+                        acls:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              type:
+                                type: string
+                                example: USER
+                              name:
+                                type: string
+                                example: testuser
+                              scope:
+                                type: string
+                                example: ACCESS
+                              aclList:
+                                type: array
+                                items:
+                                  type: string
+                                  example: WRITE
+              example:
+                totalCount: 5
+                buckets:
+                  - volumeName: vol1
+                    bucketName: buck1
+                    versioning: false
+                    storageType: DISK
+                    creationTime: 1665588176616
+                    modificationTime: 1665590392293
+                    usedBytes: 943718400
+                    usedNamespace: 40000
+                    quotaInBytes: 1073741824
+                    quotaInNamespace: 50000
+                    owner: testuser
+                    bucketLayout: OBJECT_STORE
+                    acls:
+                      - type: USER
+                        name: testuser
+                        scope: ACCESS
+                        aclList:
+                          - WRITE
+                          - READ
+                          - DELETE
+
   /keys/open:
     get:
       tags:
