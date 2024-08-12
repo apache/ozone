@@ -32,15 +32,8 @@ import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -51,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -65,6 +57,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildContainerMerkleTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.containerChecksumFileExists;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -230,8 +223,8 @@ public class TestCloseContainer {
     OzoneContainer ozoneContainer = hddsDatanodeService.getDatanodeStateMachine().getContainer();
     KeyValueContainer container = (KeyValueContainer) ozoneContainer.getController()
         .getContainer(containerInfo.getContainerID());
-    ContainerProtos.ContainerMerkleTree expectedMerkleTree =
-        buildContainerMerkleTree(container.getContainerData());
+    ContainerProtos.ContainerMerkleTree expectedMerkleTree = buildContainerMerkleTree(
+        container.getContainerData(), cluster.getConf());
     OzoneTestUtils.closeContainer(scm, containerInfo);
 
     // Checksum file exists after container close and matches the expected container
@@ -257,24 +250,5 @@ public class TestCloseContainer {
       LOG.error("Checksum file doesn't exist.");
     }
     return false;
-  }
-
-  private ContainerProtos.ContainerMerkleTree buildContainerMerkleTree(KeyValueContainerData containerData)
-      throws IOException {
-    ContainerMerkleTree containerMerkleTree = new ContainerMerkleTree();
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, cluster.getConf());
-         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
-             getBlockIterator(containerData.getContainerID())) {
-      while (blockIterator.hasNext()) {
-        BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
-        List<ChunkInfo> chunkInfos = new ArrayList<>();
-        for (ContainerProtos.ChunkInfo chunk : chunks) {
-          chunkInfos.add(ChunkInfo.getFromProtoBuf(chunk));
-        }
-        containerMerkleTree.addChunks(blockData.getLocalID(), chunkInfos);
-      }
-    }
-    return containerMerkleTree.toProto();
   }
 }

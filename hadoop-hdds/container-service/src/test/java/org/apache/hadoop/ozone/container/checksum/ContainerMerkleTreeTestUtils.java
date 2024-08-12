@@ -24,9 +24,14 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -34,7 +39,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -136,5 +143,25 @@ public final class ContainerMerkleTreeTestUtils {
     Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
     File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
     return containerChecksumFile.exists();
+  }
+
+  public static ContainerProtos.ContainerMerkleTree buildContainerMerkleTree(KeyValueContainerData containerData,
+                                                                             ConfigurationSource conf)
+      throws IOException {
+    ContainerMerkleTree containerMerkleTree = new ContainerMerkleTree();
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
+         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+             getBlockIterator(containerData.getContainerID())) {
+      while (blockIterator.hasNext()) {
+        BlockData blockData = blockIterator.nextBlock();
+        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+        List<ChunkInfo> chunkInfos = new ArrayList<>();
+        for (ContainerProtos.ChunkInfo chunk : chunks) {
+          chunkInfos.add(ChunkInfo.getFromProtoBuf(chunk));
+        }
+        containerMerkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+      }
+    }
+    return containerMerkleTree.toProto();
   }
 }

@@ -98,6 +98,7 @@ import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -279,7 +280,7 @@ public class TestOzoneContainerWithTLS {
           ContainerProtocolCalls.getContainerMerkleTree(client,
               containerId, containerToken);
       // Getting container merkle tree with valid container token
-      assertEquals(response.getContainerMerkleTree(), ByteString.EMPTY);
+      assertNotEquals(response.getContainerMerkleTree(), ByteString.EMPTY);
 
       // Getting container merkle tree with invalid container token
       XceiverClientSpi finalClient = client;
