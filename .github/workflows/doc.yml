@@ -112,6 +112,11 @@ jobs:
           echo "Contents of the 'ozone' directory:"
           ls -al ../ozone
 
+      - name: List all XML files in the 'ozone' directory and subdirectories
+        run: |
+          echo "XML files in the 'ozone' directory and subdirectories:"
+          find ../ozone -name "*.xml"    
+
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
