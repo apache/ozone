@@ -192,7 +192,7 @@ public class TestRequestValidations {
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
-        "oldClientPreProcessCreateKeyValidator");
+        "preProcessCreateKeyBucketLayoutClientValidator");
   }
 
   @Test
@@ -206,8 +206,8 @@ public class TestRequestValidations {
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertExactListOfValidatorsCalled(
-        "oldClientPostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator2");
+        "postProcessCreateKeyBucketLayoutClientValidator",
+        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   @Test
@@ -220,8 +220,8 @@ public class TestRequestValidations {
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertExactListOfValidatorsCalled(
-        "preFinalizePreProcessCreateKeyValidator",
-        "oldClientPreProcessCreateKeyValidator");
+        "preProcessCreateKeyQuotaLayoutValidator",
+        "preProcessCreateKeyBucketLayoutClientValidator");
   }
 
   @Test
@@ -235,9 +235,9 @@ public class TestRequestValidations {
 
     validationListener.assertNumOfEvents(3);
     validationListener.assertExactListOfValidatorsCalled(
-        "preFinalizePostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator2");
+        "postProcessCreateKeyQuotaLayoutValidator",
+        "postProcessCreateKeyBucketLayoutClientValidator",
+        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   /**

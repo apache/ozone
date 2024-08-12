@@ -164,7 +164,7 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.SetAcl,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockSetAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

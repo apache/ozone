@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.request.validation;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.Version;
 import org.reflections.Reflections;
@@ -25,6 +26,7 @@ import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -86,16 +88,18 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                     Collection<URL> searchUrls,
                     Set<Class<? extends Version>> allowedVersionTypes,
                     Set<RequestProcessingPhase> allowedProcessingPhases) {
+    Class<RequestType[]> requestArrayClass = (Class<RequestType[]>) Array.newInstance(requestType, 0)
+        .getClass();
     Set<Class<? extends Annotation>> validatorsToBeRegistered =
         new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(""))
             .setScanners(Scanners.TypesAnnotated)
             .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream()
             .filter(annotationClass -> getReturnTypeOfAnnotationMethod((Class<? extends Annotation>) annotationClass,
                 RegisterValidator.REQUEST_TYPE_METHOD_NAME)
-                .equals(requestType))
+                .equals(requestArrayClass))
             .filter(annotationClass -> allowedVersionTypes.contains(getReturnTypeOfAnnotationMethod(
                 (Class<? extends Annotation>) annotationClass,
-                    RegisterValidator.MAX_VERSION_METHOD_NAME)))
+                    RegisterValidator.APPLY_UNTIL_METHOD_NAME)))
             .map(annotationClass -> (Class<? extends Annotation>) annotationClass)
             .collect(Collectors.toSet());
     this.indexedValidatorMap = allowedVersionTypes.stream().collect(ImmutableMap.toImmutableMap(Function.identity(),
@@ -105,7 +109,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
         .setScanners(Scanners.MethodsAnnotated)
         .setParallel(true)
     );
-    initMaps(requestType, allowedProcessingPhases, validatorsToBeRegistered, reflections);
+    initMaps(requestArrayClass, allowedProcessingPhases, validatorsToBeRegistered, reflections);
   }
 
   /**
@@ -139,9 +143,12 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
   public <V extends Version> List<Method> validationsFor(RequestType requestType,
                                                          RequestProcessingPhase phase,
                                                          V requestVersion) {
+
     return Optional.ofNullable(this.indexedValidatorMap.get(requestVersion.getClass()))
         .map(requestTypeMap -> requestTypeMap.get(requestType)).map(phaseMap -> phaseMap.get(phase))
-        .map(indexedMethods -> indexedMethods.getItemsGreaterThanIdx(requestVersion.getVersion()))
+        .map(indexedMethods -> requestVersion.version() < 0 ?
+            indexedMethods.getItemsEqualToIdx(requestVersion.version()) :
+            indexedMethods.getItemsGreaterThanIdx(requestVersion.version()))
         .orElse(Collections.emptyList());
 
   }
@@ -163,8 +170,8 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
   }
 
-  private <Validator extends Annotation> Version getMaxVersion(Validator validator) {
-    return callAnnotationMethod(validator, RegisterValidator.MAX_VERSION_METHOD_NAME, Version.class);
+  private <Validator extends Annotation> Version getApplyUntilVersion(Validator validator) {
+    return callAnnotationMethod(validator, RegisterValidator.APPLY_UNTIL_METHOD_NAME, Version.class);
   }
 
   private <Validator extends Annotation> RequestProcessingPhase getRequestPhase(Validator validator) {
@@ -172,8 +179,8 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
         RequestProcessingPhase.class);
   }
 
-  private <Validator extends Annotation> RequestType getRequestType(Validator validator,
-                                                                    Class<RequestType> requestType) {
+  private <Validator extends Annotation> RequestType[] getRequestType(Validator validator,
+                                                                      Class<RequestType[]> requestType) {
     return callAnnotationMethod(validator, RegisterValidator.REQUEST_TYPE_METHOD_NAME, requestType);
   }
 
@@ -194,7 +201,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    *     - values is an {@link IndexedItems } containing the validation list
    * @param validatorsToBeRegistered collection of the annotated validtors to process.
    */
-  private void initMaps(Class<RequestType> requestType,
+  private void initMaps(Class<RequestType[]> requestType,
                         Set<RequestProcessingPhase> allowedPhases,
                         Collection<Class<? extends Annotation>> validatorsToBeRegistered,
                         Reflections reflections) {
@@ -203,37 +210,37 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
   }
 
-
-
-  private void registerValidator(Class<RequestType> requestType,
+  private void registerValidator(Class<RequestType[]> requestType,
                                  Set<RequestProcessingPhase> allowedPhases,
                                  Class<? extends Annotation> validatorToBeRegistered,
                                  Reflections reflections) {
     Collection<Method> methods =  reflections.getMethodsAnnotatedWith(validatorToBeRegistered);
     Class<? extends Version> versionClass = (Class<? extends Version>)
-        this.getReturnTypeOfAnnotationMethod(validatorToBeRegistered, RegisterValidator.MAX_VERSION_METHOD_NAME);
-    List<Pair<? extends Annotation, Method>> sortedMethodsByMaxVersion = methods.stream()
+        this.getReturnTypeOfAnnotationMethod(validatorToBeRegistered, RegisterValidator.APPLY_UNTIL_METHOD_NAME);
+    List<Pair<? extends Annotation, Method>> sortedMethodsByApplyUntilVersion = methods.stream()
         .map(method -> Pair.of(method.getAnnotation(validatorToBeRegistered), method))
         .sorted((validatorMethodPair1, validatorMethodPair2) ->
             Integer.compare(
-                this.getMaxVersion(validatorMethodPair1.getKey()).getVersion(),
-                this.getMaxVersion(validatorMethodPair2.getKey()).getVersion()))
+                this.getApplyUntilVersion(validatorMethodPair1.getKey()).version(),
+                this.getApplyUntilVersion(validatorMethodPair2.getKey()).version()))
         .collect(Collectors.toList());
-    for (Pair<? extends Annotation, Method> validatorMethodPair : sortedMethodsByMaxVersion) {
+    for (Pair<? extends Annotation, Method> validatorMethodPair : sortedMethodsByApplyUntilVersion) {
       Annotation validator = validatorMethodPair.getKey();
       Method method = validatorMethodPair.getValue();
-      Version maxVersion = this.getMaxVersion(validator);
+      Version applyUntilVersion = this.getApplyUntilVersion(validator);
       RequestProcessingPhase phase = this.getRequestPhase(validator);
       checkAllowedAnnotationValues(allowedPhases, phase, RegisterValidator.PROCESSING_PHASE_METHOD_NAME,
           method.getName());
-      RequestType type = this.getRequestType(validator, requestType);
+      Set<RequestType> types = Sets.newHashSet(this.getRequestType(validator, requestType));
       method.setAccessible(true);
+      for (RequestType type : types) {
+        EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
+            this.indexedValidatorMap.get(versionClass);
+        EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
+            this.getAndInitialize(type, () -> new EnumMap<>(RequestProcessingPhase.class), requestMap);
+        this.getAndInitialize(phase, IndexedItems::new, phaseMap).add(method, applyUntilVersion.version());
+      }
 
-      EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
-          this.indexedValidatorMap.get(versionClass);
-      EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
-          this.getAndInitialize(type, () -> new EnumMap<>(RequestProcessingPhase.class), requestMap);
-      this.getAndInitialize(phase, IndexedItems::new, phaseMap).add(method, maxVersion.getVersion());
     }
 
   }
@@ -271,6 +278,18 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
       return Optional.ofNullable(indexMap.higherEntry(indexValue))
           .map(Map.Entry::getValue)
           .map(startIndex -> items.subList(startIndex, items.size())).orElse(Collections.emptyList());
+    }
+
+    /**
+     *
+     * @param indexValue Given index value.
+     * @return All the items which has an index value greater than given index value.
+     */
+    public List<T> getItemsEqualToIdx(IDX indexValue) {
+      return Optional.ofNullable(indexMap.get(indexValue))
+          .map(startIndex -> items.subList(startIndex, Optional.ofNullable(indexMap.higherEntry(indexValue))
+              .map(Map.Entry::getValue).orElse(items.size())))
+          .orElse(Collections.emptyList());
     }
 
   }

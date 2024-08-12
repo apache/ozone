@@ -38,7 +38,7 @@ public interface ComponentVersion extends Version {
   int toProtoValue();
 
   @Override
-  default int getVersion() {
+  default int version() {
     return toProtoValue();
   }
 }

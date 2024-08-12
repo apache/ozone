@@ -49,7 +49,7 @@ public enum VersionExtractor {
     @Override
     public Version extractVersion(OMRequest req, ValidationContext ctx) {
       return req.getVersion() > ClientVersion.CURRENT_VERSION ?
-          ClientVersion.CURRENT : ClientVersion.fromProtoValue(req.getVersion());
+          ClientVersion.FUTURE_VERSION : ClientVersion.fromProtoValue(req.getVersion());
     }
 
     @Override

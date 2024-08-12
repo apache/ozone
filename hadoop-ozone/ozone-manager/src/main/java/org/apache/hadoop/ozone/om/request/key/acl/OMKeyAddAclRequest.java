@@ -167,7 +167,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.AddAcl,
-      maxVersion = ClientVersion.ERASURE_CODING_SUPPORT
+      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockAddAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

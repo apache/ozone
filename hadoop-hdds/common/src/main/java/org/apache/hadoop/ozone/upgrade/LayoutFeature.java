@@ -51,7 +51,7 @@ public interface LayoutFeature extends Version {
   }
 
   @Override
-  default int getVersion() {
+  default int version() {
     return this.layoutVersion();
   }
 

@@ -398,7 +398,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket,
-      maxVersion = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      applyUntil = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowCreateBucketWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -421,7 +421,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket,
-      maxVersion = OMLayoutFeature.BUCKET_LAYOUT_SUPPORT
+      applyUntil = OMLayoutFeature.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest handleCreateBucketWithBucketLayoutDuringPreFinalize(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -462,7 +462,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket,
-      maxVersion =  ClientVersion.ERASURE_CODING_SUPPORT
+      applyUntil =  ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {

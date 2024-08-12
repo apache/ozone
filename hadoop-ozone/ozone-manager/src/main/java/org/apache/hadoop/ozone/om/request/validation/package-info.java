@@ -38,21 +38,19 @@
  * which would be extracted out of the om request and all validators
  * fulfilling the condition would be run.
  *
- * The system uses a reflection based discovery to find methods that are
+ * The system uses a reflection based discovery to find annotations that are
  * annotated with the
  * {@link org.apache.hadoop.ozone.request.validation.RegisterValidator}
  * annotation.
- * This annotation is used to register a particular annotation which inturn would be used to specify conditions in
- * which a certain validator has to be used, the request type to which the validation should be applied,
+ * This annotation is used to register a particular annotation which in turn would be used to specify
+ * the request type to which the validation should be applied,
  * and the request processing phase in which we apply the validation and the maxVersion corresponding to which this
  * is supposed to run.
  *
  * One validator can be applied in multiple, E.g.
  * {@link org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator},
  * {@link org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator}
- * but a validator has to handle strictly just one
- * {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type
- * }.
+ *
  * The main reason to avoid validating multiple request types with the same
  * validator, is that these validators have to be simple methods without state
  * any complex validation has to happen in the reql request handling.

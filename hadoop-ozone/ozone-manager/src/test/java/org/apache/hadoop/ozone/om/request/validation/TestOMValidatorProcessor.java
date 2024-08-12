@@ -69,14 +69,14 @@ public class TestOMValidatorProcessor {
           .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream().filter(annotationClass -> {
             try {
               return annotationClass.getMethod(RegisterValidator.REQUEST_TYPE_METHOD_NAME).getReturnType()
-                  .equals(Type.class);
+                  .equals(Type[].class);
             } catch (NoSuchMethodException e) {
               throw new RuntimeException(e);
             }
           })
           .collect(Collectors.toMap(Function.identity(), annotationClass -> {
             try {
-              return annotationClass.getMethod(RegisterValidator.MAX_VERSION_METHOD_NAME).getReturnType();
+              return annotationClass.getMethod(RegisterValidator.APPLY_UNTIL_METHOD_NAME).getReturnType();
             } catch (NoSuchMethodException e) {
               throw new RuntimeException(e);
             }
@@ -502,21 +502,21 @@ public class TestOMValidatorProcessor {
   }
 
   private <V extends Enum<V> & Version> String annotationOf(
-      RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V maxVersion) {
-    return annotationOf(phase.name(), reqType, annotationClass, maxVersion);
+      RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V applyUntilVersion) {
+    return annotationOf(phase.name(), reqType, annotationClass, applyUntilVersion);
   }
 
   private <V extends Enum<V> & Version> String annotationOf(
       String phase,
       Type reqType,
       Class<?> annotationClass,
-      V maxVersion) {
+      V applyUntilVersion) {
     StringBuilder annotation = new StringBuilder();
     annotation.append("@" + annotationClass.getName() + "(");
     annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
-    if (maxVersion != null) {
-      annotation.append(", maxVersion = ").append(maxVersion.name());
+    if (applyUntilVersion != null) {
+      annotation.append(", applyUntil = ").append(applyUntilVersion.name());
     }
     annotation.append(" )");
     return annotation.toString();

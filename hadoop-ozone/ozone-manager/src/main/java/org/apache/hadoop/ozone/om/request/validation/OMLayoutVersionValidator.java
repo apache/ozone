@@ -94,13 +94,13 @@ public @interface OMLayoutVersionValidator {
    * The type of the request handled by this validator method.
    * @return the requestType to whihc the validator shoudl be applied
    */
-  Type requestType();
+  Type[] requestType();
 
   /**
    * The max version for which the validator would run. The validator would run for the request
    * where the version is older than the excluding of the specified version.
-   * @returns the max required client version for which the validator runs for older version.
+   * @returns the max layout version until which the validator runs excluding the specified version itself.
    */
-  OMLayoutFeature maxVersion();
+  OMLayoutFeature applyUntil();
 
 }

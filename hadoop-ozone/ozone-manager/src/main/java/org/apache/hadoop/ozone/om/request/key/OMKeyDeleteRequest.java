@@ -242,7 +242,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.DeleteKey,
-      maxVersion = ClientVersion.ERASURE_CODING_SUPPORT
+      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockDeleteKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

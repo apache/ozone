@@ -99,7 +99,7 @@ public class TestValidatorRegistry {
             OMLayoutFeature.FILESYSTEM_SNAPSHOT));
 
     assertEquals(1, validators.size());
-    String expectedMethodName = "preFinalizePreProcessCreateKeyValidator";
+    String expectedMethodName = "preProcessCreateKeyQuotaLayoutValidator";
     assertEquals(expectedMethodName, validators.get(0).getName());
   }
 
@@ -113,7 +113,7 @@ public class TestValidatorRegistry {
         asList(ClientVersion.CURRENT, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT));
 
     assertEquals(1, validators.size());
-    String expectedMethodName = "preFinalizePostProcessCreateKeyValidator";
+    String expectedMethodName = "postProcessCreateKeyQuotaLayoutValidator";
     assertEquals(expectedMethodName, validators.get(0).getName());
   }
 
@@ -129,8 +129,8 @@ public class TestValidatorRegistry {
     assertEquals(2, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertThat(methodNames).contains("oldClientPreProcessCreateKeyValidator");
-    assertThat(methodNames).contains("oldClientPreProcessCreateKeyValidator2");
+    assertEquals(Arrays.asList("preProcessCreateKeyBucketLayoutClientValidator",
+        "preProcessCreateKeyBucketLayoutClientValidator"), methodNames);
   }
 
   @Test
@@ -145,8 +145,8 @@ public class TestValidatorRegistry {
     assertEquals(2, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator");
-    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator2");
+    assertThat(methodNames).contains("postProcessCreateKeyBucketLayoutClientValidator");
+    assertThat(methodNames).contains("postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   @Test
@@ -162,7 +162,7 @@ public class TestValidatorRegistry {
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, newClientValidators.size());
-    String expectedMethodName = "multiPurposePreProcessCreateVolumeValidator";
+    String expectedMethodName = "multiPurposePreProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator";
     assertEquals(expectedMethodName, preFinalizeValidators.get(0).getName());
     assertEquals(expectedMethodName, newClientValidators.get(0).getName());
   }
@@ -180,7 +180,7 @@ public class TestValidatorRegistry {
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
-    String expectedMethodName = "multiPurposePostProcessCreateVolumeValidator";
+    String expectedMethodName = "multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator";
     assertEquals(expectedMethodName, preFinalizeValidators.get(0).getName());
     assertEquals(expectedMethodName, oldClientValidators.get(0).getName());
   }
@@ -197,9 +197,9 @@ public class TestValidatorRegistry {
     assertEquals(3, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertThat(methodNames).contains("preFinalizePostProcessCreateKeyValidator");
-    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator");
-    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator2");
+    assertThat(methodNames).contains("postProcessCreateKeyQuotaLayoutValidator");
+    assertThat(methodNames).contains("postProcessCreateKeyBucketLayoutClientValidator");
+    assertThat(methodNames).contains("postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   @Test
@@ -238,6 +238,21 @@ public class TestValidatorRegistry {
         REQUEST_PROCESSING_PHASES);
 
     assertTrue(registry.validationsFor(CreateDirectory, null, ClientVersion.ERASURE_CODING_SUPPORT).isEmpty());
+  }
+
+  @Test
+  public void testFutureVersionForRequestReturnsOnlyFutureVersionValidators() {
+    ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
+        OzoneManagerProtocolProtos.Type.class, PACKAGE,
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        REQUEST_PROCESSING_PHASES);
+
+    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS, ClientVersion.FUTURE_VERSION);
+
+    assertEquals(1, validators.size());
+    List<String> methodNames =
+        validators.stream().map(Method::getName).collect(Collectors.toList());
+    assertThat(methodNames).contains("preProcessCreateKeyFutureClientValidator");
   }
 
 }

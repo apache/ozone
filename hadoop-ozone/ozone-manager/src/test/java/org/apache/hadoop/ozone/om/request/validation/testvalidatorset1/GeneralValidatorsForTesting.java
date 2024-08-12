@@ -90,87 +90,97 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMLayoutVersionValidator(
-      maxVersion = OMLayoutFeature.QUOTA,
+      applyUntil = OMLayoutFeature.QUOTA,
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
-  public static OMRequest preFinalizePreProcessCreateKeyValidator(
+  public static OMRequest preProcessCreateKeyQuotaLayoutValidator(
       OMRequest req, ValidationContext ctx) {
-    fireValidationEvent("preFinalizePreProcessCreateKeyValidator");
+    fireValidationEvent("preProcessCreateKeyQuotaLayoutValidator");
+    return req;
+  }
+
+  @OMClientVersionValidator(
+      applyUntil = ClientVersion.FUTURE_VERSION,
+      processingPhase = PRE_PROCESS,
+      requestType = CreateKey)
+  public static OMRequest preProcessCreateKeyFutureClientValidator(
+      OMRequest req, ValidationContext ctx) {
+    fireValidationEvent("preProcessCreateKeyFutureClientValidator");
     return req;
   }
 
   @OMLayoutVersionValidator(
-      maxVersion = OMLayoutFeature.QUOTA,
+      applyUntil = OMLayoutFeature.QUOTA,
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
-  public static OMResponse preFinalizePostProcessCreateKeyValidator(
+  public static OMResponse postProcessCreateKeyQuotaLayoutValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("preFinalizePostProcessCreateKeyValidator");
+    fireValidationEvent("postProcessCreateKeyQuotaLayoutValidator");
     return resp;
   }
 
   @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
-  public static OMRequest oldClientPreProcessCreateKeyValidator(
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+  public static OMRequest preProcessCreateKeyBucketLayoutClientValidator(
       OMRequest req, ValidationContext ctx) {
-    fireValidationEvent("oldClientPreProcessCreateKeyValidator");
+    fireValidationEvent("preProcessCreateKeyBucketLayoutClientValidator");
     return req;
   }
 
   @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
-  public static OMResponse oldClientPostProcessCreateKeyValidator(
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+  public static OMResponse postProcessCreateKeyBucketLayoutClientValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("oldClientPostProcessCreateKeyValidator");
+    fireValidationEvent("postProcessCreateKeyBucketLayoutClientValidator");
     return resp;
   }
 
   @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   @OMLayoutVersionValidator(processingPhase = PRE_PROCESS,
       requestType = CreateVolume,
-      maxVersion = OMLayoutFeature.QUOTA)
-  public static OMRequest multiPurposePreProcessCreateVolumeValidator(
+      applyUntil = OMLayoutFeature.QUOTA)
+  public static OMRequest multiPurposePreProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator(
       OMRequest req, ValidationContext ctx) {
-    fireValidationEvent("multiPurposePreProcessCreateVolumeValidator");
+    fireValidationEvent("multiPurposePreProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator");
     return req;
   }
 
   @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateVolume,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   @OMLayoutVersionValidator(processingPhase = POST_PROCESS,
       requestType = CreateVolume,
-      maxVersion = OMLayoutFeature.QUOTA)
-  public static OMResponse multiPurposePostProcessCreateVolumeValidator(
+      applyUntil = OMLayoutFeature.QUOTA)
+  public static OMResponse multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("multiPurposePostProcessCreateVolumeValidator");
+    fireValidationEvent("multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator");
     return resp;
   }
 
   @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = CreateKey,
-      maxVersion = ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST)
-  public static OMResponse oldClientPostProcessCreateKeyValidator2(
+      applyUntil = ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST)
+  public static OMResponse postProcessCreateKeyECReplicaIndexRequiredClientValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("oldClientPostProcessCreateKeyValidator2");
+    fireValidationEvent("postProcessCreateKeyECReplicaIndexRequiredClientValidator");
     return resp;
   }
 
   @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = DeleteKeys,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
-  public static OMRequest throwingPreProcessValidator(
+  public static OMRequest throwingPreProcessDeleteKeyBucketLayoutClientValidator(
       OMRequest req, ValidationContext ctx) throws IOException {
     fireValidationEvent("throwingPreProcessValidator");
     if (validatorTestsRunning) {
@@ -182,9 +192,9 @@ public final class GeneralValidatorsForTesting {
   @OMClientVersionValidator(
       processingPhase = POST_PROCESS,
       requestType = DeleteKeys,
-      maxVersion = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
-  public static OMResponse throwingPostProcessValidator(
+  public static OMResponse throwingPostProcessDeleteKeyBucketLayoutClientValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx)
       throws IOException {
     fireValidationEvent("throwingPostProcessValidator");

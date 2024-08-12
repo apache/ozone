@@ -26,6 +26,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -42,7 +44,7 @@ import java.util.Set;
  * META-INF/services/javax.annotation.processing.Processor file in the module's
  * resources folder.
  */
-@SupportedAnnotationTypes("org.apache.hadoop.ozone.om.request.validation.RegisterValidator")
+@SupportedAnnotationTypes("org.apache.hadoop.ozone.request.validation.RegisterValidator")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class RegisterValidatorProcessor extends AbstractProcessor {
 
@@ -50,11 +52,11 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
   public static final String VERSION_CLASS_NAME = "org.apache.hadoop.ozone.Version";
   public static final String REQUEST_PROCESSING_PHASE_CLASS_NAME = "org.apache.hadoop.ozone.om.request.validation" +
       ".RequestProcessingPhase";
-  public static final String MAX_VERSION_METHOD_NAME = "maxVersion";
+  public static final String APPLY_UNTIL_METHOD_NAME = "applyUntil";
   public static final String REQUEST_TYPE_METHOD_NAME = "requestType";
   public static final String PROCESSING_PHASE_METHOD_NAME = "processingPhase";
 
-  public static final String MAX_VERSION_NOT_FOUND_ERROR_MESSAGE = "Method " + MAX_VERSION_METHOD_NAME +
+  public static final String MAX_VERSION_NOT_FOUND_ERROR_MESSAGE = "Method " + APPLY_UNTIL_METHOD_NAME +
       " returning an enum implementing " + VERSION_CLASS_NAME + " not found";
   public static final String REQUEST_TYPE_NOT_FOUND_ERROR_MESSAGE = "Method " + REQUEST_TYPE_METHOD_NAME +
       " returning an enum not found";
@@ -70,6 +72,20 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
       processElements(roundEnv.getElementsAnnotatedWith(annotation));
     }
     return false;
+  }
+
+  private boolean validateArrayMethod(ExecutableElement method, String expectedMethodName,
+                                      ElementKind expectedReturnType,
+                                      String expectedReturnClass) {
+    Elements elementUtils = processingEnv.getElementUtils();
+    Types types = processingEnv.getTypeUtils();
+    TypeElement expectedReturnInterface = expectedReturnClass == null || expectedReturnClass.equals("") ? null :
+        elementUtils.getTypeElement(expectedReturnClass);
+    return method.getSimpleName().toString().equals(expectedMethodName) && (expectedReturnType == null ||
+        TypeKind.ARRAY.equals(method.getReturnType().getKind()) &&
+            types.asElement(((ArrayType)method.getReturnType()).getComponentType()).getKind() == expectedReturnType) &&
+        (expectedReturnInterface == null ||
+            types.isAssignable(types.asElement(method.getReturnType()).asType(), expectedReturnInterface.asType()));
   }
 
   private boolean validateMethod(ExecutableElement method, String expectedMethodName, ElementKind expectedReturnType,
@@ -88,22 +104,22 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
   private void processElements(Set<? extends Element> annotatedElements) {
     for (Element element : annotatedElements) {
       if (element.getKind().equals(ElementKind.ANNOTATION_TYPE)) {
-        boolean hasMaxVersion = false;
+        boolean hasApplyUntilMethod = false;
         boolean hasRequestType = false;
         boolean hasRequestProcessPhase =  false;
         for (Element enclosedElement : element.getEnclosedElements()) {
           // Check if the annotation has a method called "validatorName" returning a String
           if (enclosedElement instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) enclosedElement;
-            hasMaxVersion = hasMaxVersion || validateMethod(method, MAX_VERSION_METHOD_NAME, ElementKind.ENUM,
+            hasApplyUntilMethod = hasApplyUntilMethod || validateMethod(method, APPLY_UNTIL_METHOD_NAME, ElementKind.ENUM,
                 VERSION_CLASS_NAME);
-            hasRequestType = hasRequestType || validateMethod(method, REQUEST_TYPE_METHOD_NAME, ElementKind.ENUM,
+            hasRequestType = hasRequestType || validateArrayMethod(method, REQUEST_TYPE_METHOD_NAME, ElementKind.ENUM,
                 null);
             hasRequestProcessPhase = hasRequestProcessPhase || validateMethod(method, PROCESSING_PHASE_METHOD_NAME,
                 ElementKind.ENUM, REQUEST_PROCESSING_PHASE_CLASS_NAME);
           }
         }
-        if (!hasMaxVersion) {
+        if (!hasApplyUntilMethod) {
           emitErrorMsg(MAX_VERSION_NOT_FOUND_ERROR_MESSAGE + " for " +
               element.getSimpleName().toString());
         }

@@ -37,13 +37,9 @@ import java.lang.annotation.Target;
  * The conditions specify the specific use case in which the validator should be
  * applied to the request. See {@link VersionExtractor} for getting all the supported different
  * {@link org.apache.hadoop.ozone.Version}.
- * The validator method should be applied to just one specific request type
+ * The validator method should be applied the specified request types
  * to help keep these methods simple and straightforward. If you want to use
- * the same validation for different request types, use inheritance, and
- * annotate the override method that just calls super.
- * Note that the aim is to have these validators together with the request
- * processing code, so the handling of these specific situations are easy to
- * find.
+ * the same validation for different requests just put it as part of the lists of request types.
  *
  * The annotated methods have to have a fixed signature.
  * A {@link RequestProcessingPhase#PRE_PROCESS} phase method is running before
@@ -68,7 +64,7 @@ import java.lang.annotation.Target;
  * Its signature has to be the following:
  * - it has to be static and idempotent
  * - it has three parameters
- * - similalry to the pre-processing validators, first parameter is the
+ * - similarly to the pre-processing validators, first parameter is the
  *   OMRequest, the second parameter is the OMResponse, and the third
  *   parameter is a ValidationContext.
  * - the method has to return the modified OMResponse or throw a
@@ -94,13 +90,13 @@ public @interface OMClientVersionValidator {
    * The type of the request handled by this validator method.
    * @return the requestType to whihc the validator shoudl be applied
    */
-  Type requestType();
+  Type[] requestType();
 
   /**
    * The max version for which the validator would run. The validator would run for the request
    * where the version is older than the excluding of the specified version.
-   * @returns the max required client version for which the validator runs for older version.
+   * @returns the max client version until which the validator runs excluding the specified version itself.
    */
-  ClientVersion maxVersion();
+  ClientVersion applyUntil();
 
 }
