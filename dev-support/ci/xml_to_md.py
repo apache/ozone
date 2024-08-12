@@ -70,7 +70,7 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    extract_path = 'ozone-bin/extracted'
+    extract_path = 'ozone'
     xml_pattern = 'ozone-default-generated.xml'
     xml_files = find_xml_files(extract_path, xml_pattern)
 
