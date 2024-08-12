@@ -98,15 +98,24 @@ jobs:
           path: ozone-bin
 
       - name: List contents of ozone-bin directory
-        run: ls -al ozone-bin
+        run: |
+          echo "Contents of ozone-bin directory:"
+          ls -al ozone-bin
+
+      - name: List contents of parent directory
+        run: |
+          echo "Contents of parent directory:"
+          ls -al ..
 
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
           tar -xzf ozone-bin/ozone-1.5.0-SNAPSHOT.tar.gz -C ozone-bin/extracted
 
-      - name: List contents of ozone-bin/extracted
-        run: ls -alR ozone-bin/extracted
+      - name: List contents of extracted directory
+        run: |
+          echo "Contents of ozone-bin/extracted directory:"
+          ls -alR ozone-bin/extracted
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
