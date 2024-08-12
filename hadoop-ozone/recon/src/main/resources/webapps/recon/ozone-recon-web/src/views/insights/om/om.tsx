@@ -530,7 +530,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
     cancelMismatchedEndpointSignal = controller;
     request.then(mismatchContainersResponse => {
-      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
+      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse?.data?.containerDiscrepancyInfo;
 
       this.setState({
         loading: false,
@@ -567,7 +567,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { request, controller } = AxiosGetHelper(openKeysEndpoint, cancelOpenKeysSignal)
     cancelOpenKeysSignal = controller
     request.then(openKeysResponse => {
-      const openKeys = openKeysResponse && openKeysResponse.data;
+      const openKeys = openKeysResponse?.data;
       let allopenKeysResponse: any[] = [];
       for (let key in openKeys) {
         if (Array.isArray(openKeys[key])) {
@@ -614,7 +614,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelDeletePendingSignal = controller;
 
     request.then(deletePendingKeysResponse => {
-      const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
+      const deletePendingKeys = deletePendingKeysResponse?.data?.deletedKeyInfo;
       //Use Summation Logic iterate through all object and find sum of all datasize
       let deletedKeyInfoData = [];
       deletedKeyInfoData = deletePendingKeys && deletePendingKeys.flatMap((infoObject: any) => {
@@ -714,7 +714,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelDeletedKeysSignal = controller
     request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
-      deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
+      deletedContainerKeys = deletedKeysResponse?.data?.containers;
       this.setState({
         loading: false,
         deletedContainerKeysDataSource: deletedContainerKeys
@@ -748,7 +748,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelDeletedPendingDirSignal = controller
     request.then(deletePendingDirResponse => {
       let deletedDirInfo = [];
-      deletedDirInfo = deletePendingDirResponse && deletePendingDirResponse.data && deletePendingDirResponse.data.deletedDirInfo;
+      deletedDirInfo = deletePendingDirResponse?.data?.deletedDirInfo;
       this.setState({
         loading: false,
         pendingDeleteDirDataSource: deletedDirInfo
