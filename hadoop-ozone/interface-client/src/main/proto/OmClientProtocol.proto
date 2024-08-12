@@ -97,8 +97,8 @@ enum Type {
 
   ListMultipartUploads = 82;
 
-  ListTrash = 91 [deprecated = true];
-  RecoverTrash = 92 [deprecated = true];
+  ListTrash = 91;
+  RecoverTrash = 92;
 
   RevokeS3Secret = 93;
 
@@ -547,17 +547,17 @@ enum Status {
     in the deleted table on Ozone Manager.
 */
 message ListTrashRequest {
-  option deprecated = true;
-  required string volumeName = 1;
-  required string bucketName = 2;
-  optional string startKeyName = 3;
-  optional string keyPrefix = 4;
-  optional int32 maxKeys = 5;
+  // option deprecated = true;
+  required string volumeName = 1 [deprecated = true];
+  required string bucketName = 2 [deprecated = true];
+  optional string startKeyName = 3 [deprecated = true];
+  optional string keyPrefix = 4 [deprecated = true];
+  optional int32 maxKeys = 5 [deprecated = true];
 }
 
 message ListTrashResponse {
-  option deprecated = true;
-  repeated RepeatedKeyInfo deletedKeys = 1;
+  // option deprecated = true;
+  repeated RepeatedKeyInfo deletedKeys = 1 [deprecated = true];
 }
 
 /**
@@ -566,16 +566,16 @@ message ListTrashResponse {
 */
 
 message RecoverTrashRequest {
-    option deprecated = true;
-    required string volumeName = 1;
-    required string bucketName = 2;
-    required string keyName = 3;
-    required string destinationBucket = 4;
+    // option deprecated = true;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
+    required string keyName = 3 [deprecated = true];
+    required string destinationBucket = 4 [deprecated = true];
 }
 
 message RecoverTrashResponse {
-    option deprecated = true;
-    required bool response = 1;
+    // option deprecated = true;
+    required bool response = 1 [deprecated = true];
 }
 
 message VolumeInfo {
