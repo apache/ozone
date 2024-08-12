@@ -94,20 +94,19 @@ jobs:
       - name: Download the source artifact
         uses: actions/download-artifact@v4
         with:
-          name: ozone-src
-          path: ozone-src
+          name: ozone-bin
+          path: ozone-bin
 
-      - name: List contents of ozone-src directory
-        run: ls -al ozone-src
+      - name: List contents of ozone-bin directory
+        run: ls -al ozone-bin
 
       - name: Extract the source tarball
         run: |
-          mkdir -p ozone-src/extracted
-          tar -xzf ozone-src/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-src/extracted
+          mkdir -p ozone-bin/extracted
+          tar -xzf ozone-bin/hadoop-ozone/dist/target/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-bin/extracted
 
-      - name: List contents of ozone-src/extracted
-        run: ls -alR ozone-src/extracted
-
+      - name: List contents of ozone-bin/extracted
+        run: ls -alR ozone-bin/extracted
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
