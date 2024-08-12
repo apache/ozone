@@ -97,8 +97,8 @@ enum Type {
 
   ListMultipartUploads = 82;
 
-  ListTrash = 91;
-  RecoverTrash = 92;
+  ListTrash = 91 [deprecated = true];
+  RecoverTrash = 92 [deprecated = true];
 
   RevokeS3Secret = 93;
 
@@ -232,8 +232,8 @@ message OMRequest {
   optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
-  optional ListTrashRequest                 listTrashRequest               = 91;
-  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+  optional ListTrashRequest                 listTrashRequest               = 91 [deprecated = true];
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92 [deprecated = true];
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
@@ -360,8 +360,8 @@ message OMResponse {
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
-  optional ListTrashResponse                  listTrashResponse            = 91;
-  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional ListTrashResponse                  listTrashResponse            = 91 [deprecated = true];
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92 [deprecated = true];
   optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
   optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
@@ -547,6 +547,7 @@ enum Status {
     in the deleted table on Ozone Manager.
 */
 message ListTrashRequest {
+  option deprecated = true;
   required string volumeName = 1;
   required string bucketName = 2;
   optional string startKeyName = 3;
@@ -555,6 +556,7 @@ message ListTrashRequest {
 }
 
 message ListTrashResponse {
+  option deprecated = true;
   repeated RepeatedKeyInfo deletedKeys = 1;
 }
 
@@ -564,6 +566,7 @@ message ListTrashResponse {
 */
 
 message RecoverTrashRequest {
+    option deprecated = true;
     required string volumeName = 1;
     required string bucketName = 2;
     required string keyName = 3;
@@ -571,6 +574,7 @@ message RecoverTrashRequest {
 }
 
 message RecoverTrashResponse {
+    option deprecated = true;
     required bool response = 1;
 }
 

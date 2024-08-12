@@ -242,7 +242,6 @@ public final class OmUtils {
     case LookupKey:
     case ListKeys:
     case ListKeysLight:
-    case ListTrash:
     case ServiceList:
     case ListOpenFiles:
     case ListMultiPartUploadParts:
@@ -302,7 +301,6 @@ public final class OmUtils {
     case SetAcl:
     case AddAcl:
     case PurgeKeys:
-    case RecoverTrash:
     case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:

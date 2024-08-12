@@ -305,14 +305,16 @@ public class ClientProtocolStub implements ClientProtocol {
                                            String startKeyName,
                                            String keyPrefix, int maxKeys)
       throws IOException {
-    return null;
+    // listTrash is deprecated
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
                               String keyName, String destinationBucket)
       throws IOException {
-    return false;
+    // recoverTrash is deprecated
+    throw new UnsupportedOperationException();
   }
 
   @Override

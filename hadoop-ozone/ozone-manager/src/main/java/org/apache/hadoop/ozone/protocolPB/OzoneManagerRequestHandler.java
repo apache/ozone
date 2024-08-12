@@ -113,8 +113,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
@@ -236,11 +234,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysLightResponse listKeysLightResponse = listKeysLight(
             request.getListKeysRequest());
         responseBuilder.setListKeysLightResponse(listKeysLightResponse);
-        break;
-      case ListTrash:
-        ListTrashResponse listTrashResponse = listTrash(
-            request.getListTrashRequest(), request.getVersion());
-        responseBuilder.setListTrashResponse(listTrashResponse);
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
@@ -830,22 +823,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private ListTrashResponse listTrash(ListTrashRequest request,
       int clientVersion) throws IOException {
-
-    ListTrashResponse.Builder resp =
-        ListTrashResponse.newBuilder();
-
-    List<RepeatedOmKeyInfo> deletedKeys = impl.listTrash(
-        request.getVolumeName(),
-        request.getBucketName(),
-        request.getStartKeyName(),
-        request.getKeyPrefix(),
-        request.getMaxKeys());
-
-    for (RepeatedOmKeyInfo key: deletedKeys) {
-      resp.addDeletedKeys(key.getProto(false, clientVersion));
-    }
-
-    return resp.build();
+    // listTrash is deprecated
+    throw new UnsupportedOperationException();
   }
 
   @RequestFeatureValidator(

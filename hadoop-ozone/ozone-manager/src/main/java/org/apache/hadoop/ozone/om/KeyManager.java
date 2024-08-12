@@ -121,7 +121,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    *                the cluster level set by admins.
    * @return The list of keys that are deleted from the deleted table.
    * @throws IOException
+   * @deprecated HDDS-3367 implements a new way to store trashed files.
+   * Please avoid using this as it will be removed in a future release
    */
+  @Deprecated
   List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
