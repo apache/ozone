@@ -22,10 +22,15 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -119,5 +124,17 @@ public final class ContainerMerkleTreeTestUtils {
     try (FileInputStream inStream = new FileInputStream(ContainerChecksumTreeManager.getContainerChecksumFile(data))) {
       return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
     }
+  }
+
+  /**
+   * This function checks whether the container checksum file exists.
+   */
+  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
+                                                    ContainerInfo containerInfo)
+      throws IOException {
+    OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
+    Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
+    File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    return containerChecksumFile.exists();
   }
 }

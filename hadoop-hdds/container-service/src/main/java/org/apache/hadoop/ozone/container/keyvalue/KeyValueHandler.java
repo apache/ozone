@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -516,6 +517,7 @@ public class KeyValueHandler extends Handler {
     try {
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
+      createContainerMerkleTree(kvContainer);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -525,6 +527,25 @@ public class KeyValueHandler extends Handler {
     }
 
     return getSuccessResponse(request);
+  }
+
+  private void createContainerMerkleTree(KeyValueContainer kvContainer) throws IOException {
+    KeyValueContainerData containerData = kvContainer.getContainerData();
+    ContainerMerkleTree merkleTree = new ContainerMerkleTree();
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
+         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+             getBlockIterator(containerData.getContainerID())) {
+      while (blockIterator.hasNext()) {
+        BlockData blockData = blockIterator.nextBlock();
+        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+        List<ChunkInfo> chunkInfos = new ArrayList<>();
+        for (ContainerProtos.ChunkInfo chunk: chunks) {
+          chunkInfos.add(ChunkInfo.getFromProtoBuf(chunk));
+        }
+        merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+      }
+    }
+    checksumManager.writeContainerDataTree(containerData, merkleTree);
   }
 
   /**
