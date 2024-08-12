@@ -398,22 +398,22 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           <Tabs defaultActiveKey='1'>
             <Tabs.TabPane
               key='1'
-              tab={`Missing (${missingDataSource?.length ?? ''})`}>
+              tab={`Missing (${missingDataSource?.length ?? 0})`}>
               {generateTable(missingDataSource)}
             </Tabs.TabPane>
             <Tabs.TabPane
               key='2'
-              tab={`Under-Replicated (${underReplicatedDataSource?.length ?? ''})`}>
+              tab={`Under-Replicated (${underReplicatedDataSource?.length ?? 0})`}>
               {generateTable(underReplicatedDataSource)}
             </Tabs.TabPane>
             <Tabs.TabPane
               key='3'
-              tab={`Over-Replicated (${overReplicatedDataSource?.length ?? ''})`}>
+              tab={`Over-Replicated (${overReplicatedDataSource?.length ?? 0})`}>
               {generateTable(overReplicatedDataSource)}
             </Tabs.TabPane>
             <Tabs.TabPane
               key='4'
-              tab={`Mis-Replicated (${misReplicatedDataSource?.length ?? ''})`}>
+              tab={`Mis-Replicated (${misReplicatedDataSource?.length ?? 0})`}>
               {generateTable(misReplicatedDataSource)}
             </Tabs.TabPane>
           </Tabs>
