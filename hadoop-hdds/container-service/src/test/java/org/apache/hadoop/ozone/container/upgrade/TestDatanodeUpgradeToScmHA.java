@@ -82,8 +82,6 @@ public class TestDatanodeUpgradeToScmHA {
   private InetSocketAddress address;
   private ScmTestMock scmServerImpl;
 
-  private Random random;
-
   private void setScmHAEnabled(boolean enableSCMHA)
       throws Exception {
     this.scmHAAlreadyEnabled = enableSCMHA;
@@ -93,8 +91,6 @@ public class TestDatanodeUpgradeToScmHA {
   }
 
   private void setup() throws Exception {
-    random = new Random();
-
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }

@@ -82,8 +82,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
   private RPC.Server scmRpcServer;
   private InetSocketAddress address;
 
-  private Random random;
-
   private void initTests(Boolean enable) throws Exception {
     boolean schemaV3Enabled = enable;
     conf = new OzoneConfiguration();
@@ -97,8 +95,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
   }
 
   private void setup() throws Exception {
-    random = new Random();
-
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
