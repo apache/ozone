@@ -116,8 +116,8 @@ const COLUMNS = [
     render: (datanodes: string[]) => <div> {datanodes && datanodes.map(datanode =>
       <div key={datanode.hostName}>
         <div className='uuidtooltip'>
-          <Tooltip placement='top' title={`UUID: ${datanode?.uuid}`} getPopupContainer={(triggerNode) => triggerNode}>
-            {datanode?.hostName}
+          <Tooltip placement='top' title={`UUID: ${datanode?.uuid ?? 'NA'}`} getPopupContainer={(triggerNode) => triggerNode}>
+            {datanode?.hostName ?? 'N/A'}
           </Tooltip>
         </div>
       </div>)}
