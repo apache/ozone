@@ -103,7 +103,7 @@ jobs:
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
-          tar -xzf ozone-bin/hadoop-ozone/dist/target/ozone-1.5.0-SNAPSHOT-src.tar.gz -C ozone-bin/extracted
+          tar -xzf ozone-bin/ozone-1.5.0-SNAPSHOT.tar.gz -C ozone-bin/extracted
 
       - name: List contents of ozone-bin/extracted
         run: ls -alR ozone-bin/extracted
