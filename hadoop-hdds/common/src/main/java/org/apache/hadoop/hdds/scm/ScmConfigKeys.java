@@ -228,15 +228,27 @@ public final class ScmConfigKeys {
       "ozone.scm.handler.count.key";
   public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =
       "ozone.scm.client.handler.count.key";
+  public static final String OZONE_SCM_CLIENT_READ_THREADPOOL_KEY =
+      "ozone.scm.client.read.threadpool";
+  public static final int OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT = 10;
   public static final String OZONE_SCM_BLOCK_HANDLER_COUNT_KEY =
       "ozone.scm.block.handler.count.key";
+  public static final String OZONE_SCM_BLOCK_READ_THREADPOOL_KEY =
+      "ozone.scm.block.read.threadpool";
+  public static final int OZONE_SCM_BLOCK_READ_THREADPOOL_DEFAULT = 10;
   public static final String OZONE_SCM_DATANODE_HANDLER_COUNT_KEY =
       "ozone.scm.datanode.handler.count.key";
+  public static final String OZONE_SCM_DATANODE_READ_THREADPOOL_KEY =
+      "ozone.scm.datanode.read.threadpool";
+  public static final int OZONE_SCM_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
       "ozone.scm.security.handler.count.key";
   public static final int OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT = 2;
+  public static final String OZONE_SCM_SECURITY_READ_THREADPOOL_KEY =
+      "ozone.scm.security.read.threadpool";
+  public static final int OZONE_SCM_SECURITY_READ_THREADPOOL_DEFAULT = 1;
 
   public static final String OZONE_SCM_DEADNODE_INTERVAL =
       "ozone.scm.dead.node.interval";
