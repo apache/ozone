@@ -101,21 +101,18 @@ jobs:
         run: |
           echo "Contents of ozone-bin directory:"
           ls -al ozone-bin
-
-      - name: List contents of parent directory
+          
+      - name: Extract the source tarball
         run: |
-          echo "Contents of parent directory:"
-          ls -al ..
+          mkdir -p ozone-bin/extracted
+          tar -xzf ozone-bin/ozone-1.5.0-SNAPSHOT.tar.gz -C ozone-bin/extracted
 
-      - name: List contents of parent directory
-        run: |  
-          echo "Contents of the 'ozone' directory:"
-          ls -al ../ozone
+      - name: List contents of the extracted directory
+        run: ls -alR ozone-bin/extracted
 
-      - name: List all XML files in the 'ozone' directory and subdirectories
+      - name: Find JAR files and check for ozone-default-generated.xml
         run: |
-          echo "XML files in the 'ozone' directory and subdirectories:"
-          find ../ozone -name "*.xml"    
+          find ozone-bin/extracted/share/ozone/lib -name "*.jar" -exec sh -c 'jar tf {} | grep "ozone-default-generated.xml"' \;    
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py

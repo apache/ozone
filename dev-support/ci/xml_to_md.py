@@ -1,44 +1,37 @@
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import os
 import fnmatch
+import zipfile
 import xml.etree.ElementTree as ET
 from collections import namedtuple
 from pathlib import Path
 
 Property = namedtuple('Property', ['name', 'value', 'tag', 'description'])
 
-def find_xml_files(base_path, pattern):
-    xml_files = []
+def find_jar_files(base_path):
+    jar_files = []
     for root, dirs, files in os.walk(base_path):
-        for filename in fnmatch.filter(files, pattern):
-            if 'test-classes' not in root:
-                xml_files.append(os.path.join(root, filename))
+        for filename in fnmatch.filter(files, '*.jar'):
+            jar_files.append(os.path.join(root, filename))
+    return jar_files
+
+def extract_xml_from_jar(jar_path, xml_filename):
+    xml_files = []
+    with zipfile.ZipFile(jar_path, 'r') as jar:
+        for file_info in jar.infolist():
+            if file_info.filename.endswith(xml_filename):
+                with jar.open(file_info.filename) as xml_file:
+                    xml_files.append(xml_file.read())
     return xml_files
 
-def parse_xml_file(file_path):
-    tree = ET.parse(file_path)
-    root = tree.getroot()
+def parse_xml_file(xml_content):
+    root = ET.fromstring(xml_content)
     properties = {}
     for prop in root.findall('property'):
         name = prop.find('name').text if prop.find('name') is not None else ''
         value = prop.find('value').text if prop.find('value') is not None else ''
         tag = prop.find('tag').text if prop.find('tag') is not None else ''
         description = prop.find('description').text if prop.find('description') is not None else ''
-        description = ' '.join(description.split()).strip
+        description = ' '.join(description.split()).strip() if description else ''
         properties[name] = Property(name, value, tag, description)
     return properties
 
@@ -70,13 +63,16 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    extract_path = 'ozone'
-    xml_pattern = 'ozone-default-generated.xml'
-    xml_files = find_xml_files(extract_path, xml_pattern)
+    extract_path = 'ozone-bin/extracted/share/ozone/lib'
+    xml_filename = 'ozone-default-generated.xml'
 
+    jar_files = find_jar_files(extract_path)
     property_map = {}
-    for xml_file in xml_files:
-        property_map.update(parse_xml_file(xml_file))
+
+    for jar_file in jar_files:
+        xml_contents = extract_xml_from_jar(jar_file, xml_filename)
+        for xml_content in xml_contents:
+            property_map.update(parse_xml_file(xml_content))
 
     markdown_content = generate_markdown(property_map)
     output_path = Path("hadoop-hdds/docs/content/tools/Configurations.md")
