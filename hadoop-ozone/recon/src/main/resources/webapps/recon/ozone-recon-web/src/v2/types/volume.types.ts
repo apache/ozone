@@ -38,7 +38,6 @@ export type VolumesResponse = {
 
 export type VolumesState = {
   data: Volume[];
-  totalCount: number;
   lastUpdated: number;
   columnOptions: Option[];
   currentRow: Volume | Record<string, never>;

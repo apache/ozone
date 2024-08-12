@@ -49,6 +49,10 @@ const SearchableColumnOpts = [
   {
     label: 'Owner',
     value: 'owner'
+  },
+  {
+    label: 'Admin',
+    value: 'admin'
   }
 ]
 
@@ -157,7 +161,6 @@ const Volumes: React.FC<{}> = () => {
 
   const [state, setState] = useState<VolumesState>({
     data: [],
-    totalCount: 0,
     lastUpdated: 0,
     columnOptions: defaultColumns,
     showPanel: false,
@@ -166,7 +169,7 @@ const Volumes: React.FC<{}> = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
-  const [searchColumn, setSearchColumn] = useState<'volume' | 'owner'>('volume');
+  const [searchColumn, setSearchColumn] = useState<'volume' | 'owner' | 'admin'>('volume');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadData = () => {
@@ -182,7 +185,6 @@ const Volumes: React.FC<{}> = () => {
     cancelSignal = controller;
     request.then(response => {
       const volumesResponse: VolumesResponse = response.data;
-      const totalCount = volumesResponse.totalCount;
       const volumes: Volume[] = volumesResponse.volumes;
       const data: Volume[] = volumes.map(volume => {
         return {
@@ -201,7 +203,6 @@ const Volumes: React.FC<{}> = () => {
       setState({
         ...state,
         data,
-        totalCount,
         lastUpdated: Number(moment()),
         showPanel: false
       });
@@ -275,7 +276,7 @@ const Volumes: React.FC<{}> = () => {
   };
 
   const {
-    data, totalCount,
+    data,
     lastUpdated,
     columnOptions, showPanel,
     currentRow } = state;
@@ -317,7 +318,7 @@ const Volumes: React.FC<{}> = () => {
               onSearch={(value) => setSearchTerm(value)}
               onChange={(value) => {
                 setSearchTerm('');
-                setSearchColumn(value as 'volume' | 'owner');
+                setSearchColumn(value as 'volume' | 'owner' | 'admin');
               }} />
           </div>
           <div>
