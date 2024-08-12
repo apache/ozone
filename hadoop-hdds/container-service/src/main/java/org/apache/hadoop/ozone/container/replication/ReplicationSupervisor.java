@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Sta
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +77,7 @@ public final class ReplicationSupervisor {
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
   private final AtomicLong skippedCounter = new AtomicLong();
+  private final AtomicLong totalTimeCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -329,6 +331,7 @@ public final class ReplicationSupervisor {
 
     @Override
     public void run() {
+      long startTime = Time.monotonicNow();
       try {
         requestCounter.incrementAndGet();
 
@@ -377,8 +380,10 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.incrementAndGet();
       } finally {
+        long endTime = Time.monotonicNow();
         inFlight.remove(task);
         decrementTaskCounter(task);
+        totalTimeCounter.addAndGet(endTime - startTime);
       }
     }
 
@@ -440,6 +445,10 @@ public final class ReplicationSupervisor {
 
   public long getReplicationSuccessCount() {
     return successCounter.get();
+  }
+
+  public long getTotalTime() {
+    return totalTimeCounter.get();
   }
 
   public long getReplicationFailureCount() {

@@ -43,12 +43,6 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(ReplicateContainerCommandHandler.class);
 
-  private int invocationCount;
-
-  private long totalTime;
-
-  private ConfigurationSource conf;
-
   private ReplicationSupervisor supervisor;
 
   private ContainerReplicator downloadReplicator;
@@ -60,7 +54,6 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
       ReplicationSupervisor supervisor,
       ContainerReplicator downloadReplicator,
       ContainerReplicator pushReplicator) {
-    this.conf = conf;
     this.supervisor = supervisor;
     this.downloadReplicator = downloadReplicator;
     this.pushReplicator = pushReplicator;
@@ -101,19 +94,20 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.invocationCount;
+    return (int) supervisor.getReplicationRequestCount();
   }
 
   @Override
   public long getAverageRunTime() {
-    if (invocationCount > 0) {
-      return totalTime / invocationCount;
+    int currentCount = getInvocationCount();
+    if (currentCount > 0) {
+      return getTotalRunTime() / currentCount;
     }
     return 0;
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return supervisor.getTotalTime();
   }
 }

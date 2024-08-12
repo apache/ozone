@@ -62,7 +62,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
   private long totalTime;
 
   /**
-   * Constructs a ContainerReport handler.
+   * Constructs a close container command handler.
    */
   public CloseContainerCommandHandler(
       int threadPoolSize, int queueSize, String threadNamePrefix) {
@@ -219,5 +219,15 @@ public class CloseContainerCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return queuedCount.get();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return ((ThreadPoolExecutor)executor).getActiveCount();
   }
 }

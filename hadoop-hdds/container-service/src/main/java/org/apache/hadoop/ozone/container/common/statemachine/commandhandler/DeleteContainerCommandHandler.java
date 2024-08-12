@@ -161,6 +161,16 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public int getThreadPoolMaxPoolSize() {
+    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return ((ThreadPoolExecutor)executor).getActiveCount();
+  }
+
+  @Override
   public void stop() {
     try {
       executor.shutdown();
