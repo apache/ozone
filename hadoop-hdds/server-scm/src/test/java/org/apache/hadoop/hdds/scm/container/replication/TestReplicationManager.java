@@ -1743,15 +1743,15 @@ public class TestReplicationManager {
             * config.getDatanodeReplicationLimit() * 0.75),
         rm.getReplicationInFlightLimit());
 
-    String hour =LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH"));
+    String hour = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH"));
     config.setInflightOffPeakHour(hour);
     config.setInflightOffPeakRatio(2);
     configuration.setFromObject(config);
     rm = createReplicationManager();
     assertEquals(
-            (int) Math.ceil(healthyNodes
-                    * config.getDatanodeReplicationLimit() * 0.75 * 2),
-            rm.getReplicationInFlightLimit());
+        (int) Math.ceil(healthyNodes *
+            config.getDatanodeReplicationLimit() * 0.75 * 2),
+        rm.getReplicationInFlightLimit());
   }
 
   @SafeVarargs

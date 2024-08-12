@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.gson.JsonArray;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -430,16 +429,11 @@ public class ReplicationManager implements SCMService {
     // dead. Therefore we simply count the number of healthy nodes and include
     // those which are not in service.
     int healthyNodes = nodeManager.getNodeCount(null, HEALTHY);
-    double inflightOffPeakRatio = isOffPeakHour() ? rmConf.getInflightOffPeakRatio() : 1;
-    LOG.debug("Replication inflight limit, time:{}, inflightOffPeakRatio:{}", LocalDateTime.now(), inflightOffPeakRatio);
+    double inflightOffPeakRatio = rmConf.getInflightOffPeakRatio();
+    LOG.debug("Replication inflight limit, time:{}, inflightOffPeakRatio:{}",
+        LocalDateTime.now(), inflightOffPeakRatio);
     return (long) Math.ceil(healthyNodes * rmConf.getDatanodeReplicationLimit()
         * factor * inflightOffPeakRatio);
-  }
-
-  public boolean isOffPeakHour() {
-    List<String> offPeakHours = Arrays.stream(rmConf.getInflightOffPeakHour().split(","))
-            .map(String::trim).collect(Collectors.toList());
-    return offPeakHours.contains(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH")));
   }
 
   /**
@@ -1326,13 +1320,14 @@ public class ReplicationManager implements SCMService {
     }
 
     @Config(key = "inflight.off-peak.hour",
-            type = ConfigType.STRING,
-            defaultValue = "-1",
-            reconfigurable = true,
-            tags = { SCM },
-            description = "Set the time information of the replication off-peak period. " +
-                    "The default value -1 means turning off this parameter. The normal" +
-                    " start time is 0 to 23 hours, separated by commas. For example, '0,1,8,9,12'"
+        type = ConfigType.STRING,
+        defaultValue = "-1",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Set the time information of the replication off-peak period. " +
+            "The default value -1 means turning off this parameter. The normal" +
+            " start time is 0 to 23 hours, separated by commas. For example, '0,1,8,9,12'," +
+            "it means 00:00-00:59, 01:00-01:59, 08:00-08:59, 09:00-09:59, 12:00-12:59"
     )
     private String inflightOffPeakHour = "-1";
 
@@ -1345,16 +1340,19 @@ public class ReplicationManager implements SCMService {
     }
 
     @Config(key = "inflight.off-peak.ratio",
-            type = ConfigType.DOUBLE,
-            defaultValue = "1",
-            reconfigurable = true,
-            tags = { SCM },
-            description = "Control the ratio of replication during off-peak hours to peak hours."
+        type = ConfigType.DOUBLE,
+        defaultValue = "1",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Control the ratio of replications during off-peak hours to peak hours."
     )
     private double inflightOffPeakRatio = 1;
 
     public double getInflightOffPeakRatio() {
-      return inflightOffPeakRatio;
+      List<String> offPeakHours = Arrays.stream(getInflightOffPeakHour().split(","))
+          .map(String::trim).collect(Collectors.toList());
+      boolean isOffPeakHour = offPeakHours.contains(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH")));
+      return isOffPeakHour ? inflightOffPeakRatio : 1;
     }
 
     public void setInflightOffPeakRatio(double ratio) {
@@ -1440,7 +1438,14 @@ public class ReplicationManager implements SCMService {
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
       }
-      if(inflightOffPeakRatio <= 0) {
+      boolean isValidHours = "-1".equals(inflightOffPeakHour) || Arrays.stream(inflightOffPeakHour.split(","))
+          .map(String::trim).allMatch(hour -> hour.matches("^(0?[0-9]|1[0-9]|2[0-3])$"));
+      if (!isValidHours) {
+        throw new IllegalArgumentException(
+            "inflight.off-peak.hour is set to " + inflightOffPeakHour
+                + " and must be -1 or a number between 0 and 23");
+      }
+      if (inflightOffPeakRatio <= 0) {
         throw new IllegalArgumentException(
             "inflight.off-peak.ratio is set to " + inflightOffPeakRatio
                 + " and must be > 0");
