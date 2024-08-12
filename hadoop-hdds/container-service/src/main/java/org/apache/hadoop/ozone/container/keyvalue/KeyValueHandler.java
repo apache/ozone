@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -1304,8 +1305,8 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void reconcileContainer(DNContainerOperationClient dnClient, ContainerChecksumTreeManager checksumManager,
-      Container<?> container, List<DatanodeDetails> peers) throws IOException {
+  public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      List<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
     long id = data.getContainerID();

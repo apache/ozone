@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -216,13 +217,13 @@ public class ContainerController {
     }
   }
 
-  public void reconcileContainer(DNContainerOperationClient dnClient, ContainerChecksumTreeManager checksumManager,
-      long containerID, List<DatanodeDetails> peers) throws IOException {
+  public void reconcileContainer(DNContainerOperationClient dnClient, long containerID, List<DatanodeDetails> peers)
+      throws IOException {
     Container<?> container = containerSet.getContainer(containerID);
     if (container == null) {
       LOG.warn("Container {} to reconcile not found on this datanode.", containerID);
     } else {
-      getHandler(container).reconcileContainer(dnClient, checksumManager, container, peers);
+      getHandler(container).reconcileContainer(dnClient, container, peers);
     }
   }
 

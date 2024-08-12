@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -475,7 +476,7 @@ public class TestKeyValueHandler {
 
     Assertions.assertEquals(0, icrCount.get());
     // This should trigger container report validation in the ICR handler above.
-    keyValueHandler.reconcileContainer(container, Collections.emptyList());
+    keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptyList());
     Assertions.assertEquals(1, icrCount.get());
   }
 

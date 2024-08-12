@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -91,7 +92,7 @@ public class TestReconcileContainerCommandHandler {
     assertEquals(NUM_CONTAINERS, containerSet.containerCount());
 
     Handler containerHandler = new KeyValueHandler(new OzoneConfiguration(), dnDetails.getUuidString(), containerSet,
-        mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender);
+        mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender, );
     ContainerController controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer, containerHandler));
     ozoneContainer = mock(OzoneContainer.class);

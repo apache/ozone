@@ -1,6 +1,5 @@
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
@@ -12,19 +11,16 @@ import java.util.Objects;
 
 public class ReconcileContainerTask extends AbstractReplicationTask {
   private final ReconcileContainerCommand command;
-  // Used to read container checksum info from this datanode.
-  private final ContainerChecksumTreeManager checksumManager;
   // TODO HDDS-10376 used to read container checksum info and blocks from other datanodes.
-   private final DNContainerOperationClient dnClient;
+  private final DNContainerOperationClient dnClient;
   private final ContainerController controller;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconcileContainerTask.class);
 
-  public ReconcileContainerTask(ContainerChecksumTreeManager checksumManager, ContainerController controller,
-                                DNContainerOperationClient dnClient, ReconcileContainerCommand command) {
+  public ReconcileContainerTask(ContainerController controller,
+      DNContainerOperationClient dnClient, ReconcileContainerCommand command) {
     super(command.getContainerID(), command.getDeadline(), command.getTerm());
-    this.checksumManager = checksumManager;
     this.command = command;
     this.controller = controller;
     this.dnClient = dnClient;
@@ -38,7 +34,7 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
 
     try {
       long elapsed = Time.monotonicNow() - start;
-      controller.reconcileContainer(dnClient, checksumManager, command.getContainerID(), command.getPeerDatanodes());
+      controller.reconcileContainer(dnClient, command.getContainerID(), command.getPeerDatanodes());
       setStatus(Status.DONE);
       LOG.info("{} completed in {} ms", this, elapsed);
     } catch (Exception e) {
@@ -61,7 +57,7 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ECReconstructionCoordinatorTask that = (ECReconstructionCoordinatorTask) o;
+    ReconcileContainerTask that = (ReconcileContainerTask) o;
     return getContainerId() == that.getContainerId();
   }
 

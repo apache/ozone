@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -59,8 +60,7 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
       SCMConnectionManager connectionManager) {
     invocationCount.incrementAndGet();
     ReconcileContainerCommand reconcileCommand = (ReconcileContainerCommand) command;
-    supervisor.addTask(new ReconcileContainerTask(container.getChecksumTreeManager(),
-        container.getController(), dnClient, reconcileCommand));
+    supervisor.addTask(new ReconcileContainerTask(container.getController(), dnClient, reconcileCommand));
   }
 
   @Override

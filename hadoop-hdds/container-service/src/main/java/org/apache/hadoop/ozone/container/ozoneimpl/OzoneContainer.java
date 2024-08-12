@@ -188,13 +188,13 @@ public class OzoneContainer {
       }
     };
 
-    // TODO add checksum manager here
+    checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics, icrSender, ));
+              containerSet, volumeSet, metrics, icrSender, checksumTreeManager));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
@@ -226,8 +226,6 @@ public class OzoneContainer {
         datanodeDetails, config, hddsDispatcher, certClient);
     Duration blockDeletingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getBlockDeletionInterval();
-
-    checksumTreeManager = new ContainerChecksumTreeManager(config);
 
     long blockDeletingServiceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
@@ -539,11 +537,6 @@ public class OzoneContainer {
 
   public ContainerController getController() {
     return controller;
-  }
-
-  public ContainerChecksumTreeManager getChecksumTreeManager() {
-    // TODO Need HDDS-10926 block delete merged first.
-    return checksumTreeManager;
   }
 
   /**
