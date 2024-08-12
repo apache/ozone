@@ -16,6 +16,10 @@
 import os
 import fnmatch
 import xml.etree.ElementTree as ET
+from collections import namedtuple
+from pathlib import Path
+
+Property = namedtuple('Property', ['name', 'value', 'tag', 'description'])
 
 def find_xml_files(base_path, pattern):
     xml_files = []
@@ -25,33 +29,61 @@ def find_xml_files(base_path, pattern):
                 xml_files.append(os.path.join(root, filename))
     return xml_files
 
-def parse_xml_files(xml_files):
+def parse_xml_file(file_path):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
     properties = {}
-    for xml_file in xml_files:
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-        for prop in root.findall('property'):
-            name = prop.find('name').text
-            value = prop.find('value').text
-            if name not in properties:
-                properties[name] = value
+    for prop in root.findall('property'):
+        name = prop.find('name').text if prop.find('name') is not None else ''
+        value = prop.find('value').text if prop.find('value') is not None else ''
+        tag = prop.find('tag').text if prop.find('tag') is not None else ''
+        description = prop.find('description').text if prop.find('description') is not None else ''
+        description = ' '.join(description.split()).strip
+        properties[name] = Property(name, value, tag, description)
     return properties
 
-def generate_markdown(properties, output_file):
-    with open(output_file, 'w') as f:
-        f.write("# Configurations\n\n")
-        for name, value in properties.items():
-            f.write(f"## {name}\n\n")
-            f.write(f"**Value**: {value}\n\n")
+def generate_markdown(properties):
+    markdown = []
+    markdown.append("<!--\n")
+    markdown.append("Licensed to the Apache Software Foundation (ASF) under one or more\n")
+    markdown.append("contributor license agreements.  See the NOTICE file distributed with\n")
+    markdown.append("this work for additional information regarding copyright ownership.\n")
+    markdown.append("The ASF licenses this file to You under the Apache License, Version 2.0\n")
+    markdown.append("(the \"License\"); you may not use this file except in compliance with\n")
+    markdown.append("the License.  You may obtain a copy of the License at\n\n")
+    markdown.append("   http://www.apache.org/licenses/LICENSE-2.0\n\n")
+    markdown.append("Unless required by applicable law or agreed to in writing, software\n")
+    markdown.append("distributed under the License is distributed on an \"AS IS\" BASIS,\n")
+    markdown.append("WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n")
+    markdown.append("See the License for the specific language governing permissions and\n")
+    markdown.append("limitations under the License.\n")
+    markdown.append("-->\n\n")
 
-if __name__ == "__main__":
+    for prop in sorted(properties.values(), key=lambda p: p.name):
+        markdown.append(f"| **Name**        | `{prop.name}` |\n")
+        markdown.append("|:----------------|:----------------------------|\n")
+        markdown.append(f"| **Value**       | {prop.value} |\n")
+        markdown.append(f"| **Tag**         | {prop.tag} |\n")
+        markdown.append(f"| **Description** | {prop.description} |\n")
+        markdown.append("--------------------------------------------------------------------------------\n")
+
+    return ''.join(markdown)
+
+def main():
     extract_path = 'ozone-src/extracted'
     xml_pattern = 'ozone-default-generated.xml'
-    output_file = 'hadoop-hdds/docs/content/tools/Configurations.md'
-
-    # Find all XML files
     xml_files = find_xml_files(extract_path, xml_pattern)
 
-    # Parse the XML files and generate Markdown
-    properties = parse_xml_files(xml_files)
-    generate_markdown(properties, output_file)
+    property_map = {}
+    for xml_file in xml_files:
+        property_map.update(parse_xml_file(xml_file))
+
+    markdown_content = generate_markdown(property_map)
+    output_path = Path("hadoop-hdds/docs/content/tools/Configurations.md")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open('w', encoding='utf-8') as file:
+        file.write(markdown_content)
+
+if __name__ == '__main__':
+    main()
