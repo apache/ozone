@@ -54,7 +54,7 @@ public final class ScmConfigKeys {
       = "hdds.container.ratis.num.write.chunk.threads.per.volume";
   public static final int
       HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
-      = 10;
+      = 20;
   public static final String HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = "hdds.container.ratis.replication.level";
   public static final ReplicationLevel
@@ -62,7 +62,7 @@ public final class ScmConfigKeys {
   public static final String HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
       = "hdds.container.ratis.num.container.op.executors";
   public static final int HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
-      = 10;
+      = 20;
   public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
       "hdds.container.ratis.segment.size";
   public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
@@ -113,7 +113,7 @@ public final class ScmConfigKeys {
   public static final String HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
       "hdds.container.ratis.leader.pending.bytes.limit";
   public static final String
-      HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
+      HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "4GB";
 
   public static final String HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       "hdds.ratis.server.retry-cache.timeout.duration";
