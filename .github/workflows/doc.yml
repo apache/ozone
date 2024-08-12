@@ -112,7 +112,7 @@ jobs:
 
       - name: Find JAR files and check for ozone-default-generated.xml
         run: |
-          find ozone-bin/extracted/share/ozone/lib -name "*.jar" -exec sh -c 'jar tf {} | grep "ozone-default-generated.xml"' \;    
+          find ozone-bin/extracted/ozone-1.5.0-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'jar tf {} | grep "ozone-default-generated.xml"' \;    
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py

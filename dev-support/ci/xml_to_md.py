@@ -63,7 +63,7 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    extract_path = 'ozone-bin/extracted/share/ozone/lib'
+    extract_path = 'ozone-bin/extracted/ozone-1.5.0-SNAPSHOT/share/ozone/lib'
     xml_filename = 'ozone-default-generated.xml'
 
     jar_files = find_jar_files(extract_path)
