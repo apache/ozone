@@ -24,13 +24,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -60,7 +57,7 @@ import static org.mockito.Mockito.when;
 public final class UpgradeTestHelper {
   private UpgradeTestHelper() {
   }
-  private static final Random random = new Random();
+  private static final Random RANDOM = new Random();
 
   /**
    * Starts the datanode with the fore layout version, and calls the version
@@ -233,7 +230,7 @@ public final class UpgradeTestHelper {
 
   public static long addContainer(ContainerDispatcher dispatcher, Pipeline pipeline)
       throws Exception {
-    long containerID = random.nextInt(Integer.MAX_VALUE);
+    long containerID = RANDOM.nextInt(Integer.MAX_VALUE);
     ContainerProtos.ContainerCommandRequestProto createContainerRequest =
         ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
     dispatchRequest(dispatcher, createContainerRequest);
