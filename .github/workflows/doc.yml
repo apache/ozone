@@ -1,3 +1,17 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 name: xml-to-md
 
 on:
@@ -97,22 +111,22 @@ jobs:
           name: ozone-bin
           path: ozone-bin
 
-      - name: List contents of ozone-bin directory
-        run: |
-          echo "Contents of ozone-bin directory:"
-          ls -al ozone-bin
+#      - name: List contents of ozone-bin directory
+#        run: |
+#          echo "Contents of ozone-bin directory:"
+#          ls -al ozone-bin
           
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
-          tar -xzf ozone-bin/ozone-1.5.0-SNAPSHOT.tar.gz -C ozone-bin/extracted
+          tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
 
-      - name: List contents of the extracted directory
-        run: ls -alR ozone-bin/extracted
+#      - name: List contents of the extracted directory
+#        run: ls -alR ozone-bin/extracted
 
       - name: Find JAR files and check for ozone-default-generated.xml
         run: |
-          find ozone-bin/extracted/ozone-1.5.0-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'jar tf {} | grep "ozone-default-generated.xml"' \;    
+          find ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'if jar tf {} | grep -q "ozone-default-generated.xml"; then echo "{}:"; jar tf {} | grep "ozone-default-generated.xml"; fi' \;
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
@@ -127,3 +141,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Configurations.md
+
+      - name: Push changes to ozone-site
+        uses: actions/checkout@v4
+        with:
+          repository: apache/ozone-site
+          ref : HDDS-11072
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ozone-site
+
+      - name: Copy MD file
+        run: |
+          cp Configurations.md 
+
+      - name: Commit changes
+        working-directory: ozone-site
+        run: |
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'noreply@github.com'
+          git add <path to MD file>
+          git commit -m "[Auto] Push MD file to Ozone site"
+          git push
+

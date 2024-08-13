@@ -18,7 +18,7 @@ def extract_xml_from_jar(jar_path, xml_filename):
     xml_files = []
     with zipfile.ZipFile(jar_path, 'r') as jar:
         for file_info in jar.infolist():
-            if file_info.filename.endswith(xml_filename):
+            if file_info.filename.endswith(xml_filename) and 'test-classes' not in file_info.filename:
                 with jar.open(file_info.filename) as xml_file:
                     xml_files.append(xml_file.read())
     return xml_files
@@ -37,6 +37,10 @@ def parse_xml_file(xml_content):
 
 def generate_markdown(properties):
     markdown = []
+    markdown.append("---")
+    markdown.append("title: \"Ozone configurations\"")
+    markdown.append("summary: Ozone configurations")
+    markdown.append("---")
     markdown.append("<!--\n")
     markdown.append("Licensed to the Apache Software Foundation (ASF) under one or more\n")
     markdown.append("contributor license agreements.  See the NOTICE file distributed with\n")
@@ -63,13 +67,14 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    extract_path = 'ozone-bin/extracted/ozone-1.5.0-SNAPSHOT/share/ozone/lib'
+    extract_path = 'ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib'
     xml_filename = 'ozone-default-generated.xml'
 
     jar_files = find_jar_files(extract_path)
     property_map = {}
 
     for jar_file in jar_files:
+        print("Extract" + extract_xml_from_jar(jar_file, xml_filename))
         xml_contents = extract_xml_from_jar(jar_file, xml_filename)
         for xml_content in xml_contents:
             property_map.update(parse_xml_file(xml_content))
