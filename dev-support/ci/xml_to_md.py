@@ -1,4 +1,5 @@
 import os
+import re
 import fnmatch
 import zipfile
 import xml.etree.ElementTree as ET
@@ -67,14 +68,21 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    extract_path = 'ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib'
+    base_path = 'ozone-bin/extracted'
+
+    # Find ozone SNAPSHOT directory dynamically using regex
+    snapshot_dir = next(
+        (os.path.join(base_path, d) for d in os.listdir(base_path) if re.match(r'ozone-.*-SNAPSHOT', d)),
+        None
+    )
+
+    extract_path = os.path.join(snapshot_dir, 'share', 'ozone', 'lib')
     xml_filename = 'ozone-default-generated.xml'
 
     jar_files = find_jar_files(extract_path)
     property_map = {}
 
     for jar_file in jar_files:
-        print("Extract" + extract_xml_from_jar(jar_file, xml_filename))
         xml_contents = extract_xml_from_jar(jar_file, xml_filename)
         for xml_content in xml_contents:
             property_map.update(parse_xml_file(xml_content))

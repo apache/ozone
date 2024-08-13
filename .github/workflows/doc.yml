@@ -145,9 +145,9 @@ jobs:
       - name: Push changes to ozone-site
         uses: actions/checkout@v4
         with:
-          repository: apache/ozone-site
+          repository: sarvekshayr/ozone-site
           ref : 'HDDS-9225-website-v2'
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           path: ozone-site
 
       - name: Copy MD file
