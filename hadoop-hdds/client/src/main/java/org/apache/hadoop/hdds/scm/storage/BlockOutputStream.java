@@ -487,7 +487,9 @@ public class BlockOutputStream extends OutputStream {
     LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
     return sendWatchForCommit(commitIndex)
         .thenAccept(this::checkReply)
-        .exceptionally(e -> { throw new FlushRuntimeException(setIoException(e)); })
+        .exceptionally(e -> {
+          throw new FlushRuntimeException(setIoException(e));
+        })
         .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
   }
 
