@@ -40,7 +40,7 @@ type SearchProps = {
 
 const Search: React.FC<SearchProps> = ({
   searchColumn,
-  searchOptions,
+  searchOptions = [],
   onSearch = () => {},
   onChange = () => {}
 }) => {
