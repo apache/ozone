@@ -159,10 +159,6 @@ public class BlockManagerImpl implements BlockManager {
           }
           incrementalEnabled = false;
         }
-        /*if (data.getChunks().isEmpty()) {
-          throw new StorageContainerException("Chunk list is empty for block " +
-              data.getBlockID(), UNSUPPORTED_REQUEST);
-        }*/
         db.getStore().putBlockByID(batch, incrementalEnabled, localID, data,
             containerData, endOfBlock);
         if (bcsId != 0) {
@@ -346,9 +342,6 @@ public class BlockManagerImpl implements BlockManager {
             db.getStore().getBlockDataTable()
                 .getSequentialRangeKVs(startKey, count,
                     cData.containerPrefix(), cData.getUnprefixedKeyFilter());
-        for (Table.KeyValue<String, BlockData> entry : range) {
-          LOG.info("Block Key: {}", entry.getKey());
-        }
         for (Table.KeyValue<String, BlockData> entry : range) {
           result.add(db.getStore().getBlockByID(null, entry.getKey()));
         }

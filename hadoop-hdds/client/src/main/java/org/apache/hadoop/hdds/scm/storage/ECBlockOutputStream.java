@@ -240,12 +240,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture;
     try {
-      /*if (getContainerBlockData().getChunksCount() == 0) {
-        throw new IOException("No chunks to write for blockID " + getBlockID());
-      }*/
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
-      LOG.info("blockData PutBlock " + blockData);
-
       XceiverClientReply asyncReply =
           putBlockAsync(getXceiverClient(), blockData, close, getTokenString());
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =

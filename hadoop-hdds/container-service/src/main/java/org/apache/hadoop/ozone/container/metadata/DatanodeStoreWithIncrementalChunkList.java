@@ -142,7 +142,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       boolean endOfBlock) throws IOException {
     if (!incremental || !isPartialChunkList(data)) {
       if (data.getChunks().isEmpty()) {
-        //LOG.error("null chunk list " + data);
+        // Deal with the corner case with empty EC blocks.
         data.addChunk(ContainerProtos.ChunkInfo
             .newBuilder()
             .setChunkName("")
@@ -208,7 +208,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
           batch, blockKey, data);
-
+      // add an empty block data to populate the block table.
       if (blockData == null) {
         // populate blockDataTable with empty chunk list
         blockData = new BlockData(data.getBlockID());
