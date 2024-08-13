@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -29,7 +31,13 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -60,15 +68,12 @@ import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestContainerHealthTask.class);
+
   public TestContainerHealthTask() {
     super();
   }
