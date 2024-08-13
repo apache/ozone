@@ -255,12 +255,6 @@ public class BlockOutputStream extends OutputStream {
     return true;
   }
 
-  synchronized void refreshCurrentBuffer() {
-    currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
-  }
-
   public BlockID getBlockID() {
     return blockID.get();
   }
@@ -420,7 +414,7 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException if error occurred
    */
 
-  // In this case, the data is already cached in the currentBuffer.
+  // In this case, the data is already cached in the allocated buffers in the BufferPool.
   public synchronized void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
@@ -438,18 +432,18 @@ public class BlockOutputStream extends OutputStream {
       count++;
       writtenDataLength += writeLen;
       updateWriteChunkLength();
-      LOG.info("Write chunk on retry buffer = {}", buffer);
-      writeChunk(buffer);
-      if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
-        handleFullBuffer();
+      updatePutBlockLength();
+      LOG.debug("Write chunk on retry buffer = {}", buffer);
+      CompletableFuture<PutBlockResult> f = writeChunkAndPutBlock(buffer, false);
+      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(f);
+      try {
+        watchForCommitAsync.get();
+      } catch (InterruptedException e) {
+        handleInterruptedException(e, true);
+      } catch (ExecutionException e) {
+        handleExecutionException(e);
       }
     }
-
-    // flush all pending data due in exception handling.
-    updatePutBlockLength();
-    CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
-    recordWatchForCommitAsync(putBlockResultFuture);
-    waitForAllPendingFlushes();
   }
 
   /**
@@ -471,14 +465,6 @@ public class BlockOutputStream extends OutputStream {
   }
 
   void releaseBuffersOnException() {
-  }
-
-  // It may happen that once the exception is encountered , we still might
-  // have successfully flushed up to a certain index. Make sure the buffers
-  // only contain data which have not been sufficiently replicated
-  private void adjustBuffersOnException() {
-    releaseBuffersOnException();
-    refreshCurrentBuffer();
   }
 
   /**
@@ -820,7 +806,7 @@ public class BlockOutputStream extends OutputStream {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
-      adjustBuffersOnException();
+//      adjustBuffersOnException();
       throw getIoException();
     }
   }
@@ -1157,7 +1143,6 @@ public class BlockOutputStream extends OutputStream {
    */
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
-    adjustBuffersOnException();
     throw getIoException();
   }
 
