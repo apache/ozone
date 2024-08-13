@@ -120,7 +120,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     getBlockDataTable().dumpToFileWithPrefix(
         getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
     getLastChunkInfoTable().dumpToFileWithPrefix(
-        getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
+        getTableDumpFile(getLastChunkInfoTable(), dumpDir), prefix);
     getDeleteTransactionTable().dumpToFileWithPrefix(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir),
         prefix);
@@ -133,7 +133,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     getBlockDataTable().loadFromFile(
         getTableDumpFile(getBlockDataTable(), dumpDir));
     getLastChunkInfoTable().loadFromFile(
-        getTableDumpFile(getBlockDataTable(), dumpDir));
+        getTableDumpFile(getLastChunkInfoTable(), dumpDir));
     getDeleteTransactionTable().loadFromFile(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir));
   }
