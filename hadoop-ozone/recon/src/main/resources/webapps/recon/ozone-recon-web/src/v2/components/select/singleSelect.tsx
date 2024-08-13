@@ -42,8 +42,8 @@ interface SingleSelectProps extends ReactSelectProps<Option, false> {
 const SingleSelect: React.FC<SingleSelectProps> = ({
   options = [],
   placeholder = 'Limit',
-  onChange = () => { },
-  ...props
+  onChange = () => { },  // Assign default value as a void function
+  ...props  // Desctructure other select props
 }) => {
 
 

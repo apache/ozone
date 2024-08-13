@@ -51,8 +51,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   fixedColumn,
   columnLength,
   tagRef,
-  onTagClose = () => { },
-  onChange = () => { },
+  onTagClose = () => { },  // Assign default value as a void function
+  onChange = () => { },  // Assign default value as a void function
   ...props
 }) => {
 

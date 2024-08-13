@@ -37,7 +37,7 @@ const ColumnTag: React.FC<TagProps> = ({
   label = '',
   closable = true,
   tagRef = null,
-  onClose = () => {}
+  onClose = () => {} // Assign default value as void funciton
 }) => {
   const onPreventMouseDown = (event: React.MouseEvent<HTMLSpanElement>) => {
     // By default when clickin on the tags the text will get selected

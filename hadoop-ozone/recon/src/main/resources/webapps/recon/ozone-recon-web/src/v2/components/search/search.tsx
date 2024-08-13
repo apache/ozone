@@ -41,8 +41,8 @@ type SearchProps = {
 const Search: React.FC<SearchProps> = ({
   searchColumn,
   searchOptions = [],
-  onSearch = () => {},
-  onChange = () => {}
+  onSearch = () => {},  // Assign default value as a void function
+  onChange = () => {}   // Assign default value as a void function
 }) => {
 
   const selectFilter = searchColumn
