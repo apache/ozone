@@ -578,14 +578,14 @@ public class TestSnapshotDeletingService {
   private void assertTableRowCount(Table<String, ?> table, int count)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
-            try {
-              return assertTableRowCount(count, table);
-            } catch (Exception e) {
-              return false;
-            }
-        }, 1000,
-        120000); // 2 minutes
+      try {
+        return assertTableRowCount(count, table);
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 120000); // 2 minutes
   }
+
 
   private boolean assertTableRowCount(int expectedCount,
                                       Table<String, ?> table) {
