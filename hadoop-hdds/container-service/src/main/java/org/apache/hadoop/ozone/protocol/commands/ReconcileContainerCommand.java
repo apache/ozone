@@ -25,18 +25,21 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 /**
  * Asks datanodes to reconcile the specified container with other container replicas.
  */
 public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerCommandProto> {
 
-  private final List<DatanodeDetails> peerDatanodes;
+  private final Set<DatanodeDetails> peerDatanodes;
 
-  public ReconcileContainerCommand(long containerID, List<DatanodeDetails> peerDatanodes) {
+  public ReconcileContainerCommand(long containerID, Set<DatanodeDetails> peerDatanodes) {
     // Container ID serves as command ID, since only one reconciliation should be in progress at a time.
     super(containerID);
     this.peerDatanodes = peerDatanodes;
@@ -58,7 +61,7 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     return builder.build();
   }
 
-  public List<DatanodeDetails> getPeerDatanodes() {
+  public Set<DatanodeDetails> getPeerDatanodes() {
     return peerDatanodes;
   }
 
@@ -70,11 +73,11 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     Preconditions.checkNotNull(protoMessage);
 
     List<HddsProtos.DatanodeDetailsProto> peers = protoMessage.getPeersList();
-    List<DatanodeDetails> peerNodes = !peers.isEmpty()
+    Set<DatanodeDetails> peerNodes = !peers.isEmpty()
         ? peers.stream()
         .map(DatanodeDetails::getFromProtoBuf)
-        .collect(Collectors.toList())
-        : emptyList();
+        .collect(Collectors.toSet())
+        : emptySet();
 
     return new ReconcileContainerCommand(protoMessage.getContainerID(), peerNodes);
   }
@@ -84,5 +87,23 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     return getType() +
         ": containerId=" + getContainerID() +
         ", peerNodes=" + peerDatanodes;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ReconcileContainerCommand that = (ReconcileContainerCommand) o;
+    return getContainerID() == that.getContainerID() &&
+        Objects.equals(peerDatanodes, that.peerDatanodes);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getContainerID());
   }
 }

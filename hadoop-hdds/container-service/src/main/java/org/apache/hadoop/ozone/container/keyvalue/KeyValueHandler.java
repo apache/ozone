@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -1306,7 +1307,7 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
-      List<DatanodeDetails> peers) throws IOException {
+                                 Set<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
     long id = data.getContainerID();

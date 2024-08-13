@@ -217,7 +217,7 @@ public class ContainerController {
     }
   }
 
-  public void reconcileContainer(DNContainerOperationClient dnClient, long containerID, List<DatanodeDetails> peers)
+  public void reconcileContainer(DNContainerOperationClient dnClient, long containerID, Set<DatanodeDetails> peers)
       throws IOException {
     Container<?> container = containerSet.getContainer(containerID);
     if (container == null) {

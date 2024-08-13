@@ -33,9 +33,11 @@ import static org.mockito.Mockito.when;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.protobuf.Proto2Utils;
@@ -118,7 +120,7 @@ public class TestHeartbeatEndpointTask {
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
 
-    List<DatanodeDetails> peerDNs = new ArrayList<>();
+    Set<DatanodeDetails> peerDNs = new HashSet<>();
     peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
     peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
     ReconcileContainerCommand cmd = new ReconcileContainerCommand(1, peerDNs);

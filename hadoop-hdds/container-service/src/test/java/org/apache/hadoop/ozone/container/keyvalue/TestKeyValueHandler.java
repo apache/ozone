@@ -476,7 +476,7 @@ public class TestKeyValueHandler {
 
     Assertions.assertEquals(0, icrCount.get());
     // This should trigger container report validation in the ICR handler above.
-    keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptyList());
+    keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptySet());
     Assertions.assertEquals(1, icrCount.get());
   }
 

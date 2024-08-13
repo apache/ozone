@@ -9,9 +9,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
+/**
+ * Used to execute a container reconciliation task that has been queued from the ReplicationSupervisor.
+ */
 public class ReconcileContainerTask extends AbstractReplicationTask {
   private final ReconcileContainerCommand command;
-  // TODO HDDS-10376 used to read container checksum info and blocks from other datanodes.
   private final DNContainerOperationClient dnClient;
   private final ContainerController controller;
 
@@ -33,9 +35,9 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
     LOG.info("{}", this);
 
     try {
-      long elapsed = Time.monotonicNow() - start;
       controller.reconcileContainer(dnClient, command.getContainerID(), command.getPeerDatanodes());
       setStatus(Status.DONE);
+      long elapsed = Time.monotonicNow() - start;
       LOG.info("{} completed in {} ms", this, elapsed);
     } catch (Exception e) {
       long elapsed = Time.monotonicNow() - start;
@@ -58,7 +60,7 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
       return false;
     }
     ReconcileContainerTask that = (ReconcileContainerTask) o;
-    return getContainerId() == that.getContainerId();
+    return Objects.equals(command, that.command);
   }
 
   @Override

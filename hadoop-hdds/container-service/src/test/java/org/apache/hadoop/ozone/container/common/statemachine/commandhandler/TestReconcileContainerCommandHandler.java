@@ -127,13 +127,13 @@ public class TestReconcileContainerCommandHandler {
     init(layout, icrSender);
 
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
-      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
 
     // An unknown container should not trigger a container report being sent.
     ReconcileContainerCommand unknownContainerCmd = new ReconcileContainerCommand(NUM_CONTAINERS + 1,
-        Collections.emptyList());
+        Collections.emptySet());
     subject.handle(unknownContainerCmd, ozoneContainer, context, null);
 
     // Since the replication supervisor is mocked in this test, reports are processed immediately.
@@ -151,7 +151,7 @@ public class TestReconcileContainerCommandHandler {
 
     // All commands submitted will be blocked until the latch is counted down.
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
-      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
     assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
