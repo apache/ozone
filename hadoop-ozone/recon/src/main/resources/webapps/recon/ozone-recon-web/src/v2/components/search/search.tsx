@@ -45,14 +45,12 @@ const Search: React.FC<SearchProps> = ({
   onChange = () => {}
 }) => {
 
-  let selectFilter = null;
-
-  if (searchColumn) {
-    selectFilter = <Select
+  const selectFilter = searchColumn
+    ? (<Select
       defaultValue={searchColumn}
       options={searchOptions}
-      onChange={onChange} />
-  }
+      onChange={onChange} />)
+    : null
 
   return (
     <Input.Search

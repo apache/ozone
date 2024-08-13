@@ -48,10 +48,10 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
 
 
   const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, false>) => {
-    const selectedLimit = props.getValue() as Option[]
+    const selectedLimit = props.getValue() as Option[];
     return (
       <components.ValueContainer {...props}>
-        Limit: {selectedLimit[0].label}
+        Limit: {selectedLimit[0]?.label ?? ''}
       </components.ValueContainer>
     );
   };
