@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
 import java.util.concurrent.ExecutorService;
@@ -51,7 +50,7 @@ public class EndpointStateMachine
   private final InetSocketAddress address;
   private final Lock lock;
   private final ConfigurationSource conf;
-  private EndPointStates state;
+  private EndPointStates state = EndPointStates.FIRST;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
@@ -72,7 +71,6 @@ public class EndpointStateMachine
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
-    state = EndPointStates.getInitState();
     lock = new ReentrantLock();
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
@@ -153,11 +151,9 @@ public class EndpointStateMachine
 
   /**
    * Closes the connection.
-   *
-   * @throws IOException
    */
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (endPoint != null) {
       endPoint.close();
     }
@@ -232,9 +228,8 @@ public class EndpointStateMachine
     String serverName = "SCM";
 
     if (isPassive) {
-      // Recon connection failures can be logged 10 times lower than regular
-      // SCM.
-      missCounter = this.getMissedCount() % (10 * getLogWarnInterval(conf));
+      // Recon connection failures can be logged 10 times lower than regular SCM.
+      missCounter = this.getMissedCount() % (10L * getLogWarnInterval(conf));
       serverName = "Recon";
     }
 
@@ -272,50 +267,16 @@ public class EndpointStateMachine
    * <p>
    * This is a sorted list of states that EndPoint will traverse.
    * <p>
-   * GetNextState will move this enum from getInitState to getLastState.
+   * {@link #getNextState()} will move from {@link #FIRST} to {@link #LAST}.
    */
   public enum EndPointStates {
-    GETVERSION(1),
-    REGISTER(2),
-    HEARTBEAT(3),
-    SHUTDOWN(4); // if you add value after this please edit getLastState too.
-    private final int value;
+    GETVERSION,
+    REGISTER,
+    HEARTBEAT,
+    SHUTDOWN;
 
-    /**
-     * Constructs endPointStates.
-     *
-     * @param value  state.
-     */
-    EndPointStates(int value) {
-      this.value = value;
-    }
-
-    /**
-     * Returns the first State.
-     *
-     * @return First State.
-     */
-    public static EndPointStates getInitState() {
-      return GETVERSION;
-    }
-
-    /**
-     * The last state of endpoint states.
-     *
-     * @return last state.
-     */
-    public static EndPointStates getLastState() {
-      return SHUTDOWN;
-    }
-
-    /**
-     * returns the numeric value associated with the endPoint.
-     *
-     * @return int.
-     */
-    public int getValue() {
-      return value;
-    }
+    private static final EndPointStates FIRST = values()[0];
+    private static final EndPointStates LAST = values()[values().length - 1];
 
     /**
      * Returns the next logical state that endPoint should move to.
@@ -324,15 +285,8 @@ public class EndpointStateMachine
      * @return NextState.
      */
     public EndPointStates getNextState() {
-      if (this.getValue() < getLastState().getValue()) {
-        int stateValue = this.getValue() + 1;
-        for (EndPointStates iter : values()) {
-          if (stateValue == iter.getValue()) {
-            return iter;
-          }
-        }
-      }
-      return getLastState();
+      final int n = this.ordinal();
+      return n >= LAST.ordinal()? LAST : values()[n + 1];
     }
   }
 
