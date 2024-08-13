@@ -87,7 +87,7 @@ public class TestHSyncUpgrade {
   private MiniOzoneCluster cluster;
   private OzoneBucket bucket;
 
-  private final OzoneConfiguration CONF = new OzoneConfiguration();
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
@@ -105,23 +105,23 @@ public class TestHSyncUpgrade {
   public void init() throws Exception {
     final BucketLayout layout = BUCKET_LAYOUT;
 
-    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
-    CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
-    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
-    CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    CONF.setBoolean("ozone.client.incremental.chunk.list", true);
-    CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
-    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setBoolean("ozone.client.incremental.chunk.list", true);
+    conf.setBoolean("ozone.client.stream.putblock.piggybacking", true);
+    conf.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
-    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+    conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
-    CONF.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
+    conf.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
-    CONF.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    CONF.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -131,9 +131,9 @@ public class TestHSyncUpgrade {
         .setDataStreamBufferFlushSize(MAX_FLUSH_SIZE)
         .setDataStreamMinPacketSize(CHUNK_SIZE)
         .setDataStreamWindowSize(5 * CHUNK_SIZE)
-        .applyTo(CONF);
+        .applyTo(conf);
 
-    cluster = MiniOzoneCluster.newBuilder(CONF)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
@@ -173,14 +173,14 @@ public class TestHSyncUpgrade {
 
   private void preFinalizationChecks() throws IOException {
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
-    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
 
     final Path file = new Path(dir, "pre-finalization");
-    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(CONF)) {
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf)) {
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         OMException omException  = assertThrows(OMException.class, outputStream::hsync);
         assertFinalizationExceptionForHsync(omException);
