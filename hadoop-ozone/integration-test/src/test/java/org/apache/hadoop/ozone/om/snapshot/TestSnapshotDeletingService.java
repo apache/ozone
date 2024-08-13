@@ -586,7 +586,6 @@ public class TestSnapshotDeletingService {
     }, 1000, 120000); // 2 minutes
   }
 
-
   private boolean assertTableRowCount(int expectedCount,
                                       Table<String, ?> table) {
     AtomicLong count = new AtomicLong(0L);
