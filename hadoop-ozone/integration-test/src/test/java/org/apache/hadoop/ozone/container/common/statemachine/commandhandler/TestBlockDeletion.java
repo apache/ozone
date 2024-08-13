@@ -766,7 +766,7 @@ public class TestBlockDeletion {
 
           String blockKey = cData.getBlockKey(blockID.getLocalID());
 
-          BlockData blockData = db.getStore().getBlockByID(blockID, blockKey);
+          BlockData blockData = blockDataTable.get(blockKey);
           assertNull(blockData);
 
           String deletingKey = cData.getDeletingBlockKey(
