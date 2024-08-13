@@ -479,31 +479,30 @@ public class BlockOutputStream extends OutputStream {
   /**
    * Watch for a specific commit index.
    */
-  XceiverClientReply sendWatchForCommit(long commitIndex)
-      throws IOException {
-    return null;
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long commitIndex) {
+    return CompletableFuture.completedFuture(null);
   }
 
-  private void watchForCommit(long commitIndex) throws IOException {
-    checkOpen();
-    try {
-      LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
-      final XceiverClientReply reply = sendWatchForCommit(commitIndex);
-      if (reply != null) {
-        List<DatanodeDetails> dnList = reply.getDatanodes();
-        if (!dnList.isEmpty()) {
-          Pipeline pipe = xceiverClient.getPipeline();
+  private CompletableFuture<Void> watchForCommit(long commitIndex) {
+    LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
+    return sendWatchForCommit(commitIndex)
+        .thenAccept(this::checkReply)
+        .exceptionally(e -> { throw new FlushRuntimeException(setIoException(e)); })
+        .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
+  }
 
-          LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
-              blockID, pipe, dnList);
-          failedServers.addAll(dnList);
-        }
-      }
-    } catch (IOException ioe) {
-      setIoException(ioe);
-      throw getIoException();
+  void checkReply(XceiverClientReply reply) {
+    if (reply == null) {
+      return;
     }
-    LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+    final List<DatanodeDetails> dnList = reply.getDatanodes();
+    if (dnList.isEmpty()) {
+      return;
+    }
+
+    LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
+        blockID, xceiverClient.getPipeline(), dnList);
+    failedServers.addAll(dnList);
   }
 
   void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
@@ -724,12 +723,13 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    return putBlockResultFuture.thenAccept(x -> {
+    return putBlockResultFuture.thenCompose(x -> {
       try {
-        watchForCommit(x.commitIndex);
+        checkOpen();
       } catch (IOException e) {
         throw new FlushRuntimeException(e);
       }
+      return watchForCommit(x.commitIndex);
     });
   }
 
@@ -771,7 +771,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  public void setIoException(Exception e) {
+  public IOException setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -782,6 +782,7 @@ public class BlockOutputStream extends OutputStream {
               "so subsequent request also encounters " +
               "Storage Container Exception {}", ioe, e);
     }
+    return getIoException();
   }
 
   void cleanup() {
