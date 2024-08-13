@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -136,7 +137,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  public OzoneContainer(
+  public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
       SecretKeyVerifierClient secretKeyClient) throws IOException {
@@ -203,7 +204,7 @@ public class OzoneContainer {
      */
     controller = new ContainerController(containerSet, handlers);
 
-    writeChannel = XceiverServerRatis.newXceiverServerRatis(
+    writeChannel = XceiverServerRatis.newXceiverServerRatis(hddsDatanodeService,
         datanodeDetails, config, hddsDispatcher, controller, certClient,
         context);
 
@@ -275,7 +276,7 @@ public class OzoneContainer {
   public OzoneContainer(
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context) throws IOException {
-    this(datanodeDetails, conf, context, null, null);
+    this(null, datanodeDetails, conf, context, null, null);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {

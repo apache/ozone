@@ -213,7 +213,7 @@ public class TestSecureContainerServer {
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
-    return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
+    return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
         new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         caClient, null);
   }

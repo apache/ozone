@@ -251,7 +251,7 @@ public class TestContainerMetrics {
     CONF.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         volumeSet);
-    return XceiverServerRatis.newXceiverServerRatis(dn, CONF, dispatcher,
+    return XceiverServerRatis.newXceiverServerRatis(null, dn, CONF, dispatcher,
         new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         null, null);
   }

@@ -300,7 +300,7 @@ public class TestOzoneContainerWithTLS {
     try {
       StateContext stateContext = ContainerTestUtils.getMockContext(dn, conf);
       container = new OzoneContainer(
-          dn, conf, stateContext, caClient, keyClient);
+          null, dn, conf, stateContext, caClient, keyClient);
       container.start(clusterID);
     } catch (Throwable e) {
       if (container != null) {

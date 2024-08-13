@@ -190,7 +190,7 @@ public class TestCSMMetrics {
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
-    return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
+    return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
         new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         null, null);
   }
