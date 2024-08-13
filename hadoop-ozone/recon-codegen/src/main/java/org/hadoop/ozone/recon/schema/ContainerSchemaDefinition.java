@@ -80,7 +80,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   private void createUnhealthyContainersTable() {
     dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_TABLE_NAME)
         .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
-        .column(CONTAINER_STATE, SQLDataType.VARCHAR(16).nullable(false))
+        .column(CONTAINER_STATE, SQLDataType.VARCHAR(40).nullable(false))
         .column("in_state_since", SQLDataType.BIGINT.nullable(false))
         .column("expected_replica_count", SQLDataType.INTEGER.nullable(false))
         .column("actual_replica_count", SQLDataType.INTEGER.nullable(false))

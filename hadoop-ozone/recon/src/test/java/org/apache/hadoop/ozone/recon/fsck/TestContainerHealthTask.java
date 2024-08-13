@@ -21,8 +21,7 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -30,13 +29,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -67,12 +60,15 @@ import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestContainerHealthTask.class);
   public TestContainerHealthTask() {
     super();
   }
@@ -382,6 +378,55 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
     assertThat(taskStatus.getLastUpdatedTimestamp())
         .isGreaterThan(currentTime);
+  }
+
+  @Test
+  public void testAllContainerStateInsertions() {
+    // Set up DAOs and Schema Manager
+    UnhealthyContainersDao unHealthyContainersTableHandle =
+        getDao(UnhealthyContainersDao.class);
+
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unHealthyContainersTableHandle);
+
+    // Iterate through each state in the UnHealthyContainerStates enum
+    for (ContainerSchemaDefinition.UnHealthyContainerStates state :
+        ContainerSchemaDefinition.UnHealthyContainerStates.values()) {
+      // Create a dummy UnhealthyContainer record with the current state
+      UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
+      unhealthyContainer.setContainerId(state.ordinal() + 1L); // Ensure unique ID for each state
+      unhealthyContainer.setExpectedReplicaCount(3);
+      unhealthyContainer.setActualReplicaCount(1);
+      unhealthyContainer.setReplicaDelta(2);
+      unhealthyContainer.setContainerState(state.name());
+      unhealthyContainer.setInStateSince(System.currentTimeMillis());
+
+      // Try inserting the record and catch any exception that occurs
+      Exception exception = null;
+      try {
+        containerHealthSchemaManager.insertUnhealthyContainerRecords(
+            Collections.singletonList(unhealthyContainer));
+      } catch (Exception e) {
+        exception = e;
+      }
+
+      // Assert no exception should be thrown for each state
+      assertNull(exception,
+          "Exception was thrown during insertion for state " + state.name() +
+              ": " + exception);
+
+      // Optionally, verify the record was inserted correctly
+      List<UnhealthyContainers> insertedRecords =
+          unHealthyContainersTableHandle.fetchByContainerId(
+              state.ordinal() + 1L);
+      assertFalse(insertedRecords.isEmpty(),
+          "Record was not inserted for state " + state.name() + ".");
+      assertEquals(insertedRecords.get(0).getContainerState(), state.name(),
+          "The inserted container state does not match for state " +
+              state.name() + ".");
+    }
   }
 
   @Test
