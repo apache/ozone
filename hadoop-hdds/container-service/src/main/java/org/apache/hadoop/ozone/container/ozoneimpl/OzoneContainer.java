@@ -499,8 +499,7 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
-    // TODO stop checksumManager which will unregister the metrics.
-    ContainerMerkleTreeMetrics.unregister();
+    checksumTreeManager.stop();
   }
 
   public void handleVolumeFailures() {
