@@ -84,11 +84,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSyncUpgrade {
-  private static MiniOzoneCluster cluster;
-  private static OzoneBucket bucket;
+  private MiniOzoneCluster cluster;
+  private OzoneBucket bucket;
 
-  private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static OzoneClient client;
+  private final OzoneConfiguration CONF = new OzoneConfiguration();
+  private OzoneClient client;
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
   private static final int CHUNK_SIZE = 4 << 12;
