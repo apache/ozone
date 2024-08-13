@@ -18,7 +18,7 @@ def extract_xml_from_jar(jar_path, xml_filename):
     xml_files = []
     with zipfile.ZipFile(jar_path, 'r') as jar:
         for file_info in jar.infolist():
-            if file_info.filename.endswith(xml_filename) and 'test-classes' not in file_info.filename:
+            if file_info.filename.endswith(xml_filename):
                 with jar.open(file_info.filename) as xml_file:
                     xml_files.append(xml_file.read())
     return xml_files
@@ -37,10 +37,10 @@ def parse_xml_file(xml_content):
 
 def generate_markdown(properties):
     markdown = []
-    markdown.append("---")
-    markdown.append("title: \"Ozone configurations\"")
-    markdown.append("summary: Ozone configurations")
-    markdown.append("---")
+    markdown.append("---\n")
+    markdown.append("title: \"Ozone configurations\"\n")
+    markdown.append("summary: Ozone configurations\n")
+    markdown.append("---\n")
     markdown.append("<!--\n")
     markdown.append("Licensed to the Apache Software Foundation (ASF) under one or more\n")
     markdown.append("contributor license agreements.  See the NOTICE file distributed with\n")
