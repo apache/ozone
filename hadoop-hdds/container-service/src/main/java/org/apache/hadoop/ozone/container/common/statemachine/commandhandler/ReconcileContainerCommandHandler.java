@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ReconcileContainerCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final AtomicLong invocationCount;
-  // TODO HDDS-10376 comes from DatanodeStateMachine through ctor.
   private final DNContainerOperationClient dnClient;
 
   public ReconcileContainerCommandHandler(ReplicationSupervisor supervisor, DNContainerOperationClient dnClient) {

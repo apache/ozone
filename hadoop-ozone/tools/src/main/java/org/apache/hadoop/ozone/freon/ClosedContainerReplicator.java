@@ -195,6 +195,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               },
+              // Since this a Freon tool, this instance is not part of a running datanode.
               new ContainerChecksumTreeManager(conf));
       handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);

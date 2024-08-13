@@ -153,6 +153,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
               metrics,
               containerReplicaProto -> {
               },
+              // Since this is an Ozone debug CLI, this instance is not part of a running datanode.
               new ContainerChecksumTreeManager(conf));
       handler.setClusterID(clusterId);
       handlers.put(containerType, handler);
