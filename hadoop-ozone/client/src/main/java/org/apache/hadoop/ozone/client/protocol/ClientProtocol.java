@@ -545,7 +545,10 @@ public interface ClientProtocol {
    * @param destinationBucket - The bucket user want to recover to.
    * @return The result of recovering operation is success or not.
    * @throws IOException
+   * @deprecated HDDS-3367 implements a new way to store trashed files.
+   * Please avoid using this as it will be removed in a future release
    */
+  @Deprecated
   boolean recoverTrash(String volumeName, String bucketName, String keyName,
       String destinationBucket) throws IOException;
 
