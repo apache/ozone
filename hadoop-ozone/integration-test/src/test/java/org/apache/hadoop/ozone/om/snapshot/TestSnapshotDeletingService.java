@@ -222,7 +222,6 @@ public class TestSnapshotDeletingService {
   @SuppressWarnings("checkstyle:MethodLength")
   @Test
   @Order(3)
-  @Flaky("HDDS-11131")
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
         om.getMetadataManager().getDirectoryTable();
@@ -578,7 +577,13 @@ public class TestSnapshotDeletingService {
 
   private void assertTableRowCount(Table<String, ?> table, int count)
       throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> assertTableRowCount(count, table), 1000,
+    GenericTestUtils.waitFor(() -> {
+            try {
+              return assertTableRowCount(count, table);
+            } catch (Exception e) {
+              return false;
+            }
+        }, 1000,
         120000); // 2 minutes
   }
 
