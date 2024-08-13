@@ -15,27 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.util;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import Overview  from '@/v2/pages/overview/overview';
 
-import java.util.UUID;
-
-/**
- * Contains utilities to ease common protobuf to java object conversions.
- */
-public final class ProtobufUtils {
-  private ProtobufUtils() {
+export const routesV2: IRoute[] = [
+  {
+    path: '/Overview',
+    component: Overview
   }
-
-  public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    return HddsProtos.UUID.newBuilder()
-        .setMostSigBits(uuid.getMostSignificantBits())
-        .setLeastSigBits(uuid.getLeastSignificantBits())
-        .build();
-  }
-
-  public static UUID fromProtobuf(HddsProtos.UUID proto) {
-    return new UUID(proto.getMostSigBits(), proto.getLeastSigBits());
-  }
-}
+];

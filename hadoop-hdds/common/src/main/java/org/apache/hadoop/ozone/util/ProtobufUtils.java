@@ -15,32 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.util;
 
-package org.apache.hadoop.util;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
-import java.security.SecureRandom;
+import java.util.UUID;
 
 /**
- * Helper methods to deal with random UUIDs.
+ * Contains utilities to ease common protobuf to java object conversions.
  */
-public final class UUIDUtil {
-
-  private UUIDUtil() {
-
+public final class ProtobufUtils {
+  private ProtobufUtils() {
   }
 
-  private static final ThreadLocal<SecureRandom> GENERATOR =
-      ThreadLocal.withInitial(SecureRandom::new);
-
-  public static byte[] randomUUIDBytes() {
-    final byte[] bytes = new byte[16];
-    GENERATOR.get().nextBytes(bytes);
-    // See RFC 4122 section 4.4
-    bytes[6]  &= 0x0f;
-    bytes[6]  |= 0x40;
-    bytes[8]  &= 0x3f;
-    bytes[8]  |= 0x80;
-    return bytes;
+  public static HddsProtos.UUID toProtobuf(UUID uuid) {
+    return HddsProtos.UUID.newBuilder()
+        .setMostSigBits(uuid.getMostSignificantBits())
+        .setLeastSigBits(uuid.getLeastSignificantBits())
+        .build();
   }
 
+  public static UUID fromProtobuf(HddsProtos.UUID proto) {
+    return new UUID(proto.getMostSigBits(), proto.getLeastSigBits());
+  }
 }

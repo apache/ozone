@@ -28,7 +28,7 @@
     </tbody>
 </table>
 
-<h2>Statistics</h2>
+<h2>Usage Statistics</h2>
 <table class="table table-bordered table-striped">
     <tbody>
     <tr>
@@ -50,6 +50,62 @@
     <tr>
         <td>Standard Deviation</td>
         <td>{{statistics.nodes.usages.stdev}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>State Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode State</th>
+        <th>Count</th>
+    </tr>
+    <tr>
+        <td>Healthy Nodes</td>
+        <td>{{statistics.nodes.state.healthy}}</td>
+    </tr>
+    <tr>
+        <td>Dead Nodes</td>
+        <td>{{statistics.nodes.state.dead}}</td>
+    </tr>
+    <tr>
+        <td>Decommissioning Nodes</td>
+        <td>{{statistics.nodes.state.decommissioning}}</td>
+    </tr>
+    <tr>
+        <td>Entering Maintenance Nodes</td>
+        <td>{{statistics.nodes.state.enteringmaintenance}}</td>
+    </tr>
+    <tr>
+        <td>Volume Failures Nodes</td>
+        <td>{{statistics.nodes.state.volumefailures}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Space Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode Space</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Capacity</td>
+        <td>{{statistics.nodes.space.capacity}}</td>
+    </tr>
+    <tr>
+        <td>ScmUsed</td>
+        <td>{{statistics.nodes.space.scmused}}</td>
+    </tr>
+    <tr>
+        <td>Remaining</td>
+        <td>{{statistics.nodes.space.remaining}}</td>
+    </tr>
+    <tr>
+        <td>Non ScmUsed</td>
+        <td>{{statistics.nodes.space.nonscmused}}</td>
     </tr>
     </tbody>
 </table>

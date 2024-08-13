@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import java.util.concurrent.TimeoutException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -174,10 +173,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
-    // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
-      LOG.debug("Connecting to server : {}", dn.getIpAddress());
+      LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ",
+          dn, pipeline.getNodes());
     }
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub asyncStub =
@@ -191,6 +189,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .proxyDetector(uri -> null)
             .intercept(new GrpcClientInterceptor());
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
@@ -320,7 +319,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   /**
    * @param request
    * @param dn
-   * @param pipeline
    * In case of getBlock for EC keys, it is required to set replicaIndex for
    * every request with the replicaIndex for that DN for which the request is
    * sent to. This method unpacks proto and reconstructs request after setting
@@ -345,8 +343,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandWithTraceIDAndRetry(request, validators);
+      XceiverClientReply reply = sendCommandWithTraceIDAndRetry(request, validators);
       return reply.getResponse().get();
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
@@ -490,7 +487,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         LOG.debug(message + " on the pipeline {}.",
                 processForDebug(request), pipeline);
       } else {
-        LOG.error(message + " on the pipeline {}.",
+        LOG.warn(message + " on the pipeline {}.",
                 request.getCmdType(), pipeline);
       }
       throw ioException;
@@ -649,14 +646,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     if (!isConnected(channel)) {
       throw new IOException("This channel is not connected.");
     }
-  }
-
-  @Override
-  public XceiverClientReply watchForCommit(long index)
-      throws InterruptedException, ExecutionException, TimeoutException,
-      IOException {
-    // there is no notion of watch for commit index in standalone pipeline
-    return null;
   }
 
   @Override

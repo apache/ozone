@@ -55,6 +55,8 @@ OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
+OZONE-SITE.XML_ozone.fs.hsync.enabled=true
+
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 

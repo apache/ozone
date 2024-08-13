@@ -110,8 +110,7 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
 
   private ReadChunkResponseProto readChunk(ReadChunkRequestProto readChunk) {
     return ReadChunkResponseProto.newBuilder()
-        .setChunkData(datanodeStorage
-            .readChunkInfo(readChunk.getBlockID(), readChunk.getChunkData()))
+        .setChunkData(readChunk.getChunkData())
         .setData(datanodeStorage
             .readChunkData(readChunk.getBlockID(), readChunk.getChunkData()))
         .setBlockID(readChunk.getBlockID())
@@ -130,21 +129,26 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   }
 
   private PutBlockResponseProto putBlock(PutBlockRequestProto putBlock) {
+    return PutBlockResponseProto.newBuilder()
+        .setCommittedBlockLength(
+            doPutBlock(putBlock.getBlockData()))
+        .build();
+  }
+
+  private GetCommittedBlockLengthResponseProto doPutBlock(
+      ContainerProtos.BlockData blockData) {
     long length = 0;
-    for (ChunkInfo chunk : putBlock.getBlockData().getChunksList()) {
+    for (ChunkInfo chunk : blockData.getChunksList()) {
       length += chunk.getLen();
     }
 
-    datanodeStorage.putBlock(putBlock.getBlockData().getBlockID(),
-        putBlock.getBlockData());
+    datanodeStorage.putBlock(blockData.getBlockID(),
+        blockData);
 
-    return PutBlockResponseProto.newBuilder()
-        .setCommittedBlockLength(
-            GetCommittedBlockLengthResponseProto.newBuilder()
-                .setBlockID(putBlock.getBlockData().getBlockID())
+    return GetCommittedBlockLengthResponseProto.newBuilder()
+                .setBlockID(blockData.getBlockID())
                 .setBlockLength(length)
-                .build())
-        .build();
+                .build();
   }
 
   private XceiverClientReply result(
@@ -167,18 +171,20 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     datanodeStorage
         .writeChunk(writeChunk.getBlockID(), writeChunk.getChunkData(),
             writeChunk.getData());
-    return WriteChunkResponseProto.newBuilder()
-        .build();
+
+    WriteChunkResponseProto.Builder builder =
+        WriteChunkResponseProto.newBuilder();
+    if (writeChunk.hasBlock()) {
+      ContainerProtos.BlockData
+          blockData = writeChunk.getBlock().getBlockData();
+      builder.setCommittedBlockLength(doPutBlock(blockData));
+    }
+    return builder.build();
   }
 
   @Override
   public ReplicationType getPipelineType() {
     return pipeline.getType();
-  }
-
-  @Override
-  public XceiverClientReply watchForCommit(long index) {
-    return null;
   }
 
   @Override

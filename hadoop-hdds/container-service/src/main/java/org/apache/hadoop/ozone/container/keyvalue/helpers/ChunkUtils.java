@@ -39,10 +39,10 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.function.ToLongFunction;
 
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -65,6 +65,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.ratis.util.AutoCloseableLock;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +74,6 @@ import org.slf4j.LoggerFactory;
  * Utility methods for chunk operations for KeyValue container.
  */
 public final class ChunkUtils {
-
-  private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkUtils.class);
@@ -91,10 +90,29 @@ public final class ChunkUtils {
           StandardOpenOption.READ
       ));
   public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
+  public static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 2048;
+  private static Striped<ReadWriteLock> fileStripedLock =
+      Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
 
   /** Never constructed. **/
   private ChunkUtils() {
+  }
 
+  @VisibleForTesting
+  public static void setStripedLock(Striped<ReadWriteLock> stripedLock) {
+    fileStripedLock = stripedLock;
+  }
+
+  private static ReadWriteLock getFileLock(Path filePath) {
+    return fileStripedLock.get(filePath);
+  }
+
+  private static AutoCloseableLock getFileReadLock(Path filePath) {
+    return AutoCloseableLock.acquire(getFileLock(filePath).readLock());
+  }
+
+  private static AutoCloseableLock getFileWriteLock(Path filePath) {
+    return AutoCloseableLock.acquire(getFileLock(filePath).writeLock());
   }
 
   /**
@@ -156,24 +174,19 @@ public final class ChunkUtils {
   private static long writeDataToFile(File file, ChunkBuffer data,
       long offset, boolean sync) {
     final Path path = file.toPath();
-    try {
-      return processFileExclusively(path, () -> {
-        FileChannel channel = null;
-        try {
-          channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
+    try (AutoCloseableLock ignoredLock = getFileWriteLock(path)) {
+      FileChannel channel = null;
+      try {
+        channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
-          try (FileLock ignored = channel.lock()) {
-            return writeDataToChannel(channel, data, offset);
-          }
-        } catch (IOException e) {
-          throw new UncheckedIOException(e);
-        } finally {
-          closeFile(channel, sync);
+        try (FileLock ignored = channel.lock()) {
+          return writeDataToChannel(channel, data, offset);
         }
-      });
-    } catch (InterruptedException e) {
-      throw new UncheckedIOException(new InterruptedIOException(
-          "Interrupted while waiting to write file " + path));
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      } finally {
+        closeFile(channel, sync);
+      }
     }
   }
 
@@ -211,20 +224,11 @@ public final class ChunkUtils {
     final long startTime = Time.monotonicNow();
     final long bytesRead;
 
-    try {
-      bytesRead = processFileExclusively(path, () -> {
-        try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
-             FileLock ignored = channel.lock(offset, len, true)) {
-          return readMethod.apply(channel);
-        } catch (IOException e) {
-          onFailure(volume);
-          throw new UncheckedIOException(e);
-        }
-      });
-    } catch (UncheckedIOException e) {
+    try (AutoCloseableLock ignoredLock = getFileReadLock(path);
+         FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES)) {
+      bytesRead = readMethod.apply(channel);
+    } catch (IOException e) {
       onFailure(volume);
-      throw wrapInStorageContainerException(e.getCause());
-    } catch (InterruptedException e) {
       throw wrapInStorageContainerException(e);
     }
 
@@ -388,29 +392,6 @@ public final class ChunkUtils {
       throw new StorageContainerException(
           "Chunk file not found: " + file.getPath(),
           UNABLE_TO_FIND_CHUNK);
-    }
-  }
-
-  @VisibleForTesting
-  static <T> T processFileExclusively(Path path, Supplier<T> op)
-      throws InterruptedException {
-    long period = 1;
-    for (;;) {
-      if (LOCKS.add(path)) {
-        break;
-      } else {
-        Thread.sleep(period);
-        // exponentially backoff until the sleep time is over 1 second.
-        if (period < 1000) {
-          period *= 2;
-        }
-      }
-    }
-
-    try {
-      return op.get();
-    } finally {
-      LOCKS.remove(path);
     }
   }
 

@@ -23,6 +23,7 @@ import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { routes } from '@/routes';
+import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
@@ -51,7 +52,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
   };
 
   render() {
-    const { collapsed } = this.state;
+    const { collapsed, enableNewUI } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
 
@@ -73,13 +74,16 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   }} />
               </div>
             </Header>
-            <Content style={{ margin: '0 16px 0', overflow: 'initial' }}>
+            <Content style={(enableNewUI) ? {} : { margin: '0 16px 0', overflow: 'initial' }}>
               <Switch>
                 <Route exact path='/'>
                   <Redirect to='/Overview' />
                 </Route>
-                {
-                  routes.map(
+                {(enableNewUI)
+                  ? routesV2.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                  )
+                  : routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )
                 }

@@ -39,6 +39,19 @@
                         max : "N/A",
                         median : "N/A",
                         stdev : "N/A"
+                    },
+                    state : {
+                        healthy : "N/A",
+                        dead : "N/A",
+                        decommissioning : "N/A",
+                        enteringmaintenance : "N/A",
+                        volumefailures : "N/A"
+                    },
+                    space : {
+                        capacity : "N/A",
+                        scmused : "N/A",
+                        remaining : "N/A",
+                        nonscmused : "N/A"
                     }
                 }
             }
@@ -92,15 +105,33 @@
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
 
-                    ctrl.nodemanagermetrics.NodeStatistics.forEach(function(obj) {
-                        if(obj.key == "Min") {
-                            $scope.statistics.nodes.usages.min = obj.value;
-                        } else if(obj.key == "Max") {
-                            $scope.statistics.nodes.usages.max = obj.value;
-                        } else if(obj.key == "Median") {
-                            $scope.statistics.nodes.usages.median = obj.value;
-                        } else if(obj.key == "Stdev") {
-                            $scope.statistics.nodes.usages.stdev = obj.value;
+                    ctrl.nodemanagermetrics.NodeStatistics.forEach(({key, value}) => {
+                        if(key == "Min") {
+                            $scope.statistics.nodes.usages.min = value;
+                        } else if(key == "Max") {
+                            $scope.statistics.nodes.usages.max = value;
+                        } else if(key == "Median") {
+                            $scope.statistics.nodes.usages.median = value;
+                        } else if(key == "Stdev") {
+                            $scope.statistics.nodes.usages.stdev = value;
+                        } else if(key == "Healthy") {
+                            $scope.statistics.nodes.state.healthy = value;
+                        } else if(key == "Dead") {
+                            $scope.statistics.nodes.state.dead = value;
+                        } else if(key == "Decommissioning") {
+                            $scope.statistics.nodes.state.decommissioning = value;
+                        } else if(key == "EnteringMaintenance") {
+                            $scope.statistics.nodes.state.enteringmaintenance = value;
+                        } else if(key == "VolumeFailures") {
+                            $scope.statistics.nodes.state.volumefailures = value;
+                        } else if(key == "Capacity") {
+                            $scope.statistics.nodes.space.capacity = value;
+                        } else if(key == "Scmused") {
+                            $scope.statistics.nodes.space.scmused = value;
+                        } else if(key == "Remaining") {
+                            $scope.statistics.nodes.space.remaining = value;
+                        } else if(key == "NonScmused") {
+                            $scope.statistics.nodes.space.nonscmused = value;
                         }
                     });
                 });
