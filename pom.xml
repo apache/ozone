@@ -1576,6 +1576,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use commons-lang v3</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.commons.lang.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
