@@ -1102,7 +1102,8 @@ public class TestBlockDeletingService {
     conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet(1000);
     KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
-    KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();

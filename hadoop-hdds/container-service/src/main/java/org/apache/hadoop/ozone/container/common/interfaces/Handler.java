@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;

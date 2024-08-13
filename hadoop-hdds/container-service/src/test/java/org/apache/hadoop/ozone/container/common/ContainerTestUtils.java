@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -194,7 +193,7 @@ public final class ContainerTestUtils {
    */
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
       String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics) {
-    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> {},
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { },
         new ContainerChecksumTreeManager(config));
   }
 

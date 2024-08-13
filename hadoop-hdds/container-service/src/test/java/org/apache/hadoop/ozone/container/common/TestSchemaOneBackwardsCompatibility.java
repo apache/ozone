@@ -278,7 +278,8 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerSet containerSet = makeContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     long initialTotalSpace = newKvData().getBytesUsed();
     long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
 
@@ -347,7 +348,8 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerSet containerSet = makeContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     KeyValueContainerData cData = newKvData();
     try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
       // Read blocks that were already deleted before the upgrade.

@@ -44,15 +44,12 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
-import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -60,7 +57,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -145,7 +141,7 @@ public class TestReconcileContainerCommandHandler {
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
-    init(layout, c -> {});
+    init(layout, c -> { });
 
     assertEquals(0, subject.getInvocationCount());
 

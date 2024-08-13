@@ -128,7 +128,8 @@ class TestGrpcReplicationService {
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(
         new HddsVolume.Builder(testDir).conf(conf).build()));
 
-    Handler containerHandler = ContainerTestUtils.getKeyValueHandler(conf, datanode.getUuidString(), containerSet, volumeSet);
+    Handler containerHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanode.getUuidString(), containerSet, volumeSet);
 
     containerController = new ContainerController(containerSet,
         Collections.singletonMap(

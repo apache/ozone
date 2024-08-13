@@ -21,8 +21,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 class TestReconcileContainerTask {
-  DNContainerOperationClient mockClient;
-  ContainerController mockController;
+  private DNContainerOperationClient mockClient;
+  private ContainerController mockController;
 
   @BeforeEach
   public void init() {
