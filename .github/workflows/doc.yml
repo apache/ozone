@@ -147,7 +147,7 @@ jobs:
         with:
           repository: sarvekshayr/ozone-site
           ref : 'HDDS-9225-website-v2'
-          token: ${{ github.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: ozone-site
 
       - name: Copy MD file
