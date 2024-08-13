@@ -184,7 +184,6 @@ public class TestHSync {
     CONF.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     CONF.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    CONF.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.QUOTA.layoutVersion());
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
