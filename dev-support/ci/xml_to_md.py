@@ -80,7 +80,7 @@ def main():
                 property_map.update(parse_xml_file(xml_content))
 
     markdown_content = generate_markdown(property_map)
-    output_path = Path("hadoop-hdds/docs/content/tools/Configurations.md")
+    output_path = Path("hadoop-hdds/docs/content/Configurations.md")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open('w', encoding='utf-8') as file:
