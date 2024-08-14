@@ -4754,11 +4754,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getQuotaRepairStatus() throws IOException {
+    checkAdminUserPrivilege("quota repair status");
     return QuotaRepairTask.getStatus();
   }
 
   @Override
   public void triggerQuotaRepair(List<String> buckets) throws IOException {
+    checkAdminUserPrivilege("trigger quota repair");
     new QuotaRepairTask(this).repair(buckets);
   }
 
