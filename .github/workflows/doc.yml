@@ -105,24 +105,10 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-pip
 
-      - name: Download the source artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-bin
-          path: ozone-bin
-
-#      - name: List contents of ozone-bin directory
-#        run: |
-#          echo "Contents of ozone-bin directory:"
-#          ls -al ozone-bin
-
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
           tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
-
-#      - name: List contents of the extracted directory
-#        run: ls -alR ozone-bin/extracted
 
       - name: Find JAR files and check for ozone-default-generated.xml
         run: |
@@ -131,49 +117,22 @@ jobs:
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
-      - name: Upload the markdown file
-        uses: actions/upload-artifact@v4
-        with:
-          name: Configurations.md
-          path: hadoop-hdds/docs/content/tools/Configurations.md
-
-      - name: Download the markdown file
-        uses: actions/download-artifact@v4
-        with:
-          name: Configurations.md
-
-      - name: Checkout ozone-site repository
+      - name: Push changes to ozone-site
         uses: actions/checkout@v4
         with:
           repository: sarvekshayr/ozone-site
-          ref : 'HDDS-9225-website-v2'
+          ref: 'HDDS-9225-website-v2'
           token: ${{ secrets.GITHUB_TOKEN }}
           path: ozone-site
 
       - name: Copy MD file
         run: |
-          cp Configurations.md ozone-site/docs/03-core-concepts/06-configurations.md
+          cp hadoop-hdds/docs/content/tools/Configurations.md ozone-site/docs/03-core-concepts/06-configurations.md
 
-      - name: Compare hash of new and existing Configurations.md
-        id: hash_check
-        run: |
-          new_hash=$(sha256sum Configurations.md | awk '{ print $1 }')
-          existing_hash=$(sha256sum ozone-site/docs/03-core-concepts/06-configurations.md | awk '{ print $1 }')
-          echo "new_hash=$new_hash" >> $GITHUB_ENV
-          echo "existing_hash=$existing_hash" >> $GITHUB_ENV
-          if [ "$new_hash" == "$existing_hash" ]; then
-            echo "Hashes are identical. No need to push changes."
-            echo "skip_commit=true" >> $GITHUB_ENV
-          else
-            echo "Hashes differ. Proceeding with commit."
-            echo "skip_commit=false" >> $GITHUB_ENV
-          fi
-
-      - name: Commit and push changes if hashes differ
-        if: env.skip_commit == 'false'
+      - name: Commit changes
         run: |
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
           git add docs/03-core-concepts/06-configurations.md
-          git commit -m "[Auto] Push updated Configurations.md to Ozone site"
+          git commit -m "[Auto] Push MD file to Ozone site"
           git push
