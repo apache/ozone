@@ -286,7 +286,7 @@ public class EndpointStateMachine
      */
     public EndPointStates getNextState() {
       final int n = this.ordinal();
-      return n >= LAST.ordinal()? LAST : values()[n + 1];
+      return n >= LAST.ordinal() ? LAST : values()[n + 1];
     }
   }
 
