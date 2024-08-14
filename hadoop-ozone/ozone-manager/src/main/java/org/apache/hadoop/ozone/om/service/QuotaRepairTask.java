@@ -98,8 +98,8 @@ public class QuotaRepairTask {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     OMMetadataManager activeMetaManager = null;
     try {
-      // thread pool with 3 Table type * (1 task each + 3 thread each)
-      executor = Executors.newFixedThreadPool(12);
+      // thread pool with 3 Table type * (1 task each + 3 thread for each task)
+      executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
@@ -116,9 +116,10 @@ public class QuotaRepairTask {
           .setClientId(clientId.toString())
           .build();
       OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest, clientId);
-      if (response != null && response.getSuccess()) {
+      if (response != null && !response.getSuccess()) {
         LOG.error("update quota repair count response failed");
         REPAIR_STATUS.updateStatus("Response for update DB is failed");
+        return false;
       } else {
         REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
       }
