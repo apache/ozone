@@ -28,7 +28,65 @@ jobs:
         java: [ 8 ]
       fail-fast: false
     steps:
-    # Existing steps to build and generate Configurations.md file...
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Cache for npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+      - name: Setup java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+      - name: Run a full build
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+      - name: Store binaries for tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-bin
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store source tarball for compilation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-src
+          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
 
   xml-to-md:
     needs:
@@ -53,10 +111,22 @@ jobs:
           name: ozone-bin
           path: ozone-bin
 
+#      - name: List contents of ozone-bin directory
+#        run: |
+#          echo "Contents of ozone-bin directory:"
+#          ls -al ozone-bin
+
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
           tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
+
+#      - name: List contents of the extracted directory
+#        run: ls -alR ozone-bin/extracted
+
+      - name: Find JAR files and check for ozone-default-generated.xml
+        run: |
+          find ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'if jar tf {} | grep -q "ozone-default-generated.xml"; then echo "{}:"; jar tf {} | grep "ozone-default-generated.xml"; fi' \;
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
