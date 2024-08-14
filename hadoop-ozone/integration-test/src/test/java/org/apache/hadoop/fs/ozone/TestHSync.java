@@ -186,6 +186,8 @@ public class TestHSync {
     CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
+    // Unlimited key write concurrency
+    CONF.setInt("ozone.client.key.write.concurrency", -1);
     CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     CONF.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
