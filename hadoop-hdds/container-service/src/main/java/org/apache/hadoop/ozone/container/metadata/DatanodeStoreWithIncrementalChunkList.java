@@ -43,7 +43,20 @@ import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.F
  * 3. A Delete Transaction Table.
  */
 public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore {
- /**
+
+  // dummy chunk for empty EC blocks.
+  public static final ContainerProtos.ChunkInfo DUMMY_CHUNK =
+      ContainerProtos.ChunkInfo
+      .newBuilder()
+      .setChunkName("")
+      .setOffset(0)
+      .setLen(0)
+      .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+          .setType(ContainerProtos.ChecksumType.NONE)
+          .setBytesPerChecksum(0).build())
+      .build();
+
+  /**
   * Constructs the metadata store and starts the DB services.
   *
   * @param config - Ozone Configuration.
@@ -69,7 +82,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     if (blockData == null || blockData.getChunks().isEmpty()) {
       if (lastChunk == null) {
         throw new StorageContainerException(
-            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID + " key: " + blockKey, NO_SUCH_BLOCK);
+            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
       } else {
         if (LOG.isDebugEnabled()) {
           LOG.debug("blockData=(null), lastChunk={}", lastChunk.getChunks());
@@ -143,15 +156,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     if (!incremental || !isPartialChunkList(data)) {
       if (data.getChunks().isEmpty()) {
         // Deal with the corner case with empty EC blocks.
-        data.addChunk(ContainerProtos.ChunkInfo
-            .newBuilder()
-            .setChunkName("")
-            .setOffset(0)
-            .setLen(0)
-            .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.NONE)
-                .setBytesPerChecksum(0).build())
-            .build());
+        data.addChunk(DUMMY_CHUNK);
       }
       // Case (1) old client: override chunk list.
       getBlockDataTable().putWithBatch(

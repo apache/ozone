@@ -502,8 +502,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
-    final Table<String, BlockData> blockDataTable
-        = schemaTwoStore.getBlockDataTable();
 
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
         DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
@@ -516,7 +514,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         // counted towards bytes used and total block count above.
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable, schemaTwoStore);
+            localIDs, containerData, schemaTwoStore);
       }
     }
 
@@ -526,7 +524,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   static long computePendingDeleteBytes(List<Long> localIDs,
       KeyValueContainerData containerData,
-      Table<String, BlockData> blockDataTable, DatanodeStoreWithIncrementalChunkList schemaTwoStore) {
+      DatanodeStoreWithIncrementalChunkList schemaTwoStore) {
     long pendingDeleteBytes = 0;
     for (long id : localIDs) {
       try {
@@ -549,8 +547,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
     long pendingDeleteBytes = 0;
-    final Table<String, BlockData> blockDataTable
-        = schemaThreeStore.getBlockDataTable();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             DeletedBlocksTransaction>>
@@ -561,7 +557,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         final List<Long> localIDs = delTx.getLocalIDList();
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable, schemaThreeStore);
+            localIDs, containerData, schemaThreeStore);
       }
     }
     return new PendingDelete(pendingDeleteBlockCountTotal,

@@ -1050,15 +1050,7 @@ public class TestStorageContainerManager {
               .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
                   cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
-      List<? extends Table.KeyValue<String, BlockData>> kvs2 =
-          db.getStore().getLastChunkInfoTable()
-              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
-                  cData.containerPrefix(), cData.getUnprefixedKeyFilter());
-      // find the union of blocks in both tables.
-      Set<Table.KeyValue<String, BlockData>> unionSet = new HashSet<>(kvs);
-      unionSet.addAll(kvs2);
-
-      for (Table.KeyValue<String, BlockData> entry : unionSet) {
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
         allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
             .getKeyWithoutPrefix(entry.getKey())));
       }

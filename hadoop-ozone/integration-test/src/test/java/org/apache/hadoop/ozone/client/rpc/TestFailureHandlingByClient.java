@@ -299,9 +299,9 @@ public class TestFailureHandlingByClient {
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(containerId2)).getContainerData();
     try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
-      BlockID blockID = locationList.get(1).getBlockID();
-      String blockKey = containerData2.getBlockKey(blockID.getLocalID());
-      BlockData blockData2 = containerDb2.getStore().getBlockByID(blockID, blockKey);
+      BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
+          containerData2.getBlockKey(locationList.get(1).getBlockID()
+              .getLocalID()));
       // The second Block should have 0.5 chunkSize of data
       assertEquals(block2ExpectedChunkCount,
           blockData2.getChunks().size());

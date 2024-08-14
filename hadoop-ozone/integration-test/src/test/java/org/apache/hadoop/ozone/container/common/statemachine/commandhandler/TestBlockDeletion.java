@@ -745,8 +745,8 @@ public class TestBlockDeletion {
         KeyValueContainerData cData = (KeyValueContainerData) dnContainerSet
             .getContainer(blockID.getContainerID()).getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, conf)) {
-          assertNotNull(db.getStore().getBlockByID(blockID,
-              cData.getBlockKey(blockID.getLocalID())));
+          assertNotNull(db.getStore().getBlockDataTable()
+              .get(cData.getBlockKey(blockID.getLocalID())));
         }
       }, omKeyLocationInfoGroups);
     }
