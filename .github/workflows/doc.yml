@@ -137,13 +137,16 @@ jobs:
 
       - name: Copy MD file
         run: |
-          cp hadoop-hdds/docs/content/Configurations.md ozone-site/docs/03-core-concepts/06-configurations.md
+          cp hadoop-hdds/docs/content/concept/Configurations.md ozone-site/docs/03-core-concepts/Configurations.md
           ls -alh ozone-site/docs/03-core-concepts/
 
       - name: Commit changes
         run: |
+          cd ozone-site
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
-          git add ozone-site/docs/03-core-concepts/06-configurations.md
+          git add docs/03-core-concepts/Configurations.md
           git commit -m "[Auto] Push MD file to Ozone site"
-          git push
+          git fetch origin
+          git rebase origin/HDDS-9225-website-v2
+          git push origin HDDS-9225-website-v2
