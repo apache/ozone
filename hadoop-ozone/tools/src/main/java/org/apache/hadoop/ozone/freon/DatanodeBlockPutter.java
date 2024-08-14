@@ -29,7 +29,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -99,8 +100,8 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
       Pipeline pipeline =
           findPipelineForTest(pipelineId, scmLocationClient, LOG);
 
-      try (XceiverClientManager xceiverClientManager =
-               new XceiverClientManager(ozoneConf)) {
+      try (XceiverClientFactory xceiverClientManager =
+               new XceiverClientCreator(ozoneConf)) {
         client = xceiverClientManager.acquireClient(pipeline);
 
         timer = getMetrics().timer("put-block");

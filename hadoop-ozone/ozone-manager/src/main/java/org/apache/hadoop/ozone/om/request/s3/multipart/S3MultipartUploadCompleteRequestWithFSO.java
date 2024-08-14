@@ -96,13 +96,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long transactionLogIndex
+      String keyName, long transactionLogIndex
   ) throws IOException {
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
         multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
-        transactionLogIndex);
+        keyName, transactionLogIndex);
 
   }
 

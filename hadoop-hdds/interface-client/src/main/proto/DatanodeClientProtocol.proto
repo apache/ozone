@@ -75,6 +75,8 @@ package hadoop.hdds.datanode;
  *  17. CloseContainer - Closes an open container and makes it immutable.
  *
  *  18. CopyContainer - Copies a container from a remote machine.
+ *
+ *  19. FinalizeBlock - Finalize block request from client.
  */
 
 enum Type {
@@ -103,9 +105,11 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
-  Echo = 21;
-  ReadBlock = 22;
-  StreamRead = 23;
+
+  FinalizeBlock = 21;
+  Echo = 22;
+  ReadBlock = 23;
+  StreamRead = 24;
 }
 
 
@@ -155,6 +159,7 @@ enum Result {
   DELETE_ON_NON_EMPTY_CONTAINER = 44;
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
+  BLOCK_ALREADY_FINALIZED = 47;
 }
 
 /**
@@ -211,8 +216,10 @@ message ContainerCommandRequestProto {
 
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
-  optional   EchoRequestProto echo = 25;
-  optional   ReadBlockRequestProto readBlock = 26;
+
+  optional   FinalizeBlockRequestProto finalizeBlock = 25;
+  optional   EchoRequestProto echo = 26;
+  optional   ReadBlockRequestProto readBlock = 27;
 }
 
 message ContainerCommandResponseProto {
@@ -242,11 +249,12 @@ message ContainerCommandResponseProto {
   optional   PutSmallFileResponseProto putSmallFile = 19;
   optional   GetSmallFileResponseProto getSmallFile = 20;
 
-  optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
-  optional   EchoResponseProto echo = 22;
-  optional   ReadBlockResponseProto readBlock = 23;
-  optional   StreamDataResponseProto streamData = 24;
-}
+  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
+
+  optional   FinalizeBlockResponseProto finalizeBlock = 22;
+  optional   EchoResponseProto echo = 23;
+  optional   ReadBlockResponseProto readBlock = 24;
+  optional   StreamDataResponseProto streamData = 25;}
 
 message ContainerDataProto {
   enum State {
@@ -344,6 +352,14 @@ message  PutBlockRequestProto {
 
 message  PutBlockResponseProto {
   required GetCommittedBlockLengthResponseProto committedBlockLength = 1;
+}
+
+message  FinalizeBlockRequestProto  {
+  required DatanodeBlockID blockID = 1;
+}
+
+message  FinalizeBlockResponseProto  {
+  required BlockData blockData = 1;
 }
 
 message  GetBlockRequestProto  {
@@ -448,9 +464,11 @@ message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
+  optional PutBlockRequestProto block = 4;
 }
 
 message  WriteChunkResponseProto {
+  optional GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
 enum ReadChunkVersion {

@@ -173,7 +173,7 @@ public class OzoneClientConfig {
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
@@ -182,7 +182,7 @@ public class OzoneClientConfig {
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
           + "this config is 8KB.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private int bytesPerChecksum = 16 * 1024;
 
   @Config(key = "verify.checksum",
@@ -253,6 +253,23 @@ public class OzoneClientConfig {
           "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
+
+  @Config(key = "incremental.chunk.list",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Client PutBlock request can choose incremental chunk " +
+          "list rather than full chunk list to optimize performance. " +
+          "Critical to HBase.",
+      tags = ConfigTag.CLIENT)
+  private boolean incrementalChunkList = true;
+
+  @Config(key = "stream.putblock.piggybacking",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow PutBlock to be piggybacked in WriteChunk " +
+          "requests if the chunk is small.",
+      tags = ConfigTag.CLIENT)
+  private boolean enablePutblockPiggybacking = false;
 
   @PostConstruct
   public void validate() {
@@ -452,12 +469,28 @@ public class OzoneClientConfig {
     return fsDefaultBucketLayout;
   }
 
+  public void setEnablePutblockPiggybacking(boolean enablePutblockPiggybacking) {
+    this.enablePutblockPiggybacking = enablePutblockPiggybacking;
+  }
+
+  public boolean getEnablePutblockPiggybacking() {
+    return enablePutblockPiggybacking;
+  }
+
   public boolean isDatastreamPipelineMode() {
     return datastreamPipelineMode;
   }
 
   public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
     this.datastreamPipelineMode = datastreamPipelineMode;
+  }
+
+  public void setIncrementalChunkList(boolean enable) {
+    this.incrementalChunkList = enable;
+  }
+
+  public boolean getIncrementalChunkList() {
+    return this.incrementalChunkList;
   }
 
   public boolean isStreamReadBlock() {

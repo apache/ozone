@@ -56,10 +56,10 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -178,13 +178,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean shouldDeleteRatisLogDirectory;
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
+  private final HddsDatanodeService datanodeService;
 
-  private XceiverServerRatis(DatanodeDetails dd,
+  private XceiverServerRatis(HddsDatanodeService hddsDatanodeService, DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
       StateContext context, ConfigurationSource conf, Parameters parameters)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "DatanodeDetails == null");
+    datanodeService = hddsDatanodeService;
     datanodeDetails = dd;
     ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
@@ -242,7 +244,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return new ContainerStateMachine(gid, dispatcher, containerController,
+    return new ContainerStateMachine(datanodeService, gid, dispatcher, containerController,
         chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
@@ -522,14 +524,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .valueOf(pendingRequestsMegaBytesLimit, TraditionalBinaryPrefix.MEGA));
   }
 
-  public static XceiverServerRatis newXceiverServerRatis(
+  public static XceiverServerRatis newXceiverServerRatis(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
 
-    return new XceiverServerRatis(datanodeDetails, dispatcher,
+    return new XceiverServerRatis(hddsDatanodeService, datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);
   }
 
@@ -542,14 +544,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      KeyStoresFactory managerFactory =
-          caClient.getServerKeyStoresFactory();
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          managerFactory.getKeyManagers()[0],
-          managerFactory.getTrustManagers()[0], true);
+          caClient.getKeyManager(),
+          caClient.getTrustManager(), true);
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
-          managerFactory.getKeyManagers()[0],
-          managerFactory.getTrustManagers()[0], false);
+          caClient.getKeyManager(),
+          caClient.getTrustManager(), false);
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 
@@ -594,6 +594,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
+        LOG.info("Stopping {} {}", getClass().getSimpleName(), server.getId());
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();

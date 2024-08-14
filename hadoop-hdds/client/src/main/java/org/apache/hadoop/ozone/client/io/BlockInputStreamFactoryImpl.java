@@ -92,9 +92,9 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo.getBlockID(), blockInfo.getLength(),
           pipeline, token, xceiverFactory, refreshFunction, config);
     } else {
-      return new BlockInputStream(
-          blockInfo.getBlockID(), blockInfo.getLength(),
-          pipeline, token, xceiverFactory, refreshFunction, config);
+      return new BlockInputStream(blockInfo,
+          pipeline, token, xceiverFactory, refreshFunction,
+          config);
     }
   }
 

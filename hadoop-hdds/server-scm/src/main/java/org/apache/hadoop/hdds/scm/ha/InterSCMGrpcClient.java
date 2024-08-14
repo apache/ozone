@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCh
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
@@ -68,16 +67,14 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
             TimeUnit.MILLISECONDS);
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .proxyDetector(uri -> null);
     SecurityConfig securityConfig = new SecurityConfig(conf);
     if (securityConfig.isSecurityEnabled()
         && securityConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslClientContextBuilder = SslContextBuilder.forClient();
-      KeyStoresFactory keyStoreFactory =
-          scmCertificateClient.getClientKeyStoresFactory();
-      sslClientContextBuilder.keyManager(keyStoreFactory.getKeyManagers()[0]);
-      sslClientContextBuilder.trustManager(
-          keyStoreFactory.getTrustManagers()[0]);
+      sslClientContextBuilder.keyManager(scmCertificateClient.getKeyManager());
+      sslClientContextBuilder.trustManager(scmCertificateClient.getTrustManager());
       SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
           sslClientContextBuilder, securityConfig.getGrpcSslProvider());
       channelBuilder.sslContext(sslContextBuilder.build())

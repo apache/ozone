@@ -115,7 +115,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
           createErrorOMResponse(responseBuilder, e), -1);
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.UPGRADE_FINALIZE,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_FINALIZE,
         new HashMap<>(), exception, userInfo));
     return response;
   }

@@ -41,7 +41,6 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
-import org.bouncycastle.pkcs.PKCSException;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,8 +49,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,14 +91,10 @@ public class TestDefaultProfile {
 
   /**
    * Test valid keys are validated correctly.
-   *
-   * @throws SCMSecurityException      - on Error.
-   * @throws PKCSException             - on Error.
-   * @throws OperatorCreationException - on Error.
    */
   @Test
-  public void testVerifyCertificate() throws SCMSecurityException,
-      PKCSException, OperatorCreationException {
+  public void testVerifyCertificate() throws Exception {
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
@@ -112,7 +105,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
     assertTrue(approver.verifyPkcs10Request(csr));
   }
 
@@ -121,20 +115,13 @@ public class TestDefaultProfile {
 
   /**
    * Test invalid keys fail in the validation.
-   *
-   * @throws SCMSecurityException      - on Error.
-   * @throws PKCSException             - on Error.
-   * @throws OperatorCreationException - on Error.
-   * @throws NoSuchProviderException   - on Error.
-   * @throws NoSuchAlgorithmException  - on Error.
    */
   @Test
-  public void testVerifyCertificateInvalidKeys() throws SCMSecurityException,
-      PKCSException, OperatorCreationException,
-      NoSuchProviderException, NoSuchAlgorithmException {
+  public void testVerifyCertificateInvalidKeys() throws Exception {
     KeyPair newKeyPair = new HDDSKeyGenerator(securityConfig).generateKey();
     KeyPair wrongKey = new KeyPair(keyPair.getPublic(),
         newKeyPair.getPrivate());
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
@@ -144,7 +131,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(wrongKey)
-        .build();
+        .build()
+        .generateCSR();
     // Signature verification should fail here, since the public/private key
     // does not match.
     assertFalse(approver.verifyPkcs10Request(csr));
@@ -152,13 +140,10 @@ public class TestDefaultProfile {
 
   /**
    * Tests that normal valid extensions work with the default profile.
-   *
-   * @throws SCMSecurityException      - on Error.
-   * @throws PKCSException             - on Error.
-   * @throws OperatorCreationException - on Error.
    */
   @Test
-  public void testExtensions() throws SCMSecurityException {
+  public void testExtensions() throws Exception {
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("192.10.234.6")
@@ -168,7 +153,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
     assertTrue(approver.verfiyExtensions(csr));
   }
 
@@ -180,7 +166,8 @@ public class TestDefaultProfile {
    */
 
   @Test
-  public void testInvalidExtensionsWithCA() throws SCMSecurityException {
+  public void testInvalidExtensionsWithCA() throws Exception {
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("192.10.234.6")
@@ -190,7 +177,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
     assertFalse(approver.verfiyExtensions(csr));
   }
 

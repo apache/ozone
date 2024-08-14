@@ -438,6 +438,7 @@ public final class HddsUtils {
     case PutSmallFile:
     case StreamInit:
     case StreamWrite:
+    case FinalizeBlock:
       return false;
     case Echo:
       return proto.getEcho().hasReadOnly() && proto.getEcho().getReadOnly();
@@ -480,6 +481,7 @@ public final class HddsUtils {
     case ReadChunk:
     case ReadBlock:
     case WriteChunk:
+    case FinalizeBlock:
       return true;
     default:
       return false;
@@ -562,6 +564,11 @@ public final class HddsUtils {
     case WriteChunk:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
+      }
+      break;
+    case FinalizeBlock:
+      if (msg.hasFinalizeBlock()) {
+        blockID = msg.getFinalizeBlock().getBlockID();
       }
       break;
     default:

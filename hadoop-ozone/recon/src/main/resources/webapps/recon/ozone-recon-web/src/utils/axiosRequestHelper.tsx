@@ -48,11 +48,11 @@ export const AxiosPutHelper = (
   }
 }
 
-export const AxiosAllGetHelper = (
+export const PromiseAllSettledGetHelper = (
   urls: string[],
   controller: AbortController,
   message: string = ''
-): { requests: Promise<AxiosResponse<any, any>[]>; controller: AbortController } => {
+): { requests: Promise<PromiseSettledResult<AxiosResponse<any, any>>[]>; controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
@@ -64,7 +64,7 @@ export const AxiosAllGetHelper = (
   });
 
   return {
-    requests: axios.all(axiosGetRequests),
+    requests: Promise.allSettled(axiosGetRequests),
     controller: controller
   }
 }

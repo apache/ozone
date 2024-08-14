@@ -24,16 +24,8 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -42,10 +34,6 @@ import java.util.concurrent.ExecutionException;
 class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   // A reference to the pool of buffers holding the data
   private final BufferPool bufferPool;
-
-  // future Map to hold up all putBlock futures
-  private final ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>>
-      futureMap = new ConcurrentHashMap<>();
 
   CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
     super(xceiverClient);
@@ -59,37 +47,17 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
       acked += buffer.position();
       bufferPool.releaseBuffer(buffer);
     }
-    final long totalLength = addAckDataLength(acked);
-    // When putBlock is called, a future is added.
-    // When putBlock is replied, the future is removed below.
-    // Therefore, the removed future should not be null.
-    final CompletableFuture<ContainerCommandResponseProto> removed =
-        futureMap.remove(totalLength);
-    Objects.requireNonNull(removed, () -> "Future not found for "
-        + totalLength + ": existing = " + futureMap.keySet());
-  }
+    // TODO move the flush future map to BOS:
+    //  When there are concurrent watchForCommits, there's no guarantee of the order of execution
+    //  and the following logic to address the flushed length become irrelevant.
+    //  The flush future should be handled by BlockOutputStream and use the flushIndex which is a result of
+    //  executePutBlock.
 
-  @VisibleForTesting
-  ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>> getFutureMap() {
-    return futureMap;
-  }
-
-  public void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
-    futureMap.compute(flushPos,
-        (key, previous) -> previous == null ? flushFuture :
-            previous.thenCombine(flushFuture, (prev, curr) -> curr));
-  }
-
-
-  public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    // wait for all the transactions to complete
-    CompletableFuture.allOf(futureMap.values().toArray(
-        new CompletableFuture[0])).get();
+    addAckDataLength(acked);
   }
 
   @Override
   public void cleanup() {
     super.cleanup();
-    futureMap.clear();
   }
 }
