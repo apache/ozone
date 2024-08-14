@@ -195,6 +195,7 @@ public class BlockOutputStream extends OutputStream {
     // EC does not support incremental chunk list.
     this.supportIncrementalChunkList = config.getIncrementalChunkList() &&
         this instanceof RatisBlockOutputStream && allDataNodesSupportPiggybacking();
+    LOG.debug("incrementalChunkList is {}", supportIncrementalChunkList);
     if (supportIncrementalChunkList) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
       this.lastChunkBuffer = DIRECT_BUFFER_POOL.getBuffer(config.getStreamBufferSize());
@@ -231,12 +232,14 @@ public class BlockOutputStream extends OutputStream {
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
             allDataNodesSupportPiggybacking();
+    LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
   }
 
   private boolean allDataNodesSupportPiggybacking() {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
+      LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
       if (dn.getCurrentVersion() <
               COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
         return false;
