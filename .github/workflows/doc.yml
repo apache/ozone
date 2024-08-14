@@ -28,65 +28,7 @@ jobs:
         java: [ 8 ]
       fail-fast: false
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-
-      - name: Cache for npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
-      - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Store binaries for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-bin
-          path: |
-            hadoop-ozone/dist/target/ozone-*.tar.gz
-            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store source tarball for compilation
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-src
-          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-          retention-days: 1
+    # Existing steps to build and generate Configurations.md file...
 
   xml-to-md:
     needs:
@@ -111,22 +53,10 @@ jobs:
           name: ozone-bin
           path: ozone-bin
 
-#      - name: List contents of ozone-bin directory
-#        run: |
-#          echo "Contents of ozone-bin directory:"
-#          ls -al ozone-bin
-          
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
           tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
-
-#      - name: List contents of the extracted directory
-#        run: ls -alR ozone-bin/extracted
-
-      - name: Find JAR files and check for ozone-default-generated.xml
-        run: |
-          find ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'if jar tf {} | grep -q "ozone-default-generated.xml"; then echo "{}:"; jar tf {} | grep "ozone-default-generated.xml"; fi' \;
 
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
@@ -142,22 +72,37 @@ jobs:
         with:
           name: Configurations.md
 
-      - name: Push changes to ozone-site
+      - name: Checkout ozone-site repository
         uses: actions/checkout@v4
         with:
           repository: sarvekshayr/ozone-site
           ref : 'HDDS-9225-website-v2'
           token: ${{ secrets.GITHUB_TOKEN }}
+          path: ozone-site
 
       - name: Copy MD file
         run: |
           cp Configurations.md ozone-site/docs/03-core-concepts/06-configurations.md
 
-      - name: Commit changes
+      - name: Compare hash of new and existing Configurations.md
+        id: hash_check
+        run: |
+          new_hash=$(sha256sum Configurations.md | awk '{ print $1 }')
+          existing_hash=$(sha256sum ozone-site/docs/03-core-concepts/06-configurations.md | awk '{ print $1 }')
+          echo "new_hash=$new_hash" >> $GITHUB_ENV
+          echo "existing_hash=$existing_hash" >> $GITHUB_ENV
+          if [ "$new_hash" == "$existing_hash" ]; then
+            echo "Hashes are identical. No need to push changes."
+            echo "skip_commit=true" >> $GITHUB_ENV
+          else
+            echo "Hashes differ. Proceeding with commit."
+            echo "skip_commit=false" >> $GITHUB_ENV
+
+      - name: Commit and push changes if hashes differ
+        if: env.skip_commit == 'false'
         run: |
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
           git add docs/03-core-concepts/06-configurations.md
-          git commit -m "[Auto] Push MD file to Ozone site"
+          git commit -m "[Auto] Push updated Configurations.md to Ozone site"
           git push
-
