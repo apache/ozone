@@ -105,6 +105,12 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-pip
 
+      - name: Download the source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-bin
+          path: ozone-bin
+
       - name: Extract the source tarball
         run: |
           mkdir -p ozone-bin/extracted
