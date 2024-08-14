@@ -148,14 +148,12 @@ jobs:
           repository: sarvekshayr/ozone-site
           ref : 'HDDS-9225-website-v2'
           token: ${{ secrets.GITHUB_TOKEN }}
-          path: ozone-site
 
       - name: Copy MD file
         run: |
           cp Configurations.md ozone-site/docs/03-core-concepts/06-configurations.md
 
       - name: Commit changes
-        working-directory: ozone-site
         run: |
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
