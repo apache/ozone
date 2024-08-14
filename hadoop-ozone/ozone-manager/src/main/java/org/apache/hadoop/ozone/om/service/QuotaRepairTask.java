@@ -184,7 +184,11 @@ public class QuotaRepairTask {
     }
 
     // update volume to support quota
-    builder.setSupportVolumeOldQuota(true);
+    if (buckets.isEmpty()) {
+      builder.setSupportVolumeOldQuota(true);
+    } else {
+      builder.setSupportVolumeOldQuota(false);
+    }
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitRequest(
