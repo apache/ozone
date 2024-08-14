@@ -116,10 +116,6 @@ jobs:
           mkdir -p ozone-bin/extracted
           tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
 
-      - name: Find JAR files and check for ozone-default-generated.xml
-        run: |
-          find ozone-bin/extracted/ozone-*-SNAPSHOT/share/ozone/lib -name "*.jar" -exec sh -c 'if jar tf {} | grep -q "ozone-default-generated.xml"; then echo "{}:"; jar tf {} | grep "ozone-default-generated.xml"; fi' \;
-
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py
 
@@ -139,6 +135,6 @@ jobs:
         run: |
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
-          git add docs/03-core-concepts/06-configurations.md
+          git add ozone-site/docs/03-core-concepts/06-configurations.md
           git commit -m "[Auto] Push MD file to Ozone site"
           git push

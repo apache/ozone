@@ -1,19 +1,11 @@
 import os
 import re
-import fnmatch
 import zipfile
 import xml.etree.ElementTree as ET
 from collections import namedtuple
 from pathlib import Path
 
 Property = namedtuple('Property', ['name', 'value', 'tag', 'description'])
-
-def find_jar_files(base_path):
-    jar_files = []
-    for root, dirs, files in os.walk(base_path):
-        for filename in fnmatch.filter(files, '*.jar'):
-            jar_files.append(os.path.join(root, filename))
-    return jar_files
 
 def extract_xml_from_jar(jar_path, xml_filename):
     xml_files = []
@@ -79,13 +71,13 @@ def main():
     extract_path = os.path.join(snapshot_dir, 'share', 'ozone', 'lib')
     xml_filename = 'ozone-default-generated.xml'
 
-    jar_files = find_jar_files(extract_path)
     property_map = {}
-
-    for jar_file in jar_files:
-        xml_contents = extract_xml_from_jar(jar_file, xml_filename)
-        for xml_content in xml_contents:
-            property_map.update(parse_xml_file(xml_content))
+    for file_name in os.listdir(extract_path):
+        if file_name.endswith('.jar'):
+            jar_path = os.path.join(extract_path, file_name)
+            xml_contents = extract_xml_from_jar(jar_path, xml_filename)
+            for xml_content in xml_contents:
+                property_map.update(parse_xml_file(xml_content))
 
     markdown_content = generate_markdown(property_map)
     output_path = Path("hadoop-hdds/docs/content/tools/Configurations.md")
