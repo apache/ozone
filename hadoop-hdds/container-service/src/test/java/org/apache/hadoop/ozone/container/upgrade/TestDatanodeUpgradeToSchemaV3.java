@@ -314,7 +314,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
         new ScmTestMock(CLUSTER_ID), address, 10);
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
-    //startPreFinalizedDatanode();
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
