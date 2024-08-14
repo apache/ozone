@@ -167,6 +167,7 @@ jobs:
           else
             echo "Hashes differ. Proceeding with commit."
             echo "skip_commit=false" >> $GITHUB_ENV
+          fi
 
       - name: Commit and push changes if hashes differ
         if: env.skip_commit == 'false'
