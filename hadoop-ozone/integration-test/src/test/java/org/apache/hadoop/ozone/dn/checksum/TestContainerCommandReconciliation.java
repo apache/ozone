@@ -137,9 +137,8 @@ public class TestContainerCommandReconciliation {
     List<DatanodeDetails> datanodeDetails = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails).collect(Collectors.toList());
     for (DatanodeDetails dn: datanodeDetails) {
-      ByteString merkleTree = dnClient.getContainerMerkleTree(container.getContainerID(), dn);
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
-          ContainerProtos.ContainerChecksumInfo.parseFrom(merkleTree);
+          dnClient.getContainerChecksumInfo(container.getContainerID(), dn);
       assertTreesSortedAndMatch(tree.toProto(), containerChecksumInfo.getContainerMerkleTree());
     }
   }

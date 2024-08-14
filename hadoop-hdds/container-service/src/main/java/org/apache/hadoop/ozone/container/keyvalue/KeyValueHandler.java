@@ -294,7 +294,7 @@ public class KeyValueHandler extends Handler {
       return handler.handleFinalizeBlock(request, kvContainer);
     case Echo:
       return handler.handleEcho(request, kvContainer);
-    case GetContainerMerkleTree:
+    case GetContainerChecksumInfo:
       return handler.handleGetContainerMerkleTree(request, kvContainer);
     default:
       return null;
@@ -646,7 +646,7 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleGetContainerMerkleTree(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
 
-    if (!request.hasGetContainerMerkleTree()) {
+    if (!request.hasGetContainerChecksumInfo()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Read Container Merkle tree request. trace ID: {}",
             request.getTraceID());

@@ -143,8 +143,14 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
+  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  }
+
+  @VisibleForTesting
+  public static File getTmpContainerChecksumFile(ContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
   }
 
   private Lock getReadLock(long containerID) {
@@ -202,10 +208,6 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public static File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
-  }
-
   public ByteString getContainerChecksumInfo(KeyValueContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
@@ -228,10 +230,6 @@ public class ContainerChecksumTreeManager {
     } finally {
       readLock.unlock();
     }
-  }
-
-  public static File getTmpContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
   }
 
   @VisibleForTesting

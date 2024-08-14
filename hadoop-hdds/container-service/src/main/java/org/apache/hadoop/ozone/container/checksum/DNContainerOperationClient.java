@@ -43,9 +43,12 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Optional;
 
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * This class wraps necessary container-level rpc calls for container reconciliation.
@@ -89,16 +92,16 @@ public class DNContainerOperationClient implements AutoCloseable {
     return xceiverClientManager;
   }
 
-  public ByteString getContainerMerkleTree(long containerId, DatanodeDetails dn)
+  public ContainerProtos.ContainerChecksumInfo getContainerChecksumInfo(long containerId, DatanodeDetails dn)
       throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(createSingleNodePipeline(dn));
     try {
       String containerToken = encode(tokenHelper.getContainerToken(
           ContainerID.valueOf(containerId)));
-      ContainerProtos.GetContainerMerkleTreeResponseProto response =
-          ContainerProtocolCalls.getContainerMerkleTree(xceiverClient,
+      ContainerProtos.GetContainerChecksumInfoResponseProto response =
+          ContainerProtocolCalls.getContainerChecksumInfo(xceiverClient,
               containerId, containerToken);
-      return response.getContainerMerkleTree();
+      return ContainerProtos.ContainerChecksumInfo.parseFrom(response.getContainerChecksumInfo());
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }

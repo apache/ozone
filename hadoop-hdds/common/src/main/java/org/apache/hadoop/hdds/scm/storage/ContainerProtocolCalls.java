@@ -773,10 +773,10 @@ public final class ContainerProtocolCalls  {
    * @param containerID - Container Id of the container
    * @param encodedContainerID - Encoded token if security is enabled
    */
-  public static ContainerProtos.GetContainerMerkleTreeResponseProto getContainerMerkleTree(
+  public static ContainerProtos.GetContainerChecksumInfoResponseProto getContainerChecksumInfo(
       XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
-    ContainerProtos.GetContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
-        ContainerProtos.GetContainerMerkleTreeRequestProto
+    ContainerProtos.GetContainerChecksumInfoRequestProto containerChecksumRequestProto =
+        ContainerProtos.GetContainerChecksumInfoRequestProto
             .newBuilder()
             .setContainerID(containerID)
             .build();
@@ -784,10 +784,10 @@ public final class ContainerProtocolCalls  {
 
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(Type.GetContainerMerkleTree)
+        .setCmdType(Type.GetContainerChecksumInfo)
         .setContainerID(containerID)
         .setDatanodeUuid(id)
-        .setGetContainerMerkleTree(containerMerkleTreeRequestProto);
+        .setGetContainerChecksumInfo(containerChecksumRequestProto);
     if (encodedContainerID != null) {
       builder.setEncodedToken(encodedContainerID);
     }
@@ -796,9 +796,8 @@ public final class ContainerProtocolCalls  {
       builder.setTraceID(traceId);
     }
     ContainerCommandRequestProto request = builder.build();
-    ContainerCommandResponseProto response =
-        client.sendCommand(request, getValidatorList());
-    return response.getGetContainerMerkleTree();
+    ContainerCommandResponseProto response = client.sendCommand(request, getValidatorList());
+    return response.getGetContainerChecksumInfo();
   }
 
   /**

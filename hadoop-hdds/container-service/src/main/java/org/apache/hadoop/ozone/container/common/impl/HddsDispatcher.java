@@ -830,7 +830,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case StreamInit       : return DNAction.STREAM_INIT;
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
-    case GetContainerMerkleTree : return DNAction.GET_CONTAINER_MERKLE_TREE;
+    case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;
