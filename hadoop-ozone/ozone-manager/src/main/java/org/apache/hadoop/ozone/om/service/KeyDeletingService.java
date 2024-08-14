@@ -187,12 +187,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
 
-        // Acquire active DB deletedTable write lock because of the
-        // deletedTable read-write here to avoid interleaving with
-        // the table range delete operation in createOmSnapshotCheckpoint()
-        // that is called from OMSnapshotCreateResponse#addToDBBatch.
-        manager.getMetadataManager().getTableLock(
-            OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -214,10 +208,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
-        } finally {
-          // Release deletedTable write lock
-          manager.getMetadataManager().getTableLock(
-              OmMetadataManagerImpl.DELETED_TABLE).writeLock().unlock();
         }
 
         try {

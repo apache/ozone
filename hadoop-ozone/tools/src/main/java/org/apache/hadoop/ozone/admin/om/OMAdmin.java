@@ -53,6 +53,7 @@ import java.util.Collection;
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         FinalizeUpgradeSubCommand.class,
+        ListOpenFilesSubCommand.class,
         GetServiceRolesSubcommand.class,
         PrepareSubCommand.class,
         CancelPrepareSubCommand.class,

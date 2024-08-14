@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
-import org.rocksdb.SstFileReader;
 import org.rocksdb.TableProperties;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -90,9 +89,9 @@ public final class RocksDiffUtils {
 
     try (
         ManagedOptions options = new ManagedOptions();
-        ManagedSstFileReader sstFileReader = ManagedSstFileReader.managed(new SstFileReader(options))) {
-      sstFileReader.get().open(filepath);
-      TableProperties properties = sstFileReader.get().getTableProperties();
+        ManagedSstFileReader sstFileReader = new ManagedSstFileReader(options)) {
+      sstFileReader.open(filepath);
+      TableProperties properties = sstFileReader.getTableProperties();
       String tableName = new String(properties.getColumnFamilyName(), UTF_8);
       if (tableToPrefixMap.containsKey(tableName)) {
         String prefix = tableToPrefixMap.get(tableName);
@@ -100,7 +99,7 @@ public final class RocksDiffUtils {
         try (
             ManagedReadOptions readOptions = new ManagedReadOptions();
             ManagedSstFileReaderIterator iterator = ManagedSstFileReaderIterator.managed(
-                sstFileReader.get().newIterator(readOptions))) {
+                sstFileReader.newIterator(readOptions))) {
           iterator.get().seek(prefix.getBytes(UTF_8));
           String seekResultKey = new String(iterator.get().key(), UTF_8);
           return seekResultKey.startsWith(prefix);

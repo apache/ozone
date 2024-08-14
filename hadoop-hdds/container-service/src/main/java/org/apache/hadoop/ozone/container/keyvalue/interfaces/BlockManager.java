@@ -58,8 +58,8 @@ public interface BlockManager {
    * @return Block Data.
    * @throws IOException when BcsId is unknown or mismatched
    */
-  BlockData getBlock(Container container, BlockID blockID)
-      throws IOException;
+  BlockData getBlock(Container container, BlockID blockID) throws IOException;
+
 
   /**
    * Deletes an existing block.
@@ -89,6 +89,9 @@ public interface BlockManager {
    * @throws IOException in case, the block key does not exist in db.
    */
   long getCommittedBlockLength(Container container, BlockID blockID)
+      throws IOException;
+
+  void finalizeBlock(Container container, BlockID blockId)
       throws IOException;
 
   int getDefaultReadBufferCapacity();

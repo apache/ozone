@@ -238,6 +238,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
@@ -297,6 +298,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     assertEquals(FileSystem.getFileSystemClass(
         OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader), RootedOzoneFileSystem.class);
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(rootPath + "user/" + USER1),
+        userOfs.getHomeDirectory());
   }
 
   @Test

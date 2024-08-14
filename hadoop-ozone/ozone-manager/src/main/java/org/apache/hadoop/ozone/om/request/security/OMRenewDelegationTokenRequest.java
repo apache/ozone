@@ -85,7 +85,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       // Call OM to renew token
       renewTime = ozoneManager.renewDelegationToken(token);
     } catch (IOException ioe) {
-      auditLog(auditLogger,
+      markForAudit(auditLogger,
           buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,
               request.getUserInfo()));
       throw ioe;
@@ -181,7 +181,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     }
 
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, exception,
             getOmRequest().getUserInfo()));
 

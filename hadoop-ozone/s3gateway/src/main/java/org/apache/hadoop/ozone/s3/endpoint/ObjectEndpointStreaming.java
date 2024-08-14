@@ -122,11 +122,12 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      DigestInputStream body, PerformanceStringBuilder perf, long startNanos)
+      DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
+      Map<String, String> tags)
       throws IOException {
     long writeLen;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata)) {
+        length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);

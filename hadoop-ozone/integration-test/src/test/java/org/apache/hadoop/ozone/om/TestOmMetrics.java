@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.util.Lists;
@@ -359,7 +360,7 @@ public class TestOmMetrics {
 
     omMetrics = getMetrics("OMMetrics");
 
-    assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 8, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
@@ -425,7 +426,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeyOps + 28, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 31, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
@@ -857,6 +858,11 @@ public class TestOmMetrics {
       writeClient.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
+
+    try {
+      writeClient.listOpenFiles("", 100, "");
+    } catch (IOException ignored) {
+    }
   }
 
   private OmKeyArgs createKeyArgs(String volumeName, String bucketName,
@@ -875,6 +881,7 @@ public class TestOmMetrics {
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .setReplicationConfig(repConfig)
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
   }
 

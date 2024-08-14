@@ -45,7 +45,6 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -95,9 +94,6 @@ public class StateContext {
   @VisibleForTesting
   static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
-  @VisibleForTesting
-  static final String CRL_STATUS_REPORT_PROTO_NAME =
-      CRLStatusReport.getDescriptor().getFullName();
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
@@ -112,7 +108,6 @@ public class StateContext {
   private final AtomicReference<Message> containerReports;
   private final AtomicReference<Message> nodeReport;
   private final AtomicReference<Message> pipelineReports;
-  private final AtomicReference<Message> crlStatusReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
@@ -157,6 +152,8 @@ public class StateContext {
 
   private final String threadNamePrefix;
 
+  private RunningDatanodeState runningDatanodeState;
+
   /**
    * Constructs a StateContext.
    *
@@ -179,7 +176,6 @@ public class StateContext {
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
-    crlStatusReport = new AtomicReference<>(); // Certificate Revocation List
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -204,8 +200,6 @@ public class StateContext {
     type2Reports.put(NODE_REPORT_PROTO_NAME, nodeReport);
     fullReportTypeList.add(PIPELINE_REPORTS_PROTO_NAME);
     type2Reports.put(PIPELINE_REPORTS_PROTO_NAME, pipelineReports);
-    fullReportTypeList.add(CRL_STATUS_REPORT_PROTO_NAME);
-    type2Reports.put(CRL_STATUS_REPORT_PROTO_NAME, crlStatusReport);
   }
 
   /**
@@ -620,9 +614,11 @@ public class StateContext {
           parentDatanodeStateMachine.getConnectionManager(),
           this);
     case RUNNING:
-      return new RunningDatanodeState(this.conf,
-          parentDatanodeStateMachine.getConnectionManager(),
-          this);
+      if (runningDatanodeState == null) {
+        runningDatanodeState = new RunningDatanodeState(this.conf,
+            parentDatanodeStateMachine.getConnectionManager(), this);
+      }
+      return runningDatanodeState;
     case SHUTDOWN:
       return null;
     default:
@@ -662,7 +658,11 @@ public class StateContext {
     // Adding not null check, in a case where datanode is still starting up, but
     // we called stop DatanodeStateMachine, this sets state to SHUTDOWN, and
     // there is a chance of getting task as null.
-    if (task != null) {
+    if (task == null) {
+      return;
+    }
+
+    try {
       if (this.isEntering()) {
         task.onEnter();
       }
@@ -699,6 +699,8 @@ public class StateContext {
         // that we can terminate the datanode.
         setShutdownOnError();
       }
+    } finally {
+      task.clear();
     }
   }
 
@@ -951,11 +953,6 @@ public class StateContext {
   @VisibleForTesting
   public Message getPipelineReports() {
     return pipelineReports.get();
-  }
-
-  @VisibleForTesting
-  public Message getCRLStatusReport() {
-    return crlStatusReport.get();
   }
 
   public void configureReconHeartbeatFrequency() {

@@ -46,11 +46,13 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -89,7 +91,7 @@ public class KeyOutputStream extends OutputStream
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -105,6 +107,8 @@ public class KeyOutputStream extends OutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+  private ContainerClientMetrics clientMetrics;
+  private OzoneManagerVersion ozoneManagerVersion;
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -154,6 +158,8 @@ public class KeyOutputStream extends OutputStream
     this.clientID = b.getOpenHandler().getId();
     this.atomicKeyCreation = b.getAtomicKeyCreation();
     this.streamBufferArgs = b.getStreamBufferArgs();
+    this.clientMetrics = b.getClientMetrics();
+    this.ozoneManagerVersion = b.ozoneManagerVersion;
   }
 
   /**
@@ -192,7 +198,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -205,8 +211,10 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    synchronized (this) {
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -282,7 +290,7 @@ public class KeyOutputStream extends OutputStream
    * @param exception   actual exception that occurred
    * @throws IOException Throws IOException if Write fails
    */
-  private void handleException(BlockOutputStreamEntry streamEntry,
+  private synchronized void handleException(BlockOutputStreamEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
@@ -358,7 +366,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  private void markStreamClosed() {
+  private synchronized void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
   }
@@ -432,7 +440,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -443,7 +451,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -452,12 +460,22 @@ public class KeyOutputStream extends OutputStream
       throw new UnsupportedOperationException("The replication factor = "
           + replication.getRequiredNodes() + " <= 1");
     }
+    if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      throw new UnsupportedOperationException("Hsync API requires OM version "
+          + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+          + ozoneManagerVersion);
+    }
     checkNotClosed();
     final long hsyncPos = writeOffset;
+
     handleFlushOrClose(StreamAction.HSYNC);
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+
+    synchronized (this) {
+      Preconditions.checkState(offset >= hsyncPos,
+          "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
+          () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
+    }
   }
 
   /**
@@ -556,7 +574,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  public synchronized OmMultipartCommitUploadPartInfo
+  synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
@@ -589,6 +607,7 @@ public class KeyOutputStream extends OutputStream
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
+    private OzoneManagerVersion ozoneManagerVersion;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -711,6 +730,15 @@ public class KeyOutputStream extends OutputStream
       return executorServiceSupplier;
     }
 
+    public Builder setOmVersion(OzoneManagerVersion omVersion) {
+      this.ozoneManagerVersion = omVersion;
+      return this;
+    }
+
+    public OzoneManagerVersion getOmVersion() {
+      return ozoneManagerVersion;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(this);
     }
@@ -722,7 +750,7 @@ public class KeyOutputStream extends OutputStream
    * the last state of the volatile {@link #closed} field.
    * @throws IOException if the connection is closed.
    */
-  private void checkNotClosed() throws IOException {
+  private synchronized void checkNotClosed() throws IOException {
     if (closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "

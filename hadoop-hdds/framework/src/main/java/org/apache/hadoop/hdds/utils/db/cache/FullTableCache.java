@@ -19,16 +19,20 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -54,7 +58,8 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
   private final NavigableMap<Long, Set<CacheKey<KEY>>> epochEntries;
-  private final ExecutorService executorService;
+  private final ScheduledExecutorService executorService;
+  private final Queue<Long> epochCleanupQueue = new ConcurrentLinkedQueue<>();
 
   private final ReadWriteLock lock;
 
@@ -82,8 +87,8 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + "FullTableCache-Cleanup-%d")
         .build();
-    executorService = Executors.newSingleThreadExecutor(threadFactory);
-
+    executorService = Executors.newScheduledThreadPool(1, threadFactory);
+    executorService.scheduleWithFixedDelay(() -> cleanupTask(), 0, 1000L, TimeUnit.MILLISECONDS);
     statsRecorder = new CacheStatsRecorder();
   }
 
@@ -111,18 +116,31 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @Override
   public void put(CacheKey<KEY> cacheKey, CacheValue<VALUE> value) {
     try {
-      lock.writeLock().lock();
+      lock.readLock().lock();
       cache.put(cacheKey, value);
-      epochEntries.computeIfAbsent(value.getEpoch(),
-          v -> new CopyOnWriteArraySet<>()).add(cacheKey);
+      // add in case of null value for cleanup purpose only when key is deleted
+      if (value.getCacheValue() == null) {
+        epochEntries.computeIfAbsent(value.getEpoch(),
+            v -> new CopyOnWriteArraySet<>()).add(cacheKey);
+      }
     } finally {
-      lock.writeLock().unlock();
+      lock.readLock().unlock();
     }
   }
 
   @Override
   public void cleanup(List<Long> epochs) {
-    executorService.execute(() -> evictCache(epochs));
+    epochCleanupQueue.clear();
+    epochCleanupQueue.addAll(epochs);
+  }
+
+  private void cleanupTask() {
+    if (epochCleanupQueue.isEmpty()) {
+      return;
+    }
+    ArrayList<Long> epochList = new ArrayList<>(epochCleanupQueue);
+    epochCleanupQueue.removeAll(epochList);
+    evictCache(epochList);
   }
 
   @Override
@@ -139,45 +157,48 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @VisibleForTesting
   @Override
   public void evictCache(List<Long> epochs) {
+    // when no delete entries, can exit immediately
+    if (epochEntries.isEmpty()) {
+      return;
+    }
+
     Set<CacheKey<KEY>> currentCacheKeys;
     CacheKey<KEY> cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
-    for (long currentEpoch : epochEntries.keySet()) {
-      currentCacheKeys = epochEntries.get(currentEpoch);
+    // Acquire lock to avoid race between cleanup and add to cache entry by
+    // client requests.
+    try {
+      lock.writeLock().lock();
+      for (long currentEpoch : epochEntries.keySet()) {
+        currentCacheKeys = epochEntries.get(currentEpoch);
 
-      // If currentEntry epoch is greater than last epoch provided, we have
-      // deleted all entries less than specified epoch. So, we can break.
-      if (currentEpoch > lastEpoch) {
-        break;
-      }
+        // If currentEntry epoch is greater than last epoch provided, we have
+        // deleted all entries less than specified epoch. So, we can break.
+        if (currentEpoch > lastEpoch) {
+          break;
+        }
 
-      // Acquire lock to avoid race between cleanup and add to cache entry by
-      // client requests.
-      try {
-        lock.writeLock().lock();
-        if (epochs.contains(currentEpoch)) {
-          for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
-               iterator.hasNext();) {
-            cachekey = iterator.next();
-            cache.computeIfPresent(cachekey, ((k, v) -> {
-              // If cache epoch entry matches with current Epoch, remove entry
-              // from cache.
-              if (v.getCacheValue() == null && v.getEpoch() == currentEpoch) {
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                      k.getCacheKey(), currentEpoch);
-                }
-                return null;
+        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
+             iterator.hasNext();) {
+          cachekey = iterator.next();
+          cache.computeIfPresent(cachekey, ((k, v) -> {
+            // If cache epoch entry matches with current Epoch, remove entry
+            // from cache.
+            if (v.getCacheValue() == null && v.getEpoch() == currentEpoch) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                    k.getCacheKey(), currentEpoch);
               }
-              return v;
-            }));
-          }
+              return null;
+            }
+            return v;
+          }));
           // Remove epoch entry, as the entry is there in epoch list.
           epochEntries.remove(currentEpoch);
         }
-      } finally {
-        lock.writeLock().unlock();
       }
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 

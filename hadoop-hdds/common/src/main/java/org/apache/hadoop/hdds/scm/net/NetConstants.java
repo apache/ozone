@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
  * Class to hold network topology related constants and configurations.
@@ -32,11 +33,13 @@ public final class NetConstants {
   public static final String SCOPE_REVERSE_STR = "~";
   /** string representation of root. */
   public static final String ROOT = "";
+  public static final StringWithByteString BYTE_STRING_ROOT = StringWithByteString.valueOf(ROOT);
   public static final int INNER_NODE_COST_DEFAULT = 1;
   public static final int NODE_COST_DEFAULT = 0;
   public static final int ANCESTOR_GENERATION_DEFAULT = 0;
   public static final int ROOT_LEVEL = 1;
   public static final String DEFAULT_RACK = "/default-rack";
+  public static final StringWithByteString BYTE_STRING_DEFAULT_RACK = StringWithByteString.valueOf(DEFAULT_RACK);
   public static final String DEFAULT_NODEGROUP = "/default-nodegroup";
   public static final String DEFAULT_DATACENTER = "/default-datacenter";
   public static final String DEFAULT_REGION = "/default-dataregion";

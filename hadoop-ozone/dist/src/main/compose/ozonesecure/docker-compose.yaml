@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
 services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
     hostname: kdc
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -26,6 +26,7 @@ services:
   kms:
     image: apache/hadoop:${HADOOP_VERSION}
     hostname: kms
+    dns_search: .
     ports:
     - 9600:9600
     env_file:
@@ -38,6 +39,7 @@ services:
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: dn
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -52,6 +54,7 @@ services:
   om:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -66,8 +69,9 @@ services:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
   httpfs:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: httpfs
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -83,6 +87,7 @@ services:
   s3g:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -97,6 +102,7 @@ services:
   recon:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: recon
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -111,6 +117,7 @@ services:
   scm:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm
+    dns_search: .
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs

@@ -158,7 +158,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -686,9 +686,9 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
-      int count, BucketLayout bucketLayout) throws IOException {
+      int count, BucketLayout bucketLayout, Duration leaseThreshold) throws IOException {
     return metadataManager.getExpiredOpenKeys(expireThreshold, count,
-        bucketLayout);
+        bucketLayout, leaseThreshold);
   }
 
   @Override
@@ -1434,6 +1434,7 @@ public class KeyManagerImpl implements KeyManager {
         .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
         .setAcls(keyInfo.getAcls())
+        .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
   /**
@@ -2030,6 +2031,9 @@ public class KeyManagerImpl implements KeyManager {
           parentInfo.getObjectID())) {
         break;
       }
+      if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
+        continue;
+      }
       String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
           dirInfo.getName());
       OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
@@ -2063,6 +2067,9 @@ public class KeyManagerImpl implements KeyManager {
         if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
             parentInfo.getObjectID())) {
           break;
+        }
+        if (!metadataManager.getFileTable().isExist(entry.getKey())) {
+          continue;
         }
         fileInfo.setFileName(fileInfo.getKeyName());
         String fullKeyPath = OMFileRequest.getAbsolutePath(

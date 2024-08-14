@@ -356,6 +356,29 @@ public final class KeyValueContainerUtil {
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
     ContainerInspectorUtil.process(kvContainerData, store);
+
+    // Load finalizeBlockLocalIds for container in memory.
+    populateContainerFinalizeBlock(kvContainerData, store);
+  }
+
+  /**
+   * Loads finalizeBlockLocalIds for container in memory.
+   * @param kvContainerData - KeyValueContainerData
+   * @param store - DatanodeStore
+   * @throws IOException
+   */
+  private static void populateContainerFinalizeBlock(
+      KeyValueContainerData kvContainerData, DatanodeStore store)
+      throws IOException {
+    if (store.getFinalizeBlocksTable() != null) {
+      try (BlockIterator<Long> iter =
+               store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
+                   kvContainerData.getUnprefixedKeyFilter())) {
+        while (iter.hasNext()) {
+          kvContainerData.addToFinalizedBlockSet(iter.nextBlock());
+        }
+      }
+    }
   }
 
   /**

@@ -27,9 +27,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
@@ -78,28 +76,6 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           X509Certificate.class,
           X509CertificateCodec.get());
 
-  /**
-   * This column family is Deprecated in favor of REVOKED_CERTS_V2.
-   */
-  @Deprecated
-  public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
-      REVOKED_CERTS =
-      new DBColumnFamilyDefinition<>(
-          "revokedCerts",
-          BigInteger.class,
-          BigIntegerCodec.get(),
-          X509Certificate.class,
-          X509CertificateCodec.get());
-
-  public static final DBColumnFamilyDefinition<BigInteger, CertInfo>
-      REVOKED_CERTS_V2 =
-      new DBColumnFamilyDefinition<>(
-          "revokedCertsV2",
-          BigInteger.class,
-          BigIntegerCodec.get(),
-          CertInfo.class,
-          CertInfo.getCodec());
-
   public static final DBColumnFamilyDefinition<PipelineID, Pipeline>
       PIPELINES =
       new DBColumnFamilyDefinition<>(
@@ -126,23 +102,6 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           TransactionInfo.class,
           TransactionInfo.getCodec());
-
-  public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
-      new DBColumnFamilyDefinition<>(
-          "crls",
-          Long.class,
-          LongCodec.get(),
-          CRLInfo.class,
-          CRLInfo.getCodec());
-
-  public static final DBColumnFamilyDefinition<String, Long>
-      CRL_SEQUENCE_ID =
-      new DBColumnFamilyDefinition<>(
-          "crlSequenceId",
-          String.class,
-          StringCodec.get(),
-          Long.class,
-          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
@@ -187,14 +146,10 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           CONTAINERS,
-          CRLS,
-          CRL_SEQUENCE_ID,
           DELETED_BLOCKS,
           META,
           MOVE,
           PIPELINES,
-          REVOKED_CERTS,
-          REVOKED_CERTS_V2,
           SEQUENCE_ID,
           STATEFUL_SERVICE_CONFIG,
           TRANSACTIONINFO,

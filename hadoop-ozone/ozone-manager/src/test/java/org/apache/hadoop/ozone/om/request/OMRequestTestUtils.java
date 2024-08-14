@@ -993,7 +993,8 @@ public final class OMRequestTestUtils {
    */
   public static OMRequest createInitiateMPURequest(String volumeName,
       String bucketName, String keyName) {
-    return createInitiateMPURequest(volumeName, bucketName, keyName, Collections.emptyMap());
+    return createInitiateMPURequest(volumeName, bucketName, keyName, Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   /**
@@ -1004,7 +1005,8 @@ public final class OMRequestTestUtils {
    * @param metadata
    */
   public static OMRequest createInitiateMPURequest(String volumeName,
-      String bucketName, String keyName, Map<String, String> metadata) {
+      String bucketName, String keyName, Map<String, String> metadata,
+      Map<String, String> tags) {
     MultipartInfoInitiateRequest
         multipartInfoInitiateRequest =
         MultipartInfoInitiateRequest.newBuilder().setKeyArgs(
@@ -1013,6 +1015,7 @@ public final class OMRequestTestUtils {
                 .setKeyName(keyName)
                 .setBucketName(bucketName)
                 .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+                .addAllTags(KeyValueUtil.toProtobuf(tags))
             )
             .build();
 
@@ -1531,7 +1534,7 @@ public final class OMRequestTestUtils {
               OMRequestTestUtils.createOmDirectoryInfo(pathElement, ++objectId,
                       parentId);
       OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
-              volumeName, bucketName, txnID, omMetaMgr);
+              volumeName, bucketName, ++txnID, omMetaMgr);
       parentId = omDirInfo.getObjectID();
     }
     return parentId;

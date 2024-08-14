@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -107,6 +108,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs keyArgs = multipartUploadAbortRequest
         .getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -203,7 +205,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     }
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.ABORT_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 

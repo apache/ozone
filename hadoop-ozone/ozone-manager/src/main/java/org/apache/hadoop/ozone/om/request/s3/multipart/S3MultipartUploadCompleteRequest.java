@@ -151,6 +151,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.Part> partsList =
         multipartUploadCompleteRequest.getPartsListList();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -245,7 +246,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // Add missing multi part info to open key table
           addMultiPartToCache(omMetadataManager, multipartOpenKey,
-              pathInfoFSO, keyInfoFromArgs, trxnLogIndex);
+              pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
         }
       }
 
@@ -435,7 +436,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         .replaceAll("\\n", " "));
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
         getOmRequest().getUserInfo()));
 
@@ -493,7 +494,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setAcls(dbOpenKeyInfo.getAcls())
           .addAllMetadata(dbOpenKeyInfo.getMetadata())
           .addMetadata(OzoneConsts.ETAG,
-              multipartUploadedKeyHash(partKeyInfoMap));
+              multipartUploadedKeyHash(partKeyInfoMap))
+          .setOwnerName(keyArgs.getOwnerName())
+          .addAllTags(dbOpenKeyInfo.getTags());
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,
       // we had an upgrade.
@@ -527,6 +530,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
       omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
           multipartUploadedKeyHash(partKeyInfoMap));
+      if (dbOpenKeyInfo.getTags() != null) {
+        omKeyInfo.setTags(dbOpenKeyInfo.getTags());
+      }
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     return omKeyInfo;
@@ -553,7 +559,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long transactionLogIndex
+      String keyName, long transactionLogIndex
   ) throws IOException {
     // FSO is disabled. Do nothing.
   }

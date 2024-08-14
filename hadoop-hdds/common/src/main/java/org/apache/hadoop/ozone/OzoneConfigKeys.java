@@ -126,7 +126,15 @@ public final class OzoneConfigKeys {
   public static final String OZONE_FS_HSYNC_ENABLED
       = "ozone.fs.hsync.enabled";
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
-      = false;
+      = true;
+
+  /**
+   * hsync lease soft limit.
+   */
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT
+      = "ozone.om.lease.soft.limit";
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
+      = "60s";
 
 
   /**
@@ -455,7 +463,7 @@ public final class OzoneConfigKeys {
       "hdds.datanode.replication.work.dir";
 
 
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";

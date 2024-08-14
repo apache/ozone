@@ -63,10 +63,42 @@ Datanode Recommission is Finished
 Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
+
+Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
                             Should Contain                  ${result}             ContainerBalancer is Running.
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
                             Sleep                   60000ms
+
+Verify Verbose Balancer Status
+    [arguments]    ${output}
+
+    Should Contain    ${output}    ContainerBalancer is Running.
+    Should Contain    ${output}    Started at:
+    Should Contain    ${output}    Container Balancer Configuration values:
+
+Verify Balancer Iteration
+    [arguments]    ${output}    ${number}    ${status}    ${containers}
+
+    Should Contain    ${output}    Iteration number                                   ${number}
+    Should Contain    ${output}    Iteration result                                   ${status}
+    Should Contain    ${output}    Scheduled to move containers                       ${containers}
+
+Run Balancer Status
+    ${result} =      Execute                         ozone admin containerbalancer status
+                     Should Contain                  ${result}             ContainerBalancer is Running.
+
+Run Balancer Verbose Status
+    ${result} =      Execute                         ozone admin containerbalancer status -v
+                     Verify Verbose Balancer Status    ${result}
+                     Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
+                     Should Contain                  ${result}             Current iteration info:
+
+Run Balancer Verbose History Status
+    ${result} =    Execute                         ozone admin containerbalancer status -v --history
+                   Verify Verbose Balancer Status          ${result}
+                   Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
+                   Should Contain                  ${result}             Iteration history list:
 
 ContainerBalancer is Not Running
     ${result} =         Execute          ozone admin containerbalancer status
@@ -132,6 +164,14 @@ Verify Container Balancer for RATIS containers
     Datanode Recommission
 
     Run Container Balancer
+
+    Run Balancer Status
+
+    Run Balancer Verbose Status
+
+    Run Balancer Verbose History Status
+
+    Wait Finish Of Balancing
 
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}

@@ -213,6 +213,10 @@ public abstract class Handler {
   public abstract void deleteUnreferenced(Container container, long localID)
       throws IOException;
 
+  public abstract void addFinalizedBlock(Container container, long localID);
+
+  public abstract boolean isFinalizedBlockExist(Container container, long localID);
+
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }

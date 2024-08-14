@@ -57,13 +57,14 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
@@ -816,7 +817,7 @@ public class TestSnapshotDiffManager {
         when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
         when(keyInfo.isKeyInfoSame(any(OmKeyInfo.class),
             eq(false), eq(false),
-            eq(false), eq(false)))
+            eq(false), eq(false), eq(true)))
             .thenAnswer(k -> {
               int keyVal = Integer.parseInt(((String)i.getArgument(0))
                   .substring(3));
@@ -1274,6 +1275,7 @@ public class TestSnapshotDiffManager {
    * startup.
    */
   @Test
+  @Flaky("HDDS-10490")
   public void testLoadJobsOnStartUp() throws Exception {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

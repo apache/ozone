@@ -52,10 +52,17 @@ public class FreonReplicationOptions extends ReplicationOptions {
 
   // -t is already taken for number of threads
   @Option(names = {"--type", "--replication-type"},
-      description = "Replication type. Supported types are: RATIS, EC")
+      description = TYPE_DESCRIPTION)
   @Override
   public void setType(String type) {
     super.setType(type);
+  }
+
+  @Option(names = {"--replication", "-r"},
+      description = REPLICATION_DESCRIPTION)
+  @Override
+  public void setReplication(String replication) {
+    super.setReplication(replication);
   }
 
   /**

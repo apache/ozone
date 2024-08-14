@@ -228,6 +228,19 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Returns count of failed volumes reported by the data node.
+   * @return count of failed volumes
+   */
+  public int getFailedVolumeCount() {
+    try {
+      lock.readLock().lock();
+      return failedVolumeCount;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
    * Returns count of healthy metadata volumes reported from datanode.
    * @return count of healthy metdata log volumes
    */
