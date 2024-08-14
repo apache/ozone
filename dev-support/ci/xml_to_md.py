@@ -1,38 +1,39 @@
 import os
+import re
+import zipfile
 import xml.etree.ElementTree as ET
 from collections import namedtuple
 from pathlib import Path
 
-# Define the Property namedtuple to hold property details
 Property = namedtuple('Property', ['name', 'value', 'tag', 'description'])
 
-def parse_xml_file(file_path):
-    """
-    Parse the given XML file and extract properties.
+def extract_xml_from_jar(jar_path, xml_filename):
+    xml_files = []
+    with zipfile.ZipFile(jar_path, 'r') as jar:
+        for file_info in jar.infolist():
+            if file_info.filename.endswith(xml_filename):
+                with jar.open(file_info.filename) as xml_file:
+                    xml_files.append(xml_file.read())
+    return xml_files
 
-    :param file_path: Path to the XML file
-    :return: Dictionary of properties with property names as keys
-    """
-    tree = ET.parse(file_path)
-    root = tree.getroot()
+def parse_xml_file(xml_content):
+    root = ET.fromstring(xml_content)
     properties = {}
     for prop in root.findall('property'):
         name = prop.find('name').text if prop.find('name') is not None else ''
         value = prop.find('value').text if prop.find('value') is not None else ''
         tag = prop.find('tag').text if prop.find('tag') is not None else ''
         description = prop.find('description').text if prop.find('description') is not None else ''
-        description = ' '.join(description.split()).strip()  # Clean up whitespace
+        description = ' '.join(description.split()).strip() if description else ''
         properties[name] = Property(name, value, tag, description)
     return properties
 
 def generate_markdown(properties):
-    """
-    Generate Markdown content from properties.
-
-    :param properties: Dictionary of properties
-    :return: Markdown string
-    """
     markdown = []
+    markdown.append("---\n")
+    markdown.append("title: \"Ozone configurations\"\n")
+    markdown.append("summary: Ozone configurations\n")
+    markdown.append("---\n")
     markdown.append("<!--\n")
     markdown.append("Licensed to the Apache Software Foundation (ASF) under one or more\n")
     markdown.append("contributor license agreements.  See the NOTICE file distributed with\n")
@@ -59,34 +60,26 @@ def generate_markdown(properties):
     return ''.join(markdown)
 
 def main():
-    """
-    Main function to parse XML files and generate Markdown documentation.
-    """
-    xml_files = [
-        "hadoop-hdds/client/target/classes/ozone-default-generated.xml",
-        "hadoop-hdds/common/target/classes/ozone-default-generated.xml",
-        "hadoop-hdds/container-service/target/classes/ozone-default-generated.xml",
-        "hadoop-hdds/framework/target/classes/ozone-default-generated.xml",
-        "hadoop-hdds/server-scm/target/classes/ozone-default-generated.xml",
-        "hadoop-ozone/common/target/classes/ozone-default-generated.xml",
-        "hadoop-ozone/csi/target/classes/ozone-default-generated.xml",
-        "hadoop-ozone/ozone-manager/target/classes/ozone-default-generated.xml",
-        "hadoop-ozone/recon-codegen/target/classes/ozone-default-generated.xml",
-        "hadoop-ozone/recon/target/classes/ozone-default-generated.xml",
-    ]
+    base_path = 'ozone-bin/extracted'
+
+    # Find ozone SNAPSHOT directory dynamically using regex
+    snapshot_dir = next(
+        (os.path.join(base_path, d) for d in os.listdir(base_path) if re.match(r'ozone-.*-SNAPSHOT', d)),
+        None
+    )
+
+    extract_path = os.path.join(snapshot_dir, 'share', 'ozone', 'lib')
+    xml_filename = 'ozone-default-generated.xml'
 
     property_map = {}
-
-    for xml_file in xml_files:
-        if not os.path.exists(xml_file):
-            print(f"File not found: {xml_file}")
-            continue
-
-        properties = parse_xml_file(xml_file)
-        property_map.update(properties)
+    for file_name in os.listdir(extract_path):
+        if file_name.endswith('.jar'):
+            jar_path = os.path.join(extract_path, file_name)
+            xml_contents = extract_xml_from_jar(jar_path, xml_filename)
+            for xml_content in xml_contents:
+                property_map.update(parse_xml_file(xml_content))
 
     markdown_content = generate_markdown(property_map)
-
     output_path = Path("hadoop-hdds/docs/content/tools/Configurations.md")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
