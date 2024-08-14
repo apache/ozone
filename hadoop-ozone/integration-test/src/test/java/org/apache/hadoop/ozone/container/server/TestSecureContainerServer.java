@@ -180,8 +180,10 @@ public class TestSecureContainerServer {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
-    return ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context,
+    HddsDispatcher hddsDispatcher = ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context,
         TokenVerifier.create(new SecurityConfig(conf), secretKeyClient));
+    hddsDispatcher.setClusterId(scmId.toString());
+    return hddsDispatcher;
   }
 
   @Test
