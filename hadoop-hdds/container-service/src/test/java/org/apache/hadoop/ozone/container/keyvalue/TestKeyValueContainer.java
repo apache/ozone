@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
-import org.assertj.core.api.Fail;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -148,6 +147,7 @@ public class TestKeyValueContainer {
     CodecBuffer.enableLeakDetection();
 
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFile(true);
     dc.setAutoCompactionSmallSstFileNum(100);
     dc.setRocksdbDeleteObsoleteFilesPeriod(5000);
     CONF.setFromObject(dc);
@@ -789,7 +789,7 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void testAutoCompactionSmallSstFile() throws IOException {
+  public void testAutoCompactionSmallSstFile() throws Exception {
     Assume.assumeTrue(
         isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
@@ -870,14 +870,12 @@ public class TestKeyValueContainer {
               CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      hddsVolume.check(true);
+      hddsVolume.compactDb();
       // Sleep a while to wait for compaction to complete
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       Assert.assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
-    } catch (Exception e) {
-      Fail.fail("TestAutoCompactionSmallSstFile failed");
     } finally {
       // clean up
       for (KeyValueContainer c : containerList) {
