@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -288,17 +289,24 @@ public class TestHSync {
 
       // Clean up
       assertTrue(fs.delete(file, false));
-      // Wait for KeyDeletingService to finish to avoid interfering other tests
-      Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
-      GenericTestUtils.waitFor(
-          () -> {
-            try {
-              return deletedTable.isEmpty();
-            } catch (IOException e) {
-              return false;
-            }
-          }, 250, 10000);
+      waitForEmptyDeletedTable();
     }
+  }
+
+  private void waitForEmptyDeletedTable()
+      throws TimeoutException, InterruptedException {
+    // Wait for KeyDeletingService to finish to avoid interfering other tests
+    OMMetadataManager omMetadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+    Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            return deletedTable.isEmpty();
+          } catch (IOException e) {
+            return false;
+          }
+        }, 250, 10000);
   }
 
   @Test
@@ -322,6 +330,7 @@ public class TestHSync {
         outputStream.hsync();
       }
     }
+    waitForEmptyDeletedTable();
   }
 
   @Test
