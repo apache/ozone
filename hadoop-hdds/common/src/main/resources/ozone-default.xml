@@ -1141,6 +1141,36 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.client.read.threadpool</name>
+    <value>10</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket used by Client to access SCM.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for SCMClientProtocolServer.
+      The default value is 10.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.read.threadpool</name>
+    <value>10</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket when accessing blocks.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for SCMBlockProtocolServer.
+      The default value is 10.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.read.threadpool</name>
+    <value>10</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket used by DataNode to access SCM.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for SCMDatanodeProtocolServer.
+      The default value is 10.
+    </description>
+  </property>
+  <property>
     <name>hdds.heartbeat.interval</name>
     <value>30s</value>
     <tag>OZONE, MANAGEMENT</tag>
@@ -2494,6 +2524,16 @@
     <description>Threads configured for SCMSecurityProtocolServer.</description>
   </property>
   <property>
+    <name>ozone.scm.security.read.threadpool</name>
+    <value>1</value>
+    <tag>OZONE, HDDS, SECURITY, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket when performing security related operations with SCM.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for SCMSecurityProtocolServer.
+      The default value is 1.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.service.address</name>
     <value/>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -2933,6 +2973,16 @@
     <description>
       The number of RPC handler threads for Datanode client
       service endpoints.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.read.threadpool</name>
+    <value>10</value>
+    <tag>OZONE, HDDS, PERFORMANCE</tag>
+    <description>
+      The number of threads in RPC server reading from the socket for Datanode client service endpoints.
+      This config overrides Hadoop configuration "ipc.server.read.threadpool.size" for HddsDatanodeClientProtocolServer.
+      The default value is 10.
     </description>
   </property>
   <property>

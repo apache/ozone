@@ -250,6 +250,7 @@ function ozone_suppress_shell_log
       && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
     OZONE_LOGLEVEL=OFF
     OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+    OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
   fi
 }
 
