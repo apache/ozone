@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -208,25 +209,21 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ByteString getContainerChecksumInfo(KeyValueContainerData data)
-      throws IOException {
+  /**
+   * Reads the container checksum info file from the disk as bytes.
+   *
+   * @throws FileNotFoundException When the file does not exist. It may not have been generated yet for this container.
+   * @throws IOException On error reading the file.
+   */
+  public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
     try {
       File checksumFile = getContainerChecksumFile(data);
-
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
         return ByteString.readFrom(inStream);
-      } catch (FileNotFoundException ex) {
-        // TODO: Build the container checksum tree when it doesn't exist.
-        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
-            containerID, checksumFile, ex);
-      } catch (IOException ex) {
-        throw new IOException("Error occured when reading checksum file for container " + containerID +
-            " at the path " + checksumFile, ex);
       }
-      return ByteString.EMPTY;
     } finally {
       readLock.unlock();
     }

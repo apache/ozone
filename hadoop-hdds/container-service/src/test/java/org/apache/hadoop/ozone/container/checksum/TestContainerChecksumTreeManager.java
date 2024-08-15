@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.net.smtp.SmtpClient;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +40,7 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildChunk;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -108,7 +110,7 @@ class TestContainerChecksumTreeManager {
   public void testWriteOnlyTreeToFile() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
@@ -171,7 +173,7 @@ class TestContainerChecksumTreeManager {
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
@@ -189,7 +191,7 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
@@ -209,7 +211,7 @@ class TestContainerChecksumTreeManager {
   public void testReadContainerMerkleTreeMetric() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     checksumManager.writeContainerDataTree(container, tree);
@@ -219,12 +221,13 @@ class TestContainerChecksumTreeManager {
 
   @Test
   public void testTmpFileWriteFailure() throws Exception {
+    // TODO this is actually testing failure to write to the main file.
     File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
 
     assertFalse(tmpFile.exists());
     assertFalse(finalFile.exists());
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertFalse(tmpFile.exists());
     assertTrue(finalFile.exists());
@@ -233,9 +236,9 @@ class TestContainerChecksumTreeManager {
     assertTrue(finalFile.getParentFile().setWritable(false));
     try {
       checksumManager.writeContainerDataTree(container, tree);
-      fail();
+      fail("Write to the file should have failed.");
     } catch (IOException ex) {
-      LOG.info("Write to the tmp file failed as expected with the following exception: ", ex);
+      LOG.info("Write to the file failed as expected with the following exception: ", ex);
     }
     assertFalse(tmpFile.exists());
     // The original file should still remain valid.
@@ -250,7 +253,7 @@ class TestContainerChecksumTreeManager {
 
     assertFalse(tmpFile.exists());
     assertFalse(finalFile.exists());
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertFalse(tmpFile.exists());
     assertTrue(finalFile.exists());
@@ -284,7 +287,7 @@ class TestContainerChecksumTreeManager {
     // Write file
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
     assertFalse(finalFile.exists());
-    ContainerMerkleTree tree = buildTestTree();
+    ContainerMerkleTree tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(finalFile.exists());
 
@@ -305,24 +308,5 @@ class TestContainerChecksumTreeManager {
   public void testChecksumTreeFilePath() {
     assertEquals(checksumFile.getAbsolutePath(),
         ContainerChecksumTreeManager.getContainerChecksumFile(container).getAbsolutePath());
-  }
-
-  private ContainerMerkleTree buildTestTree() throws Exception {
-    final long blockID1 = 1;
-    final long blockID2 = 2;
-    final long blockID3 = 3;
-    ChunkInfo b1c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
-    ChunkInfo b2c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
-    ChunkInfo b2c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
-    ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
-    ChunkInfo b3c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
-
-    ContainerMerkleTree tree = new ContainerMerkleTree();
-    tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
-    tree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
-    tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
-
-    return tree;
   }
 }
