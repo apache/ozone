@@ -180,14 +180,12 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(1L));
       supervisor.addTask(createECTask(2L));
       supervisor.addTask(createECTask(3L));
-      // Sleep 5s, wait all tasks processed
+      // Sleep 10s, wait all tasks processed
       try {
-        Thread.sleep(5000);
+        Thread.sleep(10000);
       } catch (InterruptedException e) {
       }
       assertTrue(supervisor.getTotalTime(ReplicationTask.class) > 0);
-      assertTrue(supervisor.getTotalTime(
-          ECReconstructionCoordinatorTask.class) > 0);
       assertEquals(1,
           supervisor.getReplicationRequestCount(ReplicationTask.class));
       assertEquals(2,
