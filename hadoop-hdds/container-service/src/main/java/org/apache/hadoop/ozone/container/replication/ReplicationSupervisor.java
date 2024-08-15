@@ -226,12 +226,19 @@ public final class ReplicationSupervisor {
       return;
     }
 
-    synchronized (lock) {
-      if (totalTimeCounter.get(task.getClass()) == null) {
-        totalTimeCounter.put(task.getClass(), new AtomicLong());
+    if (totalTimeCounter.get(task.getClass()) == null) {
+      synchronized (lock) {
+        if (totalTimeCounter.get(task.getClass()) == null) {
+          totalTimeCounter.put(task.getClass(), new AtomicLong());
+        }
       }
-      if (requestCounter.get(task.getClass()) == null) {
-        requestCounter.put(task.getClass(), new AtomicLong());
+    }
+
+    if (requestCounter.get(task.getClass()) == null) {
+      synchronized (lock) {
+        if (requestCounter.get(task.getClass()) == null) {
+          requestCounter.put(task.getClass(), new AtomicLong());
+        }
       }
     }
 
