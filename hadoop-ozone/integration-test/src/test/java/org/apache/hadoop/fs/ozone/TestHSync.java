@@ -322,7 +322,6 @@ public class TestHSync {
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
 
-    String data = "random data";
     final Path file = new Path(dir, "file-hsync-empty");
     try (FileSystem fs = FileSystem.get(CONF)) {
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
