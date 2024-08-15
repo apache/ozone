@@ -232,12 +232,12 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private SnapshotInfo getUpdatedSnapshotInfo(String snapshotTableKey, OMMetadataManager omMetadataManager)
       throws IOException {
-    if (updatedSnapshotInfos.containsKey(snapshotTableKey)) {
-      return updatedSnapshotInfos.get(snapshotTableKey);
-    } else {
-      SnapshotInfo snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+    SnapshotInfo snapshotInfo = updatedSnapshotInfos.get(snapshotTableKey);
+
+    if (snapshotInfo == null) {
+      snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
       updatedSnapshotInfos.put(snapshotTableKey, snapshotInfo);
-      return snapshotInfo;
     }
+    return snapshotInfo;
   }
 }
