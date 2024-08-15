@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -42,6 +43,7 @@ import java.util.UUID;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -292,4 +294,11 @@ public class TestCloseContainerCommandHandler {
     GenericTestUtils.waitFor(()
         -> closeHandler.getQueuedCount() <= 0, 10, 3000);
   }
+
+  @Test
+  public void testThreadPoolPoolSize() {
+    assertEquals(1, subject.getThreadPoolMaxPoolSize());
+    assertEquals(0, subject.getThreadPoolActivePoolSize());
+  }
+
 }

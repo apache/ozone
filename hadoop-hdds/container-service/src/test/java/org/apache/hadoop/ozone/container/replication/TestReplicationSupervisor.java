@@ -82,6 +82,7 @@ import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerComman
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.mockito.Mockito.any;
@@ -158,6 +159,7 @@ public class TestReplicationSupervisor {
       assertEquals(0, supervisor.getTotalInFlightReplications());
       assertEquals(0, supervisor.getQueueSize());
       assertEquals(3, set.containerCount());
+      assertTrue(supervisor.getTotalTime() > 0);
 
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       metrics.getMetrics(metricsCollector, true);
