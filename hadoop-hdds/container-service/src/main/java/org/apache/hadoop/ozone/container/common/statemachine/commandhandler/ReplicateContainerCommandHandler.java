@@ -94,20 +94,20 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return (int) supervisor.getReplicationRequestCount();
+    return (int) supervisor.getReplicationRequestCount(ReplicationTask.class);
   }
 
   @Override
   public long getAverageRunTime() {
-    int currentCount = getInvocationCount();
-    if (currentCount > 0) {
-      return getTotalRunTime() / currentCount;
+    int invocationCount = getInvocationCount();
+    if (invocationCount > 0) {
+      return getTotalRunTime() / invocationCount;
     }
     return 0;
   }
 
   @Override
   public long getTotalRunTime() {
-    return supervisor.getTotalTime();
+    return supervisor.getTotalTime(ReplicationTask.class);
   }
 }

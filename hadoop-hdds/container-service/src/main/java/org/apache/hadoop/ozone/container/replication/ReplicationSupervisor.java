@@ -72,12 +72,15 @@ public final class ReplicationSupervisor {
   private final StateContext context;
   private final Clock clock;
 
-  private final AtomicLong requestCounter = new AtomicLong();
+  private final Map<Class<?>, AtomicLong> requestCounter =
+      new ConcurrentHashMap<>();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
   private final AtomicLong skippedCounter = new AtomicLong();
-  private final AtomicLong totalTimeCounter = new AtomicLong();
+  private final Map<Class<?>, AtomicLong> totalTimeCounter =
+      new ConcurrentHashMap<>();
+  private Object lock = new Object();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -223,6 +226,15 @@ public final class ReplicationSupervisor {
       return;
     }
 
+    synchronized (lock) {
+      if (totalTimeCounter.get(task.getClass()) == null) {
+        totalTimeCounter.put(task.getClass(), new AtomicLong());
+      }
+      if (requestCounter.get(task.getClass()) == null) {
+        requestCounter.put(task.getClass(), new AtomicLong());
+      }
+    }
+
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes
@@ -333,7 +345,7 @@ public final class ReplicationSupervisor {
     public void run() {
       long startTime = Time.monotonicNow();
       try {
-        requestCounter.incrementAndGet();
+        requestCounter.get(task.getClass()).incrementAndGet();
 
         final long now = clock.millis();
         final long deadline = task.getDeadline();
@@ -383,7 +395,7 @@ public final class ReplicationSupervisor {
         long endTime = Time.monotonicNow();
         inFlight.remove(task);
         decrementTaskCounter(task);
-        totalTimeCounter.addAndGet(endTime - startTime);
+        totalTimeCounter.get(task.getClass()).addAndGet(endTime - startTime);
       }
     }
 
@@ -424,7 +436,17 @@ public final class ReplicationSupervisor {
   }
 
   public long getReplicationRequestCount() {
-    return requestCounter.get();
+    AtomicLong totalRequest = new AtomicLong();
+    requestCounter.forEach((key, value) -> {
+      totalRequest.set(totalRequest.get() + value.get());
+    });
+    return totalRequest.get();
+  }
+
+  public long getReplicationRequestCount(
+      Class<? extends AbstractReplicationTask> taskClass) {
+    AtomicLong counter = requestCounter.get(taskClass);
+    return counter == null ? 0 : counter.get();
   }
 
   public long getQueueSize() {
@@ -447,8 +469,9 @@ public final class ReplicationSupervisor {
     return successCounter.get();
   }
 
-  public long getTotalTime() {
-    return totalTimeCounter.get();
+  public long getTotalTime(Class<? extends AbstractReplicationTask> taskClass) {
+    AtomicLong counter = totalTimeCounter.get(taskClass);
+    return counter == null ? 0 : counter.get();
   }
 
   public long getReplicationFailureCount() {

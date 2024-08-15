@@ -159,13 +159,41 @@ public class TestReplicationSupervisor {
       assertEquals(0, supervisor.getTotalInFlightReplications());
       assertEquals(0, supervisor.getQueueSize());
       assertEquals(3, set.containerCount());
-      assertTrue(supervisor.getTotalTime() > 0);
 
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       metrics.getMetrics(metricsCollector, true);
       assertEquals(1, metricsCollector.getRecords().size());
     } finally {
       metrics.unRegister();
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void normal2(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
+    // GIVEN
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+    try {
+      //WHEN
+      supervisor.addTask(createTask(1L));
+      supervisor.addTask(createECTask(2L));
+      supervisor.addTask(createECTask(3L));
+      // Sleep 5s, wait all tasks processed
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      assertTrue(supervisor.getTotalTime(ReplicationTask.class) > 0);
+      assertTrue(supervisor.getTotalTime(
+          ECReconstructionCoordinatorTask.class) > 0);
+      assertEquals(1,
+          supervisor.getReplicationRequestCount(ReplicationTask.class));
+      assertEquals(2,
+          supervisor.getReplicationRequestCount(
+              ECReconstructionCoordinatorTask.class));
+    } finally {
       supervisor.stop();
     }
   }
