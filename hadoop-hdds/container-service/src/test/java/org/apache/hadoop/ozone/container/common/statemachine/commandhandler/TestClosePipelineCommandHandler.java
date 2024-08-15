@@ -143,28 +143,4 @@ public class TestClosePipelineCommandHandler {
     return Arrays.asList(dnOne, dnTwo, dnThree);
   }
 
-  @Test
-  public void testThreadPoolPoolSize() throws IOException {
-    final List<DatanodeDetails> datanodes = getDatanodes();
-    final DatanodeDetails currentDatanode = datanodes.get(0);
-    final PipelineID pipelineID = PipelineID.randomId();
-    final SCMCommand<ClosePipelineCommandProto> command =
-        new ClosePipelineCommand(pipelineID);
-    stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
-
-    XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
-    when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
-    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(false);
-    final ClosePipelineCommandHandler commandHandler =
-        new ClosePipelineCommandHandler(conf, Executors.newFixedThreadPool(3));
-    commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
-
-    assertEquals(3, commandHandler.getThreadPoolMaxPoolSize());
-    assertEquals(1, commandHandler.getThreadPoolActivePoolSize());
-    verify(writeChannel, times(0))
-        .removeGroup(pipelineID.getProtobuf());
-    verify(raftClientGroupManager, times(0))
-        .remove(any(), anyBoolean(), anyBoolean());
-  }
-
 }

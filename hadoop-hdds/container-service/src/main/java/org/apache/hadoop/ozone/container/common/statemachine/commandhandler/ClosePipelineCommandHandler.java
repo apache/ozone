@@ -46,7 +46,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -202,15 +201,5 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return queuedCount.get();
-  }
-
-  @Override
-  public int getThreadPoolMaxPoolSize() {
-    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
-  }
-
-  @Override
-  public int getThreadPoolActivePoolSize() {
-    return ((ThreadPoolExecutor)executor).getActiveCount();
   }
 }

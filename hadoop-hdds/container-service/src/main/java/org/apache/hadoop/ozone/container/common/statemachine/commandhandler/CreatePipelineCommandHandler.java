@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
@@ -183,16 +182,4 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   public int getQueuedCount() {
     return queuedCount.get();
   }
-
-    @SuppressWarnings("checkstyle:Indentation")
-    @Override
-    public int getThreadPoolMaxPoolSize() {
-      return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
-    }
-
-    @SuppressWarnings("checkstyle:Indentation")
-    @Override
-    public int getThreadPoolActivePoolSize() {
-      return ((ThreadPoolExecutor)executor).getActiveCount();
-    }
 }
