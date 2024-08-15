@@ -19,10 +19,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.4.0</version>
+    <version>1.4.1</version>
   </parent>
   <artifactId>hdds-managed-rocksdb</artifactId>
-  <version>1.4.0</version>
+  <version>1.4.1</version>
   <description>Apache Ozone Managed RocksDB library</description>
   <name>Apache Ozone HDDS Managed RocksDB</name>
   <packaging>jar</packaging>
