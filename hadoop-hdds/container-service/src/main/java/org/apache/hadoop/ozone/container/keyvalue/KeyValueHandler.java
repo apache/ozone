@@ -97,6 +97,12 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -656,16 +662,18 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
+    // A container must have moved past the CLOSING
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    if (containerData.isOpen()) {
+    State state = containerData.getState();
+    boolean stateSupportsChecksumInfo = (state == CLOSED || state == QUASI_CLOSED || state == UNHEALTHY);
+    if (!stateSupportsChecksumInfo) {
       return ContainerCommandResponseProto.newBuilder()
           .setCmdType(request.getCmdType())
           .setTraceID(request.getTraceID())
           .setResult(UNCLOSED_CONTAINER_IO)
-          .setMessage("Checksum information is not available for open containers.")
+          .setMessage("Checksum information is not available for containers in state " + state)
           .build();
     }
-
 
     ByteString checksumTree = null;
     try {
@@ -1284,7 +1292,7 @@ public class KeyValueHandler extends Handler {
     try {
       final State state = container.getContainerState();
       // Close call is idempotent.
-      if (state == State.CLOSED) {
+      if (state == CLOSED) {
         return;
       }
       if (state == State.UNHEALTHY) {
