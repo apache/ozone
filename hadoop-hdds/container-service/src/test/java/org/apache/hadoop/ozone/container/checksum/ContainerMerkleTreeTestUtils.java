@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -39,7 +38,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -99,8 +97,8 @@ public final class ContainerMerkleTreeTestUtils {
    *     "bytesPerChecksum" amount of data and are assumed to be contiguous.
    * @return The ChunkInfo proto object built from this information.
    */
-  public static ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock, ByteBuffer... chunkChecksums)
-      throws IOException {
+  public static ContainerProtos.ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock,
+                                                     ByteBuffer... chunkChecksums) {
     final long chunkSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     final int bytesPerChecksum = config.getObject(OzoneClientConfig.class).getBytesPerChecksum();
@@ -114,13 +112,12 @@ public final class ContainerMerkleTreeTestUtils {
             .collect(Collectors.toList()))
         .build();
 
-    return ChunkInfo.getFromProtoBuf(
-        ContainerProtos.ChunkInfo.newBuilder()
+    return ContainerProtos.ChunkInfo.newBuilder()
             .setChecksumData(checksumData)
             .setChunkName("chunk")
             .setOffset(indexInBlock * chunkSize)
             .setLen(chunkSize)
-            .build());
+            .build();
   }
 
   /**
@@ -154,11 +151,7 @@ public final class ContainerMerkleTreeTestUtils {
              getBlockIterator(containerData.getContainerID())) {
       while (blockIterator.hasNext()) {
         BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
-        List<ChunkInfo> chunkInfos = new ArrayList<>();
-        for (ContainerProtos.ChunkInfo chunk : chunks) {
-          chunkInfos.add(ChunkInfo.getFromProtoBuf(chunk));
-        }
+        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
         containerMerkleTree.addChunks(blockData.getLocalID(), chunkInfos);
       }
     }

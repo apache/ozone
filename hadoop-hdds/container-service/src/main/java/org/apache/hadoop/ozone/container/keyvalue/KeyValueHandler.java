@@ -517,7 +517,6 @@ public class KeyValueHandler extends Handler {
     try {
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
-      createContainerMerkleTree(kvContainer);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -529,19 +528,15 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void createContainerMerkleTree(KeyValueContainer kvContainer) throws IOException {
-    KeyValueContainerData containerData = kvContainer.getContainerData();
+  private void createContainerMerkleTree(Container container) throws IOException {
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     ContainerMerkleTree merkleTree = new ContainerMerkleTree();
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
          BlockIterator<BlockData> blockIterator = dbHandle.getStore().
              getBlockIterator(containerData.getContainerID())) {
       while (blockIterator.hasNext()) {
         BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
-        List<ChunkInfo> chunkInfos = new ArrayList<>();
-        for (ContainerProtos.ChunkInfo chunk: chunks) {
-          chunkInfos.add(ChunkInfo.getFromProtoBuf(chunk));
-        }
+        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
         merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
       }
     }
@@ -1223,6 +1218,7 @@ public class KeyValueHandler extends Handler {
       }
       container.close();
       ContainerLogger.logClosed(container.getContainerData());
+      createContainerMerkleTree(container);
       sendICR(container);
     } finally {
       container.writeUnlock();

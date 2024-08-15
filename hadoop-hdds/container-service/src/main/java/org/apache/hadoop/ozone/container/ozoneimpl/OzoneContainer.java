@@ -597,8 +597,4 @@ public class OzoneContainer {
   public ReplicationServer getReplicationServer() {
     return replicationServer;
   }
-
-  public ContainerChecksumTreeManager getChecksumManager() {
-    return this.checksumTreeManager;
-  }
 }

@@ -63,7 +63,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to ensure a container can be closed and its replicas
@@ -139,7 +138,6 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> waitForContainerChecksumToExist(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container));
     }
 
     long originalSeq = container.getSequenceId();
@@ -194,7 +192,6 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> waitForContainerChecksumToExist(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container));
     }
 
     assertThrows(IOException.class,
@@ -231,7 +228,6 @@ public class TestCloseContainer {
     // merkle tree
     for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
       GenericTestUtils.waitFor(() -> waitForContainerChecksumToExist(hddsDatanode, containerInfo), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, containerInfo));
       ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
       container = (KeyValueContainer) ozoneContainer.getController()
               .getContainer(containerInfo.getContainerID());
@@ -243,7 +239,7 @@ public class TestCloseContainer {
   }
 
   private boolean waitForContainerChecksumToExist(HddsDatanodeService hddsDatanode,
-                                                          ContainerInfo containerInfo) {
+                                                  ContainerInfo containerInfo) {
     try {
       return ContainerMerkleTreeTestUtils.containerChecksumFileExists(hddsDatanode, containerInfo);
     } catch (IOException e) {
