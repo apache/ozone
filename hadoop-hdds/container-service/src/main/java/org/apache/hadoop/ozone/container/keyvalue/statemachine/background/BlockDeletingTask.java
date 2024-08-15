@@ -360,7 +360,7 @@ public class BlockDeletingTask implements BackgroundTask {
           .getHandler(container.getContainerType()));
 
       DeleteTransactionStats deleteBlocksResult =
-          deleteTransactions(delBlocks, handler, blockDataTable, container);
+          deleteTransactions(delBlocks, handler, meta, container);
       int deletedBlocksProcessed = deleteBlocksResult.getBlocksProcessed();
       int deletedBlocksCount = deleteBlocksResult.getBlocksDeleted();
       long releasedBytes = deleteBlocksResult.getBytesReleased();
@@ -429,9 +429,7 @@ public class BlockDeletingTask implements BackgroundTask {
    */
   private DeleteTransactionStats deleteTransactions(
       List<DeletedBlocksTransaction> delBlocks, Handler handler,
-      Table<String, BlockData> blockDataTable, Container container)
-      throws IOException {
-
+      DBHandle meta, Container container) throws IOException {
     int blocksProcessed = 0;
     int blocksDeleted = 0;
     long bytesReleased = 0;
@@ -453,7 +451,7 @@ public class BlockDeletingTask implements BackgroundTask {
         }
 
         String blk = containerData.getBlockKey(blkLong);
-        BlockData blkInfo = blockDataTable.get(blk);
+        BlockData blkInfo = meta.getStore().getBlockByID(null, blk);
         LOG.debug("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {
