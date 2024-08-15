@@ -52,7 +52,7 @@ public class TestKeyOutputStream {
 
   @Test
   void testConcurrentWriteLimitOne() throws Exception {
-    // Verify the semaphore is working to a limited the number of concurrent writes allowed.
+    // Verify the semaphore is working to limit the number of concurrent writes allowed.
     KeyOutputStreamSemaphore sema1 = new KeyOutputStreamSemaphore(1);
     KeyOutputStream keyOutputStream = mock(KeyOutputStream.class);
     when(keyOutputStream.getRequestSemaphore()).thenReturn(sema1);

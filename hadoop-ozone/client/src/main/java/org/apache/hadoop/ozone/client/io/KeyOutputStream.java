@@ -235,6 +235,7 @@ public class KeyOutputStream extends OutputStream
       getRequestSemaphore().release();
     }
   }
+
   @VisibleForTesting
   void handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {

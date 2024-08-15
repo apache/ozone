@@ -33,7 +33,7 @@ public class KeyOutputStreamSemaphore {
 
   KeyOutputStreamSemaphore(int maxConcurrentWritePerKey) {
     LOG.info("Initializing semaphore with maxConcurrentWritePerKey = {}", maxConcurrentWritePerKey);
-    if (maxConcurrentWritePerKey >= 0) {
+    if (maxConcurrentWritePerKey > 0) {
       requestSemaphore = new Semaphore(maxConcurrentWritePerKey);
     } else if (maxConcurrentWritePerKey == 0) {
       throw new IllegalArgumentException("Invalid config. ozone.client.key.write.concurrency cannot be set to 0");
