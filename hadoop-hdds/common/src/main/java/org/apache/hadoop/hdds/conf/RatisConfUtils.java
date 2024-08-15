@@ -30,15 +30,15 @@ public class RatisConfUtils {
   /** For {@link GrpcConfigKeys}. */
   public static class Grpc {
     /** For setting {@link GrpcConfigKeys#setMessageSizeMax(RaftProperties, SizeInBytes)}. */
-    public static void setMessageSizeMax(RaftProperties properties, int logAppenderBufferByteLimit) {
-      Preconditions.assertTrue(logAppenderBufferByteLimit > 0,
-          () -> "logAppenderBufferByteLimit = " + logAppenderBufferByteLimit + " <= 0");
-      Preconditions.assertSame(RaftServerConfigKeys.Log.Appender.bufferByteLimit(properties).getSize(),
-          logAppenderBufferByteLimit, "logAppenderBufferByteLimit");
+    public static void setMessageSizeMax(RaftProperties properties, int max) {
+      Preconditions.assertTrue(max > 0, () -> "max = " + max + " <= 0");
+
+      final long logAppenderBufferByteLimit = RaftServerConfigKeys.Log.Appender.bufferByteLimit(properties).getSize();
+      Preconditions.assertTrue(max >= logAppenderBufferByteLimit,
+          () -> "max = " + max + " < logAppenderBufferByteLimit = " + logAppenderBufferByteLimit);
 
       // Need an 1MB gap; see RATIS-2135
-      final long max = SizeInBytes.ONE_MB.getSize() + logAppenderBufferByteLimit;
-      GrpcConfigKeys.setMessageSizeMax(properties, SizeInBytes.valueOf(max));
+      GrpcConfigKeys.setMessageSizeMax(properties, SizeInBytes.valueOf(max + SizeInBytes.ONE_MB.getSize()));
     }
   }
 }

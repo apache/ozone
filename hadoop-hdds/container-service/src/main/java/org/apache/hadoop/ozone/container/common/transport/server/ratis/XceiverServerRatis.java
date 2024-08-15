@@ -283,7 +283,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final int logAppenderBufferByteLimit = setRaftSegmentAndWriteBufferSize(properties);
 
     // set grpc message size max
-    RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
+    final int max = Math.max(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE, logAppenderBufferByteLimit);
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, max);
 
     // set raft segment pre-allocated size
     setRaftSegmentPreallocatedSize(properties);
@@ -422,9 +423,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    assertTrue(logAppenderQueueByteLimit >= OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE,
-        () -> HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = " + logAppenderQueueByteLimit
-            + " must be >= OZONE_SCM_CHUNK_MAX_SIZE (=" + OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
     final long raftSegmentSize = (long) conf.getStorageSize(
         HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
