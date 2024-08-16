@@ -54,6 +54,10 @@ public class FsServerDefaults {
 
   public static FsServerDefaults getFromProtobuf(
       FsServerDefaultsProto serverDefaults) {
-    return new FsServerDefaults(serverDefaults.getKeyProviderUri());
+    String keyProviderUri = null;
+    if (serverDefaults.hasKeyProviderUri()) {
+      keyProviderUri = serverDefaults.getKeyProviderUri();
+    }
+    return new FsServerDefaults(keyProviderUri);
   }
 }

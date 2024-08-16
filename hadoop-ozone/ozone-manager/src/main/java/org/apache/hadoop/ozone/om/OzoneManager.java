@@ -660,11 +660,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     URI keyProviderUri = KMSUtil.getKeyProviderUri(
             hadoopConfig,
             CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
-    if (keyProviderUri != null) {
-      serverDefaults = new FsServerDefaults(keyProviderUri.toString());
-    } else {
-      serverDefaults = new FsServerDefaults();
-    }
+    String keyProviderUriStr =
+        (keyProviderUri != null) ? keyProviderUri.toString() : null;
+    serverDefaults = new FsServerDefaults(keyProviderUriStr);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
