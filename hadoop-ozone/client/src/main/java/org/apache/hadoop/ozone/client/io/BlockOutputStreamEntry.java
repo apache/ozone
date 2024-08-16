@@ -24,8 +24,6 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.fs.Syncable;
@@ -80,8 +78,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * Once this flag is on, this BlockOutputStream can only handle writeOneRetry.
    */
   private volatile boolean isHandlingRetry;
-  private final Lock handlingRetryLock = new ReentrantLock();
-  private final Condition handlingRetryCondition = handlingRetryLock.newCondition();
+
   /**
    * To record how many calls(write, flush) are being handled by this block.
    */
@@ -122,36 +119,31 @@ public class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  void onCallReceived() {
+  /** Register when a call (write or flush) is received on this block. */
+  void registerCallReceived() {
     inflightCalls.incrementAndGet();
   }
 
-  boolean oncallFinished() {
+  /**
+   * Register when a call (write or flush) is finised on this block.
+   * @return true if all the calls are done.
+   */
+  boolean registerCallFinished() {
     return inflightCalls.decrementAndGet() == 0;
   }
 
-  void waitForRetryHandling() throws InterruptedException {
-    handlingRetryLock.lock();
-    try {
-      while (isHandlingRetry) {
-        LOG.info("{} : Block to wait for retry handling.", this);
-        handlingRetryCondition.await();
-        LOG.info("{} : Done waiting for retry handling.", this);
-      }
-    } finally {
-      handlingRetryLock.unlock();
+  void waitForRetryHandling(Condition retryHandlingCond) throws InterruptedException {
+    while (isHandlingRetry) {
+      LOG.info("{} : Block to wait for retry handling.", this);
+      retryHandlingCond.await();
+      LOG.info("{} : Done waiting for retry handling.", this);
     }
   }
 
-  void finishRetryHandling() {
+  void finishRetryHandling(Condition retryHandlingCond) {
     LOG.info("{}: Exiting retry handling mode", this);
-    handlingRetryLock.lock();
-    try {
-      isHandlingRetry = false;
-      handlingRetryCondition.signalAll();
-    } finally {
-      handlingRetryLock.unlock();
-    }
+    isHandlingRetry = false;
+    retryHandlingCond.signalAll();
   }
 
   /**

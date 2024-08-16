@@ -709,7 +709,7 @@ public class TestHSync {
 
   public static Stream<Arguments> concurrentExceptionHandling() {
     return Stream.of(
-        Arguments.of(2, 1),
+        Arguments.of(4, 1),
         Arguments.of(4, 4),
         Arguments.of(8, 4)
     );

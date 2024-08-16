@@ -421,7 +421,8 @@ public class BlockOutputStream extends OutputStream {
     }
     List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("{}: Retrying write length {} for blockID {}, {} buffers", this, len, blockID, allocatedBuffers.size());
+      LOG.debug("{}: Retrying write length {} on target blockID {}, {} buffers", this, len, blockID,
+          allocatedBuffers.size());
     }
     Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
     int count = 0;
