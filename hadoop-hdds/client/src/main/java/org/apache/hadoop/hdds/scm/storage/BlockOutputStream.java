@@ -779,7 +779,7 @@ public class BlockOutputStream extends OutputStream {
   void cleanup() {
   }
 
-  public void cleanup(boolean invalidateClient) {
+  public synchronized void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }

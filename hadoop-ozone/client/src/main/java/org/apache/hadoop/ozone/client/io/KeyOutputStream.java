@@ -95,7 +95,7 @@ public class KeyOutputStream extends OutputStream
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
