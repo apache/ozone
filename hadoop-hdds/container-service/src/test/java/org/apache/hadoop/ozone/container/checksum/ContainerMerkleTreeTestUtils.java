@@ -24,13 +24,8 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -39,7 +34,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -134,27 +128,10 @@ public final class ContainerMerkleTreeTestUtils {
    * This function checks whether the container checksum file exists.
    */
   public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
-                                                    ContainerInfo containerInfo)
-      throws IOException {
+                                                    ContainerInfo containerInfo) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
     File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
     return containerChecksumFile.exists();
-  }
-
-  public static ContainerProtos.ContainerMerkleTree buildContainerMerkleTree(KeyValueContainerData containerData,
-                                                                             ConfigurationSource conf)
-      throws IOException {
-    ContainerMerkleTree containerMerkleTree = new ContainerMerkleTree();
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
-         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
-             getBlockIterator(containerData.getContainerID())) {
-      while (blockIterator.hasNext()) {
-        BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-        containerMerkleTree.addChunks(blockData.getLocalID(), chunkInfos);
-      }
-    }
-    return containerMerkleTree.toProto();
   }
 }
