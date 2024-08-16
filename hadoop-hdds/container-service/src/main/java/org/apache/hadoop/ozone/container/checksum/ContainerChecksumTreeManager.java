@@ -204,11 +204,10 @@ public class ContainerChecksumTreeManager {
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
         checksumInfo.writeTo(tmpOutputStream);
         Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), REPLACE_EXISTING);
-        // Best effort cleanup of the tmp file. If this fails it will be overwritten on the next write.
-        // No operations should read from the tmp file.
-        Files.deleteIfExists(tmpChecksumFile.toPath());
       });
     } catch (IOException ex) {
+      // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
+      // Nothing reads directly from the tmp file.
       metrics.incrementMerkleTreeWriteFailures();
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
