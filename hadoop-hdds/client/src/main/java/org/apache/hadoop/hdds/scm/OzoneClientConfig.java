@@ -264,6 +264,14 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
+  @Config(key = "key.write.concurrency",
+      defaultValue = "1",
+      description = "Maximum concurrent writes allowed on each key. " +
+          "Defaults to 1 which matches the behavior before HDDS-9844. " +
+          "For unlimited write concurrency, set this to -1 or any negative integer value.",
+      tags = ConfigTag.CLIENT)
+  private int maxConcurrentWritePerKey = 1;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -484,5 +492,13 @@ public class OzoneClientConfig {
 
   public boolean getIncrementalChunkList() {
     return this.incrementalChunkList;
+  }
+
+  public void setMaxConcurrentWritePerKey(int maxConcurrentWritePerKey) {
+    this.maxConcurrentWritePerKey = maxConcurrentWritePerKey;
+  }
+
+  public int getMaxConcurrentWritePerKey() {
+    return this.maxConcurrentWritePerKey;
   }
 }
