@@ -581,7 +581,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     writeChunkFuture.thenApply(r -> {
       if (r.getResult() != ContainerProtos.Result.SUCCESS
           && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO) {
+          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+          // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
+          // that should now
+          && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
         StorageContainerException sce =
             new StorageContainerException(r.getMessage(), r.getResult());
         LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId" +
@@ -1061,7 +1064,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         // unhealthy
         if (r.getResult() != ContainerProtos.Result.SUCCESS
             && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-            && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO) {
+            && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+            && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
           StorageContainerException sce =
               new StorageContainerException(r.getMessage(), r.getResult());
           LOG.error(
