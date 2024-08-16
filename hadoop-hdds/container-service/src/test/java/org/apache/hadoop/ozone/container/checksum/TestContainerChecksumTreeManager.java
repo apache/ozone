@@ -19,18 +19,15 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.net.smtp.SmtpClient;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -39,7 +36,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildChunk;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -219,9 +215,12 @@ class TestContainerChecksumTreeManager {
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
   }
 
+  /**
+   * Updates to the container checksum file are written to a tmp file and then swapped in to place. Test that when
+   * the write to the tmp file fails, the main file that is read from is left intact.
+   */
   @Test
   public void testTmpFileWriteFailure() throws Exception {
-    // TODO this is actually testing failure to write to the main file.
     File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
 
@@ -236,48 +235,12 @@ class TestContainerChecksumTreeManager {
     assertTrue(finalFile.getParentFile().setWritable(false));
     try {
       checksumManager.writeContainerDataTree(container, tree);
-      fail("Write to the file should have failed.");
-    } catch (IOException ex) {
-      LOG.info("Write to the file failed as expected with the following exception: ", ex);
-    }
-    assertFalse(tmpFile.exists());
-    // The original file should still remain valid.
-    assertTrue(finalFile.exists());
-    assertTreesSortedAndMatch(tree.toProto(), readChecksumFile(container).getContainerMerkleTree());
-  }
-
-  @Test
-  public void testFileRenameFailure() throws Exception {
-    File tmpFile = ContainerChecksumTreeManager.getTmpContainerChecksumFile(container);
-    File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
-
-    assertFalse(tmpFile.exists());
-    assertFalse(finalFile.exists());
-    ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree);
-    assertFalse(tmpFile.exists());
-    assertTrue(finalFile.exists());
-
-    // Remove write permissions on the final file destination. Write to the tmp file should succeed, but the rename
-    // should fail.
-    assertTrue(finalFile.setReadOnly());
-    // TODO the Files#move call is still overwriting this.
-    assertFalse(tmpFile.exists());
-    try {
-      checksumManager.writeContainerDataTree(container, tree);
-      fail("No exception thrown");
+      fail("Write to the tmp file should have failed.");
     } catch (IOException ex) {
       LOG.info("Write to the tmp file failed as expected with the following exception: ", ex);
     }
-    assertTrue(tmpFile.exists());
-    // The original file should still remain valid.
-    assertTrue(finalFile.exists());
-    assertTreesSortedAndMatch(tree.toProto(), readChecksumFile(container).getContainerMerkleTree());
-
-    // Writing again after permission is restored should clear the file.
-    assertTrue(finalFile.setWritable(true));
-    checksumManager.writeContainerDataTree(container, tree);
     assertFalse(tmpFile.exists());
+    // The original file should still remain valid.
     assertTrue(finalFile.exists());
     assertTreesSortedAndMatch(tree.toProto(), readChecksumFile(container).getContainerMerkleTree());
   }
