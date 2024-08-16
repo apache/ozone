@@ -16,25 +16,22 @@
  * limitations under the License.
  */
 
-import React from "react"
-import { Spin } from "antd"
-import { LoadingOutlined } from "@ant-design/icons"
+export const AclIdColorMap = {
+  USER: 'green',
+  GROUP: 'blue',
+  WORLD: 'magenta',
+  ANONYMOUS: 'gray',
+  CLIENT_IP: 'gold'
+};
 
-// ------------- Constants -------------- //
-const loaderStyle: React.CSSProperties = {
-  height: '100%',
-  width: '100%',
-  textAlign: 'center',
-  paddingTop: '25%'
-}
-
-// ------------- Component -------------- //
-const Loader: React.FC = () => {
-  return (
-    <div style={loaderStyle}>
-      <Spin indicator={<LoadingOutlined style={{ color: '#1AA57A', fontSize: 48}} spin/>}/>
-    </div>
-  )
-}
-
-export default Loader;
+export const AclRightsColorMap = {
+  READ: 'green',
+  WRITE: 'blue',
+  CREATE: 'orange',
+  LIST: 'magenta',
+  DELETE: 'red',
+  READ_ACL: 'lime',
+  WRITE_ACL: 'purple',
+  ALL: 'gold',
+  NONE: 'gray'
+};

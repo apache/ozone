@@ -28,6 +28,7 @@ import {
 import { selectStyles } from "@/v2/constants/select.constants";
 
 
+// ------------- Types -------------- //
 export type Option = {
   label: string;
   value: string;
@@ -43,6 +44,7 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   onTagClose: (arg0: string) => void;
 }
 
+// ------------- Component -------------- //
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
   selected = [],

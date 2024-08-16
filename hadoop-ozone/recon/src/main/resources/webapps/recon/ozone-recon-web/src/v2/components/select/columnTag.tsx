@@ -21,6 +21,7 @@ import { Tag } from "antd";
 import { createPortal } from "react-dom";
 
 
+// ------------- Types -------------- //
 /**
  *  Due to design decisions we are currently not using the Tags
  * Until we reach a concensus on a better way to display the filter
@@ -33,6 +34,7 @@ export type TagProps = {
   onClose: (arg0: string) => void;
 }
 
+// ------------- Component -------------- //
 const ColumnTag: React.FC<TagProps> = ({
   label = '',
   closable = true,

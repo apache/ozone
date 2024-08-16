@@ -28,6 +28,7 @@ import Select, {
 import { selectStyles } from "@/v2/constants/select.constants";
 
 
+// ------------- Types -------------- //
 export type Option = {
   label: string;
   value: string;
@@ -39,6 +40,7 @@ interface SingleSelectProps extends ReactSelectProps<Option, false> {
   onChange: (arg0: ValueType<Option, false>) => void;
 }
 
+// ------------- Component -------------- //
 const SingleSelect: React.FC<SingleSelectProps> = ({
   options = [],
   placeholder = 'Limit',

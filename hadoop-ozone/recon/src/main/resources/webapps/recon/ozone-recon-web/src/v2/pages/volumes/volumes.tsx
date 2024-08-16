@@ -27,7 +27,7 @@ import {
 import { ValueType } from 'react-select/src/types';
 
 import QuotaBar from '@/components/quotaBar/quotaBar';
-import { AclPanel } from '@/components/aclDrawer/aclDrawer';
+import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 
@@ -163,7 +163,6 @@ const Volumes: React.FC<{}> = () => {
     data: [],
     lastUpdated: 0,
     columnOptions: defaultColumns,
-    showPanel: false,
     currentRow: {}
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -171,6 +170,7 @@ const Volumes: React.FC<{}> = () => {
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
   const [searchColumn, setSearchColumn] = useState<'volume' | 'owner' | 'admin'>('volume');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showPanel, setShowPanel] = useState<boolean>(false);
 
   const loadData = () => {
     setLoading(true);
@@ -253,9 +253,9 @@ const Volumes: React.FC<{}> = () => {
   function handleAclLinkClick(volume: Volume) {
     setState({
       ...state,
-      showPanel: true,
       currentRow: volume
-    })
+    });
+    setShowPanel(true);
   }
 
   function filterSelectedColumns() {
@@ -276,10 +276,9 @@ const Volumes: React.FC<{}> = () => {
   };
 
   const {
-    data,
-    lastUpdated,
-    columnOptions, showPanel,
-    currentRow } = state;
+    data, lastUpdated,
+    columnOptions, currentRow
+  } = state;
 
   return (
     <>
@@ -333,7 +332,12 @@ const Volumes: React.FC<{}> = () => {
             />
           </div>
         </div>
-        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume' />
+        <AclPanel
+          visible={showPanel}
+          acls={currentRow.acls}
+          entityName={currentRow.volume}
+          entityType='Volume'
+          onClose={() => setShowPanel(false)}/>
       </div>
     </>
   );

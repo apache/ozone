@@ -20,6 +20,7 @@ import React from 'react';
 import { Input, Select } from 'antd';
 import { Option } from '@/v2/components/select/singleSelect';
 
+// ------------- Types -------------- //
 type SearchProps = {
   searchColumn?: string;
   searchOptions?: Option[];
@@ -38,6 +39,7 @@ type SearchProps = {
   ) => void;
 }
 
+// ------------- Component -------------- //
 const Search: React.FC<SearchProps> = ({
   searchColumn,
   searchOptions = [],
