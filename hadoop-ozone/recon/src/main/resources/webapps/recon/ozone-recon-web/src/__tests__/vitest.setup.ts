@@ -16,7 +16,13 @@
 */
 
 import '@testing-library/jest-dom/vitest';
+import 'vitest-canvas-mock';
 
+
+/** jsdom currently doesn't implement a local storage
+ * Hence we need to implement a minimal storage functionality
+ * for the virtualDOM, to be able to use localstorage in virtual components
+*/
 const localStorageMock = (function () {
   let store: { [key: string]: any } = {}
 

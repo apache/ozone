@@ -76,7 +76,8 @@
     "vite": "4.5.3",
     "vite-plugin-svgr": "^4.2.0",
     "vite-tsconfig-paths": "^3.6.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "vitest-canvas-mock": "^0.3.3"
   },
   "proxy": "http://localhost:9888"
 }
