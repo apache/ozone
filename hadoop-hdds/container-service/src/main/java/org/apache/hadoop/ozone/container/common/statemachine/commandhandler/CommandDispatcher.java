@@ -98,7 +98,7 @@ public final class CommandDispatcher {
         LOG.error("Exception while handle command, ", ex);
       }
     } else {
-      LOG.warn("Unknown SCM Command queued. There is no handler for this " +
+      LOG.error("Unknown SCM Command queued. There is no handler for this " +
           "command. Command: {}", command.getType().getDescriptorForType()
           .getName());
     }
