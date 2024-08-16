@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { Children } from "react";
+import React from "react";
 import Select, {
   Props as ReactSelectProps,
   components,
@@ -53,14 +53,13 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
     const selectedLimit = props.getValue() as Option[];
     return (
       <components.ValueContainer {...props}>
-        {Children.map(children, (child) => (
-          !props.hasValue || 
-          (child as React.ReactElement<any, string
+        {React.Children.map(children, (child) => (
+          ((child as React.ReactElement<any, string
             | React.JSXElementConstructor<any>>
-            | React.ReactPortal)!.type === components.Input
+            | React.ReactPortal)?.type as React.JSXElementConstructor<any>)).name === "DummyInput"
           ? child
           : null
-        ))}
+        )}
         Limit: {selectedLimit[0]?.label ?? ''}
       </components.ValueContainer>
     );
@@ -71,8 +70,8 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
       {...props}
       isClearable={false}
       closeMenuOnSelect={true}
-      isSearchable={false}
       classNamePrefix='single-select'
+      isSearchable={false}
       options={options}
       components={{
         ValueContainer
