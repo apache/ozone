@@ -137,7 +137,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       throw new IllegalArgumentException(watchType + " is not supported. " +
           "Currently only ALL_COMMITTED or MAJORITY_COMMITTED are supported");
     }
-    LOG.info("WatchType {}. Majority {}, ", this.watchType, this.majority);
+    LOG.debug("WatchType {}. Majority {}, ", this.watchType, this.majority);
     if (LOG.isTraceEnabled()) {
       LOG.trace("new XceiverClientRatis for pipeline " + pipeline.getId(),
           new Throwable("TRACE"));
