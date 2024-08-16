@@ -41,6 +41,7 @@ import jakarta.annotation.Nonnull;
 import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,6 +92,14 @@ public class DNContainerOperationClient implements AutoCloseable {
     return xceiverClientManager;
   }
 
+  /**
+   * Reads {@link ContainerProtos.ContainerChecksumInfo} for a specified container for the specified datanode.
+   *
+   * @throws IOException For errors communicating with the datanode.
+   * @throws StorageContainerException For errors obtaining the checksum info, including the file being missing or
+   * empty on the datanode, or the datanode not having a replica of the container.
+   * @throws InvalidProtocolBufferException If the file received from the datanode cannot be deserialized.
+   */
   public ContainerProtos.ContainerChecksumInfo getContainerChecksumInfo(long containerId, DatanodeDetails dn)
       throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(createSingleNodePipeline(dn));
