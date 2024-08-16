@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from "react";
+import React, { Children } from "react";
 import Select, {
   Props as ReactSelectProps,
   components,
@@ -51,6 +51,14 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
     const selectedLimit = props.getValue() as Option[];
     return (
       <components.ValueContainer {...props}>
+        {Children.map(children, (child) => (
+          !props.hasValue || 
+          (child as React.ReactElement<any, string
+            | React.JSXElementConstructor<any>>
+            | React.ReactPortal)!.type === components.Input
+          ? child
+          : null
+        ))}
         Limit: {selectedLimit[0]?.label ?? ''}
       </components.ValueContainer>
     );
