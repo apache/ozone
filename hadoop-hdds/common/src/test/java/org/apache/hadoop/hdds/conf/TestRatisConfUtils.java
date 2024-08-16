@@ -44,9 +44,9 @@ public class TestRatisConfUtils {
 
     RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties, SizeInBytes.valueOf(logAppenderBufferByteLimit));
 
-    // setMessageSizeMax with a different logAppenderBufferByteLimit
+    // setMessageSizeMax with a value smaller than logAppenderBufferByteLimit
     Assertions.assertThrows(IllegalStateException.class,
-        () -> RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit + 1));
+        () -> RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit - 1));
 
     // setMessageSizeMax with the correct logAppenderBufferByteLimit
     RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
