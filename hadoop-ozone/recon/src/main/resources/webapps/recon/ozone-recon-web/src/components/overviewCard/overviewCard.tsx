@@ -27,7 +27,8 @@ import {
   FolderOpenOutlined,
   FileTextOutlined,
   QuestionCircleOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  HourglassOutlined
 } from '@ant-design/icons';
 import { RouteComponentProps } from 'react-router';
 import { withRouter, Link } from 'react-router-dom';
@@ -70,7 +71,8 @@ const IconSelector = ({ iconType, ...extras }: { iconType: string }) => {
     'inbox': <InboxOutlined {...extras} />,
     'folder-open': <FolderOpenOutlined {...extras} />,
     'file-text': <FileTextOutlined {...extras} />,
-    'delete': <DeleteOutlined {...extras} />
+    'delete': <DeleteOutlined {...extras} />,
+    'hourglass': <HourglassOutlined {...extras} />
   }
 
   const selectIcon = (type: string) => {

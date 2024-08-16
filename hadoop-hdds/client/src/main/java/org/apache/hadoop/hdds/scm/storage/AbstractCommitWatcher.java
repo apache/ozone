@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -62,7 +62,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
-  private long totalAckDataLength;
+  private final AtomicLong totalAckDataLength = new AtomicLong();
 
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
@@ -80,12 +80,11 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   /** @return the total data which has been acknowledged. */
   long getTotalAckDataLength() {
-    return totalAckDataLength;
+    return totalAckDataLength.get();
   }
 
   long addAckDataLength(long acked) {
-    totalAckDataLength += acked;
-    return totalAckDataLength;
+    return totalAckDataLength.addAndGet(acked);
   }
 
   /**
@@ -127,32 +126,35 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  XceiverClientReply watchForCommit(long commitIndex)
-      throws IOException {
+  CompletableFuture<XceiverClientReply> watchForCommitAsync(long commitIndex) {
     final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
         = JavaUtils.memoize(CompletableFuture::new);
     final CompletableFuture<XceiverClientReply> f = replies.compute(commitIndex,
         (key, value) -> value != null ? value : supplier.get());
     if (!supplier.isInitialized()) {
       // future already exists
-      return f.join();
+      return f;
     }
 
-    try {
-      final XceiverClientReply reply = client.watchForCommit(commitIndex);
+    return client.watchForCommit(commitIndex).thenApply(reply -> {
       f.complete(reply);
-      final CompletableFuture<XceiverClientReply> removed
-          = replies.remove(commitIndex);
+      final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
       Preconditions.checkState(removed == f);
 
       final long index = reply != null ? reply.getLogIndex() : 0;
       adjustBuffers(index);
       return reply;
+    });
+  }
+
+  XceiverClientReply watchForCommit(long commitIndex) throws IOException {
+    try {
+      return watchForCommitAsync(commitIndex).get();
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
       throw getIOExceptionForWatchForCommit(commitIndex, e);
-    } catch (TimeoutException | ExecutionException e) {
+    } catch (ExecutionException e) {
       throw getIOExceptionForWatchForCommit(commitIndex, e);
     }
   }
@@ -166,7 +168,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
   /** Release the buffers for the given index. */
   abstract void releaseBuffers(long index);
 
-  void adjustBuffers(long commitIndex) {
+  synchronized void adjustBuffers(long commitIndex) {
     commitIndexMap.keySet().stream()
         .filter(p -> p <= commitIndex)
         .forEach(this::releaseBuffers);

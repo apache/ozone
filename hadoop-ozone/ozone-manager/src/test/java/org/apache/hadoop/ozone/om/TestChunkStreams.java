@@ -97,7 +97,7 @@ public class TestChunkStreams {
   private BlockInputStream createStream(byte[] buf, int offset) throws IOException {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    return new BlockInputStream(null, 100, null, null, null,
+    return new BlockInputStream(null, 100L, null, null, null,
         clientConfig) {
       private long pos;
       private final ByteArrayInputStream in =

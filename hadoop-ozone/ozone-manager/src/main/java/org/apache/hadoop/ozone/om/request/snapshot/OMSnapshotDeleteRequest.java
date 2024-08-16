@@ -214,7 +214,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     }
 
     // Perform audit logging outside the lock
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_SNAPSHOT,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.DELETE_SNAPSHOT,
         snapshotInfo.toAuditMap(), exception, userInfo));
 
     final String snapshotPath = snapshotInfo.getSnapshotPath();
