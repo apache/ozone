@@ -204,9 +204,6 @@ public class TestContainerCommandReconciliation {
   @Test
   public void testGetCorruptChecksumInfo() throws Exception {
     long containerID = writeDataAndGetContainer(true);
-    // TODO After HDDS-10379 do not need to make this file manually anymore.
-    ContainerMerkleTree tree = buildTestTree(conf);
-    writeChecksumFileToDatanodes(containerID, tree);
 
     // Pick a datanode and corrupt its checksum file.
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
@@ -219,6 +216,26 @@ public class TestContainerCommandReconciliation {
     // Reading the file from the replica should fail when the client tries to deserialize it.
     assertThrows(InvalidProtocolBufferException.class, () -> dnClient.getContainerChecksumInfo(containerID,
         targetDN.getDatanodeDetails()));
+  }
+
+  @Test
+  public void testGetEmptyChecksumInfo() throws Exception {
+    long containerID = writeDataAndGetContainer(true);
+
+    // Pick a datanode and truncate its checksum file to zero length.
+    HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
+    Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
+        .getContainerSet().getContainer(containerID);
+    File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    // TODO After HDDS-10379 the file will already exist and need to be overwritten.
+    assertTrue(treeFile.createNewFile());
+    assertEquals(0, treeFile.length());
+
+    // The client will get an empty byte string back. It should raise this as an error instead of returning a default
+    // protobuf object.
+    StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
+        dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, ex.getResult());
   }
 
   @Test

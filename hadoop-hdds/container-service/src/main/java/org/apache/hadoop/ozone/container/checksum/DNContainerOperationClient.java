@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -102,8 +103,10 @@ public class DNContainerOperationClient implements AutoCloseable {
       ByteString serializedChecksumInfo = response.getContainerChecksumInfo();
       // Protobuf will convert an empty ByteString into a default value object. Treat this as an error instead, since
       // the default value will not represent the state of the container.
+      // The server does not deserialize the file before sending it, so we must check the length on the client.
       if (serializedChecksumInfo.isEmpty()) {
-        throw new FileNotFoundException("Container checksum file for container " + containerId + " not found.");
+        throw new StorageContainerException("Empty Container checksum file for container " + containerId + " received",
+            ContainerProtos.Result.IO_EXCEPTION);
       } else {
         return ContainerProtos.ContainerChecksumInfo.parseFrom(serializedChecksumInfo);
       }
