@@ -39,6 +39,7 @@ import java.util.concurrent.locks.Lock;
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +75,8 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    */
   public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
-    Lock writeLock = getWriteLock(data.getContainerID());
+    long containerID = data.getContainerID();
+    Lock writeLock = getWriteLock(containerID);
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
@@ -84,14 +86,15 @@ public class ContainerChecksumTreeManager {
             .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
       } catch (IOException ex) {
         LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
-            data.getContainerID(), ex);
+            containerID, ex);
         checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
       }
 
       checksumInfoBuilder
+          .setContainerID(containerID)
           .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
       write(data, checksumInfoBuilder.build());
-      LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
+      LOG.debug("Data merkle tree for container {} updated", containerID);
     } finally {
       writeLock.unlock();
     }
@@ -103,7 +106,8 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    */
   public void markBlocksAsDeleted(KeyValueContainerData data, Collection<Long> deletedBlockIDs) throws IOException {
-    Lock writeLock = getWriteLock(data.getContainerID());
+    long containerID = data.getContainerID();
+    Lock writeLock = getWriteLock(containerID);
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
@@ -123,10 +127,12 @@ public class ContainerChecksumTreeManager {
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
       checksumInfoBuilder
+          .setContainerID(containerID)
           .clearDeletedBlocks()
           .addAllDeletedBlocks(sortedDeletedBlockIDs);
       write(data, checksumInfoBuilder.build());
-      LOG.debug("Deleted block list for container {} updated", data.getContainerID());
+      LOG.debug("Deleted block list for container {} updated with {} new blocks", data.getContainerID(),
+          sortedDeletedBlockIDs.size());
     } finally {
       writeLock.unlock();
     }
@@ -185,6 +191,9 @@ public class ContainerChecksumTreeManager {
   }
 
   private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
+    // Make sure callers filled in all required fields before writing.
+    Preconditions.assertTrue(checksumInfo.hasContainerID());
+
     File checksumFile = getContainerChecksumFile(data);
     File tmpChecksumFile = getTmpContainerChecksumFile(data);
 
