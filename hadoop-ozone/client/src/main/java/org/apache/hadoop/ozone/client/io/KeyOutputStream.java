@@ -345,6 +345,14 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException Throws IOException if Write fails
    */
   private void handleExceptionInternal(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
+    try {
+      // Wait for all pending flushes in the faulty stream. It's possible that a prior write is pending completion
+      // successfully. Errors are ignored here and will be handled by the individual flush call. We just wall to ensure
+      // all the pending are complete before handling exception.
+      streamEntry.waitForAllPendingFlushes();
+    } catch (IOException ignored) {
+    }
+
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
     boolean retryFailure = checkForRetryFailure(t);

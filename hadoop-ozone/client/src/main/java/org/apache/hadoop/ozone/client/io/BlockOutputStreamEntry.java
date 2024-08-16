@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 public class BlockOutputStreamEntry extends OutputStream {
   public static final Logger LOG = LoggerFactory.getLogger(BlockOutputStreamEntry.class);
   private final OzoneClientConfig config;
-  private OutputStream outputStream;
+  private BlockOutputStream outputStream;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
@@ -146,6 +146,10 @@ public class BlockOutputStreamEntry extends OutputStream {
     retryHandlingCond.signalAll();
   }
 
+  void waitForAllPendingFlushes() throws IOException {
+    outputStream.waitForAllPendingFlushes();
+  }
+
   /**
    * Creates the outputStreams that are necessary to start the write.
    * Implementors can override this to instantiate multiple streams instead.
@@ -188,6 +192,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     BlockOutputStream out = (BlockOutputStream) getOutputStream();
     out.writeOnRetry(len);
     incCurrentPosition(len);
+    LOG.info("{}: Finish retrying with len {}, currentPosition {}", this, len, currentPosition);
   }
 
   @Override
