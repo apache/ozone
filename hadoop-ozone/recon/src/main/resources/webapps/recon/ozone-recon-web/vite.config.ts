@@ -76,20 +76,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    deps: {
-      optimizer: {
-        web: {
-          include: ['vitest-canvas-mock']
-        }
-      }
-    },
     setupFiles: 'src/__tests__/vitest.setup.ts',
     include: ["src/__tests__/**/*.test.tsx"],
-    reporters: ['verbose'],
-    environmentOptions: {
-      jsdom: {
-        resources: 'usable'
-      }
-    }
+    reporters: ['verbose']
   }
 });

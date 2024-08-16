@@ -47,5 +47,33 @@ const handlers = [
     );
   })
 ]
+
+const faultyHandlers = [
+  rest.get("api/v1/clusterState", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(null)
+    );
+  }),
+  rest.get("api/v1/task/status", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(null)
+    );
+  }),
+  rest.get("api/v1/keys/open/summary", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(null)
+    );
+  }),
+  rest.get("api/v1/keys/deletePending/summary", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(null)
+    );
+  })
+]
 //This will configure a request mocking server using MSW
 export const overviewServer = setupServer(...handlers);
+export const faultyOverviewServer = setupServer(...faultyHandlers);

@@ -34,7 +34,7 @@
     "start": "vite --port=3000",
     "build": "vite build",
     "serve": "vite preview",
-    "test": "vitest",
+    "test": "vitest --silent",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
     "lint": "eslint src/*",
@@ -76,8 +76,7 @@
     "vite": "4.5.3",
     "vite-plugin-svgr": "^4.2.0",
     "vite-tsconfig-paths": "^3.6.0",
-    "vitest": "^1.6.0",
-    "vitest-canvas-mock": "^0.3.3"
+    "vitest": "^1.6.0"
   },
   "proxy": "http://localhost:9888"
 }

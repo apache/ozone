@@ -30,7 +30,7 @@ import '@testing-library/react/dont-cleanup-after-each';
 import { cleanup, render, screen } from '@testing-library/react';
 
 import { overviewLocators } from '@tests/locators/locators';
-import { overviewServer } from '@tests/mocks/overviewMocks/overviewServer';
+import { faultyOverviewServer, overviewServer } from '@tests/mocks/overviewMocks/overviewServer';
 import Overview from '@/v2/pages/overview/overview';
 
 const WrappedOverviewComponent = () => {
@@ -41,14 +41,22 @@ const WrappedOverviewComponent = () => {
   )
 }
 
+/**
+ * We need to mock the EChart component as in the virtual DOM
+ * it cannot access the DOM height and width and will throw errors
+ * Hence we intercept and mock the import to return an empty
+ * React fragment
+ */
+vi.mock('@/v2/components/eChart/eChart', () => ({
+  default: () => (<></>)
+}))
+
 describe.each([
-  { scenario: true },
-  { scenario: false }
-])('Overview Tests - Data is present ? $scenario', ({ scenario }) => {
+  true,
+  false
+])('Overview Tests - Data is present = %s', (scenario) => {
   beforeAll(async () => {
-    if (scenario) {
-      overviewServer.listen();
-    }
+    (scenario) ? overviewServer.listen() : faultyOverviewServer.listen();
     render(
       <WrappedOverviewComponent />
     );
@@ -57,9 +65,8 @@ describe.each([
   });
 
   afterAll(() => {
-    if (scenario) {
-      overviewServer.close();
-    }
+    (scenario) ? overviewServer.close() : faultyOverviewServer.close();
+    vi.clearAllMocks();
     /**
      * Need to cleanup the DOM after one suite has completely run
      * Otherwise we will get duplicate elements

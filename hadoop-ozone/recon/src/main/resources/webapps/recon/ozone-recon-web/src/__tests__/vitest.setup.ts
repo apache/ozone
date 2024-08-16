@@ -16,7 +16,6 @@
 */
 
 import '@testing-library/jest-dom/vitest';
-import 'vitest-canvas-mock';
 
 
 /** jsdom currently doesn't implement a local storage
