@@ -375,10 +375,8 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
-  }
+    final CompletableFuture<Void> flushFuture = putBlockResultFuture.thenCompose(x -> watchForCommit(x.commitIndex));
 
-  private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
     Preconditions.checkState(Thread.holdsLock(this));
     this.lastFlushFuture = flushFuture;
     this.allPendingFlushFutures = allPendingFlushFutures.thenCombine(flushFuture, (last, curr) -> null);
@@ -477,13 +475,23 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Watch for a specific commit index.
+   * Send a watch request to wait until the given index became committed.
+   * When watch is not needed (e.g. EC), this is a NOOP.
+   *
+   * @param index the log index to wait for.
+   * @return the future of the reply.
    */
-  CompletableFuture<XceiverClientReply> sendWatchForCommit(long commitIndex) {
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long index) {
     return CompletableFuture.completedFuture(null);
   }
 
   private CompletableFuture<Void> watchForCommit(long commitIndex) {
+    try {
+      checkOpen();
+    } catch (IOException e) {
+      throw new FlushRuntimeException(e);
+    }
+
     LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
     return sendWatchForCommit(commitIndex)
         .thenAccept(this::checkReply)
@@ -493,7 +501,7 @@ public class BlockOutputStream extends OutputStream {
         .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
   }
 
-  void checkReply(XceiverClientReply reply) {
+  private void checkReply(XceiverClientReply reply) {
     if (reply == null) {
       return;
     }
@@ -722,17 +730,6 @@ public class BlockOutputStream extends OutputStream {
       recordWatchForCommitAsync(putBlockResultFuture);
     }
     return lastFlushFuture;
-  }
-
-  private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    return putBlockResultFuture.thenCompose(x -> {
-      try {
-        checkOpen();
-      } catch (IOException e) {
-        throw new FlushRuntimeException(e);
-      }
-      return watchForCommit(x.commitIndex);
-    });
   }
 
   @Override
