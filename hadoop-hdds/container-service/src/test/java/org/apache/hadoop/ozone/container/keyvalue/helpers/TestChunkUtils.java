@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -107,12 +106,15 @@ class TestChunkUtils {
           assertEquals(1, buffers.size());
           final ByteBuffer readBuffer = buffers.get(0);
 
+          int remaining = readBuffer.remaining();
+          byte[] readArray = new byte[remaining];
+          readBuffer.get(readArray);
           LOG.info("Read data ({}): {}", threadNumber,
-              new String(readBuffer.array(), UTF_8));
-          if (!Arrays.equals(array, readBuffer.array())) {
+              new String(readArray, UTF_8));
+          if (!Arrays.equals(array, readArray)) {
             failed.set(true);
           }
-          assertEquals(len, readBuffer.remaining());
+          assertEquals(len, remaining);
         } catch (Exception e) {
           LOG.error("Failed to read data ({})", threadNumber, e);
           failed.set(true);
@@ -210,9 +212,11 @@ class TestChunkUtils {
     final List<ByteBuffer> buffers = chunk.asByteBufferList();
     assertEquals(1, buffers.size());
     final ByteBuffer readBuffer = buffers.get(0);
-
-    assertArrayEquals(array, readBuffer.array());
-    assertEquals(len, readBuffer.remaining());
+    int remain = readBuffer.remaining();
+    byte[] readArray = new byte[remain];
+    readBuffer.get(readArray);
+    assertArrayEquals(array, readArray);
+    assertEquals(len, remain);
   }
 
   @Test
@@ -266,29 +270,29 @@ class TestChunkUtils {
       // large file
       final int large = 10 << 20; // 10MB
       assertThat(large).isGreaterThan(MAPPED_BUFFER_THRESHOLD);
-      runTestReadFile(large, dir, true);
+      runTestReadFile(large, dir);
 
       // small file
       final int small = 30 << 10; // 30KB
       assertThat(small).isLessThanOrEqualTo(MAPPED_BUFFER_THRESHOLD);
-      runTestReadFile(small, dir, false);
+      runTestReadFile(small, dir);
 
       // boundary case
-      runTestReadFile(MAPPED_BUFFER_THRESHOLD, dir, false);
+      runTestReadFile(MAPPED_BUFFER_THRESHOLD, dir);
 
       // empty file
-      runTestReadFile(0, dir, false);
+      runTestReadFile(0, dir);
 
       for (int i = 0; i < 10; i++) {
         final int length = RANDOM.nextInt(2 * MAPPED_BUFFER_THRESHOLD) + 1;
-        runTestReadFile(length, dir, length > MAPPED_BUFFER_THRESHOLD);
+        runTestReadFile(length, dir);
       }
     } finally {
       FileUtils.deleteDirectory(dir);
     }
   }
 
-  void runTestReadFile(int length, File dir, boolean isMapped)
+  void runTestReadFile(int length, File dir)
       throws Exception {
     final File file;
     for (int i = length; ; i++) {
@@ -328,7 +332,6 @@ class TestChunkUtils {
 
     RANDOM.setSeed(seed);
     for (ByteBuffer b : buffers) {
-      assertEquals(isMapped, b instanceof MappedByteBuffer);
       RANDOM.nextBytes(array);
       assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);
     }
