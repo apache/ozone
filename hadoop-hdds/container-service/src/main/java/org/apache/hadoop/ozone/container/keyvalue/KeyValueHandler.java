@@ -1289,7 +1289,7 @@ public class KeyValueHandler extends Handler {
     try {
       final State state = container.getContainerState();
       // Close call is idempotent.
-      if (state == CLOSED) {
+      if (state == State.CLOSED) {
         return;
       }
       if (state == State.UNHEALTHY) {

@@ -191,7 +191,7 @@ public class ContainerChecksumTreeManager {
   }
 
   private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
-    // Make sure callers filled in all required fields before writing.
+    // Make sure callers filled in required fields before writing.
     Preconditions.assertTrue(checksumInfo.hasContainerID());
 
     File checksumFile = getContainerChecksumFile(data);

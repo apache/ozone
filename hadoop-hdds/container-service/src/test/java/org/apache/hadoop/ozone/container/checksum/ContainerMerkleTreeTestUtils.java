@@ -121,10 +121,11 @@ public final class ContainerMerkleTreeTestUtils {
     }
   }
 
+  /**
+   * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
+   * structure is preserved throughout serialization, deserialization, and API calls.
+   */
   public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) throws Exception {
-    final long blockID1 = 1;
-    final long blockID2 = 2;
-    final long blockID3 = 3;
     ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
     ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
@@ -133,9 +134,9 @@ public final class ContainerMerkleTreeTestUtils {
     ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
 
     ContainerMerkleTree tree = new ContainerMerkleTree();
-    tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
-    tree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
-    tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
+    tree.addChunks(1, Arrays.asList(b1c1, b1c2));
+    tree.addChunks(2, Arrays.asList(b2c1, b2c2));
+    tree.addChunks(3, Arrays.asList(b3c1, b3c2));
 
     return tree;
   }

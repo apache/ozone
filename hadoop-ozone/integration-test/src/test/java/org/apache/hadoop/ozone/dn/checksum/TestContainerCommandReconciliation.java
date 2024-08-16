@@ -229,7 +229,7 @@ public class TestContainerCommandReconciliation {
     ContainerMerkleTree tree = buildTestTree(conf);
     writeChecksumFileToDatanodes(containerID, tree);
 
-    // Verify all the ContainerMerkle Tree matches.
+    // Verify trees match on all replicas.
     // This test is expecting Ratis 3 data written on a 3 node cluster, so every node has a replica.
     assertEquals(3, cluster.getHddsDatanodes().size());
     List<DatanodeDetails> datanodeDetails = cluster.getHddsDatanodes().stream()

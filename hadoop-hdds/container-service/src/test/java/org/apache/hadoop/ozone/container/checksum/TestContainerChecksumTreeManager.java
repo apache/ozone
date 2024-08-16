@@ -267,6 +267,38 @@ class TestContainerChecksumTreeManager {
     assertTreesSortedAndMatch(tree.toProto(), readChecksumFile(container).getContainerMerkleTree());
   }
 
+  /**
+   * An empty file will be interpreted by protobuf to be an object with default values.
+   * The checksum manager should overwrite this if it is encountered.
+   */
+  @Test
+  public void testEmptyFile() throws Exception {
+    // Write file
+    File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
+    assertFalse(finalFile.exists());
+    ContainerMerkleTree tree = buildTestTree(config);
+    checksumManager.writeContainerDataTree(container, tree);
+    assertTrue(finalFile.exists());
+
+    // Truncate the file to zero length.
+    Files.write(finalFile.toPath(), new byte[0],
+        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+    assertEquals(0, finalFile.length());
+
+    // The truncated file will be interpreted as an empty protobuf object.
+    // Use a test helper method to read it directly and confirm this.
+    ContainerProtos.ContainerChecksumInfo emptyInfo = readChecksumFile(container);
+    assertFalse(emptyInfo.hasContainerID());
+    assertFalse(emptyInfo.hasContainerMerkleTree());
+
+    // The manager's read/modify/write cycle should account for the empty file and overwrite it with a valid entry.
+    // No exception should be thrown.
+    checksumManager.writeContainerDataTree(container, tree);
+    ContainerProtos.ContainerChecksumInfo info = readChecksumFile(container);
+    assertTreesSortedAndMatch(tree.toProto(), info.getContainerMerkleTree());
+    assertEquals(CONTAINER_ID, info.getContainerID());
+  }
+
   @Test
   public void testChecksumTreeFilePath() {
     assertEquals(checksumFile.getAbsolutePath(),
