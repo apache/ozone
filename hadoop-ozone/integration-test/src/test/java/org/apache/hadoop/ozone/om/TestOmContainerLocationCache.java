@@ -624,7 +624,7 @@ public class TestOmContainerLocationCache {
       }
     }
 
-    // case1: pipeline replicaIndexes missing some data indexes, not cache
+    // case1: pipeline replicaIndexes missing some data indexes, should not cache
     mockScmGetContainerEcPipeline(CONTAINER_ID.get(), ImmutableMap.of(DN1, 1, DN2, 2, DN4, 4));
     bucket.getKey(keyName);
     verify(mockScmContainerClient, times(1))
@@ -633,7 +633,7 @@ public class TestOmContainerLocationCache {
     verify(mockScmContainerClient, times(2))
         .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
-    // case2: pipeline replicaIndexes contain all data indexes, cache
+    // case2: pipeline replicaIndexes contain all data indexes, should cache
     mockScmGetContainerEcPipeline(CONTAINER_ID.get(), ImmutableMap.of(DN1, 1, DN2, 2, DN3, 3, DN4, 4));
     bucket.getKey(keyName);
     verify(mockScmContainerClient, times(3))

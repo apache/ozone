@@ -35,11 +35,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT;
@@ -55,7 +53,6 @@ public class ScmClient {
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
-  private static final Map<Integer, Set<Integer>> EC_DATA_INDEXES = new HashMap<>();
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
@@ -126,13 +123,14 @@ public class ScmClient {
             if (pipeline.isEmpty()) {
               return true;
             }
-            // filter insufficient EC pipelines
+            // filter insufficient EC pipelines which missing any data index
             ReplicationConfig repConfig = pipeline.getReplicationConfig();
             if (repConfig instanceof ECReplicationConfig) {
               int d = ((ECReplicationConfig) repConfig).getData();
-              Set<Integer> dataIndexes = EC_DATA_INDEXES.computeIfAbsent(d, k ->
-                  IntStream.rangeClosed(1, d).boxed().collect(Collectors.toSet()));
-              return !pipeline.getReplicaIndexes().values().containsAll(dataIndexes);
+              List<Integer> indexes = pipeline.getReplicaIndexes().values().stream()
+                  .sorted()
+                  .collect(Collectors.toList());
+              return !(indexes.size() >= d && indexes.get(d - 1) == d);
             }
             return false;
           })
