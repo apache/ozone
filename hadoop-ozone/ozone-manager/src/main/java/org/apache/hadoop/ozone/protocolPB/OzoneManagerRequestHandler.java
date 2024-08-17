@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -235,6 +236,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysLightResponse listKeysLightResponse = listKeysLight(
             request.getListKeysRequest());
         responseBuilder.setListKeysLightResponse(listKeysLightResponse);
+        break;
+      case ListTrash:
+        ListTrashResponse listTrashResponse = listTrash(
+            request.getListTrashRequest(), request.getVersion());
+        responseBuilder.setListTrashResponse(listTrashResponse);
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
@@ -822,10 +828,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
+  @Deprecated
   private ListTrashResponse listTrash(ListTrashRequest request,
       int clientVersion) throws IOException {
-    // listTrash is deprecated
-    throw new UnsupportedOperationException();
+  
+    ListTrashResponse.Builder resp =
+        ListTrashResponse.newBuilder();
+
+    List<RepeatedOmKeyInfo> deletedKeys = impl.listTrash(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKeyName(),
+        request.getKeyPrefix(),
+        request.getMaxKeys());
+
+    for (RepeatedOmKeyInfo key: deletedKeys) {
+      resp.addDeletedKeys(key.getProto(false, clientVersion));
+    }
+
+    return resp.build();
   }
 
   @RequestFeatureValidator(

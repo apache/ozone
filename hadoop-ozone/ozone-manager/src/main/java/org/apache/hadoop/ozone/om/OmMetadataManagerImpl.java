@@ -1386,11 +1386,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // TODO: HDDS-2419 - Complete stub below for core logic
+  @Deprecated
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException {
-    // listTrash is deprecated
-    throw new UnsupportedOperationException();
+  
+    List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
+    return deletedKeys;
   }
 
   @Override
@@ -1469,11 +1471,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
+  @Deprecated
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
-    //recoverTrash is deprecated
-    throw new UnsupportedOperationException();
+  
+    /* TODO: HDDS-2425 and HDDS-2426
+        core logic stub would be added in later patch.
+     */
+
+    boolean recoverOperation = true;
+    return recoverOperation;
   }
 
   /**

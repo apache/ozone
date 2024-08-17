@@ -300,21 +300,22 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
 
+  @Deprecated
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
                                            String startKeyName,
                                            String keyPrefix, int maxKeys)
       throws IOException {
-    // listTrash is deprecated
-    throw new UnsupportedOperationException();
+  
+    return null;
   }
 
+  @Deprecated
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
                               String keyName, String destinationBucket)
       throws IOException {
-    // recoverTrash is deprecated
-    throw new UnsupportedOperationException();
+    return false;
   }
 
   @Override

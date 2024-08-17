@@ -660,12 +660,21 @@ public class KeyManagerImpl implements KeyManager {
     return listKeysResult;
   }
 
+  @Deprecated
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix,
       int maxKeys) throws IOException {
-    // listTrash is deprecated
-    throw new UnsupportedOperationException();
+  
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    Preconditions.checkArgument(maxKeys <= listTrashKeysMax,
+        "The max keys limit specified is not less than the cluster " +
+          "allowed maximum limit.");
+
+    return metadataManager.listTrash(volumeName, bucketName,
+     startKeyName, keyPrefix, maxKeys);
+
   }
 
   @Override

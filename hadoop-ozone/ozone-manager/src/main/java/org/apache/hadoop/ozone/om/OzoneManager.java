@@ -2942,12 +2942,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
+  @Deprecated
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
-    // listTrash is deprecated
-    throw new UnsupportedOperationException();
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    auditMap.put(OzoneConsts.START_KEY, startKeyName);
+    auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
+    try {
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET,
+            StoreType.OZONE, ACLType.LIST,
+            volumeName, bucketName, keyPrefix);
+      }
+      metrics.incNumTrashKeyLists();
+      return keyManager.listTrash(volumeName, bucketName,
+          startKeyName, keyPrefix, maxKeys);
+    } catch (IOException ex) {
+      metrics.incNumTrashKeyListFails();
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_TRASH,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_TRASH,
+            auditMap));
+      }
+    }
   }
 
   @Override
