@@ -34,7 +34,7 @@
     "start": "vite --port=3000",
     "build": "vite build",
     "serve": "vite preview",
-    "test": "vitest --silent",
+    "test": "vitest",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
     "lint": "eslint src/*",
