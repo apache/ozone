@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Objects;
+import java.util.LinkedHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -112,7 +115,7 @@ public class StateContext {
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
-  private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
+  private final Map<InetSocketAddress, LinkedHashMap<PipelineKey, PipelineAction>> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -178,7 +181,7 @@ public class StateContext {
     pipelineReports = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
-    pipelineActions = new HashMap<>();
+    pipelineActions = new ConcurrentHashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
@@ -542,21 +545,23 @@ public class StateContext {
    * @param pipelineAction PipelineAction to be added
    */
   public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
-    synchronized (pipelineActions) {
-      /**
-       * If pipelineAction queue already contains entry for the pipeline id
-       * with same action, we should just return.
-       * Note: We should not use pipelineActions.contains(pipelineAction) here
-       * as, pipelineAction has a msg string. So even if two msgs differ though
-       * action remains same on the given pipeline, it will end up adding it
-       * multiple times here.
-       */
-      for (InetSocketAddress endpoint : endpoints) {
-        final Queue<PipelineAction> actionsForEndpoint =
-            pipelineActions.get(endpoint);
-        if (actionsForEndpoint.stream().noneMatch(
+    /**
+     * If pipelineAction queue already contains entry for the pipeline id
+     * with same action, we should just return.
+     * Note: We should not use pipelineActions.contains(pipelineAction) here
+     * as, pipelineAction has a msg string. So even if two msgs differ though
+     * action remains same on the given pipeline, it will end up adding it
+     * multiple times here.
+     */
+    for (InetSocketAddress endpoint : endpoints) {
+      final Map<PipelineKey, PipelineAction> actionsForEndpoint =
+          pipelineActions.get(endpoint);
+      synchronized (actionsForEndpoint) {
+        if (actionsForEndpoint.values().stream().noneMatch(
             action -> isSameClosePipelineAction(action, pipelineAction))) {
-          actionsForEndpoint.add(pipelineAction);
+          actionsForEndpoint.put(new PipelineKey(
+              pipelineAction.getClosePipeline().getPipelineID(),
+                  pipelineAction.getAction()), pipelineAction);
         }
       }
     }
@@ -572,33 +577,39 @@ public class StateContext {
       InetSocketAddress endpoint,
       int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
-    List<PipelineAction> persistPipelineAction = new ArrayList<>();
-    synchronized (pipelineActions) {
-      if (!pipelineActions.isEmpty() &&
-          CollectionUtils.isNotEmpty(pipelineActions.get(endpoint))) {
-        Queue<PipelineAction> actionsForEndpoint =
-            this.pipelineActions.get(endpoint);
-        int size = actionsForEndpoint.size();
-        int limit = size > maxLimit ? maxLimit : size;
-        for (int count = 0; count < limit; count++) {
-          // Add closePipeline back to the pipelineAction queue until
-          // pipeline is closed and removed from the DN.
-          PipelineAction action = actionsForEndpoint.poll();
-          if (action.hasClosePipeline()) {
-            if (parentDatanodeStateMachine.getContainer().getPipelineReport()
-                .getPipelineReportList().stream().noneMatch(
-                    report -> action.getClosePipeline().getPipelineID()
-                        .equals(report.getPipelineID()))) {
-              continue;
-            }
-            persistPipelineAction.add(action);
-          }
-          pipelineActionList.add(action);
-        }
-        actionsForEndpoint.addAll(persistPipelineAction);
-      }
+    if (pipelineActions.isEmpty() || pipelineActions.get(endpoint) == null
+        || pipelineActions.get(endpoint).isEmpty()) {
       return pipelineActionList;
     }
+    Map<PipelineKey, PipelineAction> persistPipelineAction = new HashMap<>();
+    final Map<PipelineKey, PipelineAction> actionsForEndpoint =
+        pipelineActions.get(endpoint);
+    synchronized (actionsForEndpoint) {
+      int size = actionsForEndpoint.size();
+      int limit = size > maxLimit ? maxLimit : size;
+      int count = 0;
+      actionsForEndpoint.forEach((key, action) -> {
+        if (count > limit) {
+          return;
+        }
+        boolean flg = false;
+        if (action.hasClosePipeline()) {
+          if (parentDatanodeStateMachine.getContainer().getPipelineReport()
+              .getPipelineReportList().stream().noneMatch(
+                  report -> key.getPipelineID().equals(report.getPipelineID()))) {
+            flg = true;
+          } else {
+            persistPipelineAction.put(key, action);
+          }
+        }
+        if (!flg) {
+          pipelineActionList.add(action);
+        }
+      });
+      actionsForEndpoint.clear();
+      actionsForEndpoint.putAll(persistPipelineAction);
+    }
+    return pipelineActionList;
   }
 
   /**
@@ -927,7 +938,7 @@ public class StateContext {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
-      this.pipelineActions.put(endpoint, new LinkedList<>());
+      this.pipelineActions.put(endpoint, new LinkedHashMap<>());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
       Map<String, AtomicBoolean> mp = new HashMap<>();
       fullReportTypeList.forEach(e -> {
@@ -987,5 +998,40 @@ public class StateContext {
 
   public String getThreadNamePrefix() {
     return threadNamePrefix;
+  }
+
+  static class PipelineKey {
+    private final HddsProtos.PipelineID pipelineID;
+    private final PipelineAction.Action action;
+
+    PipelineKey(HddsProtos.PipelineID pipelineID, PipelineAction.Action action) {
+      this.pipelineID = pipelineID;
+      this.action = action;
+    }
+
+    public HddsProtos.PipelineID getPipelineID() {
+      return pipelineID;
+    }
+
+    public PipelineAction.Action getAction() {
+      return action;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(pipelineID);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof PipelineKey)) {
+        return false;
+      }
+      final PipelineKey that = (PipelineKey) obj;
+      return Objects.equals(this.action, that.action)
+          && Objects.equals(this.pipelineID, that.pipelineID);
+    }
   }
 }
