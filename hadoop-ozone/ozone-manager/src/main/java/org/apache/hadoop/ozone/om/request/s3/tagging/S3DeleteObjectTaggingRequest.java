@@ -163,7 +163,7 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.DELETE_OBJECT_TAGGING, auditMap, exception, getOmRequest().getUserInfo()
     ));
 

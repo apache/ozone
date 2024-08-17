@@ -165,7 +165,7 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.PUT_OBJECT_TAGGING, auditMap, exception, getOmRequest().getUserInfo()
     ));
 
