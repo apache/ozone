@@ -291,7 +291,7 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
-            () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10));
+            () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10).get());
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
@@ -348,7 +348,7 @@ public class TestWatchForCommit {
             .getCloseContainer(pipeline,
                 container1.getContainerInfo().getContainerID()));
         reply.getResponse().get();
-        xceiverClient.watchForCommit(reply.getLogIndex());
+        xceiverClient.watchForCommit(reply.getLogIndex()).get();
 
         // commitInfo Map will be reduced to 2 here
         if (watchType == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
@@ -392,9 +392,8 @@ public class TestWatchForCommit {
         // just watch for a log index which in not updated in the commitInfo Map
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
-        Exception e =
-            assertThrows(Exception.class,
-                () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10));
+        final Exception e = assertThrows(Exception.class,
+            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10).get());
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       } finally {
         clientManager.releaseClient(xceiverClient, false);

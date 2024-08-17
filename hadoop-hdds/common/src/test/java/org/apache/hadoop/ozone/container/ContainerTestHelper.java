@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.UniqueId;
@@ -50,6 +52,7 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -380,11 +383,23 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    return newPutBlockRequestBuilder(pipeline, writeRequest).build();
+    return getPutBlockRequest(pipeline, writeRequest, false);
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest, boolean incremental)
+      throws IOException {
+    return newPutBlockRequestBuilder(pipeline, writeRequest, incremental).build();
   }
 
   public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
       ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
+      throws IOException {
+    return newPutBlockRequestBuilder(pipeline, writeRequest, false);
+  }
+
+  public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest, boolean incremental)
       throws IOException {
     LOG.trace("putBlock: {} to pipeline={}",
         writeRequest.getBlockID(), pipeline);
@@ -398,6 +413,9 @@ public final class ContainerTestHelper {
     newList.add(writeRequest.getChunkData());
     blockData.setChunks(newList);
     blockData.setBlockCommitSequenceId(0);
+    if (incremental) {
+      blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+    }
     putRequest.setBlockData(blockData.getProtoBufMessage());
 
     Builder request =
@@ -517,6 +535,25 @@ public final class ContainerTestHelper {
         .build();
   }
 
+  @Nonnull
+  public static ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
+      long localID, ContainerInfo container, String uuidString) {
+    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.FinalizeBlock)
+            .setContainerID(container.getContainerID())
+            .setDatanodeUuid(uuidString);
+
+    final ContainerProtos.DatanodeBlockID blockId =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(container.getContainerID()).setLocalID(localID)
+            .setBlockCommitSequenceId(0).build();
+
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
+    return builder.build();
+  }
+
   public static BlockID getTestBlockID(long containerID) {
     return getTestBlockID(containerID, null);
   }
@@ -614,6 +651,12 @@ public final class ContainerTestHelper {
                   .setBlockID(fakeBlockId)
                   .build())
               .build());
+      break;
+    case FinalizeBlock:
+      builder
+          .setFinalizeBlock(ContainerProtos
+            .FinalizeBlockRequestProto.newBuilder()
+            .setBlockID(fakeBlockId).build());
       break;
 
     default:

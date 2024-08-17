@@ -139,7 +139,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     if (ozoneAcls != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
     }
-    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 

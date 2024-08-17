@@ -26,6 +26,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -70,6 +72,7 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -94,6 +97,7 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.JavaUtils;
@@ -198,19 +202,23 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private final Semaphore applyTransactionSemaphore;
   private final boolean waitOnBothFollowers;
+  private final HddsDatanodeService datanodeService;
+  private static Semaphore semaphore = new Semaphore(1);
+
   /**
    * CSM metrics.
    */
   private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
-  public ContainerStateMachine(RaftGroupId gid,
+  public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
       ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer,
       ConfigurationSource conf,
       String threadNamePrefix) {
+    this.datanodeService = hddsDatanodeService;
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -429,25 +437,45 @@ public class ContainerStateMachine extends BaseStateMachine {
     // once the token is verified, clear it from the proto
     final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
         .clearEncodedToken();
-    if (proto.getCmdType() == Type.WriteChunk) {
+    boolean blockAlreadyFinalized = false;
+    if (proto.getCmdType() == Type.PutBlock) {
+      blockAlreadyFinalized = shouldRejectRequest(proto.getPutBlock().getBlockData().getBlockID());
+    } else if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
-      Preconditions.checkArgument(write.hasData());
-      Preconditions.checkArgument(!write.getData().isEmpty());
-      // skipping the data field as it is already set in statemachine data proto
-      final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
-          .clearData();
-      protoBuilder.setWriteChunk(commitWriteChunkProto)
-          .setPipelineID(gid.getUuid().toString())
-          .setTraceID(proto.getTraceID());
+      blockAlreadyFinalized = shouldRejectRequest(write.getBlockID());
+      if (!blockAlreadyFinalized) {
+        Preconditions.checkArgument(write.hasData());
+        Preconditions.checkArgument(!write.getData().isEmpty());
+        final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
+            .clearData();
+        protoBuilder.setWriteChunk(commitWriteChunkProto)
+            .setPipelineID(gid.getUuid().toString())
+            .setTraceID(proto.getTraceID());
 
-      builder.setStateMachineData(write.getData());
+        builder.setStateMachineData(write.getData());
+      }
+    } else if (proto.getCmdType() == Type.FinalizeBlock) {
+      containerController.addFinalizedBlock(proto.getContainerID(),
+          proto.getFinalizeBlock().getBlockID().getLocalID());
     }
-    final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
-    TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
-        .setLogData(containerCommandRequestProto.toByteString())
-        .build();
-    metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
-    return txnContext;
+
+    if (blockAlreadyFinalized) {
+      TransactionContext transactionContext = builder.build();
+      transactionContext.setException(new StorageContainerException("Block already finalized",
+          ContainerProtos.Result.BLOCK_ALREADY_FINALIZED));
+      return transactionContext;
+    } else {
+      final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
+      TransactionContext txnContext = builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
+          .setLogData(containerCommandRequestProto.toByteString())
+          .build();
+      metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
+      return txnContext;
+    }
+  }
+
+  private boolean shouldRejectRequest(ContainerProtos.DatanodeBlockID blockID) {
+    return containerController.isFinalizedBlockExist(blockID.getContainerID(), blockID.getLocalID());
   }
 
   private static ContainerCommandRequestProto getContainerCommandRequestProto(
@@ -882,6 +910,49 @@ public class ContainerStateMachine extends BaseStateMachine {
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastApplied();
     removeStateMachineDataIfNeeded(index);
+  }
+
+  @Override
+  public void notifyServerShutdown(RaftProtos.RoleInfoProto roleInfo, boolean allServer) {
+    // if datanodeService is stopped , it indicates this `close` originates
+    // from `HddsDatanodeService.stop()`, otherwise, it indicates this `close` originates from ratis.
+    if (allServer) {
+      if (datanodeService != null && !datanodeService.isStopped()) {
+        LOG.info("{} is closed by ratis", gid);
+        if (semaphore.tryAcquire()) {
+          // run with a different thread, so this raft group can be closed
+          Runnable runnable = () -> {
+            try {
+              int closed = 0, total = 0;
+              try {
+                Thread.sleep(5000); // sleep 5s
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+              Iterator<RaftGroupId> iterator = ratisServer.getServer().getGroupIds().iterator();
+              while (iterator.hasNext()) {
+                RaftGroupId id = iterator.next();
+                RaftServer.Division division = ratisServer.getServer().getDivision(id);
+                if (division.getRaftServer().getLifeCycleState() == LifeCycle.State.CLOSED) {
+                  closed++;
+                }
+                total++;
+              }
+              LOG.error("Container statemachine is closed by ratis, terminating HddsDatanodeService. " +
+                  "closed({})/total({})", closed, total);
+              datanodeService.terminateDatanode();
+            } catch (IOException e) {
+              LOG.warn("Failed to get division for raft groups", e);
+              LOG.error("Container statemachine is closed by ratis, terminating HddsDatanodeService");
+              datanodeService.terminateDatanode();
+            }
+          };
+          CompletableFuture.runAsync(runnable);
+        }
+      } else {
+        LOG.info("{} is closed by HddsDatanodeService", gid);
+      }
+    }
   }
 
   private CompletableFuture<ContainerCommandResponseProto> applyTransaction(

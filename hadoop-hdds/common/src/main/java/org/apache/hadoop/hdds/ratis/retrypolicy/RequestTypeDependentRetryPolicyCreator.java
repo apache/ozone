@@ -96,6 +96,8 @@ public class RequestTypeDependentRetryPolicyCreator
             toTimeDuration(ratisClientConfig.getExponentialPolicyBaseSleep()))
         .setMaxSleepTime(
             toTimeDuration(ratisClientConfig.getExponentialPolicyMaxSleep()))
+        .setMaxAttempts(
+            ratisClientConfig.getExponentialPolicyMaxRetries())
         .build();
   }
 

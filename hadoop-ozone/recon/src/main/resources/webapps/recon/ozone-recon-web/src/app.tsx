@@ -18,15 +18,16 @@
 
 import React from 'react';
 
-import { Layout } from 'antd';
-import './app.less';
+import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
-import { routes } from './routes';
-import { MakeRouteWithSubRoutes } from './makeRouteWithSubRoutes';
+import { routes } from '@/routes';
+import { routesV2 } from '@/v2/routes-v2';
+import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
+import './app.less';
 
 const {
   Header, Content, Footer
@@ -34,12 +35,16 @@ const {
 
 interface IAppState {
   collapsed: boolean;
+  enableNewUI: boolean;
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
   constructor(props = {}) {
     super(props);
-    this.state = { collapsed: false };
+    this.state = {
+      collapsed: false,
+      enableNewUI: false
+    };
   }
 
   onCollapse = (collapsed: boolean) => {
@@ -47,8 +52,9 @@ class App extends React.Component<Record<string, object>, IAppState> {
   };
 
   render() {
-    const { collapsed } = this.state;
+    const { collapsed, enableNewUI } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
+
 
     return (
       <Router>
@@ -56,17 +62,28 @@ class App extends React.Component<Record<string, object>, IAppState> {
           <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
           <Layout className={layoutClass}>
             <Header>
-              <div style={{ margin: '16px 0' }}>
+              <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
+                <AntDSwitch
+                  disabled={true}
+                  checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                  onChange={(checked: boolean) => {
+                    this.setState({
+                      enableNewUI: checked
+                    });
+                  }} />
               </div>
             </Header>
-            <Content style={{ margin: '0 16px 0', overflow: 'initial' }}>
+            <Content style={(enableNewUI) ? {} : { margin: '0 16px 0', overflow: 'initial' }}>
               <Switch>
                 <Route exact path='/'>
                   <Redirect to='/Overview' />
                 </Route>
-                {
-                  routes.map(
+                {(enableNewUI)
+                  ? routesV2.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                  )
+                  : routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )
                 }

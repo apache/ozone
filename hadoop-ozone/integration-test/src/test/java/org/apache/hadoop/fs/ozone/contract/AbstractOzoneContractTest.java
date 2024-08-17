@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
+import org.apache.hadoop.fs.contract.AbstractContractLeaseRecoveryTest;
 import org.apache.hadoop.fs.contract.AbstractContractMkdirTest;
 import org.apache.hadoop.fs.contract.AbstractContractOpenTest;
 import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,6 +48,7 @@ import java.time.Duration;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
@@ -309,6 +312,47 @@ abstract class AbstractOzoneContractTest {
     @Override
     protected AbstractFSContract createContract(Configuration conf) {
       return createOzoneContract(conf);
+    }
+  }
+
+  @Nested
+  class TestContractLeaseRecovery extends AbstractContractLeaseRecoveryTest {
+
+    @Override
+    protected AbstractFSContract createContract(Configuration conf) {
+      return createOzoneContract(conf);
+    }
+
+    @Override
+    protected Configuration createConfiguration() {
+      return createOzoneConfig();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecovery() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecovery();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecoveryFileNotExist() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecoveryFileNotExist();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecoveryFileOnDirectory() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecoveryFileOnDirectory();
     }
   }
 

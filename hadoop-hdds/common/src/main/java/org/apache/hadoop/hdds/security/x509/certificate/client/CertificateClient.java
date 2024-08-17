@@ -20,7 +20,9 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
@@ -155,13 +157,13 @@ public interface CertificateClient extends Closeable {
       X509Certificate cert) throws CertificateException;
 
   /**
-   * Returns a CSR builder that can be used to create a Certificate sigining
-   * request.
+   * Returns a CertificateSignRequest Builder object, that can be used to configure the sign request
+   * which we use to get  a signed certificate from our CA server implementation.
    *
-   * @return CertificateSignRequest.Builder
+   * @return CertificateSignRequest.Builder a {@link CertificateSignRequest}
+   *           based on which the certificate may be issued to this client.
    */
-  CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException;
+  CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException;
 
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
@@ -174,15 +176,9 @@ public interface CertificateClient extends Closeable {
     }
   }
 
-  /**
-   * Return the store factory for key manager and trust manager for server.
-   */
-  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+  ReloadingX509KeyManager getKeyManager() throws CertificateException;
 
-  /**
-   * Return the store factory for key manager and trust manager for client.
-   */
-  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+  ReloadingX509TrustManager getTrustManager() throws CertificateException;
 
   /**
    * Register a receiver that will be called after the certificate renewed.

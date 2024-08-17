@@ -30,7 +30,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
-import org.apache.hadoop.util.PerformanceMetrics;
+import org.apache.hadoop.ozone.util.PerformanceMetrics;
 import org.apache.hadoop.util.Time;
 
 /**
