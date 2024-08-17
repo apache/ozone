@@ -831,7 +831,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Deprecated
   private ListTrashResponse listTrash(ListTrashRequest request,
       int clientVersion) throws IOException {
-  
+
     ListTrashResponse.Builder resp =
         ListTrashResponse.newBuilder();
 

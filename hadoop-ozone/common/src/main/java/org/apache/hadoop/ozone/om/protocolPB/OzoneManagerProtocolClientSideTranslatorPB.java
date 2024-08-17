@@ -2444,7 +2444,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
-    
+
     Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
         "The volume name cannot be null or " +
         "empty.  Please enter a valid volume name or use '*' as a wild card");
@@ -2485,7 +2485,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
-  
+
     Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
         "The volume name cannot be null or empty. " +
         "Please enter a valid volume name.");
