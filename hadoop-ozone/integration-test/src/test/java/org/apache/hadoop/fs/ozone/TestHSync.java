@@ -173,7 +173,6 @@ public class TestHSync {
     // Reduce KeyDeletingService interval
     CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    CONF.setBoolean("ozone.fs.hsync.enabled", true);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
