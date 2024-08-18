@@ -174,7 +174,7 @@ public class TestObjectTaggingPut {
     endpoint.setClient(mockClient);
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
-        ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("fsoBucket", twoTagsMap);
+        ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);
 
     try {
       endpoint.put("fsoBucket", "dir/", 0, 1, null, "", twoTags());
