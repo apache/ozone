@@ -461,4 +461,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     }
   }
 
+  @Override
+  public boolean allowEmptyPrefix() {
+    return true;
+  }
 }

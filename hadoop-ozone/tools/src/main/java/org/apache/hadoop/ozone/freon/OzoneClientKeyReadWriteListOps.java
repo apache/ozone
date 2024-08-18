@@ -271,4 +271,9 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
     }
     return keyNameSb.toString();
   }
+
+  @Override
+  public boolean allowEmptyPrefix() {
+    return true;
+  }
 }

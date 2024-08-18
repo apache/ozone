@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -158,7 +159,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
                 .getUploadID())
             .build();
         Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgsForAudit);
-        auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        auditMap.put(OzoneConsts.UPLOAD_ID, abortInfo.getOmMultipartKeyInfo()
+            .getUploadID());
+        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD, auditMap,
             null, getOmRequest().getUserInfo()));
       }

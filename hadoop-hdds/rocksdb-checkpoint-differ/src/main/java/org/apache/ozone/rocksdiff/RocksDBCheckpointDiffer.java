@@ -30,7 +30,6 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.collections.CollectionUtils;
@@ -170,7 +169,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
-  private final AtomicInteger tarballRequestCount;
   private static final String DAG_PRUNING_SERVICE_NAME = "CompactionDagPruningService";
   private AtomicBoolean suspended;
 
@@ -247,7 +245,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } else {
       this.scheduler = null;
     }
-    this.tarballRequestCount = new AtomicInteger(0);
   }
 
   private String createCompactionLogDir(String metadataDirName,
@@ -517,8 +514,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             return;
           }
 
-          waitForTarballCreation();
-
           // Add the compaction log entry to Compaction log table.
           addToCompactionLogTable(compactionLogEntry);
 
@@ -556,22 +551,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (RocksDBException exception) {
       // TODO: Revisit exception handling before merging the PR.
       throw new RuntimeException(exception);
-    }
-  }
-
-  /**
-   * Check if there is any in_progress tarball creation request and wait till
-   * all tarball creation finish, and it gets notified.
-   */
-  private void waitForTarballCreation() {
-    while (tarballRequestCount.get() != 0) {
-      try {
-        wait(Integer.MAX_VALUE);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        LOG.error("Compaction log thread {} is interrupted.",
-            Thread.currentThread().getName());
-      }
     }
   }
 
@@ -1424,26 +1403,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  public void incrementTarballRequestCount() {
-    tarballRequestCount.incrementAndGet();
-  }
-
-  public void decrementTarballRequestCountAndNotify() {
-    // Synchronized block is used to ensure that lock is on the same instance notifyAll is being called.
-    synchronized (this) {
-      tarballRequestCount.decrementAndGet();
-      // Notify compaction threads to continue.
-      notifyAll();
-    }
-  }
-
   public boolean shouldRun() {
     return !suspended.get();
-  }
-
-  @VisibleForTesting
-  public int getTarballRequestCount() {
-    return tarballRequestCount.get();
   }
 
   @VisibleForTesting

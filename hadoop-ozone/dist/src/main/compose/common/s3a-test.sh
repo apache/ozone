@@ -95,10 +95,9 @@ EOF
   # Some tests are skipped due to known issues.
   # - ITestS3AContractDistCp: HDDS-10616
   # - ITestS3AContractGetFileStatusV1List: HDDS-10617
-  # - ITestS3AContractMkdir: HDDS-10572
   # - ITestS3AContractRename: HDDS-10665
   mvn -B -V --fail-never --no-transfer-progress \
-    -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractDistCp, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename' \
+    -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractDistCp, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractRename' \
     clean test
 
   local target="${RESULT_DIR}/junit/${bucket}/target"

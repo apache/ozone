@@ -405,14 +405,8 @@ public class TestEndPoint {
         null);
   }
 
-  private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
-      int rpcTimeout, boolean clearDatanodeDetails
-  ) throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
-    EndpointStateMachine rpcEndPoint =
-        createEndpoint(conf,
-            scmAddress, rpcTimeout);
-    rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+  private RegisterEndpointTask getRegisterEndpointTask(boolean clearDatanodeDetails, OzoneConfiguration conf,
+                                                       EndpointStateMachine rpcEndPoint) throws Exception {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     UUID datanodeID = UUID.randomUUID();
     when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
@@ -437,6 +431,16 @@ public class TestEndPoint {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       endpointTask.setDatanodeDetails(datanodeDetails);
     }
+    return endpointTask;
+  }
+
+  private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
+      int rpcTimeout, boolean clearDatanodeDetails
+  ) throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    EndpointStateMachine rpcEndPoint = createEndpoint(conf, scmAddress, rpcTimeout);
+    rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+    RegisterEndpointTask endpointTask = getRegisterEndpointTask(clearDatanodeDetails, conf, rpcEndPoint);
     endpointTask.call();
     return rpcEndPoint;
   }
@@ -472,14 +476,23 @@ public class TestEndPoint {
 
   @Test
   public void testRegisterRpcTimeout() throws Exception {
-    final long rpcTimeout = 1000;
-    final long tolerance = 200;
-    scmServerImpl.setRpcResponseDelay(1500);
-    long start = Time.monotonicNow();
-    registerTaskHelper(serverAddress, 1000, false).close();
-    long end = Time.monotonicNow();
-    scmServerImpl.setRpcResponseDelay(0);
-    assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
+    final int rpcTimeout = 1000;
+    final int tolerance = 200;
+    scmServerImpl.setRpcResponseDelay(rpcTimeout + tolerance * 2);
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf, serverAddress, rpcTimeout)) {
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      RegisterEndpointTask endpointTask = getRegisterEndpointTask(false, conf, rpcEndPoint);
+      long start = Time.monotonicNow();
+      endpointTask.call();
+      long end = Time.monotonicNow();
+      assertThat(end - start)
+          .isGreaterThanOrEqualTo(rpcTimeout)
+          .isLessThanOrEqualTo(rpcTimeout + tolerance);
+    } finally {
+      scmServerImpl.setRpcResponseDelay(0);
+    }
   }
 
   @Test

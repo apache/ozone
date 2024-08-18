@@ -113,6 +113,9 @@ run cp  -r "${ROOT}/hadoop-ozone/fault-injection-test/network-tests/src/test/blo
 # Optional documentation, could be missing
 cp -r "${ROOT}/hadoop-hdds/docs/target/classes/docs" ./
 
+# BOM is created only when using 'dist' profile
+cp -p "${ROOT}"/target/bom.* ./
+
 #copy byteman helpers
 run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
 

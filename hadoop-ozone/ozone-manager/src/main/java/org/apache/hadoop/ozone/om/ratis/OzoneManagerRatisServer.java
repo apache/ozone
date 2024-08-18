@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -72,6 +73,7 @@ import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.Message;
@@ -99,7 +101,7 @@ import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -495,6 +497,11 @@ public final class OzoneManagerRatisServer {
             leaderNotReadyException.getMessage()));
       }
 
+      LeaderSteppingDownException leaderSteppingDownException = reply.getLeaderSteppingDownException();
+      if (leaderSteppingDownException != null) {
+        throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
+      }
+
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
@@ -618,16 +625,15 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties, Collections.singletonList(new File(ratisStorageDir)));
 
-    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
+    final int logAppenderBufferByteLimit = (int) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES);
+    setRaftLogProperties(properties, logAppenderBufferByteLimit, conf);
 
     // For grpc config
-    setGrpcConfig(properties, logAppenderQueueByteLimit);
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
 
     setRaftLeaderElectionProperties(properties, conf);
-
-    setRaftLogProperties(properties, logAppenderQueueByteLimit, conf);
 
     setRaftRpcProperties(properties, conf);
 
@@ -685,12 +691,6 @@ public final class OzoneManagerRatisServer {
 
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
-  }
-
-  private static void setGrpcConfig(RaftProperties properties, int logAppenderQueueByteLimit) {
-    // For grpc set the maximum message size
-    // TODO: calculate the optimal max message size
-    GrpcConfigKeys.setMessageSizeMax(properties, SizeInBytes.valueOf(logAppenderQueueByteLimit));
   }
 
   private static void setRaftRpcProperties(RaftProperties properties, ConfigurationSource conf) {

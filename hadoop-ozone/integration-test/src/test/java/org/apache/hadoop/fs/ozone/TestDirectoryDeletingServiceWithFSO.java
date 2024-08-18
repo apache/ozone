@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -33,8 +34,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -297,6 +303,80 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
+  }
+
+  @Test
+  public void testDeleteWithMultiLevelsBlockDoubleBuffer() throws Exception {
+    Path root = new Path("/rootDirdd");
+    Path appRoot = new Path(root, "appRoot");
+
+    for (int i = 1; i <= 3; i++) {
+      Path parent = new Path(appRoot, "parentDir" + i);
+      Path child = new Path(parent, "childFile");
+      ContractTestUtils.touch(fs, child);
+    }
+
+    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+    Table<String, OmKeyInfo> deletedDirTable = metadataManager.getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
+
+    DirectoryDeletingService dirDeletingService = (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 5);
+    assertTableRowCount(keyTable, 3);
+
+    // stop daemon to simulate blocked double buffer
+    OzoneManagerStateMachine omStateMachine = cluster.getOzoneManager().getOmRatisServer().getOmStateMachine();
+    OzoneManagerDoubleBuffer omDoubleBuffer = omStateMachine.getOzoneManagerDoubleBuffer();
+    omDoubleBuffer.awaitFlush();
+    omDoubleBuffer.stopDaemon();
+
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);    long volumeId = metadataManager.getVolumeId(volumeName);
+
+    // manually delete dir and add to deleted table. namespace count occupied "1" as manual deletion do not reduce
+    long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        metadataManager, volumeName, bucketName, "rootDirdd", 0,
+        cluster.getOzoneManager().getDefaultReplicationConfig());
+    String ozoneDbKey = metadataManager.getOzonePathKey(volumeId, bucketId, keyStatus.getKeyInfo().getParentObjectID(),
+        keyStatus.getKeyInfo().getFileName());
+    deletedDirTable.put(ozoneDbKey, keyStatus.getKeyInfo());
+    dirTable.delete(ozoneDbKey);
+    assertTableRowCount(deletedDirTable, 1);
+    assertTableRowCount(dirTable, 4);
+
+    System.out.println("starting count: " + bucket.getUsedNamespace());
+
+    // wait for running 2 more iteration
+    long currentCount = dirDeletingService.getRunCount().get();
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() > currentCount + 2, 1000,
+        10000);
+
+    // verify bucket used namespace is not going -ve
+    assertTrue(volume.getBucket(bucketName).getUsedNamespace() >= 0);
+
+    // re-init double buffer in state machine to resume further processing
+    omStateMachine.pause();
+    omStateMachine.unpause(omStateMachine.getLastAppliedTermIndex().getIndex(),
+        omStateMachine.getLatestSnapshot().getIndex());
+    // flush previous pending transaction manually
+    omDoubleBuffer.resume();
+    CompletableFuture.supplyAsync(() -> {
+      omDoubleBuffer.flushTransactions();
+      return null;
+    });
+    omDoubleBuffer.awaitFlush();
+    omDoubleBuffer.stop();
+    // verify deletion progress completion
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTrue(volume.getBucket(bucketName).getUsedNamespace() >= 0);
+    assertTrue(volume.getBucket(bucketName).getUsedBytes() == 0);
   }
 
   @Test
