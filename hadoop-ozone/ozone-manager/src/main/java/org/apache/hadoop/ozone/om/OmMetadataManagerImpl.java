@@ -1385,16 +1385,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return new ListKeysResult(result, isTruncated);
   }
 
-  // TODO: HDDS-2419 - Complete stub below for core logic
-  @Deprecated
-  @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
-
-    List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
-    return deletedKeys;
-  }
-
   @Override
   public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
                                       String snapshotName) throws IOException {
@@ -1469,19 +1459,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw e.getCause();
     }
     return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
-  }
-
-  @Deprecated
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    /* TODO: HDDS-2425 and HDDS-2426
-        core logic stub would be added in later patch.
-     */
-
-    boolean recoverOperation = true;
-    return recoverOperation;
   }
 
   /**

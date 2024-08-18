@@ -97,6 +97,7 @@ enum Type {
 
   ListMultipartUploads = 82;
 
+  // Not used anymore due to HDDS-11251
   ListTrash = 91;
   RecoverTrash = 92;
 
@@ -232,6 +233,7 @@ message OMRequest {
   optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
+  // Not used anymore due to HDDS-11251
   optional ListTrashRequest                 listTrashRequest               = 91 [deprecated = true];
   optional RecoverTrashRequest              RecoverTrashRequest            = 92 [deprecated = true];
 
@@ -360,8 +362,10 @@ message OMResponse {
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
+  // Not used anymore due to HDDS-11251
   optional ListTrashResponse                  listTrashResponse            = 91 [deprecated = true];
   optional RecoverTrashResponse               RecoverTrashResponse         = 92 [deprecated = true];
+
   optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
   optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
@@ -545,6 +549,7 @@ enum Status {
 /**
     This command acts as a list command for deleted keys that are still present
     in the deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 message ListTrashRequest {
   // option deprecated = true;
@@ -563,6 +568,7 @@ message ListTrashResponse {
 /**
     This command acts as a recover command for deleted keys that are still
     in deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 
 message RecoverTrashRequest {

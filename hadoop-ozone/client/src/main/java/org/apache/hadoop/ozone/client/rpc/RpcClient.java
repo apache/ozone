@@ -1759,27 +1759,6 @@ public class RpcClient implements ClientProtocol {
     }
   }
 
-  @Deprecated
-  @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
-
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
-
-    return ozoneManagerClient.listTrash(volumeName, bucketName, startKeyName,
-        keyPrefix, maxKeys);
-  }
-
-  @Deprecated
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    return ozoneManagerClient.recoverTrash(volumeName, bucketName, keyName,
-        destinationBucket);
-  }
-
   @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)

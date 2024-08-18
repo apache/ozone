@@ -300,24 +300,6 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
 
-  @Deprecated
-  @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-                                           String startKeyName,
-                                           String keyPrefix, int maxKeys)
-      throws IOException {
-  
-    return null;
-  }
-
-  @Deprecated
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-                              String keyName, String destinationBucket)
-      throws IOException {
-    return false;
-  }
-
   @Override
   public OzoneKeyDetails getKeyDetails(String volumeName, String bucketName,
                                        String keyName) throws IOException {

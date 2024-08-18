@@ -514,45 +514,6 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   * @deprecated HDDS-3367 implements a new way to store trashed files.
-   * Please avoid using this as it will be removed in a future release
-   */
-  @Deprecated
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-                                    String startKeyName, String keyPrefix,
-                                    int maxKeys)
-      throws IOException;
-
-  /**
-   * Recover trash allows the user to recover keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   * @throws IOException
-   * @deprecated HDDS-3367 implements a new way to store trashed files.
-   * Please avoid using this as it will be removed in a future release
-   */
-  @Deprecated
-  boolean recoverTrash(String volumeName, String bucketName, String keyName,
-      String destinationBucket) throws IOException;
-
-  /**
    * Get OzoneKey.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

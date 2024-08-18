@@ -409,8 +409,6 @@ public class TestOmMetrics {
     doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
     doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
-    doThrow(exception).when(mockKm).listTrash(
-        any(), any(), any(), any(), anyInt());
     OmMetadataReader omMetadataReader =
         (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
     HddsWhiteboxTestUtils.setInternalState(
@@ -839,12 +837,6 @@ public class TestOmMetrics {
 
     try {
       ozoneManager.listKeys(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), null, null, 0);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.listTrash(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }
