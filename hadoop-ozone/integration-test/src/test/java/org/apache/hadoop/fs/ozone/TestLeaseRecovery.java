@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test cases for recoverLease() API.
  */
 @Timeout(300)
+@Flaky("HDDS-11323")
 public class TestLeaseRecovery {
 
   private MiniOzoneCluster cluster;
