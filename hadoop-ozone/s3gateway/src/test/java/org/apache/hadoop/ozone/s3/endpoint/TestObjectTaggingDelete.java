@@ -18,8 +18,13 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,14 +39,19 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for DeleteObjectTagging.
@@ -111,6 +121,32 @@ public class TestObjectTaggingDelete {
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
       assertEquals(NO_SUCH_BUCKET.getCode(), ex.getCode());
+    }
+  }
+
+  @Test
+  public void testDeleteObjectTaggingNotImplemented() throws Exception {
+    OzoneClient mockClient = mock(OzoneClient.class);
+    ObjectStore mockObjectStore = mock(ObjectStore.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
+    OzoneBucket mockBucket = mock(OzoneBucket.class);
+
+    when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
+    when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
+    when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
+
+    ObjectEndpoint endpoint = new ObjectEndpoint();
+    endpoint.setClient(mockClient);
+
+    doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",
+        ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).deleteObjectTagging("dir/");
+
+    try {
+      endpoint.delete("fsoBucket", "dir/", null, "");
+      fail("Expected an OS3Exception to be thrown");
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
+      assertEquals(NOT_IMPLEMENTED.getCode(), ex.getCode());
     }
   }
 }

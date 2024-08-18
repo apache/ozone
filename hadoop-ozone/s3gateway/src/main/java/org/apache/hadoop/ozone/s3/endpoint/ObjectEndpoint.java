@@ -758,6 +758,9 @@ public class ObjectEndpoint extends EndpointBase {
         // keys. Just return 204
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // When deleteObjectTagging operation is applied on FSO directory
+        throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
       } else {
         throw ex;
       }
