@@ -18,22 +18,14 @@
 package org.apache.hadoop.ozone.audit;
 
 /**
- * Enumeration for defining types of Audit Loggers in Ozone.
+ * Enum to define Audit Action types for system audit in OzoneManager. This will in addition to OMAction
+ * as present for request.
  */
-public enum AuditLoggerType {
-  DNLOGGER("DNAudit"),
-  OMLOGGER("OMAudit"),
-  SCMLOGGER("SCMAudit"),
-  S3GLOGGER("S3GAudit"),
-  OMSYSTEMLOGGER("OMSystemAudit");
+public enum OMSystemAction implements AuditAction {
+  STARTUP;
 
-  private String type;
-
-  public String getType() {
-    return type;
-  }
-
-  AuditLoggerType(String type) {
-    this.type = type;
+  @Override
+  public String getAction() {
+    return this.toString();
   }
 }
