@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { Suspense } from 'react';
+import React from 'react';
 
 import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
@@ -26,8 +26,6 @@ import { routes } from '@/routes';
 import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
-
-import Loader from '@/v2/components/loader/loader';
 
 import './app.less';
 
@@ -67,6 +65,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
               <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
                 <Breadcrumbs />
                 <AntDSwitch
+                  disabled={true}
                   checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
                   onChange={(checked: boolean) => {
                     this.setState({
@@ -81,11 +80,9 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {(enableNewUI)
-                  ? <Suspense fallback={<Loader/>}>
-                    {routesV2.map(
-                      (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                    )}
-                  </Suspense>
+                  ? routesV2.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                  )
                   : routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )
