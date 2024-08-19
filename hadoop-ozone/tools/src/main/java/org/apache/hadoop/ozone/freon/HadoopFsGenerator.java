@@ -72,9 +72,7 @@ public class HadoopFsGenerator extends HadoopBaseFreonGenerator
     super.init();
 
     Path file = new Path(getRootPath() + "/" + generateObjectName(0));
-    try (FileSystem fileSystem = getFileSystem()) {
-      fileSystem.mkdirs(file.getParent());
-    }
+    getFileSystem().mkdirs(file.getParent());
 
     contentGenerator =
         new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
