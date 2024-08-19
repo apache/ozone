@@ -30,16 +30,21 @@ import QuotaBar from '@/components/quotaBar/quotaBar';
 import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
+import SingleSelect from '@/v2/components/select/singleSelect';
+import Search from '@/v2/components/search/search';
 
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
+import { useDebounce } from '@/v2/hooks/debounce.hook';
 
-import { Volume, VolumesState, VolumesResponse } from '@/v2/types/volume.types';
+import {
+  Volume,
+  VolumesState,
+  VolumesResponse
+} from '@/v2/types/volume.types';
 
 import './volumes.less';
-import SingleSelect from '@/v2/components/select/singleSelect';
-import Search from '@/v2/components/search/search';
 
 const SearchableColumnOpts = [
   {
@@ -172,6 +177,8 @@ const Volumes: React.FC<{}> = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showPanel, setShowPanel] = useState<boolean>(false);
 
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
   const loadData = () => {
     setLoading(true);
 
@@ -204,14 +211,9 @@ const Volumes: React.FC<{}> = () => {
         ...state,
         data,
         lastUpdated: Number(moment()),
-        showPanel: false
       });
       setLoading(false);
     }).catch(error => {
-      setState({
-        ...state,
-        showPanel: false
-      });
       setLoading(false);
       showDataFetchError(error.toString());
     });
@@ -266,7 +268,9 @@ const Volumes: React.FC<{}> = () => {
   }
 
   function getFilteredData(data: Volume[]) {
-    return data.filter((volume: Volume) => volume[searchColumn].includes(searchTerm))
+    return data.filter(
+      (volume: Volume) => volume[searchColumn].includes(debouncedSearch)
+    );
   }
 
 
@@ -313,8 +317,11 @@ const Volumes: React.FC<{}> = () => {
             </div>
             <Search
               searchOptions={SearchableColumnOpts}
+              searchInput={searchTerm}
               searchColumn={searchColumn}
-              onSearch={(value) => setSearchTerm(value)}
+              onSearchChange={
+                (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+              }
               onChange={(value) => {
                 setSearchTerm('');
                 setSearchColumn(value as 'volume' | 'owner' | 'admin');

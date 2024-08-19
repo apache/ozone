@@ -18,18 +18,16 @@
 
 import React from 'react';
 import { Input, Select } from 'antd';
+
 import { Option } from '@/v2/components/select/singleSelect';
 
 // ------------- Types -------------- //
 type SearchProps = {
   searchColumn?: string;
+  searchInput: string;
   searchOptions?: Option[];
-  onSearch: (
-    arg0: string,
-    arg1: React.ChangeEvent<HTMLInputElement>
-    | React.MouseEvent<HTMLElement, MouseEvent>
-    | React.KeyboardEvent<HTMLInputElement>
-    | undefined
+  onSearchChange: (
+    arg0: React.ChangeEvent<HTMLInputElement>
   ) => void;
   onChange: (
     value: string,
@@ -42,8 +40,9 @@ type SearchProps = {
 // ------------- Component -------------- //
 const Search: React.FC<SearchProps> = ({
   searchColumn,
+  searchInput = '',
   searchOptions = [],
-  onSearch = () => {},  // Assign default value as a void function
+  onSearchChange = () => {},
   onChange = () => {}   // Assign default value as a void function
 }) => {
 
@@ -55,11 +54,12 @@ const Search: React.FC<SearchProps> = ({
     : null
 
   return (
-    <Input.Search
+    <Input
       placeholder='Enter Search text'
       allowClear={true}
+      value={searchInput}
       addonBefore={selectFilter}
-      onSearch={onSearch}
+      onChange={onSearchChange}
       size='middle'
       style={{
         maxWidth: 400
