@@ -3357,14 +3357,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.list.trash.keys.max</name>
-    <value>1000</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      The maximum number of keys to return for a list trash request.
-    </description>
-  </property>
-  <property>
     <name>ozone.http.basedir</name>
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
