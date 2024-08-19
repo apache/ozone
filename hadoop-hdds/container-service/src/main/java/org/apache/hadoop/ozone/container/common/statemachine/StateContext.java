@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -550,8 +551,12 @@ public class StateContext {
     if (map == null) {
       return Collections.emptyList();
     }
-    final PipelineReportsProto reports = parentDatanodeStateMachine.
-        getContainer().getPipelineReport();
+    final OzoneContainer ozoneContainer = parentDatanodeStateMachine.
+        getContainer();
+    if (ozoneContainer == null) {
+      return Collections.emptyList();
+    }
+    final PipelineReportsProto reports = ozoneContainer.getPipelineReport();
     return map.getActions(reports.getPipelineReportList(), maxLimit);
   }
 
