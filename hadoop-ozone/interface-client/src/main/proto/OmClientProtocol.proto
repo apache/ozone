@@ -98,8 +98,8 @@ enum Type {
   ListMultipartUploads = 82;
 
   // Not used anymore due to HDDS-11251
-  ListTrash = 91;
-  RecoverTrash = 92;
+  ListTrash = 91; // [deprecated = true]
+  RecoverTrash = 92; // [deprecated = true]
 
   RevokeS3Secret = 93;
 
