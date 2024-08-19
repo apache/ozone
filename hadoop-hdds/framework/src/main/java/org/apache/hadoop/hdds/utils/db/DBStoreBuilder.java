@@ -40,8 +40,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
@@ -97,8 +95,6 @@ public final class DBStoreBuilder {
   private ConfigurationSource configuration;
   private final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
   private String rocksDbStat;
-  // RocksDB column family write buffer size
-  private long rocksDbCfWriteBufferSize;
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
@@ -146,10 +142,6 @@ public final class DBStoreBuilder {
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-    this.rocksDbCfWriteBufferSize = (long) configuration.getStorageSize(
-        OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE,
-        OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
     this.rocksDBConfiguration = rocksDBConfiguration;
 
     // Get default DBOptions and ColumnFamilyOptions from the default DB
@@ -327,11 +319,8 @@ public final class DBStoreBuilder {
    */
   private Set<TableConfig> makeTableConfigs() {
     Set<TableConfig> tableConfigs = new HashSet<>();
-
     // If default column family was not added, add it with the default options.
-    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
-            getCfOptions(rocksDbCfWriteBufferSize));
-
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getDefaultCfOptions());
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
       String name = entry.getKey();
@@ -339,8 +328,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name,
-                getCfOptions(rocksDbCfWriteBufferSize)));
+        tableConfigs.add(new TableConfig(name, getDefaultCfOptions()));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -368,17 +356,6 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  /**
-   * Get default column family options, but with column family write buffer
-   * size limit overridden.
-   * @param writeBufferSize Specify column family write buffer size.
-   * @return ManagedColumnFamilyOptions
-   */
-  private ManagedColumnFamilyOptions getCfOptions(long writeBufferSize) {
-    ManagedColumnFamilyOptions cfOpts = getDefaultCfOptions();
-    cfOpts.setWriteBufferSize(writeBufferSize);
-    return cfOpts;
-  }
 
   /**
    * Attempts to get RocksDB {@link ManagedDBOptions} from an ini config

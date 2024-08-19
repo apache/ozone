@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -28,6 +29,13 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.CompactionStyle;
 
 import java.math.BigDecimal;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT;
 
 /**
  * User visible configs based RocksDB tuning page. Documentation for Options.
@@ -49,8 +57,10 @@ public enum DBProfile {
     @Override
     public ManagedColumnFamilyOptions getColumnFamilyOptions() {
       // Write Buffer Size -- set to 128 MB
-      final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
-
+      final long writeBufferSize = (long) CONF.getStorageSize(
+          OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE,
+          OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT,
+          org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
       ManagedColumnFamilyOptions managedColumnFamilyOptions =
           new ManagedColumnFamilyOptions();
 
@@ -82,10 +92,15 @@ public enum DBProfile {
     @Override
     public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
       // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
-      final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
-
+      final long blockCacheSize = (long) CONF.getStorageSize(
+          OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE,
+          OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE_DEFAULT,
+          org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
       // Set the Default block size to 16KB
-      final long blockSize = toLong(StorageUnit.KB.toBytes(16));
+      final long blockSize = (long) CONF.getStorageSize(
+          OZONE_METADATA_STORE_ROCKSDB_BLOCK_SIZE,
+          OZONE_METADATA_STORE_ROCKSDB_BLOCK_SIZE_DEFAULT,
+          org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
 
       ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
@@ -152,6 +167,8 @@ public enum DBProfile {
     BigDecimal temp = BigDecimal.valueOf(value);
     return temp.longValue();
   }
+
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   public abstract ManagedDBOptions getDBOptions();
 

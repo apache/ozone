@@ -747,6 +747,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.metastore.rocksdb.block.cache.size</name>
+    <value>256MB</value>
+    <tag>OZONE, OM, SCM, STORAGE, PERFORMANCE</tag>
+    <description>
+      The block cache size for each column family of the rocksdb
+      store. Check the rocksdb documentation for more details.
+    </description>
+  </property>
+  <property>
+    <name>ozone.metastore.rocksdb.block.size</name>
+    <value>16KB</value>
+    <tag>OZONE, OM, SCM, STORAGE, PERFORMANCE</tag>
+    <description>
+      The block size for the rocksdb store. Check the rocksdb
+      documentation for more details.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
     <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>
