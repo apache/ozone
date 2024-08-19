@@ -198,10 +198,6 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     SnapshotInfo nextPathSnapInfo =
         nextPathSnapshotKey != null ? getUpdatedSnapshotInfo(nextPathSnapshotKey, metadataManager) : null;
 
-    SnapshotInfo nextGlobalSnapInfo =
-        nextGlobalSnapshotKey != null ? getUpdatedSnapshotInfo(nextGlobalSnapshotKey, metadataManager) : null;
-
-    // Updates next path snapshot's previous snapshot ID
     if (nextPathSnapInfo != null) {
       nextPathSnapInfo.setPathPreviousSnapshotId(snapInfo.getPathPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
@@ -209,19 +205,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           CacheValue.get(trxnLogIndex, nextPathSnapInfo));
     }
 
-    // Updates next global snapshot's previous snapshot ID
-    // If both next global and path snapshot are same, it may overwrite
-    // nextPathSnapInfo.setPathPreviousSnapshotID(), adding this check
-    // will prevent it.
-    if (nextGlobalSnapInfo != null && nextPathSnapInfo != null &&
-        nextGlobalSnapInfo.getSnapshotId().equals(nextPathSnapInfo.getSnapshotId())) {
-      nextPathSnapInfo.setGlobalPreviousSnapshotId(snapInfo.getGlobalPreviousSnapshotId());
-      metadataManager.getSnapshotInfoTable().addCacheEntry(
-          new CacheKey<>(nextPathSnapInfo.getTableKey()),
-          CacheValue.get(trxnLogIndex, nextPathSnapInfo));
-    } else if (nextGlobalSnapInfo != null) {
-      nextGlobalSnapInfo.setGlobalPreviousSnapshotId(
-          snapInfo.getGlobalPreviousSnapshotId());
+    SnapshotInfo nextGlobalSnapInfo =
+        nextGlobalSnapshotKey != null ? getUpdatedSnapshotInfo(nextGlobalSnapshotKey, metadataManager) : null;
+
+    if (nextGlobalSnapInfo != null) {
+      nextGlobalSnapInfo.setGlobalPreviousSnapshotId(snapInfo.getGlobalPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(nextGlobalSnapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, nextGlobalSnapInfo));
