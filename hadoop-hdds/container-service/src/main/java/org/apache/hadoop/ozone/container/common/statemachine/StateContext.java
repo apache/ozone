@@ -29,6 +29,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.Objects;
 import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
@@ -115,7 +118,7 @@ public class StateContext {
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
-  private final Map<InetSocketAddress, LinkedHashMap<PipelineKey, PipelineAction>> pipelineActions;
+  private final Map<InetSocketAddress, ActionMap> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -522,48 +525,15 @@ public class StateContext {
   }
 
   /**
-   * Helper function for addPipelineActionIfAbsent that check if inputs are the
-   * same close pipeline action.
-   *
-   * Important Note: Make sure to double check for correctness before using this
-   * helper function for other purposes!
-   *
-   * @return true if a1 and a2 are the same close pipeline action,
-   *         false otherwise
-   */
-  boolean isSameClosePipelineAction(PipelineAction a1, PipelineAction a2) {
-    return a1.getAction() == a2.getAction()
-        && a1.hasClosePipeline()
-        && a2.hasClosePipeline()
-        && a1.getClosePipeline().getPipelineID()
-        .equals(a2.getClosePipeline().getPipelineID());
-  }
-
-  /**
    * Add PipelineAction to PipelineAction queue if it's not present.
    *
    * @param pipelineAction PipelineAction to be added
    */
   public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
-    /**
-     * If pipelineAction queue already contains entry for the pipeline id
-     * with same action, we should just return.
-     * Note: We should not use pipelineActions.contains(pipelineAction) here
-     * as, pipelineAction has a msg string. So even if two msgs differ though
-     * action remains same on the given pipeline, it will end up adding it
-     * multiple times here.
-     */
+    // Put only if the pipeline id with the same action is absent.
+    final PipelineKey key = new PipelineKey(pipelineAction);
     for (InetSocketAddress endpoint : endpoints) {
-      final Map<PipelineKey, PipelineAction> actionsForEndpoint =
-          pipelineActions.get(endpoint);
-      synchronized (actionsForEndpoint) {
-        if (actionsForEndpoint.values().stream().noneMatch(
-            action -> isSameClosePipelineAction(action, pipelineAction))) {
-          actionsForEndpoint.put(new PipelineKey(
-              pipelineAction.getClosePipeline().getPipelineID(),
-                  pipelineAction.getAction()), pipelineAction);
-        }
-      }
+      pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction);
     }
   }
 
@@ -576,40 +546,13 @@ public class StateContext {
   public List<PipelineAction> getPendingPipelineAction(
       InetSocketAddress endpoint,
       int maxLimit) {
-    List<PipelineAction> pipelineActionList = new ArrayList<>();
-    if (pipelineActions.isEmpty() || pipelineActions.get(endpoint) == null
-        || pipelineActions.get(endpoint).isEmpty()) {
-      return pipelineActionList;
+    final ActionMap map = pipelineActions.get(endpoint);
+    if (map == null) {
+      return Collections.emptyList();
     }
-    Map<PipelineKey, PipelineAction> persistPipelineAction = new HashMap<>();
-    final Map<PipelineKey, PipelineAction> actionsForEndpoint =
-        pipelineActions.get(endpoint);
-    synchronized (actionsForEndpoint) {
-      int size = actionsForEndpoint.size();
-      int limit = size > maxLimit ? maxLimit : size;
-      int count = 0;
-      actionsForEndpoint.forEach((key, action) -> {
-        if (count > limit) {
-          return;
-        }
-        boolean flg = false;
-        if (action.hasClosePipeline()) {
-          if (parentDatanodeStateMachine.getContainer().getPipelineReport()
-              .getPipelineReportList().stream().noneMatch(
-                  report -> key.getPipelineID().equals(report.getPipelineID()))) {
-            flg = true;
-          } else {
-            persistPipelineAction.put(key, action);
-          }
-        }
-        if (!flg) {
-          pipelineActionList.add(action);
-        }
-      });
-      actionsForEndpoint.clear();
-      actionsForEndpoint.putAll(persistPipelineAction);
-    }
-    return pipelineActionList;
+    final PipelineReportsProto reports = parentDatanodeStateMachine.
+        getContainer().getPipelineReport();
+    return map.getActions(reports.getPipelineReportList(), maxLimit);
   }
 
   /**
@@ -938,7 +881,7 @@ public class StateContext {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
-      this.pipelineActions.put(endpoint, new LinkedHashMap<>());
+      this.pipelineActions.put(endpoint, new ActionMap());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
       Map<String, AtomicBoolean> mp = new HashMap<>();
       fullReportTypeList.forEach(e -> {
@@ -1000,21 +943,61 @@ public class StateContext {
     return threadNamePrefix;
   }
 
+  static class ActionMap {
+    private final LinkedHashMap<PipelineKey, PipelineAction> map =
+        new LinkedHashMap<>();
+
+    synchronized int size() {
+      return map.size();
+    }
+
+    synchronized void putIfAbsent(PipelineKey key,
+        PipelineAction pipelineAction) {
+      map.putIfAbsent(key, pipelineAction);
+    }
+
+    synchronized List<PipelineAction> getActions(List<PipelineReport> reports,
+        int max) {
+      if (map.isEmpty()) {
+        return Collections.emptyList();
+      }
+      final List<PipelineAction> pipelineActionList = new ArrayList<>();
+      final int limit = Math.min(map.size(), max);
+      final Iterator<Map.Entry<PipelineKey, PipelineAction>> i =
+          map.entrySet().iterator();
+      for (int count = 0; count < limit && i.hasNext(); count++) {
+        final Map.Entry<PipelineKey, PipelineAction> entry = i.next();
+        final PipelineAction action = entry.getValue();
+        // Add closePipeline back to the pipelineAction queue until
+        // pipeline is closed and removed from the DN.
+        if (action.hasClosePipeline()) {
+          if (reports.stream().noneMatch(entry.getKey()::equalsId)) {
+            // pipeline is removed from the DN, this action is no longer needed.
+            i.remove();
+            continue;
+          }
+          // pipeline is closed but not yet removed from the DN.
+        } else {
+          i.remove();
+        }
+        pipelineActionList.add(action);
+      }
+      // add all
+      return pipelineActionList;
+    }
+  }
+
   static class PipelineKey {
     private final HddsProtos.PipelineID pipelineID;
     private final PipelineAction.Action action;
 
-    PipelineKey(HddsProtos.PipelineID pipelineID, PipelineAction.Action action) {
-      this.pipelineID = pipelineID;
-      this.action = action;
+    PipelineKey(PipelineAction p) {
+      this.pipelineID = p.getClosePipeline().getPipelineID();
+      this.action = p.getAction();
     }
 
-    public HddsProtos.PipelineID getPipelineID() {
-      return pipelineID;
-    }
-
-    public PipelineAction.Action getAction() {
-      return action;
+    boolean equalsId(PipelineReport report) {
+      return pipelineID.equals(report.getPipelineID());
     }
 
     @Override
