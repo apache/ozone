@@ -168,10 +168,18 @@ public class AuditLogger {
 
     /**
      * Appends pre-operation operation latency in milliseconds.
-     * @param millis Latency in nanoseconds.
+     * @param millis Latency in milliseconds.
      */
     public void appendPreOpLatencyMs(long millis) {
       append("preOpLatencyMs", millis);
+    }
+
+    /**
+     * Appends pre-operation operation latency in milliseconds.
+     * @param nanos Latency in nanoseconds.
+     */
+    public void appendPreOpLatencyNano(long nanos) {
+      append("preOpLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
     }
 
     /**
