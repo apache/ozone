@@ -94,6 +94,9 @@ public class BlockOutputStream extends OutputStream {
       KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
   private AtomicReference<BlockID> blockID;
+  // planned block full size
+  private long blockSize;
+  private boolean eofSent = false;
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
 
@@ -164,6 +167,7 @@ public class BlockOutputStream extends OutputStream {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockOutputStream(
       BlockID blockID,
+      long blockSize,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
@@ -175,6 +179,7 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
+    this.blockSize = blockSize;
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -530,7 +535,7 @@ public class BlockOutputStream extends OutputStream {
     final XceiverClientReply asyncReply;
     try {
       BlockData blockData = containerBlockData.build();
-      LOG.debug("sending PutBlock {}", blockData);
+      LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
       if (config.getIncrementalChunkList()) {
         // remove any chunks in the containerBlockData list.
@@ -538,7 +543,9 @@ public class BlockOutputStream extends OutputStream {
         containerBlockData.clearChunks();
       }
 
-      asyncReply = putBlockAsync(xceiverClient, blockData, close, tokenString);
+      // if block is full, send the eof
+      boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -550,6 +557,7 @@ public class BlockOutputStream extends OutputStream {
         if (getIoException() == null && !force) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
+          eofSent = close || isBlockFull;
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -690,7 +698,7 @@ public class BlockOutputStream extends OutputStream {
       // There're no pending written data, but there're uncommitted data.
       updatePutBlockLength();
       putBlockResultFuture = executePutBlock(close, false);
-    } else if (close) {
+    } else if (close && !eofSent) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
       updatePutBlockLength();
