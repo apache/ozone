@@ -69,11 +69,9 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
 
 
   @Override
-  public BlockData getBlockByID(BlockID blockID,
-      String blockKey) throws IOException {
+  public BlockData getCompleteBlockData(BlockData blockData,
+      BlockID blockID, String blockKey) throws IOException {
     BlockData lastChunk = null;
-    // check block data table
-    BlockData blockData = getBlockDataTable().get(blockKey);
     if (blockData == null || isPartialChunkList(blockData)) {
       // check last chunk table
       lastChunk = getLastChunkInfoTable().get(blockKey);

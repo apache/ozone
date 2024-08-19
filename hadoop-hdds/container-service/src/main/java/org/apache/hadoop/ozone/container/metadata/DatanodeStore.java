@@ -135,9 +135,14 @@ public interface DatanodeStore extends Closeable {
     // check block data table
     BlockData blockData = getBlockDataTable().get(blockKey);
 
+    return getCompleteBlockData(blockData, blockID, blockKey);
+  }
+
+  default BlockData getCompleteBlockData(BlockData blockData,
+      BlockID blockID, String blockKey) throws IOException {
     if (blockData == null) {
       throw new StorageContainerException(
-            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
+          NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
     }
 
     return blockData;
