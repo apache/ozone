@@ -43,20 +43,7 @@ import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.F
  * 3. A Delete Transaction Table.
  */
 public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore {
-
-  // dummy chunk for empty EC blocks.
-  public static final ContainerProtos.ChunkInfo DUMMY_CHUNK =
-      ContainerProtos.ChunkInfo
-      .newBuilder()
-      .setChunkName("")
-      .setOffset(0)
-      .setLen(0)
-      .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-          .setType(ContainerProtos.ChecksumType.NONE)
-          .setBytesPerChecksum(0).build())
-      .build();
-
-  /**
+ /**
   * Constructs the metadata store and starts the DB services.
   *
   * @param config - Ozone Configuration.
@@ -77,7 +64,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       lastChunk = getLastChunkInfoTable().get(blockKey);
     }
 
-    if (blockData == null || blockData.getChunks().isEmpty()) {
+    if (blockData == null) {
       if (lastChunk == null) {
         throw new StorageContainerException(
             NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
@@ -152,10 +139,6 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       long localID, BlockData data, KeyValueContainerData containerData,
       boolean endOfBlock) throws IOException {
     if (!incremental || !isPartialChunkList(data)) {
-      if (data.getChunks().isEmpty()) {
-        // Deal with the corner case with empty EC blocks.
-        data.addChunk(DUMMY_CHUNK);
-      }
       // Case (1) old client: override chunk list.
       getBlockDataTable().putWithBatch(
           batch, containerData.getBlockKey(localID), data);
@@ -211,7 +194,10 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
           batch, blockKey, data);
-      // add an empty block data to populate the block table.
+      // If the block does not exist in the block data table because it is the first chunk
+      // and the chunk is not full, then add an empty block data to populate the block table.
+      // This is required because some of the test code and utilities expect the block to be
+      // present in the block data table, they don't check the last chunk info table.
       if (blockData == null) {
         // populate blockDataTable with empty chunk list
         blockData = new BlockData(data.getBlockID());
@@ -225,7 +211,6 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       List<ContainerProtos.ChunkInfo> lastChunkInfo =
           Collections.singletonList(
               data.getChunks().get(lastChunkIndex));
-
       if (blockData == null) {
         // Case 3.2: if the block does not exist in the block data table
         List<ContainerProtos.ChunkInfo> chunkInfos =

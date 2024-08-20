@@ -142,7 +142,7 @@ public interface DatanodeStore extends Closeable {
       BlockID blockID, String blockKey) throws IOException {
     if (blockData == null) {
       throw new StorageContainerException(
-          NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
+            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
     }
 
     return blockData;
