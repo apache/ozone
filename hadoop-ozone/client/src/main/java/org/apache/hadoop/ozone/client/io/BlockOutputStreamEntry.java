@@ -108,7 +108,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * @throws IOException
    */
   void createOutputStream() throws IOException {
-    outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
+    outputStream = new RatisBlockOutputStream(blockID, length, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
         executorServiceSupplier);
   }
