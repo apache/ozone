@@ -119,7 +119,7 @@ public class StateContext {
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
-  private final Map<InetSocketAddress, ActionMap> pipelineActions;
+  private final Map<InetSocketAddress, PipelineActionMap> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -547,7 +547,7 @@ public class StateContext {
   public List<PipelineAction> getPendingPipelineAction(
       InetSocketAddress endpoint,
       int maxLimit) {
-    final ActionMap map = pipelineActions.get(endpoint);
+    final PipelineActionMap map = pipelineActions.get(endpoint);
     if (map == null) {
       return Collections.emptyList();
     }
@@ -886,7 +886,7 @@ public class StateContext {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
-      this.pipelineActions.put(endpoint, new ActionMap());
+      this.pipelineActions.put(endpoint, new PipelineActionMap());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
       Map<String, AtomicBoolean> mp = new HashMap<>();
       fullReportTypeList.forEach(e -> {
@@ -948,7 +948,7 @@ public class StateContext {
     return threadNamePrefix;
   }
 
-  static class ActionMap {
+  static class PipelineActionMap {
     private final LinkedHashMap<PipelineKey, PipelineAction> map =
         new LinkedHashMap<>();
 
