@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell.checknative;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
-import org.apache.hadoop.util.NativeCodeLoader;
 import picocli.CommandLine;
 
 /**
@@ -36,12 +35,12 @@ public class CheckNative extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    boolean nativeHadoopLoaded = NativeCodeLoader.isNativeCodeLoaded();
+    boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
     String hadoopLibraryName = "";
     String isalDetail = "";
     boolean isalLoaded = false;
     if (nativeHadoopLoaded) {
-      hadoopLibraryName = NativeCodeLoader.getLibraryName();
+      hadoopLibraryName = org.apache.hadoop.util.NativeCodeLoader.getLibraryName();
 
       isalDetail = ErasureCodeNative.getLoadingFailureReason();
       if (isalDetail != null) {
@@ -50,12 +49,18 @@ public class CheckNative extends GenericCli {
         isalDetail = ErasureCodeNative.getLibraryName();
         isalLoaded = true;
       }
-
     }
     System.out.println("Native library checking:");
     System.out.printf("hadoop:  %b %s%n", nativeHadoopLoaded,
         hadoopLibraryName);
     System.out.printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
+
+    boolean nativeRocksToolsLoaded = org.apache.hadoop.hdds.utils.NativeLibraryLoader.isLibraryLoaded();
+    String rocksToolsDetail = "";
+    if (nativeRocksToolsLoaded) {
+      rocksToolsDetail = org.apache.hadoop.hdds.utils.NativeLibraryLoader.getJniLibraryFileName();
+    }
+    System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
     return null;
   }
 }

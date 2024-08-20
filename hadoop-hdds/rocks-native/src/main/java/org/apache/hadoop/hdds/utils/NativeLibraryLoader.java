@@ -36,6 +36,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+
 /**
  * Class to load Native Libraries.
  */
@@ -65,6 +67,10 @@ public class NativeLibraryLoader {
       initNewInstance();
     }
     return instance;
+  }
+
+  public static String getJniLibraryFileName() {
+    return appendLibOsSuffix("lib" + ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
   }
 
   public static String getJniLibraryFileName(String libraryName) {
@@ -99,9 +105,12 @@ public class NativeLibraryLoader {
     return libraryFileName + getLibOsSuffix();
   }
 
+  public static boolean isLibraryLoaded() {
+    return isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+  }
+
   public static boolean isLibraryLoaded(final String libraryName) {
-    return getInstance().librariesLoaded
-        .getOrDefault(libraryName, false);
+    return getInstance().librariesLoaded.getOrDefault(libraryName, false);
   }
 
   public synchronized boolean loadLibrary(final String libraryName, final List<String> dependentFiles) {
