@@ -306,8 +306,7 @@ const Volumes: React.FC<{}> = () => {
                 placeholder='Columns'
                 onChange={handleColumnChange}
                 onTagClose={handleTagClose}
-                fixedColumn='Volume'
-                isOptionDisabled={(option) => option.value === 'volume'}
+                fixedColumn='volume'
                 columnLength={COLUMNS.length} />
               <SingleSelect
                 options={LIMIT_OPTIONS}

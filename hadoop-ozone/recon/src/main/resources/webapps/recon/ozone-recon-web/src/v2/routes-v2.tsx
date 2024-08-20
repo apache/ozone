@@ -19,6 +19,7 @@ import { lazy } from 'react';
 
 const Overview = lazy(() => import('@/v2/pages/overview/overview'));
 const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
 
 export const routesV2 = [
   {
@@ -28,5 +29,9 @@ export const routesV2 = [
   {
     path: '/Volumes',
     component: Volumes
+  },
+  {
+    path: '/Buckets',
+    component: Buckets
   }
 ];

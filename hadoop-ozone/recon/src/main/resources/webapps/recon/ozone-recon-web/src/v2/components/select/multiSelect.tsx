@@ -93,6 +93,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     }}
     placeholder={placeholder}
     value={selected}
+    isOptionDisabled={(option) => option.value === fixedColumn}
     onChange={(selected: ValueType<Option, true>) => {
       if (selected?.length === options.length) return onChange!(options);
       return onChange!(selected);
