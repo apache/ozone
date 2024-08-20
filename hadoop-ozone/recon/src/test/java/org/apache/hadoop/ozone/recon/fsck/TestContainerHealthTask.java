@@ -401,10 +401,48 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         ContainerSchemaDefinition.UnHealthyContainerStates.values()) {
       // Create a dummy UnhealthyContainer record with the current state
       UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
-      unhealthyContainer.setContainerId(state.ordinal() + 1L); // Ensure unique ID for each state
-      unhealthyContainer.setExpectedReplicaCount(3);
-      unhealthyContainer.setActualReplicaCount(1);
-      unhealthyContainer.setReplicaDelta(2);
+      unhealthyContainer.setContainerId(state.ordinal() + 1L);
+
+      // Set replica counts based on the state
+      switch (state) {
+      case MISSING:
+      case EMPTY_MISSING:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(0);
+        unhealthyContainer.setReplicaDelta(3);
+        break;
+
+      case UNDER_REPLICATED:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(1);
+        unhealthyContainer.setReplicaDelta(2);
+        break;
+
+      case OVER_REPLICATED:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(4);
+        unhealthyContainer.setReplicaDelta(-1);
+        break;
+
+      case MIS_REPLICATED:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(3);
+        unhealthyContainer.setReplicaDelta(0);
+        break;
+
+      case ALL_REPLICAS_BAD:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(0);
+        unhealthyContainer.setReplicaDelta(3);
+        break;
+
+      case NEGATIVE_SIZE:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(3);
+        unhealthyContainer.setReplicaDelta(0);
+        break;
+      }
+
       unhealthyContainer.setContainerState(state.name());
       unhealthyContainer.setInStateSince(System.currentTimeMillis());
 
