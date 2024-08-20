@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -96,7 +97,7 @@ public class BlockOutputStream extends OutputStream {
   private AtomicReference<BlockID> blockID;
   // planned block full size
   private long blockSize;
-  private boolean eofSent = false;
+  private AtomicBoolean eofSent = new AtomicBoolean(false);
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
 
@@ -557,7 +558,7 @@ public class BlockOutputStream extends OutputStream {
         if (getIoException() == null && !force) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
-          eofSent = close || isBlockFull;
+          eofSent.set(close || isBlockFull);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -698,7 +699,7 @@ public class BlockOutputStream extends OutputStream {
       // There're no pending written data, but there're uncommitted data.
       updatePutBlockLength();
       putBlockResultFuture = executePutBlock(close, false);
-    } else if (close && !eofSent) {
+    } else if (close && !eofSent.get()) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
       updatePutBlockLength();
