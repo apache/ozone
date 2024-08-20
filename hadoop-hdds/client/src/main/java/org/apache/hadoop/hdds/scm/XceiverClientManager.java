@@ -62,12 +62,6 @@ public class XceiverClientManager extends XceiverClientCreator {
   private static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientManager.class);
 
-  private static ErrorInjector errorInjector;
-
-  public static void enableErrorInjection(ErrorInjector injector) {
-    errorInjector = injector;
-  }
-
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
 
