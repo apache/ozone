@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -67,6 +68,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -123,6 +125,8 @@ abstract class AbstractTestECKeyOutputStream {
     conf.setBoolean(OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED,
         zeroCopyEnabled);
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    // "Enable" hsync to verify that hsync would be blocked by ECKeyOutputStream
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
@@ -467,6 +471,20 @@ abstract class AbstractTestECKeyOutputStream {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;
+  }
+
+  @Test
+  public void testBlockedHflushAndHsync() throws Exception {
+    // Expect ECKeyOutputStream hflush and hsync calls to throw exception
+    try (OzoneOutputStream oOut = TestHelper.createKey(
+        keyString, new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize),
+        inputSize, objectStore, volumeName, bucketName)) {
+      assertInstanceOf(ECKeyOutputStream.class, oOut.getOutputStream());
+      KeyOutputStream kOut = (KeyOutputStream) oOut.getOutputStream();
+
+      assertThrows(NotImplementedException.class, () -> kOut.hflush());
+      assertThrows(NotImplementedException.class, () -> kOut.hsync());
+    }
   }
 
 }
