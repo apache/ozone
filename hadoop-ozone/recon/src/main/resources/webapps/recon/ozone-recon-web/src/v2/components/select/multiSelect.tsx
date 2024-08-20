@@ -22,7 +22,8 @@ import {
   Props as ReactSelectProps,
   components,
   OptionProps,
-  ValueType
+  ValueType,
+  ValueContainerProps
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
@@ -45,6 +46,27 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
 }
 
 // ------------- Component -------------- //
+
+const Option: React.FC<OptionProps<Option, true>> = (props) => {
+  return (
+    <div>
+      <components.Option
+        {...props}>
+        <input
+          type='checkbox'
+          checked={props.isSelected}
+          style={{
+            marginRight: '8px',
+            accentColor: '#1AA57A'
+          }}
+          onChange={() => null} />
+        <label>{props.label}</label>
+      </components.Option>
+    </div>
+  )
+}
+
+
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
   selected = [],
@@ -58,24 +80,21 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   ...props
 }) => {
 
-  const Option: React.FC<OptionProps<Option, true>> = (props) => {
+  const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, true>) => {
+    const selectedLimit = props.getValue() as Option[];
     return (
-      <div>
-        <components.Option
-          {...props}>
-          <input
-            type='checkbox'
-            checked={props.isSelected}
-            style={{
-              marginRight: '8px',
-              accentColor: '#1AA57A'
-            }}
-            onChange={() => null} />
-          <label>{props.label}</label>
-        </components.Option>
-      </div>
-    )
-  }
+      <components.ValueContainer {...props}>
+        {React.Children.map(children, (child) => (
+          ((child as React.ReactElement<any, string
+            | React.JSXElementConstructor<any>>
+            | React.ReactPortal)?.type as React.JSXElementConstructor<any>)).name === "DummyInput"
+          ? child
+          : null
+        )}
+        {placeholder}: {selected.length} selected
+      </components.ValueContainer>
+    );
+  };
 
   return (
     <ReactSelect
@@ -89,6 +108,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     classNamePrefix='multi-select'
     options={options}
     components={{
+      ValueContainer,
       Option
     }}
     placeholder={placeholder}

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import moment from 'moment';
 import { Table, Tag } from 'antd';
 import {
@@ -232,6 +232,41 @@ const defaultColumns = COLUMNS.map(column => ({
   value: column.key as string
 }));
 
+function getVolumeBucketMap(data: Bucket[]) {
+  const volumeBucketMap = data.reduce((
+    map: Map<string, Set<Bucket>>,
+    currentBucket
+  ) => {
+    const volume = currentBucket.volumeName;
+    if (map.has(volume)) {
+      const buckets = Array.from(map.get(volume)!);
+      map.set(volume, new Set([...buckets, currentBucket]));
+    } else {
+      map.set(volume, new Set<Bucket>().add(currentBucket));
+    }
+    return map;
+  }, new Map<string, Set<Bucket>>());
+  return volumeBucketMap;
+}
+
+function getFilteredBuckets(
+  selectedVolumes: Option[],
+  bucketsMap: Map<string, Set<Bucket>>
+) {
+  let selectedBuckets: Bucket[] = [];
+  selectedVolumes.forEach(selectedVolume => {
+    if (bucketsMap.has(selectedVolume.value)
+      && bucketsMap.get(selectedVolume.value)) {
+      selectedBuckets = [
+        ...selectedBuckets,
+        ...Array.from(bucketsMap.get(selectedVolume.value)!)
+      ];
+    }
+  });
+
+  return selectedBuckets;
+}
+
 const Buckets: React.FC<{}> = () => {
 
   let cancelSignal: AbortController;
@@ -243,15 +278,15 @@ const Buckets: React.FC<{}> = () => {
     volumeBucketMap: new Map<string, Set<Bucket>>(),
     bucketsUnderVolume: [],
     volumeOptions: [],
-    currentRow: {}
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
-  const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
   const [selectedVolumes, setSelectedVolumes] = useState<Option[]>([]);
-  const [searchColumn, setSearchColumn] = useState<'name' | 'volumeName'>('name');
+  const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showPanel, setShowPanel] = useState<boolean>(false);
+  const [searchColumn, setSearchColumn] = useState<'name' | 'volumeName'>('name');
+  const [currentRow, setCurrentRow] = useState<Bucket | Record<string, never>>({})
 
   const debouncedSearch = useDebounce(searchTerm, 300);
   const { search } = useLocation();
@@ -265,43 +300,19 @@ const Buckets: React.FC<{}> = () => {
     return new URLSearchParams(search).get('volume');
   };
 
-  function getVolumeBucketMap(data: Bucket[]) {
-    const volumeBucketMap = data.reduce((
-      map: Map<string, Set<Bucket>>,
-      currentBucket
-    ) => {
-      const volume = currentBucket.volumeName;
-      if (map.has(volume)) {
-        const buckets = Array.from(map.get(volume)!);
-        map.set(volume, new Set([...buckets, currentBucket]));
-      } else {
-        map.set(volume, new Set<Bucket>().add(currentBucket));
-      }
-      return map;
-    }, new Map<string, Set<Bucket>>());
-    return volumeBucketMap;
-  }
-
   function getFilteredData(data: Bucket[]) {
     return data.filter(
       (bucket: Bucket) => bucket[searchColumn].includes(debouncedSearch)
     );
   }
 
-  function handleVolumeChange(selected: ValueType<Option, true> | Option[]) {
+  function handleVolumeChange(selected: ValueType<Option, true>) {
     const { volumeBucketMap } = state;
     const volumeSelections = (selected as Option[]);
-
     let selectedBuckets: Bucket[] = [];
+
     if (volumeSelections?.length > 0) {
-      volumeSelections.forEach(selectedVolume => {
-        if (volumeBucketMap.has(selectedVolume.value) && volumeBucketMap.get(selectedVolume.value)) {
-          selectedBuckets = [
-            ...selectedBuckets,
-            ...Array.from(volumeBucketMap.get(selectedVolume.value)!)
-          ];
-        }
-      });
+      selectedBuckets = getFilteredBuckets(volumeSelections, volumeBucketMap)
     }
 
     setSelectedVolumes(volumeSelections);
@@ -312,10 +323,7 @@ const Buckets: React.FC<{}> = () => {
   };
 
   function handleAclLinkClick(bucket: Bucket) {
-    setState({
-      ...state,
-      currentRow: bucket
-    });
+    setCurrentRow(bucket);
     setShowPanel(true);
   }
 
@@ -438,6 +446,7 @@ const Buckets: React.FC<{}> = () => {
   let autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
 
   useEffect(() => {
+    autoReloadHelper.startPolling();
     addAclColumn();
     const initialVolume = getVolumeSearchParam();
     if (initialVolume) {
@@ -447,7 +456,7 @@ const Buckets: React.FC<{}> = () => {
       }]);
     }
     loadData();
-    autoReloadHelper.startPolling();
+
 
     return (() => {
       autoReloadHelper.stopPolling();
@@ -456,7 +465,15 @@ const Buckets: React.FC<{}> = () => {
   }, []);
 
   useEffect(() => {
-    handleVolumeChange(selectedVolumes);
+    // If the data is fetched, we need to regenerate the columns
+    // To make sure the filters are properly applied
+    setState({
+      ...state,
+      bucketsUnderVolume: getFilteredBuckets(
+        selectedVolumes,
+        state.volumeBucketMap
+      )
+    });
   }, [state.volumeBucketMap])
 
   // If limit changes, load new data
@@ -465,8 +482,8 @@ const Buckets: React.FC<{}> = () => {
   }, [selectedLimit.value]);
 
   const {
-    lastUpdated, columnOptions, volumeOptions,
-    currentRow, bucketsUnderVolume
+    lastUpdated, columnOptions,
+    volumeOptions, bucketsUnderVolume
   } = state;
 
   return (

@@ -60,7 +60,7 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
           ? child
           : null
         )}
-        Limit: {selectedLimit[0]?.label ?? ''}
+        {placeholder}: {selectedLimit[0]?.label ?? ''}
       </components.ValueContainer>
     );
   };

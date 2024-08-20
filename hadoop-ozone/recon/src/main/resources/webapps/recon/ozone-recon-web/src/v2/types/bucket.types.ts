@@ -68,5 +68,4 @@ export type BucketsState = {
   volumeBucketMap: Map<string, Set<Bucket>>;
   bucketsUnderVolume: Bucket[];
   volumeOptions: MultiOption[];
-  currentRow: Bucket | Record<string, never>;
 }
