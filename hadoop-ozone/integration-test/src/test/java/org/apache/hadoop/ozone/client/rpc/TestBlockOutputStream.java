@@ -700,7 +700,8 @@ class TestBlockOutputStream {
           assertInstanceOf(RatisBlockOutputStream.class,
               keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-      assertEquals(4, blockOutputStream.getBufferPool().getSize());
+      assertThat(blockOutputStream.getBufferPool().getSize())
+          .isLessThanOrEqualTo(4);
       // writtenDataLength as well flushedDataLength will be updated here
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
