@@ -59,6 +59,7 @@ public class TestCheckNative {
     assertThat(stdOut).contains("Native library checking:");
     assertThat(stdOut).contains("hadoop: false");
     assertThat(stdOut).contains("ISA-L: false");
+    assertThat(stdOut).contains("rocks-tools: false");
   }
 
   @AfterEach
