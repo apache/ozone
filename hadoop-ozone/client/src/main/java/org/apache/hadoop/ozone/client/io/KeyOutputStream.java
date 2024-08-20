@@ -347,7 +347,7 @@ public class KeyOutputStream extends OutputStream
   private void handleExceptionInternal(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
     try {
       // Wait for all pending flushes in the faulty stream. It's possible that a prior write is pending completion
-      // successfully. Errors are ignored here and will be handled by the individual flush call. We just wall to ensure
+      // successfully. Errors are ignored here and will be handled by the individual flush call. We just want to ensure
       // all the pending are complete before handling exception.
       streamEntry.waitForAllPendingFlushes();
     } catch (IOException ignored) {

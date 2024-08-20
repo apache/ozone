@@ -75,7 +75,7 @@ public class BlockOutputStreamEntry extends OutputStream {
 
   /**
    * An indicator that this BlockOutputStream is created to handoff writes from another faulty BlockOutputStream.
-   * Once this flag is on, this BlockOutputStream can only handle writeOneRetry.
+   * Once this flag is on, this BlockOutputStream can only handle writeOnRetry.
    */
   private volatile boolean isHandlingRetry;
 
@@ -125,7 +125,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   }
 
   /**
-   * Register when a call (write or flush) is finised on this block.
+   * Register when a call (write or flush) is finished on this block.
    * @return true if all the calls are done.
    */
   boolean registerCallFinished() {

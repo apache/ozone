@@ -413,12 +413,14 @@ public class BlockOutputStream extends OutputStream {
    * @param len length of data to write
    * @throws IOException if error occurred
    */
-
-  // In this case, the data is already cached in the allocated buffers in the BufferPool.
   public synchronized void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
     }
+
+    // In this case, the data from the failing (previous) block already cached in the allocated buffers in
+    // the BufferPool. For each pending buffers in the BufferPool, we sequentially flush it and wait synchronously.
+
     List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: Retrying write length {} on target blockID {}, {} buffers", this, len, blockID,
@@ -435,8 +437,14 @@ public class BlockOutputStream extends OutputStream {
       updateWriteChunkLength();
       updatePutBlockLength();
       LOG.debug("Write chunk on retry buffer = {}", buffer);
-      CompletableFuture<PutBlockResult> f = writeChunkAndPutBlock(buffer, false);
-      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(f);
+      CompletableFuture<PutBlockResult> putBlockFuture;
+      if (allowPutBlockPiggybacking) {
+        putBlockFuture = writeChunkAndPutBlock(buffer, false);
+      } else {
+        writeChunk(buffer);
+        putBlockFuture = executePutBlock(false, false);
+      }
+      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(putBlockFuture);
       try {
         watchForCommitAsync.get();
       } catch (InterruptedException e) {
