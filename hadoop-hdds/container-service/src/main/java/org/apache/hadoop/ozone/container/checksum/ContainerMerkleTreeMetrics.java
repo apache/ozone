@@ -32,7 +32,6 @@ public class ContainerMerkleTreeMetrics {
 
   public static ContainerMerkleTreeMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    // TODO: Remove when checksum manager is moved from KeyValueHandler.
     MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
     if (source != null) {
       ms.unregisterSource(METRICS_SOURCE_NAME);

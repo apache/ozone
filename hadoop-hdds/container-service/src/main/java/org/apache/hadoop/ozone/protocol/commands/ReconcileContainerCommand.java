@@ -103,6 +103,6 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
 
   @Override
   public int hashCode() {
-    return Objects.hash(getContainerID());
+    return Objects.hash(getContainerID(), peerDatanodes);
   }
 }
