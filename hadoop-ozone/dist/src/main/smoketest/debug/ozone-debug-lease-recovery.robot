@@ -22,11 +22,20 @@ Test Timeout        5 minute
 Suite Setup         Create volume bucket and put key
 
 *** Variables ***
+${OMSERVICEID}
 ${VOLUME}           lease-recovery-volume
 ${BUCKET}           lease-recovery-bucket
 ${TESTFILE}         testfile22
 
 *** Keywords ***
+Get OM serviceId
+    ${confKey} =        Execute And Ignore Error        ozone getconf confKey ozone.om.service.ids
+    ${result} =         Evaluate                        "Configuration ozone.om.service.ids is missing" in """${confKey}"""
+    IF      ${result} == ${True}
+        Set Suite Variable  ${OMSERVICEID}         om
+    ELSE
+        Set Suite Variable  ${OMSERVICEID}         ${confKey}
+    END
 Create volume bucket and put key
     Execute                 ozone sh volume create /${VOLUME}
     Execute                 ozone sh bucket create /${VOLUME}/${BUCKET}
@@ -35,13 +44,15 @@ Create volume bucket and put key
 
 *** Test Cases ***
 Test ozone debug recover for o3fs
-    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/${TESTFILE}
+    Get OM serviceId
+    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.${OMSERVICEID}/${TESTFILE}
     Should Contain    ${result}   Lease recovery SUCCEEDED
-    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/randomfile
+    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.${OMSERVICEID}/randomfile
     Should Contain    ${result}    not found
 
 Test ozone debug recover for ofs
-    ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    Get OM serviceId
+    ${result} =              Execute Lease recovery cli    ofs://${OMSERVICEID}/${VOLUME}/${BUCKET}/${TESTFILE}
     Should Contain    ${result}   Lease recovery SUCCEEDED
-    ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/randomfile
+    ${result} =              Execute Lease recovery cli    ofs://${OMSERVICEID}/${VOLUME}/${BUCKET}/randomfile
     Should Contain    ${result}    not found
