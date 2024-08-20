@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -418,6 +419,16 @@ public final class ECKeyOutputStream extends KeyOutputStream
   @Override
   public void flush() {
     LOG.debug("ECKeyOutputStream does not support flush.");
+  }
+
+  @Override
+  public void hflush() {
+    throw new NotImplementedException("ECKeyOutputStream does not support hflush.");
+  }
+
+  @Override
+  public void hsync() {
+    throw new NotImplementedException("ECKeyOutputStream does not support hsync.");
   }
 
   private void closeCurrentStreamEntry()
