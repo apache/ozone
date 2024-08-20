@@ -44,7 +44,9 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
     if (enabled) {
       // just trigger quota repair and status can be checked via CLI
       try {
-        arg.checkLeaderStatus();
+        if (arg.isRatisEnabled()) {
+          arg.checkLeaderStatus();
+        }
         QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
         quotaRepairTask.repair();
       } catch (OMNotLeaderException | OMLeaderNotReadyException ex) {
