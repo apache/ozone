@@ -2,7 +2,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +15,7 @@ import java.util.List;
 public class DataScanResult extends MetadataScanResult {
 
   private final ContainerMerkleTree dataTree;
+  // Only deleted results can be interned. Healthy results will still have different trees.
   private static final DataScanResult DELETED = new DataScanResult(Collections.emptyList(),
       new ContainerMerkleTree(), true);
 
@@ -39,7 +39,6 @@ public class DataScanResult extends MetadataScanResult {
 
   /**
    * Constructs an unhealthy data scan result which had a successful metadata scan but unhealthy data scan.
-   * Failure types should be
    */
   public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
     return new DataScanResult(errors, dataTree, false);

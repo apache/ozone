@@ -33,9 +33,6 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
-import static org.apache.hadoop.ozone.container.common.interfaces.ScanResult.FailureType.DELETED_CONTAINER;
-
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
  */
@@ -96,8 +93,7 @@ public class BackgroundContainerDataScanner extends
       LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
     } else {
       if (!result.isHealthy()) {
-        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. The first error encountered was: {}",
-            containerId, result);
+        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerId, result);
         // Only increment the number of unhealthy containers if the container was not already unhealthy.
         if (controller.markContainerUnhealthy(containerId, result)) {
           metrics.incNumUnHealthyContainers();

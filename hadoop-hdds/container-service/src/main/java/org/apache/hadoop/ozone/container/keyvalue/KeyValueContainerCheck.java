@@ -50,22 +50,16 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.checkerframework.checker.units.qual.C;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.xml.crypto.Data;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
@@ -153,7 +147,7 @@ public class KeyValueContainerCheck {
 
       metadataErrors.addAll(checkContainerFile(containerFile));
 
-      if (!metadataErrors.isEmpty() && containerIsDeleted()) {
+      if (containerIsDeleted()) {
         return MetadataScanResult.deleted();
       } else {
         return MetadataScanResult.fromErrors(metadataErrors);

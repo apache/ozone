@@ -47,7 +47,6 @@ public class ContainerScanError {
 
   @Override
   public String toString() {
-    // TODO
-    return "";
+    return failureType + " for file " + unhealthyFile + " with exception: " + exception;
   }
 }

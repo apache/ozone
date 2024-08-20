@@ -52,15 +52,14 @@ public class MetadataScanResult implements ScanResult {
   }
 
   /**
-   * @return A string representation of the first error in this result, or an empty string if there are no errors.
+   * @return A string representation of the first error in this result, or a string indicating the result is healthy.
    */
   @Override
   public String toString() {
     if (errors.isEmpty()) {
-      return "";
+      return "Scan result has 0 errors";
     } else {
-      // TODO check this string type.
-      return errors.get(0).toString();
+      return "Scan result has " + errors.size() + " errors. The first error is: " + errors.get(0);
     }
   }
 }
