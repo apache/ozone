@@ -119,8 +119,20 @@ public class KeyOutputStream extends OutputStream
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
 
+  @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
     return keyOutputStreamSemaphore;
+  }
+
+  /** Required to spy the object in testing. */
+  @VisibleForTesting
+  @SuppressWarnings("unused")
+  KeyOutputStream() {
+    maxConcurrentWritePerKey = 0;
+    keyOutputStreamSemaphore = null;
+    blockOutputStreamEntryPool = null;
+    retryPolicyMap = null;
+    replication = null;
   }
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
