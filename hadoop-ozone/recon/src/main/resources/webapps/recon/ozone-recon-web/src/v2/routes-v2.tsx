@@ -15,11 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import { lazy } from 'react';
 
 const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'))
+const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
 
 export const routesV2 = [
   {
@@ -27,7 +26,7 @@ export const routesV2 = [
     component: Overview
   },
   {
-    path: '/Buckets',
-    component: Buckets
+    path: '/Volumes',
+    component: Volumes
   }
 ];

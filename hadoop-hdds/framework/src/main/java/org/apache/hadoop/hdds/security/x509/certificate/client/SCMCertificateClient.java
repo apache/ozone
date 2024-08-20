@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -32,10 +33,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.Defaul
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,6 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -137,14 +135,14 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    *
    * @return CertificateSignRequest.Builder
    */
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
+  public CertificateSignRequest.Builder configureCSRBuilder()
+      throws SCMSecurityException {
     String subject = SCM_SUB_CA_PREFIX + scmHostname;
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
         "subject:{}", scmHostname, scmId, cId, subject);
 
-    return super.getCSRBuilder()
+    return super.configureCSRBuilder()
         .setSubject(subject)
         .setScmID(scmId)
         .setClusterID(cId)
@@ -164,15 +162,13 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected SCMGetCertResponseProto getCertificateSignResponse(
-      PKCS10CertificationRequest request) {
-    throw new UnsupportedOperationException("getCertSignResponse of " +
-        " SCMCertificateClient is not supported currently");
+  protected SCMGetCertResponseProto sign(CertificateSignRequest request) {
+    throw new UnsupportedOperationException("Invalid call to SCMCertificateClient#sign(CertificateSignRequest. " +
+        "SCM certificate client uses a different mechanism to sign the SCMs' certificate.");
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath, boolean renew) throws CertificateException {
+  public String signAndStoreCertificate(CertificateSignRequest csr, Path certPath, boolean renew) {
     try {
       HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
           HddsProtos.ScmNodeDetailsProto.newBuilder()
@@ -182,8 +178,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response =
-          getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
-              getEncodedString(request), true);
+          getScmSecureClient().getSCMCertChain(scmNodeDetailsProto, csr.toEncodedFormat(), true);
 
       CertificateCodec certCodec = new CertificateCodec(
           getSecurityConfig(), certPath);
@@ -310,7 +305,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private void getRootCASignedSCMCert() {
     try {
       // Generate CSR.
-      PKCS10CertificationRequest csr = getCSRBuilder().build();
+      CertificateSignRequest csr = configureCSRBuilder().build();
       HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
           HddsProtos.ScmNodeDetailsProto.newBuilder()
               .setClusterId(cId)
@@ -319,7 +314,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = getScmSecureClient().
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
+          getSCMCertChain(scmNodeDetailsProto, csr.toEncodedFormat(), false);
       String pemEncodedCert = response.getX509Certificate();
 
       // Store SCM sub CA and root CA certificate.
@@ -357,9 +352,11 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       String pemEncodedRootCert =
           CertificateCodec.getPEMEncodedString(rootCACertificatePath);
 
-      PKCS10CertificationRequest csr = getCSRBuilder().build();
+      CertificateSignRequest csr = configureCSRBuilder().build();
       String subCaSerialId = BigInteger.ONE.add(BigInteger.ONE).toString();
-      CertPath scmSubCACertPath = rootCAServer.requestCertificate(csr, KERBEROS_TRUSTED, SCM, subCaSerialId).get();
+      //TODO: do not use generateCSR() here once the server side change is also done.
+      CertPath scmSubCACertPath =
+          rootCAServer.requestCertificate(csr.generateCSR(), KERBEROS_TRUSTED, SCM, subCaSerialId).get();
       String pemEncodedCert = CertificateCodec.getPEMEncodedString(scmSubCACertPath);
 
       storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE);

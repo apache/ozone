@@ -36,7 +36,7 @@ export const BucketLayoutTypeList = [
 export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 
-export type BucketResponse = {
+export type Bucket = {
   volumeName: string;
   bucketName: string;
   isVersionEnabled: boolean;
@@ -51,30 +51,5 @@ export type BucketResponse = {
   quotaInNamespace: number;
   owner: string;
   acls?: Acl[];
-}
-
-export type Bucket = {
   bucketLayout: BucketLayout;
-} & BucketResponse;
-
-export type BucketsResponse = {
-  totalCount: number;
-  buckets: BucketResponse[];
 }
-
-export type BucketsState = {
-  loading: boolean;
-  totalCount: number;
-  lastUpdated: number;
-  selectedColumns: Option;
-  columnOptions: IOption[];
-  volumeBucketMap: Map<string, Set<Bucket>>;
-  selectedVolumes: IOption[];
-  selectedBuckets: Bucket[];
-  volumeOptions: Bucket[];
-  currentRow?: Bucket;
-  showPanel: boolean;
-  selectedLimit: Bucket;
-}
-
-
