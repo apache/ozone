@@ -102,7 +102,7 @@ public class BlockOutputStream extends OutputStream {
       = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
-  private XceiverClientFactory xceiverClientFactory;
+  private volatile XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private OzoneClientConfig config;
   private StreamBufferArgs streamBufferArgs;
@@ -815,7 +815,6 @@ public class BlockOutputStream extends OutputStream {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
-//      adjustBuffersOnException();
       throw getIoException();
     }
   }
