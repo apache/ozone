@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -621,7 +622,8 @@ public class BlockOutputStream extends OutputStream {
    */
   protected void handleFlush(boolean close) throws IOException {
     try {
-      handleFlushInternal(close);
+      TracingUtil.executeInNewSpan("BlockOutputStream.handleFlush",
+          () -> handleFlushInternal(close));
       if (close) {
         waitForAllPendingFlushes();
       }
@@ -633,7 +635,10 @@ public class BlockOutputStream extends OutputStream {
     } catch (Throwable e) {
       String msg = "Failed to flush. error: " + e.getMessage();
       LOG.error(msg, e);
-      throw e;
+      if (e instanceof IOException) {
+        throw (IOException)e;
+      }
+      throw new IOException(e);
     } finally {
       if (close) {
         cleanup(false);
@@ -641,8 +646,7 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void handleFlushInternal(boolean close)
-      throws IOException, InterruptedException, ExecutionException {
+  private void handleFlushInternal(boolean close) throws Exception {
     checkOpen();
     LOG.debug("Start handleFlushInternal close={}", close);
     CompletableFuture<Void> toWaitFor = handleFlushInternalSynchronized(close);
@@ -726,7 +730,8 @@ public class BlockOutputStream extends OutputStream {
   private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
     return putBlockResultFuture.thenAccept(x -> {
       try {
-        watchForCommit(x.commitIndex);
+        TracingUtil.executeInNewSpan("BlockOutputStream.watchForCommit",
+            () -> watchForCommit(x.commitIndex));
       } catch (IOException e) {
         throw new FlushRuntimeException(e);
       }
