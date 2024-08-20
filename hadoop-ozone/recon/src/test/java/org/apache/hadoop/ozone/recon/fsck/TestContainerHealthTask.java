@@ -22,9 +22,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -399,6 +400,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Iterate through each state in the UnHealthyContainerStates enum
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :
         ContainerSchemaDefinition.UnHealthyContainerStates.values()) {
+
       // Create a dummy UnhealthyContainer record with the current state
       UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
       unhealthyContainer.setContainerId(state.ordinal() + 1L);
@@ -425,6 +427,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         break;
 
       case MIS_REPLICATED:
+      case NEGATIVE_SIZE:
         unhealthyContainer.setExpectedReplicaCount(3);
         unhealthyContainer.setActualReplicaCount(3);
         unhealthyContainer.setReplicaDelta(0);
@@ -436,11 +439,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         unhealthyContainer.setReplicaDelta(3);
         break;
 
-      case NEGATIVE_SIZE:
-        unhealthyContainer.setExpectedReplicaCount(3);
-        unhealthyContainer.setActualReplicaCount(3);
-        unhealthyContainer.setReplicaDelta(0);
-        break;
+      default:
+        fail("Unhandled state: " + state.name() + ". Please add this state to the switch case.");
       }
 
       unhealthyContainer.setContainerState(state.name());
