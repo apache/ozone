@@ -386,12 +386,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return true;
     }
 
-    // check if fields are valid
-    if (fieldsFilter != null &&
-        !checkValidValueFields(dbPath, fieldsFilter, columnFamilyDefinition)) {
-      return false;
-    }
-
     ManagedRocksIterator iterator = null;
     ManagedReadOptions readOptions = null;
     ManagedSlice slice = null;
@@ -418,47 +412,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     } finally {
       IOUtils.closeQuietly(iterator, readOptions, slice);
     }
-  }
-  boolean checkValidValueFields(String dbPath, String valueFields,
-                                DBColumnFamilyDefinition<?, ?> columnFamilyDefinition) {
-    Map<String, Object> valueSchema = new HashMap<>();
-    try {
-      boolean schemaSuccess = new ValueSchema().getValueFields(dbPath, valueSchema, 2, tableName);
-      if (!schemaSuccess) {
-        err().println("Error: Schema for table with name '" + tableName + "' not found");
-        return false;
-      }
-      Map<String, Object> valueClassSchema =
-          (Map<String, Object>) valueSchema.get(columnFamilyDefinition.getValueType().getSimpleName());
-
-      if (valueClassSchema == null) {
-        err().print("Error: Schema for table with name '" + tableName +
-            "' and value type '" + columnFamilyDefinition.getValueType().getSimpleName() + "' not found");
-        return false;
-      }
-
-      for (String field : valueFields.split(",")) { // TODO: check for distinct values
-        String[] subfields = field.split("\\.");
-        if (subfields.length > 2) {
-          err().println("Warn: Fields only up to 2nd level is allowed. Ignoring the subfields from 3rd level onwards");
-        }
-        Object subfieldValueSchema = valueClassSchema.get(subfields[0]);
-        if (subfieldValueSchema == null) {
-          err().println("Error: Field with name '" + field + "' not found");
-          return false;
-        }
-        if ((subfields.length > 1) &&
-            (subfieldValueSchema instanceof String ||
-                ((Map<String, Object>) subfieldValueSchema).get(subfields[1]) == null)) {
-          err().println("Error: subField with name '" + field + "' not found");
-          return false;
-        }
-      }
-    } catch (Exception ex) {
-      err().println("exception from fields check:" + ex.getMessage());
-    }
-
-    return true;
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
@@ -538,6 +491,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     public Void call() {
       try {
         ArrayList<String> results = new ArrayList<>(batch.size());
+        List<List<String>> fieldsSplit = new ArrayList<>();
+        if (valueFields != null) {
+          for (String field : valueFields.split(",")) {
+            String[] subfields = field.split("\\.");
+            fieldsSplit.add(Arrays.asList(subfields));
+          }
+        }
+
         for (ByteArrayKeyValue byteArrayKeyValue : batch) {
           StringBuilder sb = new StringBuilder();
           if (!(sequenceId == FIRST_SEQUENCE_ID && results.isEmpty())) {
@@ -575,47 +536,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
-            for (String field : valueFields.split(",")) {
-              String[] subfields = field.split("\\.");
+            for (List<String> subfields : fieldsSplit) {
               try {
-                Field valueClassField = getRequiredFieldFromAllFields(dbColumnFamilyDefinition.getValueType(),
-                    subfields[0]);
-                Object valueObject = valueClassField.get(o);
-                if (subfields.length == 1) {
-                  filteredValue.put(field, valueObject);
-                } else {
-                  Class<?> typeOfClassField;
-                  try {
-                    if (Collection.class.isAssignableFrom(valueClassField.getType())) {
-                      typeOfClassField = (Class<?>)
-                          ((ParameterizedType) valueClassField.getGenericType()).getActualTypeArguments()[0];
-                    } else {
-                      typeOfClassField = valueClassField.getType();
-                    }
-                  } catch (ClassCastException ex) {
-                    typeOfClassField = valueClassField.getType();
-                  }
-
-                  Field classSubField = getRequiredFieldFromAllFields(typeOfClassField, subfields[1]);
-
-                  if (Collection.class.isAssignableFrom(valueObject.getClass())) {
-                    List<Map<String, Object>> subfieldObjectsList = new ArrayList<>();
-                    for (Object ob : (List) valueObject) {
-                      Map<String, Object> subfieldValueMap = new HashMap<>();
-                      subfieldValueMap.put(subfields[1], classSubField.get(ob));
-                      subfieldObjectsList.add(subfieldValueMap);
-                    }
-                    filteredValue.put(field, subfieldObjectsList);
-                  } else {
-                    filteredValue.put(field, classSubField.get(valueObject));
-                  }
-                }
+                filteredValue.putAll(getFilteredObject(o, subfields, dbColumnFamilyDefinition.getValueType()));
               } catch (NoSuchFieldException ex) {
-                err().println("ERROR: no such field: " + valueFields);
+                err().println("ERROR: no such field: " + subfields);
+              } catch (IllegalAccessException e) {
+                err().println("ERROR: Cannot get field from object: " + subfields);
               }
             }
             sb.append(WRITER.writeValueAsString(filteredValue));
-
           } else {
             sb.append(WRITER.writeValueAsString(o));
           }
@@ -623,15 +553,51 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           results.add(sb.toString());
         }
         logWriter.log(results, sequenceId);
-      } catch (IOException | IllegalAccessException e) {
+      } catch (IOException e) {
         exception = true;
         LOG.error("Exception parse Object", e);
       }
       return null;
     }
 
+    Map<String, Object> getFilteredObject(Object o, List<String> subfields, Class<?> fieldClass)
+        throws NoSuchFieldException, IllegalAccessException {
+      Field valueClassField = getRequiredFieldFromAllFields(fieldClass, subfields.get(0));
+      Object valueObject = valueClassField.get(o);
+      int length = subfields.size();
+      Map<String, Object> valueMap = new HashMap<>();
+      if (length == 1) {
+        valueMap.put(subfields.get(0), valueObject);
+      } else {
+        Class<?> typeOfClassField;
+        try {
+          if (Collection.class.isAssignableFrom(valueClassField.getType())) {
+            typeOfClassField = (Class<?>)
+                ((ParameterizedType) valueClassField.getGenericType()).getActualTypeArguments()[0];
+          } else {
+            typeOfClassField = valueClassField.getType();
+          }
+        } catch (ClassCastException ex) {
+          typeOfClassField = valueClassField.getType();
+        }
+
+        if (Collection.class.isAssignableFrom(valueObject.getClass())) {
+          List<Object> subfieldObjectsList = new ArrayList<>();
+          for (Object ob : (List) valueObject) {
+            Object subfieldValue = getFilteredObject(ob, subfields.subList(1, length), typeOfClassField);
+            subfieldObjectsList.add(subfieldValue);
+          }
+          valueMap.put(subfields.get(0), subfieldObjectsList);
+        } else {
+          valueMap.put(subfields.get(0),
+              getFilteredObject(valueObject, subfields.subList(1, length), typeOfClassField));
+        }
+      }
+      return valueMap;
+    }
+
     Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
-      List<Field> classFieldList = new ValueSchema().getAllFields(clazz);
+      List<Field> classFieldList = ValueSchema.getAllFields(clazz);
       Field classField = null;
       for (Field f : classFieldList) {
         if (f.getName().equals(fieldName)) {
