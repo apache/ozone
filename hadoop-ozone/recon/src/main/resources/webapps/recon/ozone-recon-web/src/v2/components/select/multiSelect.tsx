@@ -81,7 +81,6 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 }) => {
 
   const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, true>) => {
-    const selectedLimit = props.getValue() as Option[];
     return (
       <components.ValueContainer {...props}>
         {React.Children.map(children, (child) => (
