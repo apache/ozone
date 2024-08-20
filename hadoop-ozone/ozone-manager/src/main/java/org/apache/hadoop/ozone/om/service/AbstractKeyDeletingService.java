@@ -36,9 +36,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -57,6 +59,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -292,8 +295,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     map.get(volumeBucketPair).add(objectKey);
   }
 
-  protected void submitPurgePaths(List<PurgePathRequest> requests,
-                                  String snapTableKey) {
+  protected OzoneManagerProtocolProtos.OMResponse submitPurgePaths(
+      List<PurgePathRequest> requests, String snapTableKey) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -314,15 +317,30 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       if (isRatisEnabled()) {
         RaftClientRequest raftClientRequest =
             createRaftClientRequestForPurge(omRequest);
-        ozoneManager.getOmRatisServer().submitRequest(omRequest,
+        return ozoneManager.getOmRatisServer().submitRequest(omRequest,
             raftClientRequest);
       } else {
-        getOzoneManager().getOmServerProtocol()
+        return getOzoneManager().getOmServerProtocol()
             .submitRequest(null, omRequest);
       }
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
+    return null;
+  }
+
+  protected OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
+      final long volumeId, final long bucketId, final List<OzoneManagerProtocolProtos.KeyInfo> purgeDeletedFiles) {
+    // Put all keys to be purged in a list
+    PurgePathRequest.Builder purgePathsRequest = PurgePathRequest.newBuilder();
+    purgePathsRequest.setVolumeId(volumeId);
+    purgePathsRequest.setBucketId(bucketId);
+
+    for (OzoneManagerProtocolProtos.KeyInfo purgeFile : purgeDeletedFiles) {
+      purgePathsRequest.addDeletedSubFiles(purgeFile);
+    }
+
+    return purgePathsRequest.build();
   }
 
   private OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
@@ -408,12 +426,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public long optimizeDirDeletesAndSubmitRequest(long remainNum,
-      long dirNum, long subDirNum, long subFileNum,
-      List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<PurgePathRequest> purgePathRequestList,
-      String snapTableKey, long startTime,
-      int remainingBufLimit, KeyManager keyManager) {
+  public Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>>  optimizeDirDeletesAndSubmitRequest(
+      long remainNum, long dirNum, long subDirNum, long subFileNum, List<Pair<String, OmKeyInfo>> allSubDirList,
+      List<PurgePathRequest> purgePathRequestList, String snapTableKey, long startTime, int remainingBufLimit,
+      KeyManager keyManager) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -451,9 +467,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         break;
       }
     }
-
+    OzoneManagerProtocolProtos.OMResponse response = null;
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey);
+      response = submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -468,7 +484,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           Time.monotonicNow() - startTime, getRunCount());
     }
-    return remainNum;
+    return Pair.of(remainNum, Optional.ofNullable(response));
   }
 
   /**
@@ -596,6 +612,20 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return null;
   }
 
+  protected SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo,
+                                             SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+      throws IOException {
+    SnapshotInfo currSnapInfo = snapInfo;
+    if (chainManager.hasPreviousPathSnapshot(currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
+
+      UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
+      String tableKey = chainManager.getTableKey(prevPathSnapshot);
+      return omSnapshotManager.getSnapshotInfo(tableKey);
+    }
+    return null;
+  }
+
   protected boolean isKeyReclaimable(
       Table<String, OmKeyInfo> previousKeyTable,
       Table<String, String> renamedTable,
@@ -660,6 +690,45 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // For key overwrite the objectID will remain the same, In this
     // case we need to check if OmKeyLocationInfo is also same.
     return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
+  }
+
+  protected boolean isDirReclaimable(
+      Table.KeyValue<String, OmKeyInfo> deletedDir,
+      Table<String, OmDirectoryInfo> previousDirTable,
+      Table<String, String> renamedTable) throws IOException {
+
+    if (previousDirTable == null) {
+      return true;
+    }
+
+    String deletedDirDbKey = deletedDir.getKey();
+    OmKeyInfo deletedDirInfo = deletedDir.getValue();
+    String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
+        deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName(),
+        deletedDirInfo.getObjectID());
+
+      /*
+      snapshotRenamedTable: /volumeName/bucketName/objectID ->
+          /volumeId/bucketId/parentId/dirName
+       */
+    String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
+    String prevDbKey = null;
+
+    if (dbKeyBeforeRename != null) {
+      prevDbKey = dbKeyBeforeRename;
+    } else {
+      // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
+      // OzoneDeletePathKey. Changing it back to check the previous DirTable.
+      prevDbKey = ozoneManager.getMetadataManager()
+          .getOzoneDeletePathDirKey(deletedDirDbKey);
+    }
+
+    OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
+    if (prevDirectoryInfo == null) {
+      return true;
+    }
+
+    return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
   }
 
   public boolean isRatisEnabled() {

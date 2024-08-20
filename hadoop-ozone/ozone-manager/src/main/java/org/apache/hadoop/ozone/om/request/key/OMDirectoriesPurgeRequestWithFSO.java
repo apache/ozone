@@ -25,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -150,6 +152,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
       }
+      if (fromSnapshotInfo != null) {
+        SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshotInfo, termIndex);
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+      }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
@@ -164,7 +171,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         entry.setValue(entry.getValue().copyObject());
       }
     }
-
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(

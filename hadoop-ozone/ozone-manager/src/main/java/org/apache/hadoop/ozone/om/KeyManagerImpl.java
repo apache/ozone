@@ -193,7 +193,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
-  private BackgroundService dirDeletingService;
+  private DirectoryDeletingService dirDeletingService;
   private final OMPerformanceMetrics metrics;
 
   private BackgroundService openKeyCleanupService;
@@ -710,7 +710,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public BackgroundService getDirDeletingService() {
+  public DirectoryDeletingService getDirDeletingService() {
     return dirDeletingService;
   }
 
@@ -2034,11 +2034,7 @@ public class KeyManagerImpl implements KeyManager {
       if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
         continue;
       }
-      String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
-          dirInfo.getName());
-      OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
-          parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
-          dirName);
+      OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(parentInfo, dirInfo);
       directories.add(omKeyInfo);
       countEntries++;
     }
@@ -2071,11 +2067,7 @@ public class KeyManagerImpl implements KeyManager {
         if (!metadataManager.getFileTable().isExist(entry.getKey())) {
           continue;
         }
-        fileInfo.setFileName(fileInfo.getKeyName());
-        String fullKeyPath = OMFileRequest.getAbsolutePath(
-            parentInfo.getKeyName(), fileInfo.getKeyName());
-        fileInfo.setKeyName(fullKeyPath);
-
+        OMFileRequest.setKeyNameAndFileName(parentInfo, fileInfo);
         files.add(fileInfo);
         countEntries++;
       }

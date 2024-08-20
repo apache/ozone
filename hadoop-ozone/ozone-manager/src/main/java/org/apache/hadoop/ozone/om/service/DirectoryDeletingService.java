@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
@@ -82,6 +83,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final long pathLimitPerTask;
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
+  private boolean runningOnAOS;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -98,6 +100,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
+    this.runningOnAOS = false;
   }
 
   private boolean shouldRun() {
@@ -124,6 +127,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     suspended.set(false);
   }
 
+  public boolean isRunningOnAOS() {
+    return runningOnAOS;
+  }
+
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -141,6 +149,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     @Override
     public BackgroundTaskResult call() {
       if (shouldRun()) {
+        runningOnAOS = true;
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
         }
@@ -210,6 +219,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
         }
+        runningOnAOS = false;
       }
 
       // place holder by returning empty results of this call back.
@@ -224,12 +234,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           getOzoneManager().getOmSnapshotManager();
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
-
+      SnapshotInfo snapshotInfo = metadataManager.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
+          deletedDirInfo.getBucketName(), omSnapshotManager);
+      if (snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+          !OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo)) {
+        return true;
+      }
       try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
-          metadataManager.getLatestActiveSnapshot(
+          metadataManager.getLatestSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),
-              omSnapshotManager)) {
+              omSnapshotManager, false)) {
 
         if (rcLatestSnapshot != null) {
           String dbRenameKey = metadataManager

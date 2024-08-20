@@ -1616,11 +1616,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
           String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
-
+          SnapshotInfo snapshotInfo = getLatestSnapshotInfo(keySplit[1], keySplit[2], omSnapshotManager);
+          if (snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+              !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapshotInfo)) {
+            continue;
+          }
           // Get the latest snapshot in snapshot path.
           try (ReferenceCounted<OmSnapshot>
-              rcLatestSnapshot = getLatestActiveSnapshot(
-                  keySplit[1], keySplit[2], omSnapshotManager)) {
+              rcLatestSnapshot = getLatestSnapshot(
+                  keySplit[1], keySplit[2], omSnapshotManager, false)) {
 
             // Multiple keys with the same path can be queued in one DB entry
             RepeatedOmKeyInfo infoList = kv.getValue();
@@ -1731,46 +1735,36 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           String volumeName, String bucketName,
           OmSnapshotManager snapshotManager)
       throws IOException {
+    return getLatestSnapshot(volumeName, bucketName, snapshotManager, true);
+  }
 
+  /**
+   * Get the latest OmSnapshot for a snapshot path.
+   */
+  public ReferenceCounted<OmSnapshot> getLatestSnapshot(String volumeName, String bucketName,
+                                                        OmSnapshotManager snapshotManager, boolean isActive)
+      throws IOException {
+    Optional<SnapshotInfo> snapshotInfo = Optional.ofNullable(getLatestSnapshotInfo(volumeName, bucketName,
+        snapshotManager));
+    if (isActive && snapshotInfo.map(si -> si.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
+        .orElse(false)) {
+      snapshotInfo = Optional.ofNullable(SnapshotUtils.getPreviousActiveSnapshot(snapshotInfo.get(),
+          snapshotChainManager, snapshotManager));
+    }
+    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot = snapshotInfo.isPresent() ?
+        Optional.ofNullable(snapshotManager.getSnapshot(volumeName, bucketName, snapshotInfo.get().getName())) :
+        Optional.empty();
+
+    return rcOmSnapshot.orElse(null);
+  }
+
+  public SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
+                                            OmSnapshotManager snapshotManager) throws IOException {
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
     Optional<UUID> latestPathSnapshot = Optional.ofNullable(
         snapshotChainManager.getLatestPathSnapshotId(snapshotPath));
-
-    Optional<SnapshotInfo> snapshotInfo = Optional.empty();
-
-    while (latestPathSnapshot.isPresent()) {
-      Optional<String> snapTableKey = latestPathSnapshot
-          .map(uuid -> snapshotChainManager.getTableKey(uuid));
-
-      snapshotInfo = snapTableKey.isPresent() ?
-          Optional.ofNullable(getSnapshotInfoTable().get(snapTableKey.get())) :
-          Optional.empty();
-
-      if (snapshotInfo.isPresent() && snapshotInfo.get().getSnapshotStatus() ==
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
-        break;
-      }
-
-      // Update latestPathSnapshot if current snapshot is deleted.
-      if (snapshotChainManager.hasPreviousPathSnapshot(snapshotPath,
-          latestPathSnapshot.get())) {
-        latestPathSnapshot = Optional.ofNullable(snapshotChainManager
-            .previousPathSnapshot(snapshotPath, latestPathSnapshot.get()));
-      } else {
-        latestPathSnapshot = Optional.empty();
-      }
-    }
-
-    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot =
-        snapshotInfo.isPresent() ?
-            Optional.ofNullable(
-                snapshotManager.getSnapshot(volumeName,
-                    bucketName,
-                    snapshotInfo.get().getName())
-            ) :
-            Optional.empty();
-
-    return rcOmSnapshot.orElse(null);
+    return latestPathSnapshot.isPresent() ?
+        SnapshotUtils.getSnapshotInfo(snapshotChainManager, latestPathSnapshot.get(), snapshotManager) : null;
   }
 
   /**

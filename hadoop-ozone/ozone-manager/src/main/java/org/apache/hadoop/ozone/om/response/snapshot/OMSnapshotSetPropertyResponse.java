@@ -27,6 +27,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
@@ -35,26 +38,29 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
  */
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotSetPropertyResponse extends OMClientResponse {
-  private final SnapshotInfo updatedSnapInfo;
+  private final Collection<SnapshotInfo> updatedSnapInfos;
 
   public OMSnapshotSetPropertyResponse(
       @Nonnull OMResponse omResponse,
-      @Nonnull SnapshotInfo updatedSnapInfo) {
+      @Nonnull Collection<SnapshotInfo> updatedSnapInfos) {
     super(omResponse);
-    this.updatedSnapInfo = updatedSnapInfo;
+    this.updatedSnapInfos = updatedSnapInfos;
   }
 
   public OMSnapshotSetPropertyResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
-    this.updatedSnapInfo = null;
+    this.updatedSnapInfos = null;
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
                               BatchOperation batchOperation)
       throws IOException {
-    omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
-        updatedSnapInfo.getTableKey(), updatedSnapInfo);
+    for (SnapshotInfo updatedSnapInfo : updatedSnapInfos) {
+      omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
+          updatedSnapInfo.getTableKey(), updatedSnapInfo);
+    }
+
   }
 }

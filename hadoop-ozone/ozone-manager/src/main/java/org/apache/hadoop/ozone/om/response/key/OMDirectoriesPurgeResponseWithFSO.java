@@ -48,12 +48,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
-    DIRECTORY_TABLE, FILE_TABLE})
+    DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
@@ -96,12 +97,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         // Init Batch Operation for snapshot db.
         try (BatchOperation writeBatch =
             fromSnapshotStore.initBatchOperation()) {
-          processPaths(fromSnapshot.getMetadataManager(), writeBatch);
+          processPaths(metadataManager, fromSnapshot.getMetadataManager(), batchOp, writeBatch);
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, fromSnapshotInfo.getTableKey(), fromSnapshotInfo);
     } else {
-      processPaths(metadataManager, batchOp);
+      processPaths(metadataManager, metadataManager, batchOp, batchOp);
     }
 
     // update bucket quota in active db
@@ -112,8 +114,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
     }
   }
 
-  public void processPaths(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
+  public void processPaths(OMMetadataManager keySpaceOmMetadataManager,
+                           OMMetadataManager deletedSpaceOmMetadataManager,
+                           BatchOperation keySpaceBatchOperation,
+                           BatchOperation deletedSpaceBatchOperation) throws IOException {
     for (OzoneManagerProtocolProtos.PurgePathRequest path : paths) {
       final long volumeId = path.getVolumeId();
       final long bucketId = path.getBucketId();
@@ -126,14 +130,14 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       // Add all sub-directories to deleted directory table.
       for (OzoneManagerProtocolProtos.KeyInfo key : markDeletedSubDirsList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-        String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+        String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
-        String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+        String ozoneDeleteKey = deletedSpaceOmMetadataManager.getOzoneDeletePathKey(
             key.getObjectID(), ozoneDbKey);
-        omMetadataManager.getDeletedDirTable().putWithBatch(batchOperation,
+        deletedSpaceOmMetadataManager.getDeletedDirTable().putWithBatch(deletedSpaceBatchOperation,
             ozoneDeleteKey, keyInfo);
 
-        omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
+        keySpaceOmMetadataManager.getDirectoryTable().deleteWithBatch(keySpaceBatchOperation,
             ozoneDbKey);
 
         if (LOG.isDebugEnabled()) {
@@ -144,10 +148,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-        String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+        String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
-        omMetadataManager.getKeyTable(getBucketLayout())
-            .deleteWithBatch(batchOperation, ozoneDbKey);
+        keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
+            .deleteWithBatch(keySpaceBatchOperation, ozoneDbKey);
 
         if (LOG.isDebugEnabled()) {
           LOG.info("Move keyName:{} to DeletedTable DBKey: {}",
@@ -157,26 +161,26 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
             keyInfo, keyInfo.getUpdateID(), isRatisEnabled);
 
-        String deletedKey = omMetadataManager
+        String deletedKey = keySpaceOmMetadataManager
             .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
                 keyInfo.getKeyName());
-        deletedKey = omMetadataManager.getOzoneDeletePathKey(
+        deletedKey = deletedSpaceOmMetadataManager.getOzoneDeletePathKey(
             keyInfo.getObjectID(), deletedKey);
 
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+        deletedSpaceOmMetadataManager.getDeletedTable().putWithBatch(deletedSpaceBatchOperation,
             deletedKey, repeatedOmKeyInfo);
       }
 
       if (!openKeyInfoMap.isEmpty()) {
         for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
-              batchOperation, entry.getKey(), entry.getValue());
+          keySpaceOmMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+              keySpaceBatchOperation, entry.getKey(), entry.getValue());
         }
       }
 
       // Delete the visited directory from deleted directory table
       if (path.hasDeletedDir()) {
-        omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation,
+        deletedSpaceOmMetadataManager.getDeletedDirTable().deleteWithBatch(deletedSpaceBatchOperation,
             path.getDeletedDir());
 
         if (LOG.isDebugEnabled()) {

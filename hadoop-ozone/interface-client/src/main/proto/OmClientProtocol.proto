@@ -149,6 +149,7 @@ enum Type {
   RenameSnapshot = 131;
 
   ListOpenFiles = 132;
+  SnapshotPurgeAndMove = 133;
 }
 
 enum SafeMode {
@@ -287,6 +288,8 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
 
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests     = 131;
+  optional SnapshotPurgeAndMoveRequest      SnapshotPurgeAndMoveRequest    = 132;
 }
 
 message OMResponse {
@@ -867,6 +870,7 @@ message SnapshotInfo {
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
+  optional bytes lastTransactionInfo = 20;
 }
 
 message SnapshotDiffJobProto {
@@ -1971,6 +1975,11 @@ message SnapshotPurgeRequest {
   repeated string updatedSnapshotDBKey = 2 [deprecated = true];
 }
 
+message SnapshotPurgeAndMoveRequest {
+  required hadoop.hdds.UUID snapshotID = 1;
+  optional hadoop.hdds.UUID expectedNextSnapshotID = 2;
+}
+
 message SetSnapshotPropertyRequest {
   optional SnapshotProperty snapshotProperty = 1 [deprecated = true];
   optional string snapshotKey = 2;
@@ -1989,6 +1998,7 @@ message SnapshotProperty {
 message SnapshotSize {
   optional uint64 exclusiveSize = 1;
   optional uint64 exclusiveReplicatedSize = 2;
+  optional bool addSize = 3;
 }
 
 message DeleteTenantRequest {

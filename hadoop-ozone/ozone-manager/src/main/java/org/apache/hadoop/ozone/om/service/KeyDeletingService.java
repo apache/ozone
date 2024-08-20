@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 
@@ -88,12 +87,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final KeyManager manager;
+
+  private boolean runningOnAOS;
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
-  private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
 
   public KeyDeletingService(OzoneManager ozoneManager,
@@ -112,8 +112,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
-    this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
+    this.runningOnAOS = false;
   }
 
   /**
@@ -165,6 +165,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = keyLimitPerTask;
   }
 
+  public boolean isRunningOnAOS() {
+    return runningOnAOS;
+  }
+
   /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
@@ -184,6 +188,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
+        runningOnAOS = true;
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
 
@@ -194,7 +199,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
-
           PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(getKeyLimitPerTask());
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
@@ -205,6 +209,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 pendingKeysDeletion.getKeysToModify(), null);
             deletedKeyCount.addAndGet(delCount);
           }
+          runningOnAOS = false;
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
@@ -218,7 +223,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           LOG.error("Error while running deep clean on snapshots. Will " +
               "retry at next run.", e);
         }
-
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
@@ -235,7 +239,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           .getSnapshotChainManager();
       Table<String, SnapshotInfo> snapshotInfoTable =
           getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-      List<String> deepCleanedSnapshots = new ArrayList<>();
+      Map<String, Optional<String>> deepCleanedSnapshots = new HashMap<>();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
@@ -244,10 +248,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
           SnapshotInfo currSnapInfo = iterator.next().getValue();
 
-          // Deep clean only on active snapshot. Deleted Snapshots will be
-          // cleaned up by SnapshotDeletingService.
-          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
-              currSnapInfo.getDeepClean()) {
+          // Deep clean only on snapshots whose deleted directory table has been deep cleaned. This is to avoid
+          // unnecessary additional iteration on the deleted table after SnapshotDirectoryDeletingService adds
+          // entries in deleted table. We should wait for all changes on the snapshot to be flushed to the db.
+          if (!currSnapInfo.getDeepCleanedDeletedDir() || currSnapInfo.getDeepClean()
+              || !OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, currSnapInfo.getTableKey())) {
             continue;
           }
 
@@ -279,12 +284,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
+            SnapshotInfo previousSnapshot = getPreviousSnapshot(
                 currSnapInfo, snapChainManager, omSnapshotManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             if (previousSnapshot != null) {
-              previousToPrevSnapshot = getPreviousActiveSnapshot(
+              previousToPrevSnapshot = getPreviousSnapshot(
                   previousSnapshot, snapChainManager, omSnapshotManager);
             }
 
@@ -392,16 +397,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
               if (delCount < keyLimitPerTask) {
                 // Deep clean is completed, we can update the SnapInfo.
-                deepCleanedSnapshots.add(currSnapInfo.getTableKey());
+                deepCleanedSnapshots.put(currSnapInfo.getTableKey(), Optional.empty());
                 // exclusiveSizeList contains check is used to prevent
                 // case where there is no entry in deletedTable, this
                 // will throw NPE when we submit request.
                 if (previousSnapshot != null && exclusiveSizeMap
                     .containsKey(previousSnapshot.getTableKey())) {
-                  completedExclusiveSizeSet.add(
-                      previousSnapshot.getTableKey());
+                  deepCleanedSnapshots.put(currSnapInfo.getTableKey(), Optional.of(previousSnapshot.getTableKey()));
                 }
-
                 snapshotSeekMap.remove(currSnapInfo.getTableKey());
               } else {
                 // There are keys that still needs processing
@@ -423,61 +426,39 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         }
       }
-
       updateDeepCleanedSnapshots(deepCleanedSnapshots);
-      updateSnapshotExclusiveSize();
     }
 
-    private void updateSnapshotExclusiveSize() {
-
-      if (completedExclusiveSizeSet.isEmpty()) {
-        return;
-      }
-
-      Iterator<String> completedSnapshotIterator =
-          completedExclusiveSizeSet.iterator();
-      while (completedSnapshotIterator.hasNext()) {
-        ClientId clientId = ClientId.randomId();
-        String dbKey = completedSnapshotIterator.next();
-        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
-                .setExclusiveSize(exclusiveSizeMap.getOrDefault(dbKey, 0L))
-                .setExclusiveReplicatedSize(
-                    exclusiveReplicatedSizeMap.getOrDefault(dbKey, 0L))
-                .build();
-        SetSnapshotPropertyRequest setSnapshotPropertyRequest =
-            SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(dbKey)
-                .setSnapshotSize(snapshotSize)
-                .build();
-
-        OMRequest omRequest = OMRequest.newBuilder()
-            .setCmdType(Type.SetSnapshotProperty)
-            .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
-            .setClientId(clientId.toString())
-            .build();
-        submitRequest(omRequest, clientId);
-        exclusiveSizeMap.remove(dbKey);
-        exclusiveReplicatedSizeMap.remove(dbKey);
-        completedSnapshotIterator.remove();
-      }
+    private SnapshotSize getSnapshotSize(String snapshotDBKey) {
+      return SnapshotSize.newBuilder()
+          .setExclusiveSize(exclusiveSizeMap.getOrDefault(snapshotDBKey, 0L))
+          .setExclusiveReplicatedSize(
+              exclusiveReplicatedSizeMap.getOrDefault(snapshotDBKey, 0L))
+          .setAddSize(true)
+          .build();
     }
 
-    private void updateDeepCleanedSnapshots(List<String> deepCleanedSnapshots) {
-      for (String deepCleanedSnapshot: deepCleanedSnapshots) {
+    private void updateDeepCleanedSnapshots(Map<String, Optional<String>> deepCleanedSnapshots) {
+      for (Map.Entry<String, Optional<String>> deepCleanedSnapshot : deepCleanedSnapshots.entrySet()) {
         ClientId clientId = ClientId.randomId();
-        SetSnapshotPropertyRequest setSnapshotPropertyRequest =
-            SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(deepCleanedSnapshot)
-                .setDeepCleanedDeletedKey(true)
-                .build();
-
-        OMRequest omRequest = OMRequest.newBuilder()
+        String snapshotDBKey = deepCleanedSnapshot.getKey();
+        Optional<String> previousSnapshotDBKey = deepCleanedSnapshot.getValue();
+        SetSnapshotPropertyRequest.Builder setSnapshotPropertyRequest = SetSnapshotPropertyRequest.newBuilder()
+                .setSnapshotKey(snapshotDBKey)
+                .setDeepCleanedDeletedKey(true);
+        OMRequest.Builder omRequest = OMRequest.newBuilder()
             .setCmdType(Type.SetSnapshotProperty)
-            .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
-            .setClientId(clientId.toString())
-            .build();
-
-        submitRequest(omRequest, clientId);
+            .addSetSnapshotPropertyRequests(setSnapshotPropertyRequest)
+            .setClientId(clientId.toString());
+        if (previousSnapshotDBKey.isPresent()) {
+          SetSnapshotPropertyRequest setPreviousSnapshotPropertyRequest =
+              SetSnapshotPropertyRequest.newBuilder()
+                  .setSnapshotKey(previousSnapshotDBKey.get())
+                  .setSnapshotSize(getSnapshotSize(previousSnapshotDBKey.get()))
+                  .build();
+          omRequest.addSetSnapshotPropertyRequests(setPreviousSnapshotPropertyRequest);
+        }
+        submitRequest(omRequest.build(), clientId);
       }
     }
 

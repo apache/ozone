@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
@@ -262,7 +263,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Directory Deleting Service.
    * @return Background service.
    */
-  BackgroundService getDirDeletingService();
+  DirectoryDeletingService getDirDeletingService();
 
   /**
    * Returns the instance of Open Key Cleanup Service.

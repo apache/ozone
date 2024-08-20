@@ -162,7 +162,16 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
    */
   public static TransactionInfo readTransactionInfo(
       DBStoreHAManager metadataManager) throws IOException {
-    return metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    return readTransactionInfo(metadataManager, false);
+  }
+
+  /**
+   * Return transaction info persisted in OM DB skipping cache.
+   */
+  public static TransactionInfo readTransactionInfo(
+      DBStoreHAManager metadataManager, boolean skipCache) throws IOException {
+    return skipCache ? metadataManager.getTransactionInfoTable().getSkipCache(TRANSACTION_INFO_KEY) :
+        metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
   }
 
   public SnapshotInfo toSnapshotInfo() {
