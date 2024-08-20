@@ -48,8 +48,9 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
         QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
         quotaRepairTask.repair();
       } catch (OMNotLeaderException | OMLeaderNotReadyException ex) {
-        // on leader node, repair will be triggered where finalize is called
-        LOG.warn("Unable to start quota repair as this is not a leader node");
+        // on leader node, repair will be triggered where finalize is called. For other nodes, it will be ignored.
+        // This can be triggered on need basis via CLI tool.
+        LOG.warn("Skip quota repair operation during upgrade on the node as this is not a leader node.");
       }
     }
   }

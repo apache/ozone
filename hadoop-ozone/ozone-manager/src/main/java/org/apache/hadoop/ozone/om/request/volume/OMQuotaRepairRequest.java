@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +58,16 @@ public class OMQuotaRepairRequest extends OMClientRequest {
 
   public OMQuotaRepairRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    UserGroupInformation ugi = createUGIForApi();
+    if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi + ". Admin privilege is required for quota repair.",
+          OMException.ResultCodes.ACCESS_DENIED);
+    }
+    return super.preExecute(ozoneManager);
   }
 
   @Override
