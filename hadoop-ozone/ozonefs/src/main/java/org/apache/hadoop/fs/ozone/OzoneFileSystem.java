@@ -35,7 +35,6 @@ import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -64,11 +63,6 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
     this.storageStatistics = new OzoneFSStorageStatistics();
     String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
     forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
-  }
-
-  @Override
-  public OzoneFsServerDefaults getServerDefaults() throws IOException {
-    return getAdapter().getServerDefaults();
   }
 
   @Override
