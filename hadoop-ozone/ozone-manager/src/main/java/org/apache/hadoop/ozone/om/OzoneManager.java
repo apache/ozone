@@ -91,7 +91,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.FsServerDefaults;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -437,7 +437,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
 
   private KeyProviderCryptoExtension kmsProvider;
-  private FsServerDefaults serverDefaults;
+  private OzoneFsServerDefaults serverDefaults;
   private final OMLayoutVersionManager versionManager;
 
   private final ReplicationConfigValidator replicationConfigValidator;
@@ -662,7 +662,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
     String keyProviderUriStr =
         (keyProviderUri != null) ? keyProviderUri.toString() : null;
-    serverDefaults = new FsServerDefaults(keyProviderUriStr);
+    serverDefaults = new OzoneFsServerDefaults(keyProviderUriStr);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -4781,7 +4781,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public FsServerDefaults getServerDefaults() {
+  public OzoneFsServerDefaults getServerDefaults() {
     return serverDefaults;
   }
 

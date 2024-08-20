@@ -27,8 +27,8 @@ import java.util.UUID;
 import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.ozone.FsServerDefaults;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1183,8 +1183,8 @@ public interface OzoneManagerProtocol
   /**
    * Get server default configurations.
    *
+   * @return OzoneFsServerDefaults some default configurations from server.
    * @throws IOException
-   * @return FsServerDefaults some default configurations from server.
    */
-  FsServerDefaults getServerDefaults() throws IOException;
+  OzoneFsServerDefaults getServerDefaults() throws IOException;
 }

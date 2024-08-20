@@ -40,8 +40,8 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.FsServerDefaults;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -2648,7 +2648,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public FsServerDefaults getServerDefaults()
+  public OzoneFsServerDefaults getServerDefaults()
       throws IOException {
     ServerDefaultsRequest serverDefaultsRequest =
         ServerDefaultsRequest.newBuilder().build();
@@ -2659,7 +2659,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     ServerDefaultsResponse serverDefaultsResponse =
         handleError(submitRequest(omRequest)).getServerDefaultsResponse();
 
-    return FsServerDefaults.getFromProtobuf(
+    return OzoneFsServerDefaults.getFromProtobuf(
         serverDefaultsResponse.getServerDefaults());
   }
 

@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.FsServerDefaults;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -506,7 +506,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public FsServerDefaults getServerDefaults() throws IOException {
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
     return null;
   }
 

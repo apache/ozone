@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.FsServerDefaults;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -864,7 +864,7 @@ public interface ClientProtocol {
    * @return Default configuration from the server.
    * @throws IOException
    */
-  FsServerDefaults getServerDefaults() throws IOException;
+  OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
    * Get KMS client provider.

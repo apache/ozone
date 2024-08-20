@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
@@ -30,34 +31,29 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FsServe
  ****************************************************/
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class FsServerDefaults {
-  private String keyProviderUri;
+public class OzoneFsServerDefaults extends FsServerDefaults {
 
-  public FsServerDefaults() {
+  public OzoneFsServerDefaults() {
   }
 
-  public FsServerDefaults(String keyProviderUri) {
-    this.keyProviderUri = keyProviderUri;
-  }
-
-  public String getKeyProviderUri() {
-    return keyProviderUri;
+  public OzoneFsServerDefaults(String keyProviderUri) {
+    super(0L, 0, 0, (short)0, 0, false, 0L, null, keyProviderUri);
   }
 
   public FsServerDefaultsProto getProtobuf() {
     Builder builder = FsServerDefaultsProto.newBuilder();
-    if (keyProviderUri != null) {
-      builder.setKeyProviderUri(keyProviderUri);
+    if (getKeyProviderUri() != null) {
+      builder.setKeyProviderUri(getKeyProviderUri());
     }
     return builder.build();
   }
 
-  public static FsServerDefaults getFromProtobuf(
+  public static OzoneFsServerDefaults getFromProtobuf(
       FsServerDefaultsProto serverDefaults) {
     String keyProviderUri = null;
     if (serverDefaults.hasKeyProviderUri()) {
       keyProviderUri = serverDefaults.getKeyProviderUri();
     }
-    return new FsServerDefaults(keyProviderUri);
+    return new OzoneFsServerDefaults(keyProviderUri);
   }
 }

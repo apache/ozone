@@ -62,7 +62,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.FsServerDefaults;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -228,7 +228,7 @@ public class RpcClient implements ClientProtocol {
   private final ContainerClientMetrics clientMetrics;
   private final MemoizedSupplier<ExecutorService> writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
-  private volatile FsServerDefaults serverDefaults;
+  private volatile OzoneFsServerDefaults serverDefaults;
   private volatile long serverDefaultsLastUpdate;
   private final long serverDefaultsValidityPeriod;
 
@@ -2604,7 +2604,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public FsServerDefaults getServerDefaults() throws IOException {
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
         (now - serverDefaultsLastUpdate > serverDefaultsValidityPeriod)) {
