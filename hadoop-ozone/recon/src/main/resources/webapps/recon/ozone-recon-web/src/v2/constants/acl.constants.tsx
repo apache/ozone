@@ -15,18 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+export const AclIdColorMap = {
+  USER: 'green',
+  GROUP: 'blue',
+  WORLD: 'magenta',
+  ANONYMOUS: 'gray',
+  CLIENT_IP: 'gold'
+};
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  }
-];
+export const AclRightsColorMap = {
+  READ: 'green',
+  WRITE: 'blue',
+  CREATE: 'orange',
+  LIST: 'magenta',
+  DELETE: 'red',
+  READ_ACL: 'lime',
+  WRITE_ACL: 'purple',
+  ALL: 'gold',
+  NONE: 'gray'
+};

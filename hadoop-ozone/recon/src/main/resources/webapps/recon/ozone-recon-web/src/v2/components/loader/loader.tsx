@@ -15,18 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+import React from "react"
+import { Spin } from "antd"
+import { LoadingOutlined } from "@ant-design/icons"
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  }
-];
+// ------------- Constants -------------- //
+const loaderStyle: React.CSSProperties = {
+  height: '100%',
+  width: '100%',
+  textAlign: 'center',
+  paddingTop: '25%'
+}
+
+// ------------- Component -------------- //
+const Loader: React.FC = () => {
+  return (
+    <div style={loaderStyle}>
+      <Spin indicator={<LoadingOutlined style={{ color: '#1AA57A', fontSize: 48}} spin/>}/>
+    </div>
+  )
+}
+
+export default Loader;

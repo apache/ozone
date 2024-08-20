@@ -15,18 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+import React from 'react';
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  }
-];
+export function useDebounce<T>(value: T, timeout: number): T {
+  const [debounceValue, setDebounceValue] = React.useState<T>(value);
+
+  React.useEffect(() => {
+    const timeoutHandler = setTimeout(() => {
+      setDebounceValue(value);
+    }, timeout);
+
+    return () => {
+      clearTimeout(timeoutHandler);
+    }
+  }, [value, timeout]); // Need to set new timeout anytime the value or timeout duration changes
+
+  return debounceValue;
+}
