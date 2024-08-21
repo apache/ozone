@@ -147,11 +147,14 @@ public class KeyValueContainerCheck {
 
       metadataErrors.addAll(checkContainerFile(containerFile));
 
-      if (containerIsDeleted()) {
-        return MetadataScanResult.deleted();
-      } else {
-        return MetadataScanResult.fromErrors(metadataErrors);
+      try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig)) {
+        if (containerIsDeleted(db)) {
+          return MetadataScanResult.deleted();
+        }
+      } catch (IOException ex) {
+        metadataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, onDiskContainerData.getDbFile(), ex));
       }
+      return MetadataScanResult.fromErrors(metadataErrors);
     } finally {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("Metadata scan of container " +
@@ -275,7 +278,7 @@ public class KeyValueContainerCheck {
               currentTree);
           // In the common case there will be no errors reading the block. Only if there are errors do we need to
           // check if the container was deleted during the scan.
-          containerDeleted = !blockErrors.isEmpty() && containerIsDeleted();
+          containerDeleted = !blockErrors.isEmpty() && containerIsDeleted(db);
           errors.addAll(blockErrors);
         }
       }
@@ -290,19 +293,13 @@ public class KeyValueContainerCheck {
     }
   }
 
-  private boolean containerIsDeleted() {
-    // TODO check this logic
+  private boolean containerIsDeleted(DBHandle db) throws IOException {
     // If schema V3 and container details not in DB or
     // if containerDBPath is removed
-    if ((onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3) &&
-        db.getStore().getMetadataTable().get(
-            onDiskContainerData.getBcsIdKey()) == null) ||
-        !new File(onDiskContainerData.getDbFile()
-            .getAbsolutePath()).exists()) {
-      // Container has been deleted. Skip the rest of the blocks.
-      return DataScanResult.unhealthy(
-          ScanResult.FailureType.DELETED_CONTAINER,
-          result.getUnhealthyFile(), result.getException());
+    if (onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      return db.getStore().getMetadataTable().get(onDiskContainerData.getBlockCountKey()) == null;
+    } else {
+      return !onDiskContainerData.getDbFile().exists();
     }
   }
 
