@@ -54,7 +54,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
