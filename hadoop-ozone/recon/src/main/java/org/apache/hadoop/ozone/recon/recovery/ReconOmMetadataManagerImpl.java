@@ -302,6 +302,9 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     int currentCount = 0;
     Table<String, OmBucketInfo> bucketTable = getBucketTable();
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (bucketTable == null) return result;
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = bucketTable.iterator()) {
