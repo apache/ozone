@@ -526,6 +526,7 @@ public class TestHSync {
 
   @Test
   public void testUncommittedBlocks() throws Exception {
+    waitForEmptyDeletedTable();
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
