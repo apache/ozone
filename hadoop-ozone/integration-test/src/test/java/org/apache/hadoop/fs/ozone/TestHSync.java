@@ -45,6 +45,9 @@ import org.apache.hadoop.crypto.Encryptor;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.ErrorInjector;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -95,6 +98,11 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -518,6 +526,7 @@ public class TestHSync {
 
   @Test
   public void testUncommittedBlocks() throws Exception {
+    waitForEmptyDeletedTable();
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -696,6 +705,99 @@ public class TestHSync {
         return false;
       }
     }, 500, 3000);
+  }
+
+
+  public static Stream<Arguments> concurrentExceptionHandling() {
+    return Stream.of(
+        Arguments.of(4, 1),
+        Arguments.of(4, 4),
+        Arguments.of(8, 4)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("concurrentExceptionHandling")
+  public void testConcurrentExceptionHandling(int syncerThreads, int errors) throws Exception {
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    ErrorInjectorImpl errorInjector = new ErrorInjectorImpl();
+    XceiverClientManager.enableErrorInjection(errorInjector);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "exceptionhandling");
+      byte[] data = new byte[8];
+      ThreadLocalRandom.current().nextBytes(data);
+      int writes;
+      try (FSDataOutputStream out = fs.create(file, true)) {
+        writes = runConcurrentWriteHSyncWithException(file, out, data, syncerThreads, errors, errorInjector);
+      }
+      validateWrittenFile(file, fs, data, writes);
+      fs.delete(file, false);
+    }
+  }
+
+  private int runConcurrentWriteHSyncWithException(Path file,
+      final FSDataOutputStream out, byte[] data, int syncThreadsCount, int errors,
+      ErrorInjectorImpl errorInjector) throws Exception {
+
+    AtomicReference<Exception> writerException = new AtomicReference<>();
+    AtomicReference<Exception> syncerException = new AtomicReference<>();
+
+    LOG.info("runConcurrentWriteHSyncWithException {} with size {}", file, data.length);
+    AtomicInteger writes = new AtomicInteger();
+    final long start = Time.monotonicNow();
+
+    Runnable syncer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.write(data);
+          writes.incrementAndGet();
+          out.hsync();
+        } catch (Exception e) {
+          LOG.error("Error calling hsync", e);
+          syncerException.compareAndSet(null, e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Thread[] syncThreads = new Thread[syncThreadsCount];
+    for (int i = 0; i < syncThreadsCount; i++) {
+      syncThreads[i] = new Thread(syncer);
+      syncThreads[i].setName("Syncer-" + i);
+      syncThreads[i].start();
+    }
+
+    // Inject error at 3rd second.
+    Runnable startErrorInjector = () -> {
+      while ((Time.monotonicNow() - start <= 3000)) {
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      errorInjector.start(errors);
+      LOG.info("Enabled error injection in XceiverClientRatis");
+    };
+
+    new Thread(startErrorInjector).start();
+
+    for (Thread sync : syncThreads) {
+      sync.join();
+    }
+
+    if (syncerException.get() != null) {
+      throw syncerException.get();
+    }
+    if (writerException.get() != null) {
+      throw writerException.get();
+    }
+    return writes.get();
   }
 
   private int runConcurrentWriteHSync(Path file,
@@ -1319,5 +1421,34 @@ public class TestHSync {
       }
     }
     return keys;
+  }
+
+  private static class ErrorInjectorImpl implements ErrorInjector {
+    private final AtomicInteger remaining = new AtomicInteger();
+    void start(int count) {
+      remaining.set(count);
+    }
+    @Override
+    public RaftClientReply getResponse(ContainerProtos.ContainerCommandRequestProto request, ClientId clientId,
+        Pipeline pipeline) {
+      int errorNum = remaining.decrementAndGet();
+      if (errorNum >= 0) {
+        ContainerProtos.ContainerCommandResponseProto proto = ContainerProtos.ContainerCommandResponseProto.newBuilder()
+            .setResult(ContainerProtos.Result.CLOSED_CONTAINER_IO)
+            .setMessage("Simulated error #" + errorNum)
+            .setCmdType(request.getCmdType())
+            .build();
+        RaftClientReply reply = RaftClientReply.newBuilder()
+            .setSuccess(true)
+            .setMessage(Message.valueOf(proto.toByteString()))
+            .setClientId(clientId)
+            .setServerId(RaftPeerId.getRaftPeerId(pipeline.getLeaderId().toString()))
+            .setGroupId(RaftGroupId.randomId())
+            .build();
+        return reply;
+      }
+
+      return null;
+    }
   }
 }

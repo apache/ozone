@@ -34,7 +34,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,7 +54,7 @@ public class TestKeyOutputStream {
   void testConcurrentWriteLimitOne() throws Exception {
     // Verify the semaphore is working to limit the number of concurrent writes allowed.
     KeyOutputStreamSemaphore sema1 = new KeyOutputStreamSemaphore(1);
-    KeyOutputStream keyOutputStream = mock(KeyOutputStream.class);
+    KeyOutputStream keyOutputStream = spy(KeyOutputStream.class);
     when(keyOutputStream.getRequestSemaphore()).thenReturn(sema1);
 
     final AtomicInteger countWrite = new AtomicInteger(0);
