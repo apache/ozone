@@ -583,7 +583,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
           && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
           // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
-          // that should now
+          // that should not crash the pipeline.
           && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
         StorageContainerException sce =
             new StorageContainerException(r.getMessage(), r.getResult());
