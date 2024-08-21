@@ -338,7 +338,6 @@ public class TestOmMetrics {
     long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
     long initialNumKeyLists = getLongCounter("NumKeyLists", omMetrics);
-    long initialNumTrashKeyLists = getLongCounter("NumTrashKeyLists", omMetrics);
     long initialNumKeys = getLongCounter("NumKeys", omMetrics);
     long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
 
@@ -346,7 +345,6 @@ public class TestOmMetrics {
     long initialNumKeyAllocateFails = getLongCounter("NumKeyAllocateFails", omMetrics);
     long initialNumKeyLookupFails = getLongCounter("NumKeyLookupFails", omMetrics);
     long initialNumKeyDeleteFails = getLongCounter("NumKeyDeleteFails", omMetrics);
-    long initialNumTrashKeyListFails = getLongCounter("NumTrashKeyListFails", omMetrics);
     long initialNumInitiateMultipartUploadFails = getLongCounter("NumInitiateMultipartUploadFails", omMetrics);
     long initialNumBlockAllocationFails = getLongCounter("NumBlockAllocationFails", omMetrics);
     long initialNumKeyListFails = getLongCounter("NumKeyListFails", omMetrics);
@@ -365,7 +363,6 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyLists + 1, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 1, getLongCounter("NumTrashKeyLists", omMetrics));
     assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
 
@@ -429,14 +426,12 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyLists + 3, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 3, getLongCounter("NumTrashKeyLists", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 3, getLongCounter("NumInitiateMultipartUploads", omMetrics));
 
     assertEquals(initialNumKeyAllocateFails + 1, getLongCounter("NumKeyAllocateFails", omMetrics));
     assertEquals(initialNumKeyLookupFails + 1, getLongCounter("NumKeyLookupFails", omMetrics));
     assertEquals(initialNumKeyDeleteFails + 1, getLongCounter("NumKeyDeleteFails", omMetrics));
     assertEquals(initialNumKeyListFails + 1, getLongCounter("NumKeyListFails", omMetrics));
-    assertEquals(initialNumTrashKeyListFails + 1, getLongCounter("NumTrashKeyListFails", omMetrics));
     assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
         "NumInitiateMultipartUploadFails", omMetrics));
     assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
