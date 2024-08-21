@@ -16,12 +16,35 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
-import App from './app';
+export const ClusterState = {
+  "deletedDirs": 0,
+  "pipelines": 7,
+  "totalDatanodes": 5,
+  "healthyDatanodes": 3,
+  "storageReport": {
+    "capacity": 1352149585920,
+    "used": 822805801,
+    "remaining": 1068824879104,
+    "committed": 12000222315
+  },
+  "containers": 20,
+  "missingContainers": 2,
+  "openContainers": 8,
+  "deletedContainers": 10,
+  "volumes": 2,
+  "buckets": 24,
+  "keys": 1424,
+  "keysPendingDeletion": 2
+}
 
-it('renders without crashing', () => {
-  const div = document.createElement('div');
-  ReactDOM.render(<App/>, div);
-  ReactDOM.unmountComponentAtNode(div);
-});
+export const OpenKeys = {
+  "totalUnreplicatedDataSize": 4096,
+  "totalReplicatedDataSize": 1024,
+  "totalOpenKeys": 10
+}
+
+export const DeletePendingSummary = {
+  "totalUnreplicatedDataSize": 4096,
+  "totalReplicatedDataSize": 1024,
+  "totalDeletedKeys": 3
+}
