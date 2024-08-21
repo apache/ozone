@@ -557,23 +557,32 @@ public class TestDeleteContainerHandler {
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
-      List<? extends Table.KeyValue<String, BlockData>>
-          blocks = dbHandle.getStore().getBlockDataTable().getRangeKVs(
-          ((KeyValueContainerData) container.getContainerData()).
-              startKeyEmpty(),
-          Integer.MAX_VALUE,
-          ((KeyValueContainerData) container.getContainerData()).
-              containerPrefix(),
-          ((KeyValueContainerData) container.getContainerData()).
-              getUnprefixedKeyFilter());
-      try (BatchOperation batch = dbHandle.getStore().getBatchHandler()
-          .initBatchOperation()) {
-        for (Table.KeyValue<String, BlockData> kv : blocks) {
-          String blk = kv.getKey();
-          dbHandle.getStore().getBlockDataTable().deleteWithBatch(batch, blk);
-        }
-        dbHandle.getStore().getBatchHandler().commitBatchOperation(batch);
+      Table<String, BlockData> table = dbHandle.getStore().getBlockDataTable();
+      clearTable(dbHandle, table, container);
+
+      table = dbHandle.getStore().getLastChunkInfoTable();
+      clearTable(dbHandle, table, container);
+    }
+  }
+
+  private void clearTable(DBHandle dbHandle, Table<String, BlockData> table, Container container)
+      throws IOException {
+    List<? extends Table.KeyValue<String, BlockData>>
+        blocks = table.getRangeKVs(
+            ((KeyValueContainerData) container.getContainerData()).
+                startKeyEmpty(),
+        Integer.MAX_VALUE,
+        ((KeyValueContainerData) container.getContainerData()).
+            containerPrefix(),
+        ((KeyValueContainerData) container.getContainerData()).
+            getUnprefixedKeyFilter());
+    try (BatchOperation batch = dbHandle.getStore().getBatchHandler()
+        .initBatchOperation()) {
+      for (Table.KeyValue<String, BlockData> kv : blocks) {
+        String blk = kv.getKey();
+        table.deleteWithBatch(batch, blk);
       }
+      dbHandle.getStore().getBatchHandler().commitBatchOperation(batch);
     }
   }
 
