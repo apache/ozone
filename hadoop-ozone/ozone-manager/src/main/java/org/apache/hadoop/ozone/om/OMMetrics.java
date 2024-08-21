@@ -829,6 +829,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyListFails.incr();
   }
 
+  public void incNumVolumeListFails() {
+    numVolumeListFails.incr();
+  }
+
   public void incNumGetServiceListFails() {
     numGetServiceListFails.incr();
   }
