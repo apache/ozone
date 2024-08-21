@@ -214,6 +214,12 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
+  public void shutdown() {
+    // invalidate all open files
+    files.files.invalidateAll();
+  }
+
+  @Override
   public void finishWriteChunks(KeyValueContainer container,
       BlockData blockData) throws IOException {
     final File chunkFile = getChunkFile(container, blockData.getBlockID());
