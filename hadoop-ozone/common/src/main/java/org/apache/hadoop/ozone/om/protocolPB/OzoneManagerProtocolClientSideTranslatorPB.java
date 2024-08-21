@@ -2600,7 +2600,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .build();
     OMRequest omRequest = createOMRequest(Type.QuotaRepairTrigger)
         .setQuotaRepairTriggerRequest(quotaRepairTriggerRequest).build();
-    handleError(submitRequest(omRequest)).getQuotaRepairTriggerResponse();
+    handleError(submitRequest(omRequest));
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {

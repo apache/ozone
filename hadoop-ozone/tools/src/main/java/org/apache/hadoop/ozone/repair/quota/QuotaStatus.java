@@ -22,7 +22,6 @@
 package org.apache.hadoop.ozone.repair.quota;
 
 import java.util.concurrent.Callable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
