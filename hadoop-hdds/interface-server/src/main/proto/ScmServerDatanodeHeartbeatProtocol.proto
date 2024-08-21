@@ -177,30 +177,32 @@ message StorageReportProto {
   optional uint64 capacity = 3 [default = 0];
   optional uint64 scmUsed = 4 [default = 0];
   optional uint64 remaining = 5 [default = 0];
-  optional StorageTypeProto storageType = 6 [default = DISK];
+  optional StorageTypeProto storageType = 6 [default = DISK, deprecated = true];
   optional bool failed = 7 [default = false];
   optional uint64 committed = 8 [default = 0];
   optional uint64 freeSpaceToSpare = 9 [default = 0];
+  optional StorageType storageTypeProto = 10 [default = DISK_TYPE];
 }
 
 message MetadataStorageReportProto {
   required string storageLocation = 1;
-  optional StorageTypeProto storageType = 2 [default = DISK];
+  optional StorageTypeProto storageType = 2 [default = DISK, deprecated = true];
   optional uint64 capacity = 3 [default = 0];
   optional uint64 scmUsed = 4 [default = 0];
   optional uint64 remaining = 5 [default = 0];
   optional bool failed = 6 [default = false];
+  optional StorageType storageTypeProto = 7 [default = DISK_TYPE];
 }
 
 /**
  * Types of recognized storage media.
  */
 enum StorageTypeProto {
-  DISK = 1;
-  SSD = 2;
-  ARCHIVE = 3;
-  RAM_DISK = 4;
-  PROVIDED = 5;
+  DISK = 1 [deprecated = true];
+  SSD = 2 [deprecated = true];
+  ARCHIVE = 3 [deprecated = true];
+  RAM_DISK = 4 [deprecated = true];
+  PROVIDED = 5 [deprecated = true];
 }
 
 message ContainerReportsProto {

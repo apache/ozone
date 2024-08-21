@@ -24,8 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.interfaces
     .StorageLocationReportMXBean;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
@@ -113,52 +112,52 @@ public final class StorageLocationReport implements
     return storageType;
   }
 
-  private StorageTypeProto getStorageTypeProto() throws IOException {
+  private HddsProtos.StorageType getStorageTypeProto() throws IOException {
     return getStorageTypeProto(getStorageType());
   }
 
-  public static StorageTypeProto getStorageTypeProto(StorageType type)
+  public static HddsProtos.StorageType getStorageTypeProto(StorageType type)
       throws IOException {
-    StorageTypeProto storageTypeProto;
+    HddsProtos.StorageType storageType;
     switch (type) {
     case SSD:
-      storageTypeProto = StorageTypeProto.SSD;
+      storageType = HddsProtos.StorageType.SSD_TYPE;
       break;
     case DISK:
-      storageTypeProto = StorageTypeProto.DISK;
+      storageType = HddsProtos.StorageType.DISK_TYPE;
       break;
     case ARCHIVE:
-      storageTypeProto = StorageTypeProto.ARCHIVE;
+      storageType = HddsProtos.StorageType.ARCHIVE_TYPE;
       break;
     case PROVIDED:
-      storageTypeProto = StorageTypeProto.PROVIDED;
+      storageType = HddsProtos.StorageType.PROVIDED_TYPE;
       break;
     case RAM_DISK:
-      storageTypeProto = StorageTypeProto.RAM_DISK;
+      storageType = HddsProtos.StorageType.RAM_DISK_TYPE;
       break;
     default:
       throw new IOException("Illegal Storage Type specified");
     }
-    return storageTypeProto;
+    return storageType;
   }
 
-  private static StorageType getStorageType(StorageTypeProto proto) throws
+  private static StorageType getStorageType(HddsProtos.StorageType proto) throws
       IOException {
     StorageType storageType;
     switch (proto) {
-    case SSD:
+    case SSD_TYPE:
       storageType = StorageType.SSD;
       break;
-    case DISK:
+    case DISK_TYPE:
       storageType = StorageType.DISK;
       break;
-    case ARCHIVE:
+    case ARCHIVE_TYPE:
       storageType = StorageType.ARCHIVE;
       break;
-    case PROVIDED:
+    case PROVIDED_TYPE:
       storageType = StorageType.PROVIDED;
       break;
-    case RAM_DISK:
+    case RAM_DISK_TYPE:
       storageType = StorageType.RAM_DISK;
       break;
     default:
@@ -185,7 +184,7 @@ public final class StorageLocationReport implements
         .setScmUsed(getScmUsed())
         .setRemaining(getRemaining())
         .setCommitted(getCommitted())
-        .setStorageType(getStorageTypeProto())
+        .setStorageTypeProto(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .setFreeSpaceToSpare(conf != null ?
@@ -206,7 +205,7 @@ public final class StorageLocationReport implements
     return srb.setCapacity(getCapacity())
         .setScmUsed(getScmUsed())
         .setRemaining(getRemaining())
-        .setStorageType(getStorageTypeProto())
+        .setStorageTypeProto(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .build();
@@ -230,8 +229,8 @@ public final class StorageLocationReport implements
     if (report.hasScmUsed()) {
       builder.setScmUsed(report.getScmUsed());
     }
-    if (report.hasStorageType()) {
-      builder.setStorageType(getStorageType(report.getStorageType()));
+    if (report.hasStorageTypeProto()) {
+      builder.setStorageType(getStorageType(report.getStorageTypeProto()));
     }
     if (report.hasRemaining()) {
       builder.setRemaining(report.getRemaining());
@@ -260,8 +259,8 @@ public final class StorageLocationReport implements
     if (report.hasScmUsed()) {
       builder.setScmUsed(report.getScmUsed());
     }
-    if (report.hasStorageType()) {
-      builder.setStorageType(getStorageType(report.getStorageType()));
+    if (report.hasStorageTypeProto()) {
+      builder.setStorageType(getStorageType(report.getStorageTypeProto()));
     }
     if (report.hasRemaining()) {
       builder.setRemaining(report.getRemaining());

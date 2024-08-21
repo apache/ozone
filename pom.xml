@@ -191,7 +191,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
-    <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
+    <proto2.hadooprpc.protobuf.version>2.6.1</proto2.hadooprpc.protobuf.version>
     <proto3.hadooprpc.protobuf.version>3.7.1</proto3.hadooprpc.protobuf.version>
     <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
 
@@ -1624,6 +1624,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <reason>Use commons-lang v3</reason>
                     <bannedImports>
                       <bannedImport>org.apache.commons.lang.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                  <restrictImports>
+                    <parseFullCompilationUnit>true</parseFullCompilationUnit>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${basedir}/target/generated-sources/java/</excludedSourceRoot>
+                      <excludedSourceRoot>${basedir}/target/generated-sources/protobuf/java/</excludedSourceRoot>
+                    </excludedSourceRoots>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Deprecated StorageTypeProto</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>

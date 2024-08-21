@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Storage
 /**
  * Ozone specific storage types.
  */
+@Deprecated
 public enum StorageType {
   RAM_DISK,
   SSD,

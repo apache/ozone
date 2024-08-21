@@ -294,6 +294,14 @@ enum ReplicationFactor {
     ZERO = 0; // Invalid Factor
 }
 
+enum StorageType {
+    DISK_TYPE = 1;
+    SSD_TYPE = 2;
+    ARCHIVE_TYPE = 3;
+    RAM_DISK_TYPE = 4;
+    PROVIDED_TYPE = 5;
+}
+
 message ECReplicationConfig {
     required int32 data = 1;
     required int32 parity = 2;
