@@ -173,7 +173,9 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     // If the table is not yet initialized, i.e. it is null
     // Return empty list as response
-    if (volumeTable == null) return result;
+    if (volumeTable == null) {
+      return result;
+    }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
                  iterator = volumeTable.iterator()) {
@@ -304,7 +306,9 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     Table<String, OmBucketInfo> bucketTable = getBucketTable();
     // If the table is not yet initialized, i.e. it is null
     // Return empty list as response
-    if (bucketTable == null) return result;
+    if (bucketTable == null) {
+      return result;
+    }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = bucketTable.iterator()) {
