@@ -244,6 +244,7 @@ public final class OmUtils {
     case ListKeysLight:
     case ListTrash:
     case ServiceList:
+    case ListOpenFiles:
     case ListMultiPartUploadParts:
     case GetFileStatus:
     case LookupFile:
@@ -326,6 +327,7 @@ public final class OmUtils {
     case SetTimes:
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
+    case QuotaRepair:
     case UnknownCommand:
       return false;
     case EchoRPC:

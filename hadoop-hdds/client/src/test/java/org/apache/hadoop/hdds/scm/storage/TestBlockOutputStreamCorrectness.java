@@ -174,6 +174,7 @@ class TestBlockOutputStreamCorrectness {
 
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
+        -1,
         xcm,
         pipeline,
         bufferPool,
@@ -276,7 +277,7 @@ class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply watchForCommit(long index) {
+    public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setCmdType(Type.WriteChunk)
@@ -284,7 +285,7 @@ class TestBlockOutputStreamCorrectness {
       final XceiverClientReply xceiverClientReply = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));
       xceiverClientReply.setLogIndex(index);
-      return xceiverClientReply;
+      return CompletableFuture.completedFuture(xceiverClientReply);
     }
 
     @Override

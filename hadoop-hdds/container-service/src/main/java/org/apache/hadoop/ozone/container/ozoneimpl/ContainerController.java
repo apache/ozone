@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -39,7 +40,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -163,6 +163,29 @@ public class ContainerController {
     getHandler(container).closeContainer(container);
   }
 
+  /**
+   * Returns the Container given a container id.
+   *
+   * @param containerId ID of the container
+   * @return Container
+   */
+  public void addFinalizedBlock(final long containerId,
+      final long localId) {
+    Container container = containerSet.getContainer(containerId);
+    if (container != null) {
+      getHandler(container).addFinalizedBlock(container, localId);
+    }
+  }
+
+  public boolean isFinalizedBlockExist(final long containerId,
+      final long localId) {
+    Container container = containerSet.getContainer(containerId);
+    if (container != null) {
+      return getHandler(container).isFinalizedBlockExist(container, localId);
+    }
+    return false;
+  }
+
   public Container importContainer(
       final ContainerData containerData,
       final InputStream rawContainerStream,
@@ -192,12 +215,13 @@ public class ContainerController {
     }
   }
 
-  public void reconcileContainer(long containerID, List<DatanodeDetails> peers) throws IOException {
+  public void reconcileContainer(DNContainerOperationClient dnClient, long containerID, Set<DatanodeDetails> peers)
+      throws IOException {
     Container<?> container = containerSet.getContainer(containerID);
     if (container == null) {
       LOG.warn("Container {} to reconcile not found on this datanode.", containerID);
     } else {
-      getHandler(container).reconcileContainer(container, peers);
+      getHandler(container).reconcileContainer(dnClient, container, peers);
     }
   }
 

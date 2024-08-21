@@ -1108,7 +1108,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       InetSocketAddress addr,
       Class<?> protocol,
       BlockingService instance,
-      int handlerCount)
+      int handlerCount,
+      int readThreads)
       throws IOException {
 
     RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
@@ -1117,6 +1118,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setBindAddress(addr.getHostString())
         .setPort(addr.getPort())
         .setNumHandlers(handlerCount)
+        .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
         .build());

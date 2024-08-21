@@ -104,6 +104,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_THREADPOOL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -163,6 +165,8 @@ public class SCMDatanodeProtocolServer implements
     final int handlerCount = conf.getInt(OZONE_SCM_DATANODE_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
+    final int readThreads = conf.getInt(OZONE_SCM_DATANODE_READ_THREADPOOL_KEY,
+        OZONE_SCM_DATANODE_READ_THREADPOOL_DEFAULT);
 
     RPC.setProtocolEngine(conf, getProtocolClass(), ProtobufRpcEngine.class);
 
@@ -178,7 +182,8 @@ public class SCMDatanodeProtocolServer implements
         datanodeRpcAddr,
         getProtocolClass(),
         dnProtoPbService,
-        handlerCount);
+        handlerCount,
+        readThreads);
 
     datanodeRpcAddress = updateRPCListenAddress(
             conf, getDatanodeAddressKey(), datanodeRpcAddr,

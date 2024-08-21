@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -311,7 +312,7 @@ public class TestContainerPersistence {
 
     KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, metrics,
-        c -> icrReceived.incrementAndGet());
+        c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
 
     Exception exception = assertThrows(
         StorageContainerException.class,

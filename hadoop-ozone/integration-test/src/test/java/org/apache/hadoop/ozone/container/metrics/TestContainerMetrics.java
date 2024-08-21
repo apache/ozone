@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
@@ -48,7 +47,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -148,18 +146,7 @@ public class TestContainerMetrics {
     ContainerSet containerSet = new ContainerSet(1000);
     StateContext context = ContainerTestUtils.getMockContext(
         dd, CONF);
-    ContainerMetrics metrics = ContainerMetrics.create(CONF);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, CONF,
-              context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
-              c -> { }));
-    }
-    HddsDispatcher dispatcher = new HddsDispatcher(CONF, containerSet,
-        volumeSet, handlers, context, metrics, null);
+    HddsDispatcher dispatcher = ContainerTestUtils.getHddsDispatcher(CONF, containerSet, volumeSet, context);
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     dispatcher.setClusterId(UUID.randomUUID().toString());
@@ -253,7 +240,7 @@ public class TestContainerMetrics {
     CONF.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         volumeSet);
-    return XceiverServerRatis.newXceiverServerRatis(dn, CONF, dispatcher,
+    return XceiverServerRatis.newXceiverServerRatis(null, dn, CONF, dispatcher,
         new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         null, null);
   }

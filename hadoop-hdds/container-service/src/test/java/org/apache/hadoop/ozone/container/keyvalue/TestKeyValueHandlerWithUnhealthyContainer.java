@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -48,6 +49,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.DATANODE_UUID;
@@ -170,6 +172,19 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
+  public void testFinalizeBlock() {
+    KeyValueContainer container = getMockUnhealthyContainer();
+    KeyValueHandler handler = getDummyHandler();
+
+    ContainerProtos.ContainerCommandResponseProto response =
+        handler.handleFinalizeBlock(
+            getDummyCommandRequestProto(
+                ContainerProtos.Type.FinalizeBlock),
+            container);
+    assertEquals(CONTAINER_UNHEALTHY, response.getResult());
+  }
+
+  @Test
   public void testGetSmallFile() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
@@ -240,7 +255,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(MutableVolumeSet.class),
-        mock(ContainerMetrics.class), mockIcrSender);
+        mock(ContainerMetrics.class), mockIcrSender, mock(ContainerChecksumTreeManager.class));
   }
 
   private KeyValueContainer getMockUnhealthyContainer() {

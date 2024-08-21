@@ -129,6 +129,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
+    final int readThreads = conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_READ_THREADPOOL_KEY,
+        ScmConfigKeys.OZONE_SCM_SECURITY_READ_THREADPOOL_DEFAULT);
     rpcAddress = HddsServerUtil
         .getScmSecurityInetAddress(conf);
     // SCM security service RPC service.
@@ -157,7 +159,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
             rpcAddress,
             SCMSecurityProtocolPB.class,
             secureProtoPbService,
-            handlerCount);
+            handlerCount,
+            readThreads);
     HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolDatanodePB.class,
         secretKeyService, rpcServer);
     HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolOmPB.class,

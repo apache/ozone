@@ -194,7 +194,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_OWNER, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_OWNER, auditMap,
         exception, userInfo));
 
     // return response after releasing lock.
