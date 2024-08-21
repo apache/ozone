@@ -73,12 +73,12 @@ def generate_markdown(properties):
     return markdown
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python3 xml_to_md.py <base_path> <output_path>")
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print("Usage: python3 xml_to_md.py <base_path> [<output_path>]")
         sys.exit(1)
 
     base_path = sys.argv[1]
-    output_path = sys.argv[2]
+    output_path = sys.argv[2] if len(sys.argv) == 3 else None
 
     # Find ozone SNAPSHOT directory dynamically using regex
     snapshot_dir = next(
