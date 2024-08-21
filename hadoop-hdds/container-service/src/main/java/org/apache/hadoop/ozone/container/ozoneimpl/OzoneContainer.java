@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeMetrics;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -188,12 +187,13 @@ public class OzoneContainer {
       }
     };
 
+    checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics, icrSender));
+              containerSet, volumeSet, metrics, icrSender, checksumTreeManager));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
@@ -225,8 +225,6 @@ public class OzoneContainer {
         datanodeDetails, config, hddsDispatcher, certClient);
     Duration blockDeletingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getBlockDeletionInterval();
-
-    checksumTreeManager = new ContainerChecksumTreeManager(config);
 
     long blockDeletingServiceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
@@ -500,8 +498,7 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
-    // TODO: To properly shut down ContainerMerkleTreeMetrics
-    ContainerMerkleTreeMetrics.unregister();
+    checksumTreeManager.stop();
   }
 
   public void handleVolumeFailures() {

@@ -32,7 +32,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -78,9 +77,9 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
       LOG.info("Reconcile container event triggered for container {} with peers {}", containerID, allReplicaNodes);
 
       for (DatanodeDetails replica : allReplicaNodes) {
-        List<DatanodeDetails> otherReplicas = allReplicaNodes.stream()
+        Set<DatanodeDetails> otherReplicas = allReplicaNodes.stream()
             .filter(other -> !other.equals(replica))
-            .collect(Collectors.toList());
+            .collect(Collectors.toSet());
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherReplicas);
         command.setTerm(scmContext.getTermOfLeader());
         publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica.getUuid(), command));

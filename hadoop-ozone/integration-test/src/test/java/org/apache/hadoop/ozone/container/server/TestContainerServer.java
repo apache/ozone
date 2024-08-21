@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -200,19 +199,7 @@ public class TestContainerServer {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, conf,
-              dd.getUuid().toString(),
-              containerSet, volumeSet, metrics,
-              c -> {
-              }));
-    }
-    HddsDispatcher hddsDispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, context, metrics, null);
+    HddsDispatcher hddsDispatcher = ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context);
     hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
   }

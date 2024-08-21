@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -70,16 +72,17 @@ public abstract class Handler {
     this.icrSender = icrSender;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender) {
+      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, metrics,
-          icrSender);
+          icrSender, checksumManager);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");
@@ -199,7 +202,8 @@ public abstract class Handler {
    * @param container container to be reconciled.
    * @param peers The other datanodes with a copy of this container whose data should be checked.
    */
-  public abstract void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException;
+  public abstract void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      Set<DatanodeDetails> peers) throws IOException;
 
   /**
    * Deletes the given files associated with a block of the container.
