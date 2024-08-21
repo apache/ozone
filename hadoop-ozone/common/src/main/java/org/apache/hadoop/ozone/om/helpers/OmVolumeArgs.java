@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -41,6 +43,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates the OmVolumeArgs Args.
  */
+@JsonDeserialize(builder = OmVolumeArgs.Builder.class)
 public final class OmVolumeArgs extends WithObjectID
     implements CopyObject<OmVolumeArgs>, Auditable {
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
@@ -89,6 +92,11 @@ public final class OmVolumeArgs extends WithObjectID
     this.refCount = b.refCount;
   }
 
+  /*public OmVolumeArgs() {
+    this.adminName = "om";
+    this.volume = "vol";
+    this.acls = null;
+  }*/
   public long getRefCount() {
     Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
@@ -275,6 +283,7 @@ public final class OmVolumeArgs extends WithObjectID
   /**
    * Builder for OmVolumeArgs.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder extends WithObjectID.Builder {
     private String adminName;
     private String ownerName;
@@ -366,6 +375,13 @@ public final class OmVolumeArgs extends WithObjectID
 
     public Builder addOzoneAcls(OzoneAcl acl) {
       OzoneAclUtil.addAcl(acls, acl);
+      return this;
+    }
+
+    public Builder setAcls(List<OzoneAcl> acl) {
+      for (OzoneAcl a:acl) {
+        OzoneAclUtil.addAcl(acls, a);
+      }
       return this;
     }
 

@@ -88,6 +88,17 @@ public class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
+  public OzoneAcl() {
+    this.name = "name";
+    this.type = ACLIdentityType.USER;
+    this.aclScope = AclScope.ACCESS;
+    this.aclBits = 0;
+
+    this.toStringMethod = MemoizedSupplier.valueOf(() -> getType() + ":" + getName() + ":"
+        + ACLType.getACLString(BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer())) + "[" + getAclScope() + "]");
+    this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
+        BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
+  }
 
 
   private static int toInt(int aclTypeOrdinal) {

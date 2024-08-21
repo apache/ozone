@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.utils;
 
 import java.nio.file.Path;
 import java.util.Arrays;
