@@ -1,7 +1,6 @@
 {
   "__inputs": [
     {
-      "name": "DS_PROMETHEUS",
       "label": "prometheus",
       "description": "",
       "type": "datasource",
@@ -65,8 +64,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -145,8 +143,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -165,8 +162,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -244,8 +240,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -264,8 +259,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -344,8 +338,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -364,8 +357,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -443,8 +435,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -476,8 +467,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -556,8 +546,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -576,8 +565,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -656,8 +644,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -676,8 +663,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -755,8 +741,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -775,8 +760,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -854,8 +838,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -887,8 +870,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -967,8 +949,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -987,8 +968,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1067,8 +1047,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1087,8 +1066,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1166,8 +1144,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
