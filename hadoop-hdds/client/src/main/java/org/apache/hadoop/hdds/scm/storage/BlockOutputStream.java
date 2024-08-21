@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -94,6 +95,9 @@ public class BlockOutputStream extends OutputStream {
       KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
   private AtomicReference<BlockID> blockID;
+  // planned block full size
+  private long blockSize;
+  private AtomicBoolean eofSent = new AtomicBoolean(false);
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
 
@@ -149,6 +153,7 @@ public class BlockOutputStream extends OutputStream {
   private Pipeline pipeline;
   private final ContainerClientMetrics clientMetrics;
   private boolean allowPutBlockPiggybacking;
+  private boolean supportIncrementalChunkList;
 
   private CompletableFuture<Void> lastFlushFuture;
   private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
@@ -164,6 +169,7 @@ public class BlockOutputStream extends OutputStream {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockOutputStream(
       BlockID blockID,
+      long blockSize,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
@@ -175,6 +181,7 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
+    this.blockSize = blockSize;
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -189,8 +196,13 @@ public class BlockOutputStream extends OutputStream {
     }
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
+    this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
-    if (config.getIncrementalChunkList()) {
+    // EC does not support incremental chunk list.
+    this.supportIncrementalChunkList = config.getIncrementalChunkList() &&
+        this instanceof RatisBlockOutputStream && allDataNodesSupportPiggybacking();
+    LOG.debug("incrementalChunkList is {}", supportIncrementalChunkList);
+    if (supportIncrementalChunkList) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
       this.lastChunkBuffer = DIRECT_BUFFER_POOL.getBuffer(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
@@ -223,16 +235,17 @@ public class BlockOutputStream extends OutputStream {
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
     this.clientMetrics = clientMetrics;
-    this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
             allDataNodesSupportPiggybacking();
+    LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
   }
 
   private boolean allDataNodesSupportPiggybacking() {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
+      LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
       if (dn.getCurrentVersion() <
               COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
         return false;
@@ -530,15 +543,17 @@ public class BlockOutputStream extends OutputStream {
     final XceiverClientReply asyncReply;
     try {
       BlockData blockData = containerBlockData.build();
-      LOG.debug("sending PutBlock {}", blockData);
+      LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
-      if (config.getIncrementalChunkList()) {
+      if (supportIncrementalChunkList) {
         // remove any chunks in the containerBlockData list.
         // since they are sent.
         containerBlockData.clearChunks();
       }
 
-      asyncReply = putBlockAsync(xceiverClient, blockData, close, tokenString);
+      // if block is full, send the eof
+      boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -550,6 +565,7 @@ public class BlockOutputStream extends OutputStream {
         if (getIoException() == null && !force) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
+          eofSent.set(close || isBlockFull);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -690,7 +706,7 @@ public class BlockOutputStream extends OutputStream {
       // There're no pending written data, but there're uncommitted data.
       updatePutBlockLength();
       putBlockResultFuture = executePutBlock(close, false);
-    } else if (close) {
+    } else if (close && !eofSent.get()) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
       updatePutBlockLength();
@@ -866,7 +882,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       BlockData blockData = null;
 
-      if (config.getIncrementalChunkList()) {
+      if (supportIncrementalChunkList) {
         updateBlockDataForWriteChunk(chunk);
       } else {
         containerBlockData.addChunks(chunkInfo);
@@ -880,7 +896,7 @@ public class BlockOutputStream extends OutputStream {
         blockData = containerBlockData.build();
         LOG.debug("piggyback chunk list {}", blockData);
 
-        if (config.getIncrementalChunkList()) {
+        if (supportIncrementalChunkList) {
           // remove any chunks in the containerBlockData list.
           // since they are sent.
           containerBlockData.clearChunks();

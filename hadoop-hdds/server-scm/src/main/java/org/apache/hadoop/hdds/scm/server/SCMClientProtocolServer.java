@@ -122,6 +122,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -152,6 +154,8 @@ public class SCMClientProtocolServer implements
     final int handlerCount = conf.getInt(OZONE_SCM_CLIENT_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
+    final int readThreads = conf.getInt(OZONE_SCM_CLIENT_READ_THREADPOOL_KEY,
+        OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT);
     RPC.setProtocolEngine(conf, StorageContainerLocationProtocolPB.class,
         ProtobufRpcEngine.class);
 
@@ -175,7 +179,8 @@ public class SCMClientProtocolServer implements
             scmAddress,
             StorageContainerLocationProtocolPB.class,
             storageProtoPbService,
-            handlerCount);
+            handlerCount,
+            readThreads);
 
     // Add reconfigureProtocolService.
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol

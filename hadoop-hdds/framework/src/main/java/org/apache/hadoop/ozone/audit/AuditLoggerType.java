@@ -24,7 +24,8 @@ public enum AuditLoggerType {
   DNLOGGER("DNAudit"),
   OMLOGGER("OMAudit"),
   SCMLOGGER("SCMAudit"),
-  S3GLOGGER("S3GAudit");
+  S3GLOGGER("S3GAudit"),
+  OMSYSTEMLOGGER("OMSystemAudit");
 
   private String type;
 

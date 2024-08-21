@@ -1568,6 +1568,39 @@ public class TestOzoneShellHA {
         .contains("Missing required parameter");
     out.reset();
 
+    // Test incompatible volume-bucket quota
+    args = new String[]{"volume", "create", "vol6"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol6/buck6"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    args = new String[]{"volume", "setquota", "vol6", "--space-quota", "1000B"};
+    executeWithError(ozoneShell, args, "Can not set volume space quota " +
+        "on volume as some of buckets in this volume have no quota set");
+    out.reset();
+
+    args = new String[]{"bucket", "setquota", "vol6/buck6", "--space-quota", "1000B"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    args = new String[]{"volume", "setquota", "vol6", "--space-quota", "2000B"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol6/buck62"};
+    executeWithError(ozoneShell, args, "Bucket space quota in this " +
+        "volume should be set as volume space quota is already set.");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol6/buck62", "--space-quota", "2000B"};
+    executeWithError(ozoneShell, args, "Total buckets quota in this volume " +
+        "should not be greater than volume quota : the total space quota is set to:3000. " +
+        "But the volume space quota is:2000");
+    out.reset();
+
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
     String[] bucketArgs8 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "1000B"};
