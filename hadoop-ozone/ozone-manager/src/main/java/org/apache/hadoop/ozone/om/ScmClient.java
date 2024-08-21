@@ -127,11 +127,11 @@ public class ScmClient {
             ReplicationConfig repConfig = pipeline.getReplicationConfig();
             if (repConfig instanceof ECReplicationConfig) {
               int d = ((ECReplicationConfig) repConfig).getData();
-              List<Integer> indexes = pipeline.getReplicaIndexes().values().stream()
-                  .sorted()
-                  .distinct()
-                  .collect(Collectors.toList());
-              return !(indexes.size() >= d && indexes.get(d - 1) == d);
+              for (int i = 1; i <= d; i++) {
+                if (!pipeline.getReplicaIndexes().containsValue(i)) {
+                  return true;
+                }
+              }
             }
             return false;
           })
