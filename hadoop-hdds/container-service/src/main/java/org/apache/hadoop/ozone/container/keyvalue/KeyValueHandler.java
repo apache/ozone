@@ -529,6 +529,10 @@ public class KeyValueHandler extends Handler {
   }
 
   private void createContainerMerkleTree(Container container) throws IOException {
+    if (checksumManager.checksumFileExist(container)) {
+      return;
+    }
+
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     ContainerMerkleTree merkleTree = new ContainerMerkleTree();
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
@@ -1106,6 +1110,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerForClose(Container container)
       throws IOException {
+    createContainerMerkleTree(container);
     container.writeLock();
     try {
       ContainerProtos.ContainerDataProto.State state =
@@ -1128,7 +1133,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
-      throws StorageContainerException {
+      throws IOException {
+    createContainerMerkleTree(container);
     container.writeLock();
     try {
       long containerID = container.getContainerData().getContainerID();
@@ -1167,6 +1173,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public void quasiCloseContainer(Container container, String reason)
       throws IOException {
+    createContainerMerkleTree(container);
     container.writeLock();
     try {
       final State state = container.getContainerState();
@@ -1194,6 +1201,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
+    createContainerMerkleTree(container);
     container.writeLock();
     try {
       final State state = container.getContainerState();
@@ -1218,7 +1226,6 @@ public class KeyValueHandler extends Handler {
       }
       container.close();
       ContainerLogger.logClosed(container.getContainerData());
-      createContainerMerkleTree(container);
       sendICR(container);
     } finally {
       container.writeUnlock();

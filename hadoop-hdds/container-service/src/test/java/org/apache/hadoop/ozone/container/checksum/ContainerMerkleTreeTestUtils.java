@@ -46,7 +46,7 @@ public final class ContainerMerkleTreeTestUtils {
   private ContainerMerkleTreeTestUtils() { }
 
   public static void assertTreesSortedAndMatch(ContainerProtos.ContainerMerkleTree expectedTree,
-      ContainerProtos.ContainerMerkleTree actualTree) {
+                                               ContainerProtos.ContainerMerkleTree actualTree) {
     assertEquals(expectedTree.getDataChecksum(), actualTree.getDataChecksum());
     assertEquals(expectedTree.getBlockMerkleTreeCount(), actualTree.getBlockMerkleTreeCount());
 

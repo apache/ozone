@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -204,6 +205,11 @@ public class ContainerChecksumTreeManager {
   @VisibleForTesting
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;
+  }
+
+  public boolean checksumFileExist(Container container) {
+    File checksumFile = getContainerChecksumFile(container.getContainerData());
+    return checksumFile.exists();
   }
 
   /**
