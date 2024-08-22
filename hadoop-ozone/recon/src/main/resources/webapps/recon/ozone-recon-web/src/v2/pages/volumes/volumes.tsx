@@ -193,7 +193,7 @@ const Volumes: React.FC<{}> = () => {
     request.then(response => {
       const volumesResponse: VolumesResponse = response.data;
       const volumes: Volume[] = volumesResponse.volumes;
-      const data: Volume[] = volumes.map(volume => {
+      const data: Volume[] = volumes?.map(volume => {
         return {
           volume: volume.volume,
           owner: volume.owner,
@@ -205,7 +205,7 @@ const Volumes: React.FC<{}> = () => {
           usedNamespace: volume.usedNamespace,
           acls: volume.acls
         };
-      });
+      }) ?? [];
 
       setState({
         ...state,
@@ -315,6 +315,7 @@ const Volumes: React.FC<{}> = () => {
                 onChange={handleLimitChange} />
             </div>
             <Search
+              disabled={data?.length < 1}
               searchOptions={SearchableColumnOpts}
               searchInput={searchTerm}
               searchColumn={searchColumn}

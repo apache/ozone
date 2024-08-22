@@ -393,7 +393,7 @@ const Buckets: React.FC<{}> = () => {
       const totalCount = bucketsResponse.totalCount;
       const buckets: Bucket[] = bucketsResponse.buckets;
 
-      const dataSource: Bucket[] = buckets.map(bucket => {
+      const dataSource: Bucket[] = buckets?.map(bucket => {
         return {
           volumeName: bucket.volumeName,
           name: bucket.name,
@@ -411,7 +411,7 @@ const Buckets: React.FC<{}> = () => {
           owner: bucket.owner,
           acls: bucket.acls
         };
-      });
+      }) ?? [];
 
       const volumeBucketMap: Map<string, Set<Bucket>> = getVolumeBucketMap(dataSource);
 
@@ -526,6 +526,7 @@ const Buckets: React.FC<{}> = () => {
                 onChange={handleLimitChange} />
             </div>
             <Search
+              disabled={bucketsUnderVolume?.length < 1}
               searchOptions={SearchableColumnOpts}
               searchInput={searchTerm}
               searchColumn={searchColumn}
