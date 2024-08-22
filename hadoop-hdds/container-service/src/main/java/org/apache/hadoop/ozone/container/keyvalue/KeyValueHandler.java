@@ -109,6 +109,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNCLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
@@ -299,6 +300,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleEcho(request, kvContainer);
     case GetContainerMerkleTree:
       return handler.handleGetContainerMerkleTree(request, kvContainer);
+    case WriteChunkForClosedContainer:
+      return handler.handleWriteChunkForClosedContainer(request, kvContainer);
     default:
       return null;
     }
@@ -971,6 +974,47 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
+   * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
+   */
+  ContainerCommandResponseProto handleWriteChunkForClosedContainer(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    if (!request.hasWriteChunk()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Write Chunk request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    try {
+      checkContainerClose(kvContainer);
+
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+      ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
+
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
+      Preconditions.checkNotNull(chunkInfo);
+
+      DispatcherContext dispatcherContext =
+          DispatcherContext.getHandleWriteChunk();
+      ChunkBuffer data =
+          ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
+
+      chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
+          dispatcherContext);
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Write Chunk failed", ex, IO_EXCEPTION),
+          request);
+    }
+    return getSuccessResponse(request);
+  }
+
+  /**
    * Handle Put Small File operation. Writes the chunk and associated key
    * using a single RPC. Calls BlockManager and ChunkManager to process the
    * request.
@@ -1134,6 +1178,38 @@ public class KeyValueHandler extends Handler {
       break;
     case UNHEALTHY:
       result = CONTAINER_UNHEALTHY;
+      break;
+    case INVALID:
+      result = INVALID_CONTAINER_STATE;
+      break;
+    default:
+      result = CONTAINER_INTERNAL_ERROR;
+    }
+    String msg = "Requested operation not allowed as ContainerState is " +
+        containerState;
+    throw new StorageContainerException(msg, result);
+  }
+
+  /**
+   * Check if container is Closed. Throw exception otherwise.
+   * @param kvContainer
+   * @throws StorageContainerException
+   */
+  private void checkContainerClose(KeyValueContainer kvContainer)
+      throws StorageContainerException {
+
+    final State containerState = kvContainer.getContainerState();
+    if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED
+        || containerState == State.UNHEALTHY) {
+      return;
+    }
+
+    final ContainerProtos.Result result;
+    switch (containerState) {
+    case OPEN:
+    case CLOSING:
+    case RECOVERING:
+      result = UNCLOSED_CONTAINER_IO;
       break;
     case INVALID:
       result = INVALID_CONTAINER_STATE;

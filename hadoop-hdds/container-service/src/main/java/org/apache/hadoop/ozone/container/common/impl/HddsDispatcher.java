@@ -833,6 +833,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
     case GetContainerMerkleTree : return DNAction.GET_CONTAINER_MERKLE_TREE;
+    case WriteChunkForClosedContainer: return DNAction.WRITE_CHUNK_FOR_CLOSED_CONTAINER;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;

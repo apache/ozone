@@ -108,6 +108,7 @@ enum Type {
   FinalizeBlock = 21;
   Echo = 22;
   GetContainerMerkleTree = 23;
+  WriteChunkForClosedContainer = 24;
 }
 
 

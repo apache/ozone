@@ -479,6 +479,45 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * Calls the container protocol to write a chunk for a closed container.
+   *
+   * @param xceiverClient client to perform call
+   * @param chunk information about chunk to write
+   * @param blockID ID of the block
+   * @param data the data of the chunk to write
+   * @param tokenString serialized block token
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static XceiverClientReply writeChunkForClosedContainer(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
+      ByteString data, String tokenString, int replicationIndex)
+      throws IOException, ExecutionException, InterruptedException {
+    WriteChunkRequestProto.Builder writeChunkRequest =
+        WriteChunkRequestProto.newBuilder()
+            .setBlockID(DatanodeBlockID.newBuilder()
+                .setContainerID(blockID.getContainerID())
+                .setLocalID(blockID.getLocalID())
+                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+                .setReplicaIndex(replicationIndex)
+                .build())
+            .setChunkData(chunk)
+            .setData(data);
+    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.WriteChunkForClosedContainer)
+            .setContainerID(blockID.getContainerID())
+            .setDatanodeUuid(id)
+            .setWriteChunk(writeChunkRequest);
+
+    if (tokenString != null) {
+      builder.setEncodedToken(tokenString);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    return xceiverClient.sendCommandAsync(request);
+  }
+
+  /**
    * Allows writing a small file using single RPC. This takes the container
    * name, block name and data to write sends all that data to the container
    * using a single RPC. This API is designed to be used for files which are

@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -44,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
@@ -99,6 +102,21 @@ public class DNContainerOperationClient implements AutoCloseable {
           ContainerProtocolCalls.getContainerMerkleTree(xceiverClient,
               containerId, containerToken);
       return response.getContainerMerkleTree();
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
+  }
+
+  public XceiverClientReply writeChunkForClosedContainer(ContainerProtos.ChunkInfo chunkInfo, BlockID blockID,
+                                                         ByteString data, int replicationIndex, DatanodeDetails dn)
+      throws IOException, ExecutionException, InterruptedException {
+    XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(createSingleNodePipeline(dn));
+    // Set OzoneConsts.CHUNK_OVERWRITE
+    try {
+      String containerToken = encode(tokenHelper.getContainerToken(
+          ContainerID.valueOf(blockID.getContainerID())));
+      return ContainerProtocolCalls.writeChunkForClosedContainer(
+          xceiverClient, chunkInfo, blockID, data, containerToken, replicationIndex);
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }
