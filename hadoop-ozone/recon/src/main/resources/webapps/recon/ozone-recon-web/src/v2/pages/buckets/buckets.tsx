@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import moment from 'moment';
 import { Table, Tag } from 'antd';
 import {
@@ -456,7 +456,6 @@ const Buckets: React.FC<{}> = () => {
       }]);
     }
     loadData();
-
 
     return (() => {
       autoReloadHelper.stopPolling();
