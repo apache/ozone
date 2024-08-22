@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { Suspense } from 'react';
 
 import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
@@ -27,6 +27,8 @@ import { routes } from '@/routes';
 import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
+
+import Loader from '@/v2/components/loader/loader';
 
 import './app.less';
 
@@ -85,9 +87,11 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview' />
                 </Route>
                 {(enableNewUI)
-                  ? routesV2.map(
-                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                  )
+                  ? <Suspense fallback={<Loader/>}>
+                    {routesV2.map(
+                      (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                    )}
+                  </Suspense>
                   : routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
                   )

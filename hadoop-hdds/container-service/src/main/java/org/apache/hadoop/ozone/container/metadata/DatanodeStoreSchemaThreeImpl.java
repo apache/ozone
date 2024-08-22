@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
@@ -106,6 +108,9 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       getMetadataTable().deleteBatchWithPrefix(batch, prefix);
       getBlockDataTable().deleteBatchWithPrefix(batch, prefix);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+        getLastChunkInfoTable().deleteBatchWithPrefix(batch, prefix);
+      }
       getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
@@ -118,6 +123,10 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         getTableDumpFile(getMetadataTable(), dumpDir), prefix);
     getBlockDataTable().dumpToFileWithPrefix(
         getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+      getLastChunkInfoTable().dumpToFileWithPrefix(
+          getTableDumpFile(getLastChunkInfoTable(), dumpDir), prefix);
+    }
     getDeleteTransactionTable().dumpToFileWithPrefix(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir),
         prefix);
@@ -129,6 +138,10 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         getTableDumpFile(getMetadataTable(), dumpDir));
     getBlockDataTable().loadFromFile(
         getTableDumpFile(getBlockDataTable(), dumpDir));
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+      getLastChunkInfoTable().loadFromFile(
+          getTableDumpFile(getLastChunkInfoTable(), dumpDir));
+    }
     getDeleteTransactionTable().loadFromFile(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir));
   }

@@ -147,8 +147,8 @@ enum Type {
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
   RenameSnapshot = 131;
-
   ListOpenFiles = 132;
+  QuotaRepair = 133;
 }
 
 enum SafeMode {
@@ -285,8 +285,8 @@ message OMRequest {
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
-
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
+  optional QuotaRepairRequest               QuotaRepairRequest             = 131;
 }
 
 message OMResponse {
@@ -410,8 +410,8 @@ message OMResponse {
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
-
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
+  optional QuotaRepairResponse            QuotaRepairResponse        = 134;
 }
 
 enum Status {
@@ -2185,6 +2185,21 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message QuotaRepairRequest {
+    repeated BucketQuotaCount bucketCount = 1;
+    required bool supportVolumeOldQuota = 2 [default=false];
+}
+message BucketQuotaCount {
+    required string volName = 1;
+    required string bucketName = 2;
+    required int64 diffUsedBytes = 3;
+    required int64 diffUsedNamespace = 4;
+    required bool supportOldQuota = 5 [default=false];
+}
+
+message QuotaRepairResponse {
 }
 
 message OMLockDetailsProto {

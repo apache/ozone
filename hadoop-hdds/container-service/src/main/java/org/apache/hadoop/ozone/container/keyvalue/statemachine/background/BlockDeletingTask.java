@@ -327,6 +327,8 @@ public class BlockDeletingTask implements BackgroundTask {
     try {
       Table<String, BlockData> blockDataTable =
           meta.getStore().getBlockDataTable();
+      Table<String, BlockData> lastChunkInfoTable =
+          meta.getStore().getLastChunkInfoTable();
       DeleteTransactionStore<?> txnStore =
           (DeleteTransactionStore<?>) meta.getStore();
       Table<?, DeletedBlocksTransaction> deleteTxns =
@@ -376,7 +378,10 @@ public class BlockDeletingTask implements BackgroundTask {
         for (DeletedBlocksTransaction delTx : deletedBlocksTxs) {
           deleter.apply(deleteTxns, batch, delTx.getTxID());
           for (Long blk : delTx.getLocalIDList()) {
+            // delete from both blockDataTable and lastChunkInfoTable.
             blockDataTable.deleteWithBatch(batch,
+                containerData.getBlockKey(blk));
+            lastChunkInfoTable.deleteWithBatch(batch,
                 containerData.getBlockKey(blk));
           }
         }
