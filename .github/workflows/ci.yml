@@ -189,14 +189,12 @@ jobs:
       - name: Run the Python script to convert XML properties into Markdown
         run: python3 dev-support/ci/xml_to_md.py ozone-bin/extracted > hadoop-hdds/docs/content/tools/Configurations.md
       - name: Create Pull Request in apache/ozone
-        if: github.ref == 'refs/heads/master'
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: "[Auto] Update Configurations.md from $GITHUB_SHA"
           title: "[Auto] Update Configurations.md from $GITHUB_SHA"
           body: "This is an Automated pull request generated from build-config-doc workflow."
       - name: Checkout ozone-site repository
-        if: github.ref == 'refs/heads/master'
         uses: actions/checkout@v4
         with:
           repository: apache/ozone-site
@@ -204,11 +202,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: ozone-site
       - name: Copy MD file to ozone-site repository
-        if: github.ref == 'refs/heads/master'
         run: |
           cp hadoop-hdds/docs/content/tools/Configurations.md ozone-site/docs/*-administrative-guide/*-configuration/configurations.md
       - name: Create Pull Request in apache/ozone-site
-        if: github.ref == 'refs/heads/master'
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: "[Auto] Update configurations.md page from ozone $GITHUB_SHA"
