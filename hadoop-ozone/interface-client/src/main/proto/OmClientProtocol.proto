@@ -769,7 +769,7 @@ message BucketInfo {
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
     required bool isVersionEnabled = 4 [default = false];
-    required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
+    required hadoop.hdds.StorageTypeProto storageType = 5 [deprecated = true, default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;

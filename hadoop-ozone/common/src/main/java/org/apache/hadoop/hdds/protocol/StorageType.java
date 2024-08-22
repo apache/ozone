@@ -21,7 +21,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 
 /**
  * Ozone specific storage types.
+ *
+ * @deprecated Ozone buckets should not have a StorageType attribute.
+ * This class is specific to `OzoneBucket` and is planned for removal in future versions.
+ * It is recommended to use `{@link org.apache.hadoop.fs.StorageType}` instead for
+ * any storage type requirements.
  */
+@Deprecated
 public enum StorageType {
   RAM_DISK,
   SSD,
