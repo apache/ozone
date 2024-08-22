@@ -149,6 +149,7 @@ enum Type {
   RenameSnapshot = 131;
   ListOpenFiles = 132;
   QuotaRepair = 133;
+  GetServerDefaults = 134;
 }
 
 enum SafeMode {
@@ -287,6 +288,7 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
+  optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
 }
 
 message OMResponse {
@@ -412,6 +414,7 @@ message OMResponse {
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
+  optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
 }
 
 enum Status {
@@ -2200,6 +2203,17 @@ message BucketQuotaCount {
 }
 
 message QuotaRepairResponse {
+}
+
+message ServerDefaultsRequest {
+}
+
+message FsServerDefaultsProto {
+  optional string keyProviderUri = 1;
+}
+
+message ServerDefaultsResponse {
+  required FsServerDefaultsProto serverDefaults = 1;
 }
 
 message OMLockDetailsProto {

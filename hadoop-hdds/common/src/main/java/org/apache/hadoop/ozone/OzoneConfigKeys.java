@@ -583,6 +583,13 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
 
+  public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
+      "ozone.client.server-defaults.validity.period.ms";
+
+  public static final long
+      OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1); // 1 hour
+
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
           "ozone.network.flexible.fqdn.resolution.enabled";
   public static final boolean OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT =
