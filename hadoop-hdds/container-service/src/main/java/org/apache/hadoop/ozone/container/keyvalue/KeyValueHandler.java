@@ -540,23 +540,28 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void createContainerMerkleTree(Container container) throws IOException {
+  private void createContainerMerkleTree(Container container) {
     if (checksumManager.checksumFileExist(container)) {
       return;
     }
 
-    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-    ContainerMerkleTree merkleTree = new ContainerMerkleTree();
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
-         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
-             getBlockIterator(containerData.getContainerID())) {
-      while (blockIterator.hasNext()) {
-        BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-        merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+    try {
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      ContainerMerkleTree merkleTree = new ContainerMerkleTree();
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
+           BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+               getBlockIterator(containerData.getContainerID())) {
+        while (blockIterator.hasNext()) {
+          BlockData blockData = blockIterator.nextBlock();
+          List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+          merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+        }
       }
+      checksumManager.writeContainerDataTree(containerData, merkleTree);
+    } catch (IOException ex) {
+      LOG.error("Cannot create container checksum for container {} , Exception: ",
+          container.getContainerData().getContainerID(), ex);
     }
-    checksumManager.writeContainerDataTree(containerData, merkleTree);
   }
 
   /**
