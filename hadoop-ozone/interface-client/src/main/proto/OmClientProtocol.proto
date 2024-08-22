@@ -149,6 +149,7 @@ enum Type {
   RenameSnapshot = 131;
   ListOpenFiles = 132;
   QuotaRepair = 133;
+  PersistDb = 134;
 }
 
 enum SafeMode {
@@ -287,6 +288,7 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
+  optional PersistDbRequest                 PersistDbRequest               = 132;
 }
 
 message OMResponse {
@@ -412,6 +414,7 @@ message OMResponse {
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
+  optional PersistDbResponse            PersistDbResponse        = 135;
 }
 
 enum Status {
@@ -2202,6 +2205,20 @@ message BucketQuotaCount {
 message QuotaRepairResponse {
 }
 
+message PersistDbRequest {
+    repeated DBTableUpdate tableUpdates = 1;
+    required int64 cacheIndex = 2;
+}
+message DBTableUpdate {
+    required string tableName = 1;
+    repeated DBTableRecord records = 2;
+}
+message DBTableRecord {
+    required bytes key = 1;
+    optional bytes value = 2;
+}
+message PersistDbResponse {
+}
 message OMLockDetailsProto {
   optional bool isLockAcquired = 1;
   optional uint64 waitLockNanos    = 2;

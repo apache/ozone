@@ -251,7 +251,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    */
   private OMResponse submitRequestToRatis(OMRequest request)
       throws ServiceException {
-    return omRatisServer.submitRequest(request);
+    return omRatisServer.submitRequest(request, null);
   }
 
   private OMResponse submitReadRequestToOM(OMRequest request)

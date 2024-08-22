@@ -542,7 +542,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void loadFromFile(File externalFile) throws IOException {
     rawTable.loadFromFile(externalFile);
   }
-
+  @Override
+  public Table getRawTable() {
+    return rawTable;
+  }
   @Override
   public void cleanupCache(List<Long> epochs) {
     cache.cleanup(epochs);

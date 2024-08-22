@@ -85,7 +85,10 @@ public class RDBBatchOperation implements BatchOperation {
     }
 
     byte[] array() {
-      return array;
+      if (null != array) {
+        return array;
+      }
+      return buffer.getArray();
     }
 
     ByteBuffer asReadOnlyByteBuffer() {
@@ -258,6 +261,9 @@ public class RDBBatchOperation implements BatchOperation {
             countSize2String(discardedCount, discardedSize));
       }
 
+      public Map<Bytes, Object> getOps() {
+        return ops;
+      }
       @Override
       public String toString() {
         return name + ": " + family.getName();
@@ -320,6 +326,27 @@ public class RDBBatchOperation implements BatchOperation {
           countSize2String(discardedCount, discardedSize),
           countSize2String(opCount - discardedCount, opSize - discardedSize));
     }
+
+    Map<String, Map<byte[], byte[]>> getCachedTransaction() {
+      Map<String, Map<byte[], byte[]>> tableMap = new HashMap<>();
+      for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
+        Map<byte[], byte[]> dataMap = tableMap.computeIfAbsent(e.getKey(), (p) -> new HashMap<>());
+        for (Map.Entry<Bytes, Object> d : e.getValue().getOps().entrySet()) {
+          Object value = d.getValue();
+          if (value instanceof byte[]) {
+            dataMap.put(d.getKey().array(), (byte[]) value);
+          } else if (value instanceof CodecBuffer) {
+            dataMap.put(d.getKey().array(), (byte[]) ((CodecBuffer) value).getArray());
+          } else if (value == Op.DELETE) {
+            dataMap.put(d.getKey().array(), null);
+          } else {
+            throw new IllegalStateException("Unexpected value: " + value
+                + ", class=" + value.getClass().getSimpleName());
+          }
+        }
+      }
+      return tableMap;
+    }
   }
 
   private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
@@ -377,5 +404,9 @@ public class RDBBatchOperation implements BatchOperation {
   public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
     opCache.put(family, key, value);
+  }
+
+  public Map<String, Map<byte[], byte[]>> getCachedTransaction() {
+    return opCache.getCachedTransaction();
   }
 }

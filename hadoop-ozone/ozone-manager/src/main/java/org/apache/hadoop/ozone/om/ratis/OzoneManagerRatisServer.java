@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
@@ -121,6 +122,7 @@ public final class OzoneManagerRatisServer {
   private final OzoneManagerStateMachine omStateMachine;
   private final String ratisStorageDir;
   private final OMPerformanceMetrics perfMetrics;
+  private final OzoneManagerRequestExecutor omRequestExecutor;
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -188,6 +190,7 @@ public final class OzoneManagerRatisServer {
       }
     });
     this.perfMetrics = om.getPerfMetrics();
+    omRequestExecutor = new OzoneManagerRequestExecutor(this);
   }
 
   /**
@@ -310,9 +313,18 @@ public final class OzoneManagerRatisServer {
    */
   public OMResponse submitRequest(OMRequest omRequest,
       RaftClientRequest raftClientRequest) throws ServiceException {
-    RaftClientReply raftClientReply =
-        submitRequestToRatis(raftClientRequest);
-    return createOmResponse(omRequest, raftClientReply);
+    try {
+      CompletableFuture<OMResponse> reply = omRequestExecutor.submit(omRequest);
+      return reply.get();
+    } catch (ExecutionException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new ServiceException(ex.getMessage(), ex);
+    }
+    //RaftClientReply raftClientReply =
+    //    submitRequestToRatis(raftClientRequest);
+    //return createOmResponse(omRequest, raftClientReply);
   }
 
   private RaftClientReply submitRequestToRatisImpl(
@@ -452,10 +464,12 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
-    if (!ozoneManager.isTestSecureOmFlag()) {
-      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
-    }
+    // TODO remove as Server.getClientId() is set for external request, but with change
+    // in mode, this is not required as submit will be done internally
+    //if (!ozoneManager.isTestSecureOmFlag()) {
+    //  Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+    //  Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    //}
     return RaftClientRequest.newBuilder()
         .setClientId(
             ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
