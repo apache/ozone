@@ -74,9 +74,9 @@ public abstract class HadoopBaseFreonGenerator extends BaseFreonGenerator {
     return threadLocalFileSystem.get();
   }
 
-  private org.apache.hadoop.fs.FileSystem createFS() {
+  private FileSystem createFS() {
     try {
-      return org.apache.hadoop.fs.FileSystem.get(uri, configuration);
+      return FileSystem.get(uri, configuration);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
