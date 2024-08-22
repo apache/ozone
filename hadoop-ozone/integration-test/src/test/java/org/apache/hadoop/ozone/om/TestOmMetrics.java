@@ -354,11 +354,11 @@ public class TestOmMetrics {
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    doKeyOps(keyArgs);
+    doKeyOps(keyArgs); // This will perform 7 different operations on the key
 
     omMetrics = getMetrics("OMMetrics");
 
-    assertEquals(initialNumKeyOps + 8, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
