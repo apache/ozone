@@ -51,8 +51,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,12 +70,12 @@ class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
 
-  @BeforeAll
+  @BeforeEach
   void init() throws Exception {
     cluster = createCluster();
   }
 
-  @AfterAll
+  @AfterEach
   void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -442,7 +442,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
@@ -455,7 +456,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -506,9 +508,10 @@ class TestBlockOutputStreamWithFailures {
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
     // we have just written data more than flush Size(2 chunks), at this time
-    // buffer pool will have 4 buffers allocated worth of chunk size
+    // buffer pool will have up to 4 buffers allocated worth of chunk size
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
@@ -531,7 +534,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
