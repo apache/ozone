@@ -210,7 +210,7 @@ public class ContainerChecksumTreeManager {
     return this.metrics;
   }
 
-  public boolean checksumFileExist(Container container) {
+  public static boolean checksumFileExist(Container container) {
     File checksumFile = getContainerChecksumFile(container.getContainerData());
     return checksumFile.exists();
   }

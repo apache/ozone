@@ -69,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.Assertions;
@@ -348,6 +349,7 @@ public class TestKeyValueHandler {
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
         keyValueHandler.handleCloseContainer(closeContainerRequest, container);
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
@@ -509,11 +511,8 @@ public class TestKeyValueHandler {
     hddsVolume.createWorkingDir(clusterId, null);
     hddsVolume.createTmpDirs(clusterId);
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
-    final AtomicInteger icrReceived = new AtomicInteger(0);
-    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-        datanodeId, containerSet, volumeSet, metrics,
-        c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
+    final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet);
     kvHandler.setClusterID(clusterId);
     return kvHandler;
   }

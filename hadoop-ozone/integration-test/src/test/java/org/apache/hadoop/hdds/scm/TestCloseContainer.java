@@ -62,6 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -228,6 +229,7 @@ public class TestCloseContainer {
       Container<?> container1 = ozoneContainer.getController().getContainer(containerInfo1.getContainerID());
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
               container1.getContainerData());
+      assertNotNull(containerChecksumInfo);
       if (prevExpectedChecksumInfo1 != null) {
         ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch(prevExpectedChecksumInfo1.getContainerMerkleTree(),
             containerChecksumInfo.getContainerMerkleTree());
@@ -255,6 +257,7 @@ public class TestCloseContainer {
       Container<?> container2 = ozoneContainer.getController().getContainer(containerInfo2.getContainerID());
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
           container2.getContainerData());
+      assertNotNull(containerChecksumInfo);
       if (prevExpectedChecksumInfo2 != null) {
         ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch(prevExpectedChecksumInfo2.getContainerMerkleTree(),
             containerChecksumInfo.getContainerMerkleTree());

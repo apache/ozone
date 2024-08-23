@@ -541,7 +541,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private void createContainerMerkleTree(Container container) {
-    if (checksumManager.checksumFileExist(container)) {
+    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
       return;
     }
 
@@ -1206,7 +1206,6 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerForClose(Container container)
       throws IOException {
-    createContainerMerkleTree(container);
     container.writeLock();
     try {
       ContainerProtos.ContainerDataProto.State state =
@@ -1219,21 +1218,22 @@ public class KeyValueHandler extends Handler {
           ContainerLogger.logRecovered(container.getContainerData());
         }
         container.markContainerForClose();
-        ContainerLogger.logClosing(container.getContainerData());
-        sendICR(container);
       }
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logClosing(container.getContainerData());
+    sendICR(container);
   }
 
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
-    createContainerMerkleTree(container);
     container.writeLock();
+    long containerID = 0L;
     try {
-      long containerID = container.getContainerData().getContainerID();
+      containerID = container.getContainerData().getContainerID();
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
@@ -1248,28 +1248,24 @@ public class KeyValueHandler extends Handler {
             "already failed volume {}", containerID, containerVolume);
         return;
       }
-
-      try {
-        container.markContainerUnhealthy();
-      } catch (StorageContainerException ex) {
-        LOG.warn("Unexpected error while marking container {} unhealthy",
-            containerID, ex);
-      } finally {
-        // Even if the container file is corrupted/missing and the unhealthy
-        // update fails, the unhealthy state is kept in memory and sent to
-        // SCM. Write a corresponding entry to the container log as well.
-        ContainerLogger.logUnhealthy(container.getContainerData(), reason);
-        sendICR(container);
-      }
+      container.markContainerUnhealthy();
+    } catch (StorageContainerException ex) {
+      LOG.warn("Unexpected error while marking container {} unhealthy",
+          containerID, ex);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    // Even if the container file is corrupted/missing and the unhealthy
+    // update fails, the unhealthy state is kept in memory and sent to
+    // SCM. Write a corresponding entry to the container log as well.
+    ContainerLogger.logUnhealthy(container.getContainerData(), reason);
+    sendICR(container);
   }
 
   @Override
   public void quasiCloseContainer(Container container, String reason)
       throws IOException {
-    createContainerMerkleTree(container);
     container.writeLock();
     try {
       final State state = container.getContainerState();
@@ -1287,11 +1283,12 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.quasiClose();
-      ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
-      sendICR(container);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
+    sendICR(container);
   }
 
   @Override

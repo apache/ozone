@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -131,7 +130,6 @@ public final class ContainerMerkleTreeTestUtils {
                                                     ContainerInfo containerInfo) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
-    File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
-    return containerChecksumFile.exists();
+    return ContainerChecksumTreeManager.checksumFileExist(container);
   }
 }

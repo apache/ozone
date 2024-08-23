@@ -63,6 +63,8 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockR
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
@@ -79,6 +81,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       TestKeyValueHandlerWithUnhealthyContainer.class);
 
   private IncrementalReportSender<Container> mockIcrSender;
+  private OzoneConfiguration conf;
   @TempDir
   private Path tempDir;
   @TempDir
@@ -87,6 +90,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   @BeforeEach
   public void init() {
     mockIcrSender = mock(IncrementalReportSender.class);
+    conf = new OzoneConfiguration();
   }
 
   @Test
@@ -210,7 +214,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   void testNPEFromPutBlock() throws IOException {
     KeyValueContainer container = new KeyValueContainer(
         mock(KeyValueContainerData.class),
-        new OzoneConfiguration());
+        conf);
     KeyValueHandler subject = getDummyHandler();
 
     BlockID blockID = getTestBlockID(1);
@@ -227,7 +231,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   @Test
   public void testMarkContainerUnhealthyInFailedVolume() throws IOException {
     KeyValueHandler handler = getDummyHandler();
-    OzoneConfiguration conf = new OzoneConfiguration();
     KeyValueContainerData kvData = new KeyValueContainerData(1L,
         ContainerLayoutVersion.FILE_PER_BLOCK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
@@ -239,14 +242,14 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .volumeSet(mock(MutableVolumeSet.class))
         .build();
     kvData.setVolume(hddsVolume);
-    KeyValueContainer container = new KeyValueContainer(
-        kvData, new OzoneConfiguration());
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
 
     // When volume is failed, the call to mark the container unhealthy should
     // be ignored.
     hddsVolume.setState(StorageVolume.VolumeState.FAILED);
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
+    assertFalse(ContainerChecksumTreeManager.checksumFileExist(container));
     verify(mockIcrSender, never()).send(any());
 
     // When volume is healthy, ICR should be sent when container is marked
@@ -254,6 +257,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     hddsVolume.setState(StorageVolume.VolumeState.NORMAL);
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 
@@ -269,11 +273,11 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);
 
     return new KeyValueHandler(
-        new OzoneConfiguration(),
+        conf,
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(MutableVolumeSet.class),
-        mock(ContainerMetrics.class), mockIcrSender, mock(ContainerChecksumTreeManager.class));
+        mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
   }
 
   private KeyValueContainer getMockUnhealthyContainer() {
@@ -283,7 +287,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     when(containerData.getBlockCommitSequenceId()).thenReturn(100L);
     when(containerData.getProtoBufMessage()).thenReturn(ContainerProtos
         .ContainerDataProto.newBuilder().setContainerID(1).build());
-    return new KeyValueContainer(containerData, new OzoneConfiguration());
+    return new KeyValueContainer(containerData, conf);
   }
 
   private KeyValueContainer getMockContainerWithReplicaIndex(int replicaIndex) {
@@ -294,6 +298,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     when(containerData.getReplicaIndex()).thenReturn(replicaIndex);
     when(containerData.getProtoBufMessage()).thenReturn(ContainerProtos
         .ContainerDataProto.newBuilder().setContainerID(1).build());
-    return new KeyValueContainer(containerData, new OzoneConfiguration());
+    return new KeyValueContainer(containerData, conf);
   }
 }
