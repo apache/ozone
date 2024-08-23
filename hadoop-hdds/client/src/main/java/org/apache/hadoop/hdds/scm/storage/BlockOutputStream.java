@@ -442,7 +442,8 @@ public class BlockOutputStream extends OutputStream {
         writeChunk(buffer);
         putBlockFuture = executePutBlock(false, false);
       }
-      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(putBlockFuture);
+      CompletableFuture<Void> watchForCommitAsync =
+          putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
       try {
         watchForCommitAsync.get();
       } catch (InterruptedException e) {
