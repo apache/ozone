@@ -56,7 +56,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -538,7 +537,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             Map<String, Object> filteredValue = new HashMap<>();
             for (List<String> subfields : fieldsSplit) {
               try {
-                filteredValue.putAll(getFilteredObject(o, subfields, dbColumnFamilyDefinition.getValueType()));
+                filteredValue.putAll(getFilteredObject(o, dbColumnFamilyDefinition.getValueType(), subfields));
               } catch (NoSuchFieldException ex) {
                 err().println("ERROR: no such field: " + subfields);
               } catch (IllegalAccessException e) {
@@ -560,40 +559,49 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    Map<String, Object> getFilteredObject(Object o, List<String> subfields, Class<?> fieldClass)
+    Map<String, Object> getFilteredObject(Object obj, Class<?> clazz, List<String> fields)
         throws NoSuchFieldException, IllegalAccessException {
-      Field valueClassField = getRequiredFieldFromAllFields(fieldClass, subfields.get(0));
-      Object valueObject = valueClassField.get(o);
-      int length = subfields.size();
+      Field valueClassField = getRequiredFieldFromAllFields(clazz, fields.get(0));
+      Object valueObject = valueClassField.get(obj);
+      int length = fields.size();
       Map<String, Object> valueMap = new HashMap<>();
-      if (length == 1) {
-        valueMap.put(subfields.get(0), valueObject);
-      } else {
-        Class<?> typeOfClassField;
-        try {
-          if (Collection.class.isAssignableFrom(valueClassField.getType())) {
-            typeOfClassField = (Class<?>)
-                ((ParameterizedType) valueClassField.getGenericType()).getActualTypeArguments()[0];
-          } else {
-            typeOfClassField = valueClassField.getType();
-          }
-        } catch (ClassCastException ex) {
-          typeOfClassField = valueClassField.getType();
-        }
 
+      if (length == 1) {
+        valueMap.put(fields.get(0), valueObject);
+      } else {
         if (Collection.class.isAssignableFrom(valueObject.getClass())) {
-          List<Object> subfieldObjectsList = new ArrayList<>();
-          for (Object ob : (List) valueObject) {
-            Object subfieldValue = getFilteredObject(ob, subfields.subList(1, length), typeOfClassField);
-            subfieldObjectsList.add(subfieldValue);
+          List<Object> subfieldObjectsList =
+              getFilteredObjectCollection((Collection) valueObject, fields.subList(1, length));
+          valueMap.put(fields.get(0), subfieldObjectsList);
+        } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
+          Map<Object, Object> subfieldObjectsMap = new HashMap<>();
+          Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
+          for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
+            Object subfieldValue;
+            if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
+              subfieldValue = getFilteredObjectCollection((Collection)ob.getValue(), fields.subList(1, length));
+            } else {
+              subfieldValue = getFilteredObject(ob.getValue(), ob.getValue().getClass(), fields.subList(1, length));
+            }
+            subfieldObjectsMap.put(ob.getKey(), subfieldValue);
           }
-          valueMap.put(subfields.get(0), subfieldObjectsList);
+          valueMap.put(fields.get(0), subfieldObjectsMap);
         } else {
-          valueMap.put(subfields.get(0),
-              getFilteredObject(valueObject, subfields.subList(1, length), typeOfClassField));
+          valueMap.put(fields.get(0),
+              getFilteredObject(valueObject, valueClassField.getType(), fields.subList(1, length)));
         }
       }
       return valueMap;
+    }
+
+    List<Object> getFilteredObjectCollection(Collection<?> valueObject, List<String> fields)
+        throws NoSuchFieldException, IllegalAccessException {
+      List<Object> subfieldObjectsList = new ArrayList<>();
+      for (Object ob : valueObject) {
+        Object subfieldValue = getFilteredObject(ob, ob.getClass(), fields);
+        subfieldObjectsList.add(subfieldValue);
+      }
+      return subfieldObjectsList;
     }
 
     Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
