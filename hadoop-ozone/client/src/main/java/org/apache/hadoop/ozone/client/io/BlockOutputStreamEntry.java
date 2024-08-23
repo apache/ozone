@@ -22,6 +22,8 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.fs.Syncable;
@@ -41,6 +43,8 @@ import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ratis.util.JavaUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A BlockOutputStreamEntry manages the data writes into the DataNodes.
@@ -51,9 +55,9 @@ import org.apache.ratis.util.JavaUtils;
  * but there can be other implementations that are using a different way.
  */
 public class BlockOutputStreamEntry extends OutputStream {
-
+  public static final Logger LOG = LoggerFactory.getLogger(BlockOutputStreamEntry.class);
   private final OzoneClientConfig config;
-  private OutputStream outputStream;
+  private BlockOutputStream outputStream;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
@@ -69,6 +73,18 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final StreamBufferArgs streamBufferArgs;
   private final Supplier<ExecutorService> executorServiceSupplier;
 
+  /**
+   * An indicator that this BlockOutputStream is created to handoff writes from another faulty BlockOutputStream.
+   * Once this flag is on, this BlockOutputStream can only handle writeOnRetry.
+   */
+  private volatile boolean isHandlingRetry;
+
+  /**
+   * To record how many calls(write, flush) are being handled by this block.
+   */
+  private AtomicInteger inflightCalls = new AtomicInteger();
+
+
   BlockOutputStreamEntry(Builder b) {
     this.config = b.config;
     this.outputStream = null;
@@ -83,6 +99,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.clientMetrics = b.clientMetrics;
     this.streamBufferArgs = b.streamBufferArgs;
     this.executorServiceSupplier = b.executorServiceSupplier;
+    this.isHandlingRetry = b.forRetry;
   }
 
   @Override
@@ -100,6 +117,37 @@ public class BlockOutputStreamEntry extends OutputStream {
     if (!isInitialized()) {
       createOutputStream();
     }
+  }
+
+  /** Register when a call (write or flush) is received on this block. */
+  void registerCallReceived() {
+    inflightCalls.incrementAndGet();
+  }
+
+  /**
+   * Register when a call (write or flush) is finished on this block.
+   * @return true if all the calls are done.
+   */
+  boolean registerCallFinished() {
+    return inflightCalls.decrementAndGet() == 0;
+  }
+
+  void waitForRetryHandling(Condition retryHandlingCond) throws InterruptedException {
+    while (isHandlingRetry) {
+      LOG.info("{} : Block to wait for retry handling.", this);
+      retryHandlingCond.await();
+      LOG.info("{} : Done waiting for retry handling.", this);
+    }
+  }
+
+  void finishRetryHandling(Condition retryHandlingCond) {
+    LOG.info("{}: Exiting retry handling mode", this);
+    isHandlingRetry = false;
+    retryHandlingCond.signalAll();
+  }
+
+  void waitForAllPendingFlushes() throws IOException {
+    outputStream.waitForAllPendingFlushes();
   }
 
   /**
@@ -144,6 +192,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     BlockOutputStream out = (BlockOutputStream) getOutputStream();
     out.writeOnRetry(len);
     incCurrentPosition(len);
+    LOG.info("{}: Finish retrying with len {}, currentPosition {}", this, len, currentPosition);
   }
 
   @Override
@@ -368,6 +417,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
+    private boolean forRetry;
 
     public Pipeline getPipeline() {
       return pipeline;
@@ -430,6 +480,11 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
       this.executorServiceSupplier = executorServiceSupplier;
+      return this;
+    }
+
+    public Builder setForRetry(boolean forRetry) {
+      this.forRetry = forRetry;
       return this;
     }
 

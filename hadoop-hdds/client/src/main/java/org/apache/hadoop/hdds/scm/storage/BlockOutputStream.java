@@ -102,7 +102,7 @@ public class BlockOutputStream extends OutputStream {
       = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
-  private XceiverClientFactory xceiverClientFactory;
+  private volatile XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private OzoneClientConfig config;
   private StreamBufferArgs streamBufferArgs;
@@ -216,7 +216,8 @@ public class BlockOutputStream extends OutputStream {
         this.token.encodeToUrlString();
 
     //number of buffers used before doing a flush
-    refreshCurrentBuffer();
+    currentBuffer = null;
+    currentBufferRemaining = 0;
     flushPeriod = (int) (streamBufferArgs.getStreamBufferFlushSize() / streamBufferArgs
         .getStreamBufferSize());
 
@@ -252,12 +253,6 @@ public class BlockOutputStream extends OutputStream {
       }
     }
     return true;
-  }
-
-  synchronized void refreshCurrentBuffer() {
-    currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
   public BlockID getBlockID() {
@@ -418,42 +413,44 @@ public class BlockOutputStream extends OutputStream {
    * @param len length of data to write
    * @throws IOException if error occurred
    */
-
-  // In this case, the data is already cached in the currentBuffer.
   public synchronized void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
     }
+
+    // In this case, the data from the failing (previous) block already cached in the allocated buffers in
+    // the BufferPool. For each pending buffers in the BufferPool, we sequentially flush it and wait synchronously.
+
+    List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Retrying write length {} for blockID {}", len, blockID);
+      LOG.debug("{}: Retrying write length {} on target blockID {}, {} buffers", this, len, blockID,
+          allocatedBuffers.size());
     }
     Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
     int count = 0;
-    List<ChunkBuffer> allocatedBuffers = bufferPool.getAllocatedBuffers();
     while (len > 0) {
       ChunkBuffer buffer = allocatedBuffers.get(count);
       long writeLen = Math.min(buffer.position(), len);
-      if (!buffer.hasRemaining()) {
-        writeChunk(buffer);
-      }
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
-      // we should not call isBufferFull/shouldFlush here.
-      // The buffer might already be full as whole data is already cached in
-      // the buffer. We should just validate
-      // if we wrote data of size streamBufferMaxSize/streamBufferFlushSize to
-      // call for handling full buffer/flush buffer condition.
-      if (writtenDataLength % streamBufferArgs.getStreamBufferFlushSize() == 0) {
-        // reset the position to zero as now we will be reading the
-        // next buffer in the list
-        updateWriteChunkLength();
-        updatePutBlockLength();
-        CompletableFuture<PutBlockResult> putBlockResultFuture = executePutBlock(false, false);
-        recordWatchForCommitAsync(putBlockResultFuture);
+      updateWriteChunkLength();
+      updatePutBlockLength();
+      LOG.debug("Write chunk on retry buffer = {}", buffer);
+      CompletableFuture<PutBlockResult> putBlockFuture;
+      if (allowPutBlockPiggybacking) {
+        putBlockFuture = writeChunkAndPutBlock(buffer, false);
+      } else {
+        writeChunk(buffer);
+        putBlockFuture = executePutBlock(false, false);
       }
-      if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
-        handleFullBuffer();
+      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(putBlockFuture);
+      try {
+        watchForCommitAsync.get();
+      } catch (InterruptedException e) {
+        handleInterruptedException(e, true);
+      } catch (ExecutionException e) {
+        handleExecutionException(e);
       }
     }
   }
@@ -477,14 +474,6 @@ public class BlockOutputStream extends OutputStream {
   }
 
   void releaseBuffersOnException() {
-  }
-
-  // It may happen that once the exception is encountered , we still might
-  // have successfully flushed up to a certain index. Make sure the buffers
-  // only contain data which have not been sufficiently replicated
-  private void adjustBuffersOnException() {
-    releaseBuffersOnException();
-    refreshCurrentBuffer();
   }
 
   /**
@@ -633,6 +622,9 @@ public class BlockOutputStream extends OutputStream {
   protected void handleFlush(boolean close) throws IOException {
     try {
       handleFlushInternal(close);
+      if (close) {
+        waitForAllPendingFlushes();
+      }
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -672,6 +664,17 @@ public class BlockOutputStream extends OutputStream {
     if (close) {
       // When closing, must wait for all flush futures to complete.
       allPendingFlushFutures.get();
+    }
+  }
+
+  public void waitForAllPendingFlushes() throws IOException {
+    // When closing, must wait for all flush futures to complete.
+    try {
+      allPendingFlushFutures.get();
+    } catch (InterruptedException e) {
+      handleInterruptedException(e, true);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
     }
   }
 
@@ -740,6 +743,7 @@ public class BlockOutputStream extends OutputStream {
         // Preconditions.checkArgument(buffer.position() == 0);
         // bufferPool.checkBufferPoolEmpty();
       } else {
+        waitForAllPendingFlushes();
         cleanup(false);
       }
     }
@@ -783,7 +787,7 @@ public class BlockOutputStream extends OutputStream {
   void cleanup() {
   }
 
-  public void cleanup(boolean invalidateClient) {
+  public synchronized void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
@@ -811,7 +815,6 @@ public class BlockOutputStream extends OutputStream {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
-      adjustBuffersOnException();
       throw getIoException();
     }
   }
@@ -1148,7 +1151,6 @@ public class BlockOutputStream extends OutputStream {
    */
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
-    adjustBuffersOnException();
     throw getIoException();
   }
 

@@ -152,10 +152,10 @@ public class TestHadoopDirTreeGenerator {
     Path rootDir = new Path(rootPath.concat("/"));
     // verify root path details
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
+    // verify the num of peer directories, expected span count is 1
+    // as it has only one dir at root.
+    verifyActualSpan(1, fileStatuses);
     for (FileStatus fileStatus : fileStatuses) {
-      // verify the num of peer directories, expected span count is 1
-      // as it has only one dir at root.
-      verifyActualSpan(1, fileStatuses);
       int actualDepth =
           traverseToLeaf(fileSystem, fileStatus.getPath(), 1, depth, span,
               fileCount, StorageSize.parse(perFileSize, StorageUnit.BYTES));
