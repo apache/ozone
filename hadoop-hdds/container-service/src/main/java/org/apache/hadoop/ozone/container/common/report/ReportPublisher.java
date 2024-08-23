@@ -83,7 +83,7 @@ public abstract class ReportPublisher<T extends Message>
       } else {
         context.refreshFullReport(report);
       }
-    } catch (IOException e) {
+    } catch (IOException | IllegalArgumentException e) {
       LOG.error("Exception while publishing report.", e);
     }
   }

@@ -42,6 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -246,11 +247,15 @@ public final class ContainerUtils {
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
     if (enabled) {
       String storedChecksum = containerData.getContainerFileChecksum();
+      StorageType storageType =
+          containerData instanceof KeyValueContainerData
+              ? containerData.getStorageType() : null;
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(
           containerData.getContainerType(),
-          containerData instanceof KeyValueContainerData &&
-              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
+          containerData instanceof KeyValueContainerData
+              && ((KeyValueContainerData) containerData).getReplicaIndex() > 0,
+          storageType);
       containerData.computeAndSetContainerFileChecksum(yaml);
       String computedChecksum = containerData.getContainerFileChecksum();
 

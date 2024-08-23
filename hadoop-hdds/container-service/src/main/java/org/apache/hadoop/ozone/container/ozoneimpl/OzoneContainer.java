@@ -677,7 +677,7 @@ public class OzoneContainer {
    * Returns node report of container storage usage.
    */
   public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
-          throws IOException {
+          throws IOException, IllegalArgumentException {
     StorageLocationReport[] reports = volumeSet.getStorageReport();
     StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
             = StorageContainerDatanodeProtocolProtos.

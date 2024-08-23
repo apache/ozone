@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -114,6 +115,7 @@ public abstract class ContainerData {
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   public static final String ZERO_CHECKSUM = new String(new byte[64],
       CHARSET_ENCODING);
+  private StorageType storageType;
 
   // Common Fields need to be stored in .container file.
   protected static final List<String> YAML_FIELDS =
@@ -162,6 +164,7 @@ public abstract class ContainerData {
         source.getLayoutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
     replicaIndex = source.getReplicaIndex();
+    storageType = source.getStorageType();
   }
 
   /**
@@ -282,6 +285,14 @@ public abstract class ContainerData {
    */
   public Map<String, String> getMetadata() {
     return Collections.unmodifiableMap(this.metadata);
+  }
+
+  public void setStorageType(StorageType type) {
+    storageType = type;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 
   /**
