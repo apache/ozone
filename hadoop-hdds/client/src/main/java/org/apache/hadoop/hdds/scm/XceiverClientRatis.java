@@ -262,27 +262,20 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       }
     }
     String fullSpanID = TracingUtil.exportCurrentSpan();
-    return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name() + "-async",
-        () -> {
-          final ContainerCommandRequestMessage message
-              = ContainerCommandRequestMessage.toMessage(
-              request, fullSpanID);
-          if (HddsUtils.isReadOnly(request)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync ReadOnly {}", message);
-            }
-            return getClient().async().sendReadOnly(message);
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync {}", message);
-            }
-            return getClient().async().send(message);
-          }
-
+      final ContainerCommandRequestMessage message
+          = ContainerCommandRequestMessage.toMessage(
+          request, fullSpanID);
+      if (HddsUtils.isReadOnly(request)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync ReadOnly {}", message);
         }
-
-    );
+        return getClient().async().sendReadOnly(message);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync {}", message);
+        }
+        return getClient().async().send(message);
+      }
   }
 
   // gets the minimum log index replicated to all servers
@@ -376,7 +369,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     long requestTime = System.currentTimeMillis();
 
     Span span = GlobalTracer.get()
-        .buildSpan("XceiverClientReply." + request.getCmdType()).start();
+        .buildSpan("XceiverClientRatis.sendCommandAsync(" + request.getCmdType() +")").start();
 
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
