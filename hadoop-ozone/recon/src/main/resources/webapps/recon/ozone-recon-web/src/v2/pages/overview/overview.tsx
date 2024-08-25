@@ -99,7 +99,7 @@ const getSummaryTableValue = (
   colType: 'value' | undefined = undefined
 ): string => {
   if (!value) return 'N/A';
-  if (colType === 'value') String(value as string)
+  if (colType === 'value') return String(value as string)
   return size(value as number)
 }
 

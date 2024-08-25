@@ -248,21 +248,21 @@ public class OzoneClientConfig {
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @Config(key = "incremental.chunk.list",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       description = "Client PutBlock request can choose incremental chunk " +
           "list rather than full chunk list to optimize performance. " +
-          "Critical to HBase.",
+          "Critical to HBase. EC does not support this feature.",
       tags = ConfigTag.CLIENT)
   private boolean incrementalChunkList = true;
 
   @Config(key = "stream.putblock.piggybacking",
-          defaultValue = "false",
+          defaultValue = "true",
           type = ConfigType.BOOLEAN,
           description = "Allow PutBlock to be piggybacked in WriteChunk " +
                   "requests if the chunk is small.",
           tags = ConfigTag.CLIENT)
-  private boolean enablePutblockPiggybacking = false;
+  private boolean enablePutblockPiggybacking = true;
 
   @Config(key = "key.write.concurrency",
       defaultValue = "1",

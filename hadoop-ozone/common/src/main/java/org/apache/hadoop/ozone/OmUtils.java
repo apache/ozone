@@ -274,6 +274,7 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
+    case GetServerDefaults:
     case GetObjectTagging:
       return true;
     case CreateVolume:
@@ -328,6 +329,7 @@ public final class OmUtils {
     case SetTimes:
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
+    case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
     case UnknownCommand:

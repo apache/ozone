@@ -4908,6 +4908,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertThat(omSMLog.getOutput()).contains("Failed to write, Exception occurred");
   }
 
+  @Test
+  public void testGetServerDefaults() throws IOException {
+    assertNotNull(getClient().getProxy().getServerDefaults());
+    assertNull(getClient().getProxy().getServerDefaults().getKeyProviderUri());
+  }
+
   private static class OMRequestHandlerPauseInjector extends FaultInjector {
     private CountDownLatch ready;
     private CountDownLatch wait;
