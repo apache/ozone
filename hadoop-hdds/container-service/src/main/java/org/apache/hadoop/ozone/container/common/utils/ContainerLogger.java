@@ -91,10 +91,7 @@ public final class ContainerLogger {
    */
   public static void logUnhealthy(ContainerData containerData,
       ScanResult reason) {
-    String message = reason.getFailureType() + " for file " +
-        reason.getUnhealthyFile() +
-        ". Message: " + reason.getException().getMessage();
-    LOG.error(getMessage(containerData, message));
+    LOG.error(getMessage(containerData, reason.toString()));
   }
 
   /**
