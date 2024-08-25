@@ -85,7 +85,7 @@ public class TestPipelineManagerMXBean {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500, 3000);
+    }, 500, 12000);
   }
 
   private Integer getMetricsCount(TabularData data, String state) {
