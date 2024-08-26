@@ -486,15 +486,34 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       this.valueFields = valueFields;
     }
 
+    Map<String, Object> getFieldSplit(List<String> fields, Map<String, Object> fieldMap) {
+      int len = fields.size();
+      if (fieldMap == null) {
+        fieldMap = new HashMap<>();
+      }
+      if (len == 1) {
+        fieldMap.putIfAbsent(fields.get(0), null);
+      } else {
+        Map<String, Object> fieldMapGet = (Map<String, Object>) fieldMap.get(fields.get(0));
+        if (fieldMapGet == null) {
+          fieldMap.put(fields.get(0), getFieldSplit(fields.subList(1, len), null));
+        } else {
+          fieldMap.put(fields.get(0), getFieldSplit(fields.subList(1, len), fieldMapGet));
+        }
+      }
+      return fieldMap;
+    }
+
     @Override
     public Void call() {
       try {
         ArrayList<String> results = new ArrayList<>(batch.size());
-        List<List<String>> fieldsSplit = new ArrayList<>();
+        Map<String, Object> fieldsSplitMap = new HashMap<>();
+
         if (valueFields != null) {
           for (String field : valueFields.split(",")) {
             String[] subfields = field.split("\\.");
-            fieldsSplit.add(Arrays.asList(subfields));
+            fieldsSplitMap = getFieldSplit(Arrays.asList(subfields), fieldsSplitMap);
           }
         }
 
@@ -535,15 +554,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
-            for (List<String> subfields : fieldsSplit) {
-              try {
-                filteredValue.putAll(getFilteredObject(o, dbColumnFamilyDefinition.getValueType(), subfields));
-              } catch (NoSuchFieldException ex) {
-                err().println("ERROR: no such field: " + subfields);
-              } catch (IllegalAccessException e) {
-                err().println("ERROR: Cannot get field from object: " + subfields);
-              }
-            }
+            filteredValue.putAll(getFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
             sb.append(WRITER.writeValueAsString(filteredValue));
           } else {
             sb.append(WRITER.writeValueAsString(o));
@@ -559,42 +570,49 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    Map<String, Object> getFilteredObject(Object obj, Class<?> clazz, List<String> fields)
-        throws NoSuchFieldException, IllegalAccessException {
-      Field valueClassField = getRequiredFieldFromAllFields(clazz, fields.get(0));
-      Object valueObject = valueClassField.get(obj);
-      int length = fields.size();
+    Map<String, Object> getFilteredObject(Object obj, Class<?> clazz, Map<String, Object> fieldsSplitMap) {
       Map<String, Object> valueMap = new HashMap<>();
+      for (Map.Entry<String, Object> field : fieldsSplitMap.entrySet()) {
+        try {
+          Field valueClassField = getRequiredFieldFromAllFields(clazz, field.getKey());
+          Object valueObject = valueClassField.get(obj);
+          Map<String, Object> subfields = (Map<String, Object>) field.getValue();
 
-      if (length == 1) {
-        valueMap.put(fields.get(0), valueObject);
-      } else {
-        if (Collection.class.isAssignableFrom(valueObject.getClass())) {
-          List<Object> subfieldObjectsList =
-              getFilteredObjectCollection((Collection) valueObject, fields.subList(1, length));
-          valueMap.put(fields.get(0), subfieldObjectsList);
-        } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
-          Map<Object, Object> subfieldObjectsMap = new HashMap<>();
-          Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
-          for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
-            Object subfieldValue;
-            if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
-              subfieldValue = getFilteredObjectCollection((Collection)ob.getValue(), fields.subList(1, length));
+          if (subfields == null) {
+            valueMap.put(field.getKey(), valueObject);
+          } else {
+            if (Collection.class.isAssignableFrom(valueObject.getClass())) {
+              List<Object> subfieldObjectsList =
+                  getFilteredObjectCollection((Collection) valueObject, subfields);
+              valueMap.put(field.getKey(), subfieldObjectsList);
+            } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
+              Map<Object, Object> subfieldObjectsMap = new HashMap<>();
+              Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
+              for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
+                Object subfieldValue;
+                if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
+                  subfieldValue = getFilteredObjectCollection((Collection)ob.getValue(), subfields);
+                } else {
+                  subfieldValue = getFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
+                }
+                subfieldObjectsMap.put(ob.getKey(), subfieldValue);
+              }
+              valueMap.put(field.getKey(), subfieldObjectsMap);
             } else {
-              subfieldValue = getFilteredObject(ob.getValue(), ob.getValue().getClass(), fields.subList(1, length));
+              valueMap.put(field.getKey(),
+                  getFilteredObject(valueObject, valueClassField.getType(), subfields));
             }
-            subfieldObjectsMap.put(ob.getKey(), subfieldValue);
           }
-          valueMap.put(fields.get(0), subfieldObjectsMap);
-        } else {
-          valueMap.put(fields.get(0),
-              getFilteredObject(valueObject, valueClassField.getType(), fields.subList(1, length)));
+        } catch (NoSuchFieldException ex) {
+          err().println("ERROR: no such field: " + field);
+        } catch (IllegalAccessException e) {
+          err().println("ERROR: Cannot get field from object: " + field);
         }
       }
       return valueMap;
     }
 
-    List<Object> getFilteredObjectCollection(Collection<?> valueObject, List<String> fields)
+    List<Object> getFilteredObjectCollection(Collection<?> valueObject, Map<String, Object> fields)
         throws NoSuchFieldException, IllegalAccessException {
       List<Object> subfieldObjectsList = new ArrayList<>();
       for (Object ob : valueObject) {
