@@ -162,6 +162,9 @@ public class TestBackgroundContainerDataScanner extends
     when(unhealthy.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
     when(unhealthy.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
         .thenReturn(getUnhealthyDataScanResult());
+    // If a container is not already in an unhealthy state, the controller will return true from this method.
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(true);
 
     setContainers(unhealthy, healthy);
 
@@ -179,7 +182,7 @@ public class TestBackgroundContainerDataScanner extends
     // Update the mock to reflect this.
     when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertTrue(unhealthy.shouldScanData());
-
+    // Since the container is already unhealthy, the real controller would return false from this method.
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(false);
     scanner.runIteration();

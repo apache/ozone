@@ -135,21 +135,26 @@ public final class OnDemandContainerDataScanner {
       // Metrics for skipped containers should not be updated.
       if (result.isDeleted()) {
         LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
-        return;
-      }
-      if (!result.isHealthy()) {
-        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerId, result);
-        boolean containerMarkedUnhealthy = instance.containerController
-            .markContainerUnhealthy(containerId, result);
-        if (containerMarkedUnhealthy) {
-          instance.metrics.incNumUnHealthyContainers();
+      } else {
+        if (!result.isHealthy()) {
+          LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerId, result);
+          boolean containerMarkedUnhealthy = instance.containerController
+              .markContainerUnhealthy(containerId, result);
+          if (containerMarkedUnhealthy) {
+            instance.metrics.incNumUnHealthyContainers();
+          }
         }
+        // TODO HDDS-10374 will need to update the merkle tree here as well.
+        instance.metrics.incNumContainersScanned();
       }
 
-      instance.metrics.incNumContainersScanned();
+      // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
       Instant now = Instant.now();
       logScanCompleted(containerData, now);
-      instance.containerController.updateDataScanTimestamp(containerId, now);
+
+      if (!result.isDeleted()) {
+        instance.containerController.updateDataScanTimestamp(containerId, now);
+      }
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);

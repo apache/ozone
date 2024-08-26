@@ -173,6 +173,8 @@ public class TestOnDemandContainerDataScanner extends
     resultFutureList.add(
         OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+    // Deleted containers will not count towards the scan count metric.
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(deletedContainer));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase

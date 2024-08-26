@@ -296,10 +296,16 @@ public class KeyValueContainerCheck {
     }
   }
 
+  /**
+   * Checks if a container has been deleted using the database.
+   *
+   * A Schema V2 contianer is determined to be deleted if its database is no longer present on disk.
+   * A Schema V3 container is determined to be deleted if its entries have been removed from the DB.
+   * This method checks the block count key for existence since this is used by EC and Ratis containers.
+   */
   private boolean containerIsDeleted(DBHandle db) throws IOException {
-    // If schema V3 and container details not in DB or
-    // if containerDBPath is removed
     if (onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      // TODO use iterator and check for entries.
       return db.getStore().getMetadataTable().get(onDiskContainerData.getBlockCountKey()) == null;
     } else {
       return !onDiskContainerData.getDbFile().exists();

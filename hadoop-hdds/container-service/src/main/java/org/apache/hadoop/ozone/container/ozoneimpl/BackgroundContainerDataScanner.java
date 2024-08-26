@@ -100,10 +100,10 @@ public class BackgroundContainerDataScanner extends
         }
       }
       checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+      metrics.incNumContainersScanned();
     }
 
-    // Even if the container was deleted, mark the scan as completed.
-    metrics.incNumContainersScanned();
+    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
     Instant now = Instant.now();
     logScanCompleted(containerData, now);
 
