@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -48,8 +55,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -65,6 +70,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.util.JavaUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -256,27 +262,21 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         return CompletableFuture.completedFuture(response);
       }
     }
-    return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(),
-        () -> {
-          final ContainerCommandRequestMessage message
-              = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
-          if (HddsUtils.isReadOnly(request)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync ReadOnly {}", message);
-            }
-            return getClient().async().sendReadOnly(message);
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync {}", message);
-            }
-            return getClient().async().send(message);
-          }
-
+    String fullSpanID = TracingUtil.exportCurrentSpan();
+      final ContainerCommandRequestMessage message
+          = ContainerCommandRequestMessage.toMessage(
+          request, fullSpanID);
+      if (HddsUtils.isReadOnly(request)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync ReadOnly {}", message);
         }
-
-    );
+        return getClient().async().sendReadOnly(message);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("sendCommandAsync {}", message);
+        }
+        return getClient().async().send(message);
+      }
   }
 
   // gets the minimum log index replicated to all servers
@@ -368,11 +368,19 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ContainerCommandRequestProto request) {
     XceiverClientReply asyncReply = new XceiverClientReply(null);
     long requestTime = System.currentTimeMillis();
+
+    Span span = GlobalTracer.get()
+        .buildSpan("XceiverClientRatis.sendCommandAsync(" + request.getCmdType() +")").start();
+    Scope scope = GlobalTracer.get().activateSpan(span);
+
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
         raftClientReply.whenComplete((reply, e) -> {
+          scope.close();
+          span.finish();
+
           if (LOG.isDebugEnabled()) {
             LOG.debug("received reply {} for request: cmdType={}, containerID={}, pipelineID={}, traceID={}", reply,
                 request.getCmdType(), request.getContainerID(),
