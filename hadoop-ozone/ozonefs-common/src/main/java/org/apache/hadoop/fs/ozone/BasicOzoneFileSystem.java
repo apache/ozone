@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -722,6 +723,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public Path getHomeDirectory() {
+    return makeQualified(new Path(OZONE_USER_DIR + "/"
+        + this.userName));
+  }
+
+  @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
     return adapter.getDelegationToken(renewer);
   }
@@ -857,6 +864,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public short getDefaultReplication() {
     return adapter.getDefaultReplication();
+  }
+
+  @Override
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
+    return adapter.getServerDefaults();
   }
 
   @Override

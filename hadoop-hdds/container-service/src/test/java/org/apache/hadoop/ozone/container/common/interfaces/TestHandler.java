@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import java.util.Map;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -27,13 +25,11 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
-import com.google.common.collect.Maps;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,19 +58,7 @@ public class TestHandler {
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
-    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-    for (ContainerProtos.ContainerType containerType :
-        ContainerProtos.ContainerType.values()) {
-      handlers.put(containerType,
-          Handler.getHandlerForContainerType(
-              containerType, conf,
-              context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
-    }
-    this.dispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, null, metrics, null);
+    this.dispatcher = ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context);
   }
 
   @AfterEach

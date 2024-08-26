@@ -83,6 +83,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -172,6 +173,10 @@ abstract class AbstractOzoneFileSystemTest {
   private String bucketName;
   private Trash trash;
   private OMMetrics omMetrics;
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void init() throws Exception {
@@ -183,6 +188,7 @@ abstract class AbstractOzoneFileSystemTest {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (!bucketLayout.equals(FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
@@ -217,6 +223,10 @@ abstract class AbstractOzoneFileSystemTest {
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
+
+    userO3fs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<OzoneFileSystem>)()
+            -> (OzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterAll
@@ -256,6 +266,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(fsRoot + "user/" + USER1),
+        userO3fs.getHomeDirectory());
   }
 
   @Test

@@ -34,4 +34,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
   </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

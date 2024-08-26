@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -126,6 +127,7 @@ public class TestSnapshotDirectoryCleaningService {
 
   @SuppressWarnings("checkstyle:LineLength")
   @Test
+  @Flaky("HDDS-11129")
   public void testExclusiveSizeWithDirectoryDeepClean() throws Exception {
 
     Table<String, OmKeyInfo> deletedDirTable =

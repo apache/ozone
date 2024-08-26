@@ -41,6 +41,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -48,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -250,6 +253,14 @@ public class TestKeyValueHandler {
         .dispatchRequest(handler, getSmallFileRequest, container, null);
     verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
+
+    // Test Finalize Block Request handling
+    ContainerCommandRequestProto finalizeBlock =
+        getDummyCommandRequestProto(ContainerProtos.Type.FinalizeBlock);
+    KeyValueHandler
+        .dispatchRequest(handler, finalizeBlock, container, null);
+    verify(handler, times(1)).handleFinalizeBlock(
+        any(ContainerCommandRequestProto.class), any());
   }
 
   @Test
@@ -267,16 +278,11 @@ public class TestKeyValueHandler {
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
       ContainerSet cset = new ContainerSet(1000);
-      int[] interval = new int[1];
-      interval[0] = 2;
-      ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);
-      KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
-          context.getParent().getDatanodeDetails().getUuidString(), cset,
-          volumeSet, metrics, c -> {
-      });
+      KeyValueHandler keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf,
+          context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet);
       assertEquals("org.apache.hadoop.ozone.container.common" +
           ".volume.CapacityVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
@@ -286,8 +292,8 @@ public class TestKeyValueHandler {
       conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
           "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
       RuntimeException exception = assertThrows(RuntimeException.class,
-          () -> new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
-              metrics, c -> { }));
+          () -> ContainerTestUtils.getKeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(),
+              cset, volumeSet));
 
       assertThat(exception).hasMessageEndingWith(
           "class org.apache.hadoop.ozone.container.common.impl.HddsDispatcher " +
@@ -377,7 +383,7 @@ public class TestKeyValueHandler {
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
           datanodeId, containerSet, volumeSet, metrics,
-          c -> icrReceived.incrementAndGet());
+          c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
       kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
@@ -451,8 +457,7 @@ public class TestKeyValueHandler {
 
     // Allows checking the invocation count of the lambda.
     AtomicInteger icrCount = new AtomicInteger(0);
-    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
-        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), c -> {
+    IncrementalReportSender<Container> icrSender = c -> {
       // Check that the ICR contains expected info about the container.
       ContainerReplicaProto report = c.getContainerReport();
       long reportedID = report.getContainerID();
@@ -462,11 +467,14 @@ public class TestKeyValueHandler {
       Assertions.assertNotEquals(0, reportDataChecksum,
           "Container report should have populated the checksum field with a non-zero value.");
       icrCount.incrementAndGet();
-    });
+    };
+
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
+        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), icrSender, new ContainerChecksumTreeManager(conf));
 
     Assertions.assertEquals(0, icrCount.get());
     // This should trigger container report validation in the ICR handler above.
-    keyValueHandler.reconcileContainer(container, Collections.emptyList());
+    keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptySet());
     Assertions.assertEquals(1, icrCount.get());
   }
 

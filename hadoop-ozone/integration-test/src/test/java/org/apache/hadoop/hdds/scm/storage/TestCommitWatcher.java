@@ -209,7 +209,6 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -220,21 +219,15 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
-        // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.
             getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
         assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
         watcher.watchOnLastIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(1).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) 2 * chunkSize);
         assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-        assertThat(watcher.getFutureMap()).isEmpty();
         assertThat(watcher.getCommitIndexMap()).isEmpty();
       }
     } finally {
@@ -282,7 +275,6 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -293,14 +285,11 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
         // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
         assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
@@ -325,10 +314,8 @@ public class TestCommitWatcher {
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
           assertEquals(1, watcher.getCommitIndexMap().size());
-          assertEquals(1, watcher.getFutureMap().size());
         } else {
           assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-          assertThat(watcher.getFutureMap()).isEmpty();
           assertThat(watcher.getCommitIndexMap()).isEmpty();
         }
       }

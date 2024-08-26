@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -173,6 +174,7 @@ class TestBlockOutputStreamCorrectness {
 
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
+        -1,
         xcm,
         pipeline,
         bufferPool,
@@ -228,9 +230,12 @@ class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply sendCommandAsync(
-        ContainerCommandRequestProto request
-    ) {
+    public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request) {
+
+      if (!request.hasVersion()) {
+        request = ContainerCommandRequestProto.newBuilder(request)
+            .setVersion(ClientVersion.CURRENT.toProtoValue()).build();
+      }
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setResult(Result.SUCCESS)
@@ -272,7 +277,7 @@ class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply watchForCommit(long index) {
+    public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setCmdType(Type.WriteChunk)
@@ -280,7 +285,7 @@ class TestBlockOutputStreamCorrectness {
       final XceiverClientReply xceiverClientReply = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));
       xceiverClientReply.setLogIndex(index);
-      return xceiverClientReply;
+      return CompletableFuture.completedFuture(xceiverClientReply);
     }
 
     @Override

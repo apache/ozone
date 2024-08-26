@@ -17,16 +17,27 @@
  */
 package org.apache.hadoop.ozone.shell.snapshot;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdfs.DFSUtilClient;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.io.PrintStream;
+
+import static org.apache.hadoop.hdds.server.JsonUtils.toJsonStringWithDefaultPrettyPrinter;
 
 /**
  * ozone sh snapshot diff.
@@ -51,8 +62,10 @@ public class SnapshotDiffHandler extends Handler {
   private String token;
 
   @CommandLine.Option(names = {"-p", "--page-size"},
-      description = "number of diff entries to be returned in the response" +
-          " (optional)")
+      description = "number of diff entries to be returned in the response",
+      defaultValue = "1000",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS
+  )
   private int pageSize;
 
   @CommandLine.Option(names = {"--ffd", "--force-full-diff"},
@@ -73,6 +86,11 @@ public class SnapshotDiffHandler extends Handler {
           " native libs (optional)",
       hidden = true)
   private boolean diffDisableNativeLibs;
+
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
 
   @Override
   protected OzoneAddress getAddress() {
@@ -97,17 +115,71 @@ public class SnapshotDiffHandler extends Handler {
 
   private void getSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
+    SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff, diffDisableNativeLibs);
     try (PrintStream stream = out()) {
-      stream.println(store.snapshotDiff(volumeName, bucketName, fromSnapshot,
-          toSnapshot, token, pageSize, forceFullDiff, diffDisableNativeLibs));
+      if (json) {
+        stream.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+      } else {
+        stream.println(diffResponse);
+      }
     }
   }
 
   private void cancelSnapshotDiff(ObjectStore store, String volumeName,
                                   String bucketName) throws IOException {
     try (PrintStream stream = out()) {
-      stream.print(store.cancelSnapshotDiff(volumeName, bucketName,
-          fromSnapshot, toSnapshot));
+      stream.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
+    }
+  }
+
+  private ObjectNode getJsonObject(SnapshotDiffResponse diffResponse) {
+    ObjectNode diffResponseNode = JsonUtils.createObjectNode(null);
+    diffResponseNode.set("snapshotDiffReport", getJsonObject(diffResponse.getSnapshotDiffReport()));
+    diffResponseNode.put("jobStatus", diffResponse.getJobStatus().name());
+    if (diffResponse.getWaitTimeInMs() != 0) {
+      diffResponseNode.put("waitTimeInMs", diffResponse.getWaitTimeInMs());
+    }
+    if (StringUtils.isNotEmpty(diffResponse.getReason())) {
+      diffResponseNode.put("reason", diffResponse.getReason());
+    }
+    return diffResponseNode;
+  }
+
+  private ObjectNode getJsonObject(SnapshotDiffReportOzone diffReportOzone) {
+    ObjectNode diffReportNode = JsonUtils.createObjectNode(null);
+    diffReportNode.put("volumeName", diffReportOzone.getVolumeName());
+    diffReportNode.put("bucketName", diffReportOzone.getBucketName());
+    diffReportNode.put("fromSnapshot", diffReportOzone.getFromSnapshot());
+    diffReportNode.put("toSnapshot", diffReportOzone.getLaterSnapshotName());
+    ArrayNode resArray = JsonUtils.createArrayNode();
+    diffReportOzone.getDiffList()
+        .forEach(diffReportEntry -> resArray.add(getJsonObject(diffReportEntry)));
+    diffReportNode.set("diffList", resArray);
+
+    if (StringUtils.isNotEmpty(diffReportOzone.getToken())) {
+      diffReportNode.put("nextToken", diffReportOzone.getToken());
+    }
+    return diffReportNode;
+  }
+
+
+  private ObjectNode getJsonObject(SnapshotDiffReport.DiffReportEntry diffReportEntry) {
+    ObjectNode diffReportNode = JsonUtils.createObjectNode(null);
+    diffReportNode.put("diffType", diffReportEntry.getType().getLabel());
+    diffReportNode.put("sourcePath", getPathString(diffReportEntry.getSourcePath()));
+    if (diffReportEntry.getTargetPath() != null) {
+      diffReportNode.put("targetPath", getPathString(diffReportEntry.getTargetPath()));
+    }
+    return diffReportNode;
+  }
+
+  private String getPathString(byte[] path) {
+    String pathStr = DFSUtilClient.bytes2String(path);
+    if (pathStr.isEmpty()) {
+      return Path.CUR_DIR;
+    } else {
+      return Path.CUR_DIR + Path.SEPARATOR + pathStr;
     }
   }
 }

@@ -147,6 +147,9 @@ enum Type {
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
   RenameSnapshot = 131;
+  ListOpenFiles = 132;
+  QuotaRepair = 133;
+  GetServerDefaults = 134;
 }
 
 enum SafeMode {
@@ -283,6 +286,9 @@ message OMRequest {
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
+  optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
+  optional QuotaRepairRequest               QuotaRepairRequest             = 131;
+  optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
 }
 
 message OMResponse {
@@ -406,6 +412,9 @@ message OMResponse {
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
+  optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
+  optional QuotaRepairResponse            QuotaRepairResponse        = 134;
+  optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
 }
 
 enum Status {
@@ -529,6 +538,11 @@ enum Status {
     INVALID_PATH = 93;
 
     TOO_MANY_BUCKETS = 94;
+
+    KEY_UNDER_LEASE_RECOVERY = 95;
+    KEY_ALREADY_CLOSED = 96;
+    KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
+
 }
 
 /**
@@ -1029,6 +1043,14 @@ message KeyArgs {
 
     // S3 object tags support
     repeated hadoop.hdds.KeyValue tags = 22;
+
+    // expectedDataGeneration, when used in key creation indicates that a
+    // key with the same keyName should exist with the given generation.
+    // For a key commit to succeed, the original key should still be present with the
+    // generation unchanged.
+    // This allows a key to be created an committed atomically if the original has not
+    // been modified.
+    optional uint64 expectedDataGeneration = 23;
 }
 
 message KeyLocation {
@@ -1113,6 +1135,13 @@ message KeyInfo {
     optional bool isFile = 19;
     optional string ownerName = 20;
     repeated hadoop.hdds.KeyValue tags = 21;
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+    optional uint64 expectedDataGeneration = 22;
 }
 
 message BasicKeyInfo {
@@ -1301,9 +1330,16 @@ message DeleteKeyArgs {
     repeated string keys = 3;
 }
 
+message DeleteKeyError {
+    optional string key = 1;
+    optional string errorCode = 2;
+    optional string errorMsg = 3;
+}
+
 message DeleteKeysResponse {
     optional DeleteKeyArgs unDeletedKeys = 1;
     optional bool status = 2;
+    repeated DeleteKeyError errors = 3;
 }
 
 message DeleteKeyResponse {
@@ -1429,6 +1465,7 @@ message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
     optional bool hsync = 3;
+    optional bool recovery = 4;
 }
 
 message CommitKeyResponse {
@@ -1534,6 +1571,24 @@ message CancelPrepareRequest {
 
 message CancelPrepareResponse {
 
+}
+
+message ListOpenFilesRequest {
+  optional string path = 1;
+  optional uint32 count = 2;
+  optional string token = 3;
+}
+
+message ListOpenFilesResponse {
+  // size of openKeyTable and openFileTable combined
+  optional uint64 totalOpenKeyCount = 1;
+  // indicates if there are more entries to be retrieved under the given path
+  optional bool hasMore = 2;
+  // continuation token should match a dbKey in openKeyTable or openFileTable
+  optional string continuationToken = 3;
+  // result
+  repeated uint64 clientID = 4;
+  repeated KeyInfo keyInfo = 5;
 }
 
 message ServicePort {
@@ -1982,6 +2037,7 @@ message CreateSnapshotResponse {
 
 message ListSnapshotResponse {
   repeated SnapshotInfo snapshotInfo = 1;
+  optional string lastSnapshot = 2;
 }
 
 message SnapshotDiffResponse {
@@ -2108,10 +2164,13 @@ message RecoverLeaseRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string keyName = 3;
+  optional bool force = 4;
 }
 
 message RecoverLeaseResponse {
-  optional bool response = 1;
+  optional bool response = 1 [deprecated=true];
+  optional KeyInfo keyInfo = 2;
+  optional KeyInfo openKeyInfo = 3;
 }
 
 message SetTimesRequest {
@@ -2129,6 +2188,32 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message QuotaRepairRequest {
+    repeated BucketQuotaCount bucketCount = 1;
+    required bool supportVolumeOldQuota = 2 [default=false];
+}
+message BucketQuotaCount {
+    required string volName = 1;
+    required string bucketName = 2;
+    required int64 diffUsedBytes = 3;
+    required int64 diffUsedNamespace = 4;
+    required bool supportOldQuota = 5 [default=false];
+}
+
+message QuotaRepairResponse {
+}
+
+message ServerDefaultsRequest {
+}
+
+message FsServerDefaultsProto {
+  optional string keyProviderUri = 1;
+}
+
+message ServerDefaultsResponse {
+  required FsServerDefaultsProto serverDefaults = 1;
 }
 
 message OMLockDetailsProto {

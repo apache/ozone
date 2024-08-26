@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -70,11 +69,6 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
                                     ReconUtils reconUtils) {
     this.reconUtils = reconUtils;
     this.ozoneConfiguration = configuration;
-  }
-
-  @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return super.getTableLock(tableName);
   }
 
   @Override
@@ -175,8 +169,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // Unlike in {@link OmMetadataManagerImpl}, the volumes are queried directly
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
+    Table<String, OmVolumeArgs>  volumeTable = getVolumeTable();
+
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (volumeTable == null) {
+      return result;
+    }
+
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = getVolumeTable().iterator()) {
+                 iterator = volumeTable.iterator()) {
 
       while (iterator.hasNext() && result.size() < maxKeys) {
         Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -302,6 +304,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     int currentCount = 0;
     Table<String, OmBucketInfo> bucketTable = getBucketTable();
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (bucketTable == null) {
+      return result;
+    }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = bucketTable.iterator()) {

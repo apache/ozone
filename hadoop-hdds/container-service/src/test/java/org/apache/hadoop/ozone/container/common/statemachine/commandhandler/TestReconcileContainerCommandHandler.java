@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -39,16 +42,14 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
-import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -56,7 +57,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,7 +80,14 @@ public class TestReconcileContainerCommandHandler {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = randomDatanodeDetails();
-    subject = new ReconcileContainerCommandHandler("");
+
+    ReplicationSupervisor mockSupervisor = mock(ReplicationSupervisor.class);
+    doAnswer(invocation -> {
+      ((ReconcileContainerTask)invocation.getArguments()[0]).runTask();
+      return null;
+    }).when(mockSupervisor).addTask(any());
+
+    subject = new ReconcileContainerCommandHandler(mockSupervisor, mock(DNContainerOperationClient.class));
     context = ContainerTestUtils.getMockContext(dnDetails, conf);
 
     containerSet = new ContainerSet(1000);
@@ -91,7 +100,7 @@ public class TestReconcileContainerCommandHandler {
     assertEquals(NUM_CONTAINERS, containerSet.containerCount());
 
     Handler containerHandler = new KeyValueHandler(new OzoneConfiguration(), dnDetails.getUuidString(), containerSet,
-        mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender);
+        mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender, new ContainerChecksumTreeManager(conf));
     ContainerController controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer, containerHandler));
     ozoneContainer = mock(OzoneContainer.class);
@@ -114,80 +123,37 @@ public class TestReconcileContainerCommandHandler {
     init(layout, icrSender);
 
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
-      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
 
     // An unknown container should not trigger a container report being sent.
     ReconcileContainerCommand unknownContainerCmd = new ReconcileContainerCommand(NUM_CONTAINERS + 1,
-        Collections.emptyList());
+        Collections.emptySet());
     subject.handle(unknownContainerCmd, ozoneContainer, context, null);
 
-    waitForAllCommandsToFinish();
+    // Since the replication supervisor is mocked in this test, reports are processed immediately.
     verifyAllContainerReports(containerReportsSent);
   }
 
+  /**
+   * Most metrics are handled by the ReplicationSupervisor. Only check the individual metrics here.
+   */
   @ContainerLayoutTestInfo.ContainerTest
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
-    // Used to block ICR sending so that queue metrics can be checked before the reconcile task completes.
-    CountDownLatch icrLatch = new CountDownLatch(1);
-    // Wait this long before completing the task.
-    // This provides a lower bound on execution time.
-    final long minExecTimeMillis = 500;
-    // This is the lower bound on execution time of all the commands combined.
-    final long expectedTotalMinExecTimeMillis = minExecTimeMillis * NUM_CONTAINERS;
+    init(layout, c -> { });
 
-    IncrementalReportSender<Container> icrSender = c -> {
-      try {
-        // Block the caller until the latch is counted down.
-        // Caller can check queue metrics in the meantime.
-        LOG.info("ICR sender waiting for latch");
-        assertTrue(icrLatch.await(30, TimeUnit.SECONDS));
-        LOG.info("ICR sender proceeding after latch");
-
-        Thread.sleep(minExecTimeMillis);
-      } catch (Exception ex) {
-        LOG.error("ICR sender failed", ex);
-      }
-    };
-
-    init(layout, icrSender);
+    assertEquals(0, subject.getInvocationCount());
 
     // All commands submitted will be blocked until the latch is counted down.
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
-      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
-    assertEquals(NUM_CONTAINERS, subject.getQueuedCount());
-    assertEquals(0, subject.getTotalRunTime());
-    assertEquals(0, subject.getAverageRunTime());
-
-    // This will resume handling of the tasks.
-    icrLatch.countDown();
-    waitForAllCommandsToFinish();
-
     assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
-    long totalRunTime = subject.getTotalRunTime();
-    assertTrue(totalRunTime >= expectedTotalMinExecTimeMillis,
-        "Total run time " + totalRunTime + "ms was not larger than the minimum total exec time " +
-            expectedTotalMinExecTimeMillis + "ms");
-    long avgRunTime = subject.getAverageRunTime();
-    assertTrue(avgRunTime >= minExecTimeMillis,
-        "Average run time " + avgRunTime + "ms was not larger than the minimum per task exec time " +
-            minExecTimeMillis + "ms");
   }
 
-  private void waitForAllCommandsToFinish() throws Exception {
-    // Queue count should be decremented only after the task completes, so the other metrics should be consistent when
-    // it reaches zero.
-    GenericTestUtils.waitFor(() -> {
-      int qCount = subject.getQueuedCount();
-      LOG.info("Waiting for queued command count to reach 0. Currently at " + qCount);
-      return qCount == 0;
-    }, 500, 3000);
-  }
-
-  private void verifyAllContainerReports(Map<ContainerID, ContainerReplicaProto> reportsSent) throws Exception {
+  private void verifyAllContainerReports(Map<ContainerID, ContainerReplicaProto> reportsSent) {
     assertEquals(NUM_CONTAINERS, reportsSent.size());
 
     for (Map.Entry<ContainerID, ContainerReplicaProto> entry: reportsSent.entrySet()) {

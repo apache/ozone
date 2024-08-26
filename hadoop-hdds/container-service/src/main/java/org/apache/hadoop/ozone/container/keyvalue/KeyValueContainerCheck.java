@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
+import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,7 @@ public class KeyValueContainerCheck {
   private String metadataPath;
   private HddsVolume volume;
   private KeyValueContainer container;
+  private static final DirectBufferPool BUFFER_POOL = new DirectBufferPool();
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
       long containerID, HddsVolume volume, KeyValueContainer container) {
@@ -373,6 +375,7 @@ public class KeyValueContainerCheck {
       }
 
       // If the chunk does not exist, we cannot proceed to scan it.
+      // TODO chunk file might be null
       if (chunkFile != null && !chunkFile.exists()) {
         // In EC, client may write empty putBlock in padding block nodes.
         // So, we need to make sure, chunk length > 0, before declaring
@@ -385,8 +388,12 @@ public class KeyValueContainerCheck {
           fileMissing = true;
         }
       } else if (chunk.getChecksumData().getType() != ContainerProtos.ChecksumType.NONE) {
+        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+        ByteBuffer buffer = BUFFER_POOL.getBuffer(bytesPerChecksum);
         // Keep scanning the block even if there are errors with individual chunks.
-        blockErrors.addAll(verifyChecksum(block, chunk, chunkFile, layout, currentTree, throttler, canceler));
+        blockErrors.addAll(verifyChecksum(block, chunk, chunkFile, layout, buffer, currentTree, throttler, canceler));
+        buffer.clear();
+        BUFFER_POOL.returnBuffer(buffer);
       }
     }
 
@@ -408,9 +415,10 @@ public class KeyValueContainerCheck {
     return blockErrors;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private static List<ContainerScanError> verifyChecksum(BlockData block,
-      ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ContainerMerkleTree currentTree,
-      DataTransferThrottler throttler, Canceler canceler) {
+      ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
+      ContainerMerkleTree currentTree, DataTransferThrottler throttler, Canceler canceler) {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 
@@ -420,7 +428,6 @@ public class KeyValueContainerCheck {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     Checksum cal = new Checksum(checksumData.getChecksumType(),
         bytesPerChecksum);
-    ByteBuffer buffer = ByteBuffer.allocate(bytesPerChecksum);
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
