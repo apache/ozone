@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration
 import java.io.File;
 import java.io.RandomAccessFile;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.ScanResult.FailureType.DELETED_CONTAINER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -221,7 +220,6 @@ public class TestKeyValueContainerCheck
 
     ScanResult result = kvCheck.scanContainer(throttler, canceler);
 
-    assertFalse(result.isHealthy());
-    assertEquals(DELETED_CONTAINER, result.getFailureType());
+    assertTrue(result.isDeleted());
   }
 }

@@ -228,14 +228,14 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     // be ignored.
     when(mockVolume.isFailed()).thenReturn(true);
     handler.markContainerUnhealthy(container,
-        ContainerTestUtils.getUnhealthyScanResult());
+        ContainerTestUtils.getUnhealthyDataScanResult());
     verify(mockIcrSender, never()).send(any());
 
     // When volume is healthy, ICR should be sent when container is marked
     // unhealthy.
     when(mockVolume.isFailed()).thenReturn(false);
     handler.markContainerUnhealthy(container,
-        ContainerTestUtils.getUnhealthyScanResult());
+        ContainerTestUtils.getUnhealthyDataScanResult());
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 
