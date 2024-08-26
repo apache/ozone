@@ -32,6 +32,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -728,8 +731,9 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
+    Span span = GlobalTracer.get().activeSpan();
     return putBlockResultFuture.thenAccept(x -> {
-      try {
+      try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
         TracingUtil.executeInNewSpan("BlockOutputStream.watchForCommit",
             () -> watchForCommit(x.commitIndex));
       } catch (IOException e) {

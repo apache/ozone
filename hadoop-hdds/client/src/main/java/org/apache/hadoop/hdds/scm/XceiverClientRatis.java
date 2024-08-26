@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 
@@ -370,13 +371,14 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
     Span span = GlobalTracer.get()
         .buildSpan("XceiverClientRatis.sendCommandAsync(" + request.getCmdType() +")").start();
+    Scope scope = GlobalTracer.get().activateSpan(span);
 
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
         raftClientReply.whenComplete((reply, e) -> {
-
+          scope.close();
           span.finish();
 
           if (LOG.isDebugEnabled()) {
