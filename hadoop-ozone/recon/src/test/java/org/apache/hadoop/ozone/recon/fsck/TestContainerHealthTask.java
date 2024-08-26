@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -168,7 +171,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     List<UnhealthyContainers> unhealthyContainers =
         containerHealthSchemaManager.getUnhealthyContainers(
-            ALL_REPLICAS_UNHEALTHY, 0, Integer.MAX_VALUE);
+            ALL_REPLICAS_BAD, 0, Integer.MAX_VALUE);
     assertEquals(1, unhealthyContainers.size());
     assertEquals(2L,
         unhealthyContainers.get(0).getContainerId().longValue());
@@ -335,6 +338,91 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
     Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
+  }
+
+  @Test
+  public void testAllContainerStateInsertions() {
+    UnhealthyContainersDao unHealthyContainersTableHandle =
+        getDao(UnhealthyContainersDao.class);
+
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unHealthyContainersTableHandle);
+
+    // Iterate through each state in the UnHealthyContainerStates enum
+    for (ContainerSchemaDefinition.UnHealthyContainerStates state :
+        ContainerSchemaDefinition.UnHealthyContainerStates.values()) {
+
+      // Create a dummy UnhealthyContainer record with the current state
+      UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
+      unhealthyContainer.setContainerId(state.ordinal() + 1L);
+
+      // Set replica counts based on the state
+      switch (state) {
+      case MISSING:
+      case EMPTY_MISSING:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(0);
+        unhealthyContainer.setReplicaDelta(3);
+        break;
+
+      case UNDER_REPLICATED:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(1);
+        unhealthyContainer.setReplicaDelta(2);
+        break;
+
+      case OVER_REPLICATED:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(4);
+        unhealthyContainer.setReplicaDelta(-1);
+        break;
+
+      case MIS_REPLICATED:
+      case NEGATIVE_SIZE:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(3);
+        unhealthyContainer.setReplicaDelta(0);
+        break;
+
+      case ALL_REPLICAS_BAD:
+        unhealthyContainer.setExpectedReplicaCount(3);
+        unhealthyContainer.setActualReplicaCount(0);
+        unhealthyContainer.setReplicaDelta(3);
+        break;
+
+      default:
+        fail("Unhandled state: " + state.name() + ". Please add this state to the switch case.");
+      }
+
+      unhealthyContainer.setContainerState(state.name());
+      unhealthyContainer.setInStateSince(System.currentTimeMillis());
+
+      // Try inserting the record and catch any exception that occurs
+      Exception exception = null;
+      try {
+        containerHealthSchemaManager.insertUnhealthyContainerRecords(
+            Collections.singletonList(unhealthyContainer));
+      } catch (Exception e) {
+        exception = e;
+      }
+
+      // Assert no exception should be thrown for each state
+      assertNull(exception,
+          "Exception was thrown during insertion for state " + state.name() +
+              ": " + exception);
+
+      // Optionally, verify the record was inserted correctly
+      List<UnhealthyContainers> insertedRecords =
+          unHealthyContainersTableHandle.fetchByContainerId(
+              state.ordinal() + 1L);
+      assertFalse(insertedRecords.isEmpty(),
+          "Record was not inserted for state " + state.name() + ".");
+      assertEquals(insertedRecords.get(0).getContainerState(), state.name(),
+          "The inserted container state does not match for state " +
+              state.name() + ".");
+    }
   }
 
   @Test
