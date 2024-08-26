@@ -104,6 +104,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSetTime;
   private @Metric MutableCounterLong numGetKeyInfo;
 
+  private @Metric MutableCounterLong numGetObjectTagging;
+  private @Metric MutableCounterLong numPutObjectTagging;
+  private @Metric MutableCounterLong numDeleteObjectTagging;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -185,6 +189,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListStatusFails;
   private @Metric MutableCounterLong numListOpenFilesFails;
   private @Metric MutableCounterLong getNumGetKeyInfoFails;
+
+  private @Metric MutableCounterLong numGetObjectTaggingFails;
+  private @Metric MutableCounterLong numPutObjectTaggingFails;
+  private @Metric MutableCounterLong numDeleteObjectTaggingFails;
 
   private @Metric MutableCounterLong numRecoverLeaseFails;
 
@@ -922,6 +930,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @Override
   public void incNumGetKeyInfoFails() {
     getNumGetKeyInfoFails.incr();
+  }
+
+  @Override
+  public void incNumGetObjectTagging() {
+    numGetObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  @Override
+  public void incNumGetObjectTaggingFails() {
+    numGetObjectTaggingFails.incr();
+  }
+
+  public void incNumPutObjectTagging() {
+    numPutObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumPutObjectTaggingFails() {
+    numPutObjectTaggingFails.incr();
+  }
+
+  public void incNumDeleteObjectTagging() {
+    numDeleteObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumDeleteObjectTaggingFails() {
+    numDeleteObjectTaggingFails.incr();
   }
 
   @VisibleForTesting

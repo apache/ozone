@@ -91,6 +91,9 @@ public final class OMAuditLogger {
     CMD_AUDIT_ACTION_MAP.put(Type.Prepare, OMAction.UPGRADE_PREPARE);
     CMD_AUDIT_ACTION_MAP.put(Type.CancelPrepare, OMAction.UPGRADE_CANCEL);
     CMD_AUDIT_ACTION_MAP.put(Type.FinalizeUpgrade, OMAction.UPGRADE_FINALIZE);
+    CMD_AUDIT_ACTION_MAP.put(Type.GetObjectTagging, OMAction.GET_OBJECT_TAGGING);
+    CMD_AUDIT_ACTION_MAP.put(Type.PutObjectTagging, OMAction.PUT_OBJECT_TAGGING);
+    CMD_AUDIT_ACTION_MAP.put(Type.DeleteObjectTagging, OMAction.DELETE_OBJECT_TAGGING);
   }
 
   private static OMAction getAction(OzoneManagerProtocolProtos.OMRequest request) {
