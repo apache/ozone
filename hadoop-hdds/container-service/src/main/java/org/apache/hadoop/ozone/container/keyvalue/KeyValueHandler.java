@@ -300,8 +300,6 @@ public class KeyValueHandler extends Handler {
       return handler.handleEcho(request, kvContainer);
     case GetContainerMerkleTree:
       return handler.handleGetContainerMerkleTree(request, kvContainer);
-    case WriteChunkForClosedContainer:
-      return handler.handleWriteChunkForClosedContainer(request, kvContainer);
     default:
       return null;
     }
@@ -975,43 +973,25 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
+   *
    */
-  ContainerCommandResponseProto handleWriteChunkForClosedContainer(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+  private void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
+                                            ChunkBuffer data, KeyValueContainer kvContainer) {
 
-    if (!request.hasWriteChunk()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Malformed Write Chunk request. trace ID: {}",
-            request.getTraceID());
-      }
-      return malformedRequest(request);
-    }
-
+    // TODO: Set OzoneConsts.CHUNK_OVERWRITE in ChunkInfo to overwrite chunks.
     try {
+      Preconditions.checkNotNull(chunkInfo);
+      Preconditions.checkNotNull(blockID);
+      Preconditions.checkNotNull(data);
       checkContainerClose(kvContainer);
 
-      WriteChunkRequestProto writeChunk = request.getWriteChunk();
-      BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
-      ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
-
-      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
-
-      DispatcherContext dispatcherContext =
-          DispatcherContext.getHandleWriteChunk();
-      ChunkBuffer data =
-          ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
+      DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
 
       chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
           dispatcherContext);
-    } catch (StorageContainerException ex) {
-      return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Write Chunk failed", ex, IO_EXCEPTION),
-          request);
+      LOG.error("Write Chunk failed for closed container", ex);
     }
-    return getSuccessResponse(request);
   }
 
   /**

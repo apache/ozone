@@ -42,8 +42,7 @@ public enum DNAction implements AuditAction {
   STREAM_INIT,
   FINALIZE_BLOCK,
   ECHO,
-  GET_CONTAINER_MERKLE_TREE,
-  WRITE_CHUNK_FOR_CLOSED_CONTAINER;
+  GET_CONTAINER_MERKLE_TREE;
 
   @Override
   public String getAction() {
