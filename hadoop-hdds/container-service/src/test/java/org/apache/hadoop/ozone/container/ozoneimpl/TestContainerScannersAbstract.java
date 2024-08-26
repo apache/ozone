@@ -42,6 +42,8 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
@@ -188,9 +190,9 @@ public abstract class TestContainerScannersAbstract {
   }
 
   private ContainerController mockContainerController() {
-    DataScanResult healthyData = DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTree());
+    DataScanResult healthyData = getHealthyDataScanResult();
     DataScanResult unhealthyData = getUnhealthyDataScanResult();
-    MetadataScanResult healthyMetadata = MetadataScanResult.fromErrors(Collections.emptyList());
+    MetadataScanResult healthyMetadata = getHealthyMetadataScanResult();
     MetadataScanResult unhealthyMetadata = getUnhealthyMetadataScanResult();
 
     // healthy container

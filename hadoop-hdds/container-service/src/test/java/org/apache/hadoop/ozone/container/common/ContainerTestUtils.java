@@ -277,9 +277,6 @@ public final class ContainerTestUtils {
     }
   }
 
-  /**
-   * Construct an unhealthy scan result to use for testing purposes.
-   */
   public static DataScanResult getHealthyDataScanResult() {
     return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTree());
   }
@@ -291,6 +288,10 @@ public final class ContainerTestUtils {
     ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CHUNK,
         new File(""), new IOException("Fake data corruption failure for testing"));
     return DataScanResult.fromErrors(Collections.singletonList(error), new ContainerMerkleTree());
+  }
+
+  public static MetadataScanResult getHealthyMetadataScanResult() {
+    return MetadataScanResult.fromErrors(Collections.emptyList());
   }
 
   /**
