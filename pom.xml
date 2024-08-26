@@ -24,7 +24,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <packaging>pom</packaging>
 
   <modules>
-    <module>shared</module>
+    <module>dev-support</module>
     <module>hadoop-hdds</module>
     <module>hadoop-ozone</module>
   </modules>

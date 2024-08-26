@@ -253,13 +253,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>maven-remote-resources-plugin</artifactId>
         <configuration>
           <resourceBundles>
-            <resourceBundle>org.apache.ozone:ozone-shared-resources:${ozone.version}</resourceBundle>
+            <resourceBundle>org.apache.ozone:ozone-dev-support:${ozone.version}</resourceBundle>
           </resourceBundles>
         </configuration>
         <dependencies>
           <dependency>
             <groupId>org.apache.ozone</groupId>
-            <artifactId>ozone-shared-resources</artifactId>
+            <artifactId>ozone-dev-support</artifactId>
             <version>${ozone.version}</version>
           </dependency>
         </dependencies>
