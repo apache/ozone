@@ -1,6 +1,5 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 import java.util.Collections;

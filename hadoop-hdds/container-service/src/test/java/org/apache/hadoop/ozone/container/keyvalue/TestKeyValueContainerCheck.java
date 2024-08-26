@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.junit.jupiter.api.Disabled;
+import org.apache.ozone.test.tag.Slow;
 
 import java.io.File;
 import java.io.RandomAccessFile;

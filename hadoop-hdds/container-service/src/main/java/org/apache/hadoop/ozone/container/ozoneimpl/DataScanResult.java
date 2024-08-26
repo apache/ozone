@@ -12,7 +12,7 @@ import java.util.List;
  * The result will contain all the errors seen while scanning the container, and a ContainerMerkleTree representing
  * the data that the scan saw on the disk when it ran.
  */
-public class DataScanResult extends MetadataScanResult {
+public final class DataScanResult extends MetadataScanResult {
 
   private final ContainerMerkleTree dataTree;
   // Only deleted results can be interned. Healthy results will still have different trees.
