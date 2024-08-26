@@ -145,6 +145,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, snapInfo));
+      updatedSnapshotInfos.put(snapInfo.getTableKey(), snapInfo);
     }
   }
 
