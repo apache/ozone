@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -53,6 +54,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
 
+  /**
+   * This map contains up to date snapshotInfo and works as a local cache for OMSnapshotPurgeRequest.
+   * Since purge and other updates happen in sequence inside validateAndUpdateCache, we can get updated snapshotInfo
+   * from this map rather than getting form snapshotInfoTable which creates a deep copy for every get call.
+   */
+  private final Map<String, SnapshotInfo> updatedSnapshotInfos = new HashMap<>();
+
   public OMSnapshotPurgeRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -78,9 +86,6 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     try {
       List<String> snapshotDbKeys = snapshotPurgeRequest
           .getSnapshotDBKeysList();
-      Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
-      Map<String, SnapshotInfo> updatedPathPreviousAndGlobalSnapshots =
-          new HashMap<>();
 
       // Each snapshot purge operation does three things:
       //  1. Update the deep clean flag for the next active snapshot (So that it can be
@@ -90,7 +95,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // There is no need to take lock for snapshot purge as of now. We can simply rely on OMStateMachine
       // because it executes transaction sequentially.
       for (String snapTableKey : snapshotDbKeys) {
-        SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(snapTableKey);
+        SnapshotInfo fromSnapshot = getUpdatedSnapshotInfo(snapTableKey, omMetadataManager);
         if (fromSnapshot == null) {
           // Snapshot may have been purged in the previous iteration of SnapshotDeletingService.
           LOG.warn("The snapshot {} is not longer in snapshot table, It maybe removed in the previous " +
@@ -102,10 +107,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
 
         // Step 1: Update the deep clean flag for the next active snapshot
-        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex, updatedSnapInfos);
+        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
         // Step 2: Update the snapshot chain.
-        updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex,
-            updatedPathPreviousAndGlobalSnapshots);
+        updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
         // Remove and close snapshot's RocksDB instance from SnapshotCache.
         omSnapshotManager.invalidateCacheEntry(fromSnapshot.getSnapshotId());
         // Step 3: Purge the snapshot from SnapshotInfoTable cache.
@@ -113,14 +117,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
       }
 
-      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),
-          snapshotDbKeys, updatedSnapInfos,
-          updatedPathPreviousAndGlobalSnapshots);
+      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos);
 
       omMetrics.incNumSnapshotPurges();
-      LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating deep clean flags for " +
-              "snapshots: {} and global and previous for snapshots:{}.",
-          snapshotPurgeRequest, updatedSnapInfos.keySet(), updatedPathPreviousAndGlobalSnapshots.keySet());
+      LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
+          snapshotPurgeRequest, updatedSnapshotInfos);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
@@ -131,9 +132,8 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
-      OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
-                                          Map<String, SnapshotInfo> updatedSnapInfos) throws IOException {
+  private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo, OmMetadataManagerImpl omMetadataManager,
+                                          long trxnLogIndex) throws IOException {
     if (snapInfo != null) {
       // Setting next snapshot deep clean to false, Since the
       // current snapshot is deleted. We can potentially
@@ -143,7 +143,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, snapInfo));
-      updatedSnapInfos.put(snapInfo.getTableKey(), snapInfo);
+      updatedSnapshotInfos.put(snapInfo.getTableKey(), snapInfo);
     }
   }
 
@@ -156,8 +156,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   private void updateSnapshotChainAndCache(
       OmMetadataManagerImpl metadataManager,
       SnapshotInfo snapInfo,
-      long trxnLogIndex,
-      Map<String, SnapshotInfo> updatedPathPreviousAndGlobalSnapshots
+      long trxnLogIndex
   ) throws IOException {
     if (snapInfo == null) {
       return;
@@ -196,43 +195,36 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     }
 
     SnapshotInfo nextPathSnapInfo =
-        nextPathSnapshotKey != null ? metadataManager.getSnapshotInfoTable().get(nextPathSnapshotKey) : null;
+        nextPathSnapshotKey != null ? getUpdatedSnapshotInfo(nextPathSnapshotKey, metadataManager) : null;
 
-    SnapshotInfo nextGlobalSnapInfo =
-        nextGlobalSnapshotKey != null ? metadataManager.getSnapshotInfoTable().get(nextGlobalSnapshotKey) : null;
-
-    // Updates next path snapshot's previous snapshot ID
     if (nextPathSnapInfo != null) {
       nextPathSnapInfo.setPathPreviousSnapshotId(snapInfo.getPathPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(nextPathSnapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, nextPathSnapInfo));
-      updatedPathPreviousAndGlobalSnapshots
-          .put(nextPathSnapInfo.getTableKey(), nextPathSnapInfo);
     }
 
-    // Updates next global snapshot's previous snapshot ID
-    // If both next global and path snapshot are same, it may overwrite
-    // nextPathSnapInfo.setPathPreviousSnapshotID(), adding this check
-    // will prevent it.
-    if (nextGlobalSnapInfo != null && nextPathSnapInfo != null &&
-        nextGlobalSnapInfo.getSnapshotId().equals(nextPathSnapInfo.getSnapshotId())) {
-      nextPathSnapInfo.setGlobalPreviousSnapshotId(snapInfo.getGlobalPreviousSnapshotId());
-      metadataManager.getSnapshotInfoTable().addCacheEntry(
-          new CacheKey<>(nextPathSnapInfo.getTableKey()),
-          CacheValue.get(trxnLogIndex, nextPathSnapInfo));
-      updatedPathPreviousAndGlobalSnapshots
-          .put(nextPathSnapInfo.getTableKey(), nextPathSnapInfo);
-    } else if (nextGlobalSnapInfo != null) {
-      nextGlobalSnapInfo.setGlobalPreviousSnapshotId(
-          snapInfo.getGlobalPreviousSnapshotId());
+    SnapshotInfo nextGlobalSnapInfo =
+        nextGlobalSnapshotKey != null ? getUpdatedSnapshotInfo(nextGlobalSnapshotKey, metadataManager) : null;
+
+    if (nextGlobalSnapInfo != null) {
+      nextGlobalSnapInfo.setGlobalPreviousSnapshotId(snapInfo.getGlobalPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(nextGlobalSnapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, nextGlobalSnapInfo));
-      updatedPathPreviousAndGlobalSnapshots
-          .put(nextGlobalSnapInfo.getTableKey(), nextGlobalSnapInfo);
     }
 
     snapshotChainManager.deleteSnapshot(snapInfo);
+  }
+
+  private SnapshotInfo getUpdatedSnapshotInfo(String snapshotTableKey, OMMetadataManager omMetadataManager)
+      throws IOException {
+    SnapshotInfo snapshotInfo = updatedSnapshotInfos.get(snapshotTableKey);
+
+    if (snapshotInfo == null) {
+      snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+      updatedSnapshotInfos.put(snapshotTableKey, snapshotInfo);
+    }
+    return snapshotInfo;
   }
 }
