@@ -40,7 +40,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -73,7 +74,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testRecentlyScannedContainerIsSkipped() throws Exception {
     setScannedTimestampRecent(healthy);
     scanContainer(healthy);
-    verify(healthy, never()).scanData(any(), any(), );
+    verify(healthy, never()).scanData(any(), any());
   }
 
   @Test
@@ -83,7 +84,7 @@ public class TestOnDemandContainerDataScanner extends
     // should be scanned.
     setScannedTimestampOld(healthy);
     scanContainer(healthy);
-    verify(healthy, atLeastOnce()).scanData(any(), any(), );
+    verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @Test
@@ -93,7 +94,7 @@ public class TestOnDemandContainerDataScanner extends
     when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
     scanContainer(healthy);
-    verify(healthy, atLeastOnce()).scanData(any(), any(), );
+    verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @AfterEach
@@ -140,10 +141,10 @@ public class TestOnDemandContainerDataScanner extends
     CountDownLatch latch = new CountDownLatch(1);
     when(corruptData.scanData(
             OnDemandContainerDataScanner.getThrottler(),
-            OnDemandContainerDataScanner.getCanceler(), ))
+            OnDemandContainerDataScanner.getCanceler()))
         .thenAnswer((Answer<ScanResult>) invocation -> {
           latch.await();
-          return getUnhealthyScanResult();
+          return getUnhealthyDataScanResult();
         });
     Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
@@ -243,7 +244,7 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testShutdownDuringScan() throws Exception {
     // Make the on demand scan block until interrupt.
-    when(healthy.scanData(any(), any(), )).then(i -> {
+    when(healthy.scanData(any(), any())).then(i -> {
       Thread.sleep(Duration.ofDays(1).toMillis()); return null;
     });
 
@@ -261,10 +262,10 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testUnhealthyContainerRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(unhealthy.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
     when(unhealthy.scanData(
-        any(DataTransferThrottler.class), any(Canceler.class), ))
-        .thenReturn(getUnhealthyScanResult());
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyDataScanResult());
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(true);
 
