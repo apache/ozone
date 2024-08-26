@@ -39,6 +39,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -65,6 +66,9 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -256,7 +260,7 @@ public final class ContainerTestUtils {
 
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
-      ScanResult metadataScanResult, ScanResult dataScanResult,
+      MetadataScanResult metadataScanResult, DataScanResult dataScanResult,
       AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
@@ -265,8 +269,7 @@ public final class ContainerTestUtils {
     when(c.getContainerData().getVolume()).thenReturn(vol);
 
     try {
-      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class), ))
-          .thenReturn(dataScanResult);
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class))).thenReturn(dataScanResult);
       Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
     } catch (InterruptedException ex) {
       // Mockito.when invocations will not throw this exception. It is just
@@ -277,19 +280,26 @@ public final class ContainerTestUtils {
   /**
    * Construct an unhealthy scan result to use for testing purposes.
    */
-  public static ScanResult getUnhealthyScanResult() {
-    return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
-        new File(""),
-        new IOException("Fake corruption failure for testing"));
+  public static DataScanResult getHealthyDataScanResult() {
+    return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTree());
   }
 
   /**
-   * Construct an unhealthy scan result with DELETED_CONTAINER failure type.
+   * Construct an unhealthy scan result to use for testing purposes.
    */
-  public static ScanResult getDeletedContainerResult() {
-    return ScanResult.unhealthy(ScanResult.FailureType.DELETED_CONTAINER,
-        new File(""),
-        new IOException("Fake deleted container exception"));
+  public static DataScanResult getUnhealthyDataScanResult() {
+    ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CHUNK,
+        new File(""), new IOException("Fake data corruption failure for testing"));
+    return DataScanResult.fromErrors(Collections.singletonList(error), new ContainerMerkleTree());
+  }
+
+  /**
+   * Construct an unhealthy scan result to use for testing purposes.
+   */
+  public static MetadataScanResult getUnhealthyMetadataScanResult() {
+    ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE,
+        new File(""), new IOException("Fake metadata corruption failure for testing"));
+    return DataScanResult.fromErrors(Collections.singletonList(error));
   }
 
   public static KeyValueContainer addContainerToDeletedDir(
