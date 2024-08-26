@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -244,7 +245,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(chunksDir.exists());
-    }, ScanResult.FailureType.MISSING_CHUNKS_DIR),
+    }, FailureType.MISSING_CHUNKS_DIR),
 
     MISSING_METADATA_DIR(container -> {
       File metadataDir =
@@ -257,13 +258,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(metadataDir.exists());
-    }, ScanResult.FailureType.MISSING_METADATA_DIR),
+    }, FailureType.MISSING_METADATA_DIR),
 
     MISSING_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       assertTrue(containerFile.delete());
       assertFalse(containerFile.exists());
-    }, ScanResult.FailureType.MISSING_CONTAINER_FILE),
+    }, FailureType.MISSING_CONTAINER_FILE),
 
     MISSING_CONTAINER_DIR(container -> {
       File containerDir =
@@ -275,7 +276,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(containerDir.exists());
-    }, ScanResult.FailureType.MISSING_CONTAINER_DIR),
+    }, FailureType.MISSING_CONTAINER_DIR),
 
     MISSING_BLOCK(container -> {
       File chunksDir = new File(
@@ -289,17 +290,17 @@ public abstract class TestContainerScannerIntegrationAbstract {
           throw new UncheckedIOException(ex);
         }
       }
-    }, ScanResult.FailureType.MISSING_CHUNK_FILE),
+    }, FailureType.MISSING_CHUNK_FILE),
 
     CORRUPT_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       corruptFile(containerFile);
-    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
+    }, FailureType.CORRUPT_CONTAINER_FILE),
 
     TRUNCATED_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       truncateFile(containerFile);
-    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
+    }, FailureType.CORRUPT_CONTAINER_FILE),
 
     CORRUPT_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -309,7 +310,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
-    }, ScanResult.FailureType.CORRUPT_CHUNK),
+    }, FailureType.CORRUPT_CHUNK),
 
     TRUNCATED_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -319,13 +320,12 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       assertTrue(blockFile.isPresent());
       truncateFile(blockFile.get());
-    }, ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH);
+    }, FailureType.INCONSISTENT_CHUNK_LENGTH);
 
     private final Consumer<Container<?>> corruption;
-    private final ScanResult.FailureType expectedResult;
+    private final FailureType expectedResult;
 
-    ContainerCorruptions(Consumer<Container<?>> corruption,
-                         ScanResult.FailureType expectedResult) {
+    ContainerCorruptions(Consumer<Container<?>> corruption, FailureType expectedResult) {
       this.corruption = corruption;
       this.expectedResult = expectedResult;
 
