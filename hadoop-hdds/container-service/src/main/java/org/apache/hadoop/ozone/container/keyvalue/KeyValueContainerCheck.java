@@ -52,6 +52,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
@@ -355,46 +356,48 @@ public class KeyValueContainerCheck {
     Iterator<ContainerProtos.ChunkInfo> chunkIter = block.getChunks().iterator();
     while (chunkIter.hasNext() && !fileMissing) {
       ContainerProtos.ChunkInfo chunk = chunkIter.next();
+      // This is populated with a file if we are able to locate the correct directory.
+      Optional<File> optionalFile = Optional.empty();
+
       // If we cannot locate where to read chunk files from, then we cannot proceed with scanning this block.
-      File chunkFile = null;
       try {
-        chunkFile = layout.getChunkFile(onDiskContainerData,
-            block.getBlockID(), chunk.getChunkName());
+        optionalFile = Optional.of(layout.getChunkFile(onDiskContainerData,
+            block.getBlockID(), chunk.getChunkName()));
       } catch (StorageContainerException ex) {
         // The parent directory that contains chunk files does not exist.
         if (ex.getResult() == ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR) {
           blockErrors.add(new ContainerScanError(FailureType.MISSING_CHUNKS_DIR,
               new File(onDiskContainerData.getChunksPath()), ex));
-          fileMissing = true;
         } else {
           // Unknown exception occurred trying to locate the file.
           blockErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK,
               new File(onDiskContainerData.getChunksPath()), ex));
-          fileMissing = true;
         }
       }
 
-      // If the chunk does not exist, we cannot proceed to scan it.
-      // TODO chunk file might be null
-      if (chunkFile != null && !chunkFile.exists()) {
-        // In EC, client may write empty putBlock in padding block nodes.
-        // So, we need to make sure, chunk length > 0, before declaring
-        // the missing chunk file.
-        if (!block.getChunks().isEmpty() && block.getChunks().get(0).getLen() > 0) {
-          ContainerScanError error = new ContainerScanError(FailureType.MISSING_CHUNK_FILE,
-              new File(onDiskContainerData.getChunksPath()), new IOException("Missing chunk file " +
-              chunkFile.getAbsolutePath()));
-          blockErrors.add(error);
-          fileMissing = true;
+      if (optionalFile.isPresent()) {
+        File chunkFile = optionalFile.get();
+        if (!chunkFile.exists()) {
+          // In EC, client may write empty putBlock in padding block nodes.
+          // So, we need to make sure, chunk length > 0, before declaring
+          // the missing chunk file.
+          if (!block.getChunks().isEmpty() && block.getChunks().get(0).getLen() > 0) {
+            ContainerScanError error = new ContainerScanError(FailureType.MISSING_CHUNK_FILE,
+                new File(onDiskContainerData.getChunksPath()), new IOException("Missing chunk file " +
+                chunkFile.getAbsolutePath()));
+            blockErrors.add(error);
+          }
+        } else if (chunk.getChecksumData().getType() != ContainerProtos.ChecksumType.NONE) {
+          int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+          ByteBuffer buffer = BUFFER_POOL.getBuffer(bytesPerChecksum);
+          // Keep scanning the block even if there are errors with individual chunks.
+          blockErrors.addAll(verifyChecksum(block, chunk, chunkFile, layout, buffer, currentTree, throttler, canceler));
+          buffer.clear();
+          BUFFER_POOL.returnBuffer(buffer);
         }
-      } else if (chunk.getChecksumData().getType() != ContainerProtos.ChecksumType.NONE) {
-        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
-        ByteBuffer buffer = BUFFER_POOL.getBuffer(bytesPerChecksum);
-        // Keep scanning the block even if there are errors with individual chunks.
-        blockErrors.addAll(verifyChecksum(block, chunk, chunkFile, layout, buffer, currentTree, throttler, canceler));
-        buffer.clear();
-        BUFFER_POOL.returnBuffer(buffer);
       }
+
+      fileMissing = !optionalFile.isPresent() || !optionalFile.get().exists();
     }
 
     try {
