@@ -62,6 +62,7 @@ services:
     hostname: om
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
       HADOOP_OPTS:
     ports:
       - 9874:9874
