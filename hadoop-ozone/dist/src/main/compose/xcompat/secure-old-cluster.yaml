@@ -44,7 +44,7 @@ services:
     env_file:
       - ./secure-docker-config
     environment:
-      HADOOP_CONF_DIR: /opt/ozone/etc/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
     volumes:
       - ../../libexec/transformation.py:/opt/transformation.py
     command: [ "hadoop", "kms" ]
@@ -88,7 +88,6 @@ services:
     hostname: scm
     ports:
       - 9876:9876
-      - 9860:9860
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
