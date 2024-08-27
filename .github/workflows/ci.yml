@@ -166,6 +166,99 @@ jobs:
           path: |
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
+  build-config-doc:
+    needs:
+      - build
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Download the source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-bin
+          path: ozone-bin
+      - name: Extract the source tarball
+        run: |
+          mkdir -p ozone-bin/extracted
+          tar -xzf ozone-bin/ozone-*-SNAPSHOT.tar.gz -C ozone-bin/extracted
+      - name: Calculate hash of the existing Configurations.md
+        id: existing-hash
+        run: |
+          if [ -f hadoop-hdds/docs/content/tools/Configurations.md ]; then
+            sha256sum hadoop-hdds/docs/content/tools/Configurations.md | awk '{ print $1 }' > existing_hash.txt
+          else
+            echo "No existing file found." > existing_hash.txt
+          fi
+      - name: Run the Python script to convert XML properties into Markdown
+        run: python3 dev-support/ci/xml_to_md.py ozone-bin/extracted > hadoop-hdds/docs/content/tools/Configurations.md
+      - name: Calculate hash of the new Configurations.md
+        id: new-hash
+        run: sha256sum hadoop-hdds/docs/content/tools/Configurations.md | awk '{ print $1 }' > new_hash.txt
+      - name: Compare hashes and decide to commit
+        id: hash-check
+        run: |
+          EXISTING_HASH=$(cat existing_hash.txt)
+          NEW_HASH=$(cat new_hash.txt)
+          if [ "$EXISTING_HASH" != "$NEW_HASH" ]; then
+            echo "Configurations.md has changed, proceeding to commit and create PRs."
+            echo "hashes_differ=true" >> $GITHUB_ENV
+          else
+            echo "Configurations.md is unchanged, skipping commit and PR creation."
+            echo "hashes_differ=false" >> $GITHUB_ENV
+          fi
+      - name: Configure Git
+        if: env.hashes_differ == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Commit and push changes to apache/ozone
+        if: env.hashes_differ == 'true'
+        run: |
+          git add hadoop-hdds/docs/content/tools/Configurations.md
+          git commit -m "[Auto] Update Configurations.md from $GITHUB_SHA"
+          git push origin HEAD:master
+      - name: Create Pull Request in apache/ozone
+        if: env.hashes_differ == 'true'
+        env:
+          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --title "[Auto] Update Configurations.md" --body "This is an automated pull request."
+      - name: Checkout ozone-site repository
+        if: env.hashes_differ == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: apache/ozone-site
+          ref: 'HDDS-9225-website-v2'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ozone-site
+      - name: Copy MD file to ozone-site repository
+        if: env.hashes_differ == 'true'
+        run: |
+          TARGET_DIR=$(find ozone-site/docs -type d -name '*-administrative-guide' -exec find {} -type d -name '*-configuration' -print -quit \;)
+          echo "$TARGET_DIR"
+          cp hadoop-hdds/docs/content/tools/Configurations.md "$TARGET_DIR/configurations.md"
+      - name: Commit and push changes to apache/ozone-site
+        if: env.hashes_differ == 'true'
+        run: |
+          cd ozone-site 
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cd ..
+          git add "$TARGET_DIR/configurations.md"
+          git commit -m "[Auto] Update configurations.md page from ozone $GITHUB_SHA"
+          git push origin HEAD:HDDS-9225-website-v2
+      - name: Create Pull Request in apache/ozone-site
+        if: env.hashes_differ == 'true'
+        env:
+          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ozone-site
+          gh pr create --title "[Auto] Update configurations.md page" --body "This is an automated pull request from the ozone repository."
   compile:
     needs:
       - build-info
