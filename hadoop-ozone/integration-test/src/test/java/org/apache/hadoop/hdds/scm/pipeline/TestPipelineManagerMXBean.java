@@ -26,6 +26,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -45,6 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 @Timeout(3000)
 public class TestPipelineManagerMXBean {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestPipelineManagerMXBean.class);
   private MiniOzoneCluster cluster;
   private MBeanServer mbs;
 
@@ -78,6 +82,8 @@ public class TestPipelineManagerMXBean {
           final Integer count = entry.getValue();
           final Integer currentCount = getMetricsCount(data, entry.getKey());
           if (currentCount == null || !currentCount.equals(count)) {
+            LOG.error("PipelineState = {}: [currentCount = {}, PipelineCount = {}]",
+                entry.getKey(), currentCount, count);
             return false;
           }
         }
