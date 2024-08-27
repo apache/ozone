@@ -1769,7 +1769,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.hadoop.ozone.*</includes>
             </configuration>
           </execution>
         </executions>
