@@ -46,6 +46,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 
 /**
@@ -118,9 +119,10 @@ public class RDBPut
         throw new IllegalArgumentException(errorMessage);
       }
 
-      Class<?> c = columnFamilyDefinition.getValueType();
+      Class<?> valueClass = columnFamilyDefinition.getValueType();
+      Class<?> keyClass = columnFamilyDefinition.getKeyType();
     //Class<?> c = OmVolumeArgs.class;
-      System.out.println("7. class of value type:  " + c);
+      System.out.println("7. class of value type:  " + valueClass);
 
       Object newValue;
       try {
@@ -128,31 +130,51 @@ public class RDBPut
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
         objectMapper.enable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
-        newValue = objectMapper.readValue(value, c);
+        newValue = objectMapper.readValue(value, valueClass);
+        System.out.println("After objectMapper");
         System.out.println(newValue);
       } catch (IOException e) {
+        System.err.println("IOEX in objectMapper");
         e.printStackTrace();
         throw e;
       }
-      Method m = c.getDeclaredMethod("getObjectInfo");
+
+      System.out.println("8. Converting to byte[]");
+      Class<?> valueCodecClass = columnFamilyDefinition.getValueCodec().getClass();
+      Method valueCodecClassToPersistedFormat = Stream.of(valueCodecClass.getMethods())
+          .filter((m) -> m.getName().equals("toPersistedFormat"))
+          .findFirst()
+          .get();
+      System.out.println(" valueCodecClassToPersistedFormat: " + valueCodecClassToPersistedFormat.getName() + valueCodecClassToPersistedFormat.getReturnType());
+
+      Class<?> keyCodecClass = columnFamilyDefinition.getKeyCodec().getClass();
+      Method keyCodecClassToPersistedFormat = Stream.of(keyCodecClass.getMethods())
+          .filter((m) -> m.getName().equals("toPersistedFormat"))
+          .findFirst()
+          .get();
+      System.out.println(" mm2: " + keyCodecClassToPersistedFormat.getName() + keyCodecClassToPersistedFormat.getReturnType());
+
+      byte[] valueBytes = (byte[]) valueCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getValueCodec(), valueClass.cast(newValue));
+      byte[] keyBytes = (byte[]) keyCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getKeyCodec(), keyClass.cast(key));
+
+      System.out.println("Key Bytes: " + keyBytes);
+      System.out.println("Value Bytes: " + valueBytes);
+
+      Method m = valueClass.getDeclaredMethod("getObjectInfo");
       m.setAccessible(true);
       System.out.println("\n\nnew value class: " + newValue.getClass());
       System.out.println("\n\nnew value: \n" + newValue);
       System.out.println("\n\nnew value: \n" + m.invoke(newValue));
 
       Object oldValue = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
-      System.out.println("The original value was \n" + oldValue);
+      System.out.println("The original value was \n" + m.invoke(oldValue));
 
-      Class<?> cc = columnFamilyDefinition.getValueCodec().getClass();
-      System.out.println(" CC: " + cc);
-      Method mm = cc.getDeclaredMethod("toPersistedFormat", Object.class);
-      System.out.println(" mm: " + mm.getName() + mm.getReturnType());
 
-      byte[] valueBytes = (byte[]) mm.invoke(columnFamilyDefinition.getValueCodec(), c.cast(newValue));
-
-      System.out.println("Bytes: " + valueBytes);
-
-      db.get().put(columnFamilyHandle, , valueBytes);
+      System.out.println("------------------------");
+      db.get().put(columnFamilyHandle, keyBytes, valueBytes);
+      Object newValuee = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
+      System.out.println("The new value is \n" + m.invoke(newValuee));
+      System.out.println("------------------------");
 
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
