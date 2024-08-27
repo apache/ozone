@@ -55,9 +55,11 @@ import picocli.CommandLine;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +122,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @CommandLine.Option(names = {"--endkey", "--ek", "-e"},
       description = "Key at which iteration of the DB ends")
   private String endKey;
+
+  @CommandLine.Option(names = {"--fields"},
+      description = "Comma-separated list of fields needed for each value. " +
+          "eg.) \"name,acls.type\" for showing name and type under acls.")
+  private String fieldsFilter;
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
@@ -291,7 +298,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         }
         Future<Void> future = threadPool.submit(
             new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
-                withKey, schemaV3));
+                withKey, schemaV3, fieldsFilter));
         futures.add(future);
         batch = new ArrayList<>(batchSize);
         sequenceId++;
@@ -299,7 +306,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
-          batch, logWriter, sequenceId, withKey, schemaV3));
+          batch, logWriter, sequenceId, withKey, schemaV3, fieldsFilter));
       futures.add(future);
     }
 
@@ -465,22 +472,51 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     private final long sequenceId;
     private final boolean withKey;
     private final boolean schemaV3;
+    private String valueFields;
 
     Task(DBColumnFamilyDefinition dbColumnFamilyDefinition,
          ArrayList<ByteArrayKeyValue> batch, LogWriter logWriter,
-         long sequenceId, boolean withKey, boolean schemaV3) {
+         long sequenceId, boolean withKey, boolean schemaV3, String valueFields) {
       this.dbColumnFamilyDefinition = dbColumnFamilyDefinition;
       this.batch = batch;
       this.logWriter = logWriter;
       this.sequenceId = sequenceId;
       this.withKey = withKey;
       this.schemaV3 = schemaV3;
+      this.valueFields = valueFields;
+    }
+
+    Map<String, Object> getFieldSplit(List<String> fields, Map<String, Object> fieldMap) {
+      int len = fields.size();
+      if (fieldMap == null) {
+        fieldMap = new HashMap<>();
+      }
+      if (len == 1) {
+        fieldMap.putIfAbsent(fields.get(0), null);
+      } else {
+        Map<String, Object> fieldMapGet = (Map<String, Object>) fieldMap.get(fields.get(0));
+        if (fieldMapGet == null) {
+          fieldMap.put(fields.get(0), getFieldSplit(fields.subList(1, len), null));
+        } else {
+          fieldMap.put(fields.get(0), getFieldSplit(fields.subList(1, len), fieldMapGet));
+        }
+      }
+      return fieldMap;
     }
 
     @Override
     public Void call() {
       try {
         ArrayList<String> results = new ArrayList<>(batch.size());
+        Map<String, Object> fieldsSplitMap = new HashMap<>();
+
+        if (valueFields != null) {
+          for (String field : valueFields.split(",")) {
+            String[] subfields = field.split("\\.");
+            fieldsSplitMap = getFieldSplit(Arrays.asList(subfields), fieldsSplitMap);
+          }
+        }
+
         for (ByteArrayKeyValue byteArrayKeyValue : batch) {
           StringBuilder sb = new StringBuilder();
           if (!(sequenceId == FIRST_SEQUENCE_ID && results.isEmpty())) {
@@ -515,15 +551,91 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
           Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(byteArrayKeyValue.getValue());
-          sb.append(WRITER.writeValueAsString(o));
+
+          if (valueFields != null) {
+            Map<String, Object> filteredValue = new HashMap<>();
+            filteredValue.putAll(getFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
+            sb.append(WRITER.writeValueAsString(filteredValue));
+          } else {
+            sb.append(WRITER.writeValueAsString(o));
+          }
+
           results.add(sb.toString());
         }
         logWriter.log(results, sequenceId);
-      } catch (Exception e) {
+      } catch (IOException e) {
         exception = true;
         LOG.error("Exception parse Object", e);
       }
       return null;
+    }
+
+    Map<String, Object> getFilteredObject(Object obj, Class<?> clazz, Map<String, Object> fieldsSplitMap) {
+      Map<String, Object> valueMap = new HashMap<>();
+      for (Map.Entry<String, Object> field : fieldsSplitMap.entrySet()) {
+        try {
+          Field valueClassField = getRequiredFieldFromAllFields(clazz, field.getKey());
+          Object valueObject = valueClassField.get(obj);
+          Map<String, Object> subfields = (Map<String, Object>) field.getValue();
+
+          if (subfields == null) {
+            valueMap.put(field.getKey(), valueObject);
+          } else {
+            if (Collection.class.isAssignableFrom(valueObject.getClass())) {
+              List<Object> subfieldObjectsList =
+                  getFilteredObjectCollection((Collection) valueObject, subfields);
+              valueMap.put(field.getKey(), subfieldObjectsList);
+            } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
+              Map<Object, Object> subfieldObjectsMap = new HashMap<>();
+              Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
+              for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
+                Object subfieldValue;
+                if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
+                  subfieldValue = getFilteredObjectCollection((Collection)ob.getValue(), subfields);
+                } else {
+                  subfieldValue = getFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
+                }
+                subfieldObjectsMap.put(ob.getKey(), subfieldValue);
+              }
+              valueMap.put(field.getKey(), subfieldObjectsMap);
+            } else {
+              valueMap.put(field.getKey(),
+                  getFilteredObject(valueObject, valueClassField.getType(), subfields));
+            }
+          }
+        } catch (NoSuchFieldException ex) {
+          err().println("ERROR: no such field: " + field);
+        } catch (IllegalAccessException e) {
+          err().println("ERROR: Cannot get field from object: " + field);
+        }
+      }
+      return valueMap;
+    }
+
+    List<Object> getFilteredObjectCollection(Collection<?> valueObject, Map<String, Object> fields)
+        throws NoSuchFieldException, IllegalAccessException {
+      List<Object> subfieldObjectsList = new ArrayList<>();
+      for (Object ob : valueObject) {
+        Object subfieldValue = getFilteredObject(ob, ob.getClass(), fields);
+        subfieldObjectsList.add(subfieldValue);
+      }
+      return subfieldObjectsList;
+    }
+
+    Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
+      List<Field> classFieldList = ValueSchema.getAllFields(clazz);
+      Field classField = null;
+      for (Field f : classFieldList) {
+        if (f.getName().equals(fieldName)) {
+          classField = f;
+          break;
+        }
+      }
+      if (classField == null) {
+        throw new NoSuchFieldException();
+      }
+      classField.setAccessible(true);
+      return classField;
     }
   }
 
