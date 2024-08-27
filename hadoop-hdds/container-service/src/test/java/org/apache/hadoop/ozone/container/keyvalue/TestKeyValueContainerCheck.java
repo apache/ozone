@@ -68,11 +68,7 @@ public class TestKeyValueContainerCheck
     // test Closed Container
     KeyValueContainer container = createContainerWithBlocks(containerID,
         normalBlocks, deletedBlocks, true);
-    KeyValueContainerData containerData = container.getContainerData();
-
-    KeyValueContainerCheck kvCheck =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume(), container);
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
 
     // first run checks on a Open Container
     boolean valid = kvCheck.fastCheck().isHealthy();
@@ -107,9 +103,7 @@ public class TestKeyValueContainerCheck
 
     container.close();
 
-    KeyValueContainerCheck kvCheck =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume(), container);
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
 
     File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(containerData);
@@ -208,17 +202,12 @@ public class TestKeyValueContainerCheck
     when(mockContainerData.getBcsIdKey())
         .thenReturn(containerData.getBcsIdKey());
 
-    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(
-        containerData.getMetadataPath(), conf, containerData.getContainerID(),
-        containerData.getVolume(), container);
-
-    kvCheck.setContainerData(mockContainerData);
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
+    kvCheck.injectContainerDataFromDisk(mockContainerData);
 
     DataTransferThrottler throttler = new DataTransferThrottler(
         sc.getBandwidthPerVolume());
-    Canceler canceler = null;
-
-    ScanResult result = kvCheck.fullCheck(throttler, canceler);
+    ScanResult result = kvCheck.fullCheck(throttler, null);
 
     // A deleted container during a scan still counts as healthy.
     assertTrue(result.isHealthy());

@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -63,8 +62,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.xml.crypto.Data;
-
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 /**
@@ -77,25 +74,28 @@ public class KeyValueContainerCheck {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerCheck.class);
 
-  private long containerID;
-  private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
-  private ConfigurationSource checkConfig;
+  private final long containerID;
+  private final ConfigurationSource checkConfig;
 
-  private String metadataPath;
-  private HddsVolume volume;
-  private KeyValueContainer container;
+  private final String metadataPath;
+  private final HddsVolume volume;
+  private final KeyValueContainer container;
+  // Container data already loaded in the datanode's memory. Used when the container data cannot be loaded from the
+  // disk, for example, because the container was deleted during a scan.
+  private final KeyValueContainerData containerDataFromMemory;
+  // Container data read from the container file on disk. Used to verify the integrity of the container.
+  // This is not loaded until a scan begins.
+  private KeyValueContainerData containerDataFromDisk;
   private static final DirectBufferPool BUFFER_POOL = new DirectBufferPool();
 
-  public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID, HddsVolume volume, KeyValueContainer container) {
-    Preconditions.checkArgument(metadataPath != null);
-
+  public KeyValueContainerCheck(ConfigurationSource conf, KeyValueContainer container) {
     this.checkConfig = conf;
-    this.containerID = containerID;
-    this.onDiskContainerData = null;
-    this.metadataPath = metadataPath;
-    this.volume = volume;
     this.container = container;
+    this.containerDataFromDisk = null;
+    this.containerDataFromMemory = this.container.getContainerData();
+    this.containerID = containerDataFromMemory.getContainerID();
+    this.metadataPath = containerDataFromMemory.getMetadataPath();
+    this.volume = containerDataFromMemory.getVolume();
   }
 
   /**
@@ -111,14 +111,14 @@ public class KeyValueContainerCheck {
     try {
       List<ContainerScanError> metadataErrors = scanMetadata();
       try {
+        // We need to check if the container was deleted
         // If the metadata scan came back with errors, check if they could have been caused by the container getting
-        // deleted.
-        // In this case the errors should be ignored.
-        if (!metadataErrors.isEmpty() && containerIsDeleted()) {
+        // deleted. In this case the errors should be ignored.
+        if (!metadataErrors.isEmpty() && containerDataFromDisk != null && containerIsDeleted()) {
           return MetadataScanResult.deleted();
         }
       } catch (IOException ex) {
-        metadataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, onDiskContainerData.getDbFile(), ex));
+        metadataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, containerDataFromDisk.getDbFile(), ex));
       }
       return MetadataScanResult.fromErrors(metadataErrors);
     } finally {
@@ -168,7 +168,7 @@ public class KeyValueContainerCheck {
     // Chunks directory should exist.
     // The metadata scan can continue even if this fails, since it does not look at the data inside the chunks
     // directory.
-    File chunksDir = new File(onDiskContainerData.getChunksPath());
+    File chunksDir = new File(containerDataFromDisk.getChunksPath());
     if (!chunksDir.exists()) {
       metadataErrors.add(new ContainerScanError(FailureType.MISSING_CHUNKS_DIR, chunksDir,
           new FileNotFoundException("Chunks directory " + chunksDir + " not found.")));
@@ -204,13 +204,13 @@ public class KeyValueContainerCheck {
       ContainerMerkleTree dataTree = new ContainerMerkleTree();
       List<ContainerScanError> dataErrors = scanData(dataTree, throttler, canceler);
       try {
-        // If the data scan came back with errors, check if they could have been caused by the container getting deleted.
-        // In this case the errors should be ignored.
+        // If the data scan came back with errors, check if they could have been caused by the container getting
+        // deleted. In this case the errors should be ignored.
         if (!dataErrors.isEmpty() && containerIsDeleted()) {
           return DataScanResult.deleted();
         }
       } catch (IOException ex) {
-        dataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, onDiskContainerData.getDbFile(), ex));
+        dataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, containerDataFromDisk.getDbFile(), ex));
       }
       return DataScanResult.fromErrors(dataErrors, dataTree);
     } finally {
@@ -225,13 +225,13 @@ public class KeyValueContainerCheck {
 
   private List<ContainerScanError> scanData(ContainerMerkleTree currentTree, DataTransferThrottler throttler,
       Canceler canceler) {
-    Preconditions.checkState(onDiskContainerData != null,
+    Preconditions.checkState(containerDataFromDisk != null,
         "invoke loadContainerData prior to calling this function");
 
     List<ContainerScanError> errors = new ArrayList<>();
 
     // If the DB cannot be loaded, we cannot proceed with the data scan.
-    File dbFile = onDiskContainerData.getDbFile();
+    File dbFile = containerDataFromDisk.getDbFile();
     if (!dbFile.exists() || !dbFile.canRead()) {
       String dbFileErrorMsg = "Unable to access DB File [" + dbFile.toString()
           + "] for Container [" + containerID + "] metadata path ["
@@ -241,10 +241,10 @@ public class KeyValueContainerCheck {
     }
 
     try {
-      try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+      try (DBHandle db = BlockUtils.getDB(containerDataFromDisk, checkConfig);
            BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
-               onDiskContainerData.getContainerID(),
-               onDiskContainerData.getUnprefixedKeyFilter())) {
+               containerDataFromDisk.getContainerID(),
+               containerDataFromDisk.getUnprefixedKeyFilter())) {
         // If the container was deleted during the scan, stop trying to process its data.
         boolean containerDeleted = false;
         while (kvIter.hasNext() && !containerDeleted) {
@@ -270,43 +270,42 @@ public class KeyValueContainerCheck {
      */
     String dbType;
     Preconditions
-        .checkState(onDiskContainerData != null, "Container File not loaded");
+        .checkState(containerDataFromDisk != null, "Container File not loaded");
     
     List<ContainerScanError> errors = new ArrayList<>();
 
     // If the file checksum does not match, we will not try to read the file.
     try {
-      ContainerUtils.verifyContainerFileChecksum(onDiskContainerData, checkConfig);
+      ContainerUtils.verifyContainerFileChecksum(containerDataFromDisk, checkConfig);
     } catch (IOException ex) {
       errors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, ex));
       return errors;
     }
 
     // All other failures are independent.
-    if (onDiskContainerData.getContainerType()
+    if (containerDataFromDisk.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
       String errStr = "Bad Container type in Containerdata for " + containerID;
       errors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, new IOException(errStr)));
     }
 
-    if (onDiskContainerData.getContainerID() != containerID) {
+    if (containerDataFromDisk.getContainerID() != containerID) {
       String errStr =
           "Bad ContainerID field in Containerdata for " + containerID;
       errors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, new IOException(errStr)));
     }
 
-    dbType = onDiskContainerData.getContainerDBType();
+    dbType = containerDataFromDisk.getContainerDBType();
     if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
       errors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, new IOException(errStr)));
     }
 
-    KeyValueContainerData kvData = onDiskContainerData;
-    if (!metadataPath.equals(kvData.getMetadataPath())) {
+    if (!metadataPath.equals(containerDataFromDisk.getMetadataPath())) {
       String errStr =
           "Bad metadata path in Containerdata for " + containerID + "Expected ["
-              + metadataPath + "] Got [" + kvData.getMetadataPath()
+              + metadataPath + "] Got [" + containerDataFromDisk.getMetadataPath()
               + "]";
       errors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, new IOException(errStr)));
     }
@@ -322,11 +321,11 @@ public class KeyValueContainerCheck {
    * This method checks the block count key for existence since this is used by EC and Ratis containers.
    */
   private boolean containerIsDeleted(DBHandle db) throws IOException {
-    if (onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+    if (containerDataFromMemory.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // TODO use iterator and check for entries.
-      return db.getStore().getMetadataTable().get(onDiskContainerData.getBlockCountKey()) == null;
+      return db.getStore().getMetadataTable().get(containerDataFromMemory.getBlockCountKey()) == null;
     } else {
-      return !onDiskContainerData.getDbFile().exists();
+      return !containerDataFromMemory.getDbFile().exists();
     }
   }
 
@@ -334,12 +333,12 @@ public class KeyValueContainerCheck {
    * Checks if a container has been deleted using the database. This method allocates a DB handle instance if the
    * caller does not already have one.
    *
-   * A Schema V2 contianer is determined to be deleted if its database is no longer present on disk.
+   * A Schema V2 container is determined to be deleted if its database is no longer present on disk.
    * A Schema V3 container is determined to be deleted if its entries have been removed from the DB.
    * This method checks the block count key for existence since this is used by EC and Ratis containers.
    */
   private boolean containerIsDeleted() throws IOException {
-    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig)) {
+    try (DBHandle db = BlockUtils.getDB(containerDataFromMemory, checkConfig)) {
       return containerIsDeleted(db);
     }
   }
@@ -358,7 +357,7 @@ public class KeyValueContainerCheck {
   private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
       throws IOException {
     String blockKey =
-        onDiskContainerData.getBlockKey(block.getBlockID().getLocalID());
+        containerDataFromDisk.getBlockKey(block.getBlockID().getLocalID());
     return db.getStore().getBlockDataTable().get(blockKey);
   }
 
@@ -384,7 +383,7 @@ public class KeyValueContainerCheck {
 
   private List<ContainerScanError> scanBlock(DBHandle db, File dbFile, BlockData block,
       DataTransferThrottler throttler, Canceler canceler, ContainerMerkleTree currentTree) {
-    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
+    ContainerLayoutVersion layout = containerDataFromDisk.getLayoutVersion();
 
     List<ContainerScanError> blockErrors = new ArrayList<>();
 
@@ -400,17 +399,17 @@ public class KeyValueContainerCheck {
 
       // If we cannot locate where to read chunk files from, then we cannot proceed with scanning this block.
       try {
-        optionalFile = Optional.of(layout.getChunkFile(onDiskContainerData,
+        optionalFile = Optional.of(layout.getChunkFile(containerDataFromDisk,
             block.getBlockID(), chunk.getChunkName()));
       } catch (StorageContainerException ex) {
         // The parent directory that contains chunk files does not exist.
         if (ex.getResult() == ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR) {
           blockErrors.add(new ContainerScanError(FailureType.MISSING_CHUNKS_DIR,
-              new File(onDiskContainerData.getChunksPath()), ex));
+              new File(containerDataFromDisk.getChunksPath()), ex));
         } else {
           // Unknown exception occurred trying to locate the file.
           blockErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK,
-              new File(onDiskContainerData.getChunksPath()), ex));
+              new File(containerDataFromDisk.getChunksPath()), ex));
         }
       }
 
@@ -422,7 +421,7 @@ public class KeyValueContainerCheck {
           // the missing chunk file.
           if (!block.getChunks().isEmpty() && block.getChunks().get(0).getLen() > 0) {
             ContainerScanError error = new ContainerScanError(FailureType.MISSING_CHUNK_FILE,
-                new File(onDiskContainerData.getChunksPath()), new IOException("Missing chunk file " +
+                new File(containerDataFromDisk.getChunksPath()), new IOException("Missing chunk file " +
                 chunkFile.getAbsolutePath()));
             blockErrors.add(error);
           }
@@ -518,7 +517,8 @@ public class KeyValueContainerCheck {
                     + " actual length=%d for block %s",
                 chunk.getChunkName(),
                 chunk.getLen(), bytesRead, block.getBlockID());
-        scanErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK, chunkFile, new IOException(message)));
+        scanErrors.add(new ContainerScanError(FailureType.INCONSISTENT_CHUNK_LENGTH, chunkFile,
+            new IOException(message)));
       }
     } catch (IOException ex) {
       scanErrors.add(new ContainerScanError(FailureType.MISSING_CHUNK_FILE, chunkFile, ex));
@@ -528,14 +528,17 @@ public class KeyValueContainerCheck {
   }
 
   private void loadContainerData(File containerFile) throws IOException {
-    onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
+    containerDataFromDisk = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    onDiskContainerData.setVolume(volume);
-    onDiskContainerData.setDbFile(KeyValueContainerLocationUtil.getContainerDBFile(onDiskContainerData));
+    containerDataFromDisk.setVolume(volume);
+    containerDataFromDisk.setDbFile(KeyValueContainerLocationUtil.getContainerDBFile(containerDataFromDisk));
   }
 
+  /**
+   * Injects a {@link KeyValueContainerData} object into the scan as if this was the data read from disk.
+   */
   @VisibleForTesting
-  void setContainerData(KeyValueContainerData containerData) {
-    onDiskContainerData = containerData;
+  void injectContainerDataFromDisk(KeyValueContainerData containerData) {
+    containerDataFromDisk = containerData;
   }
 }

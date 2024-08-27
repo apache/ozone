@@ -944,10 +944,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public MetadataScanResult scanMetaData() throws InterruptedException {
-    long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
+        new KeyValueContainerCheck(config, this);
     return checker.fastCheck();
   }
 
@@ -974,11 +972,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           + containerData.getState());
     }
 
-    long containerId = containerData.getContainerID();
-    KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
-
+    KeyValueContainerCheck checker = new KeyValueContainerCheck(config, this);
     return checker.fullCheck(throttler, canceler);
   }
 
