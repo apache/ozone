@@ -19,27 +19,33 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../ozone-lib/freon.robot
+Resource            ../lib/fs.robot
 Test Timeout        10 minutes
-Suite Setup         Get OM serviceId
+Suite Setup         Create volume and bucket
 
 *** Variables ***
-${OMSERVICEID}
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 ${VOLUME}           hsync-volume
 ${BUCKET}           hsync-bucket
 
 *** Keywords ***
-Get OM serviceId
-    ${confKey} =        Execute And Ignore Error        ozone getconf confKey ozone.om.service.ids
-    ${result} =         Evaluate                        "Configuration ozone.om.service.ids is missing" in """${confKey}"""
-    IF      ${result} == ${True}
-        Set Suite Variable  ${OMSERVICEID}         om
-    ELSE
-        Set Suite Variable  ${OMSERVICEID}         ${confKey}
-    END
+Create volume and bucket
+    Execute             ozone sh volume create /${volume}
+    Execute             ozone sh bucket create /${volume}/${bucket}
 
 *** Test Cases ***
-Generate key by HSYNC
-    Freon DFSG    sync=HSYNC    path=ofs://${OMSERVICEID}/${VOLUME}/${BUCKET}
+Generate key for o3fs by HSYNC
+    ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
+    Freon DFSG    sync=HSYNC    path=${path}
 
-Generate key by HFLUSH
-    Freon DFSG    sync=HFLUSH   path=ofs://${OMSERVICEID}/${VOLUME}/${BUCKET}
+Generate key for o3fs by HFLUSH
+    ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
+    Freon DFSG    sync=HFLUSH   path=${path}
+
+Generate key for ofs by HSYNC
+    ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
+    Freon DFSG    sync=HSYNC    path=${path}
+
+Generate key for ofs by HFLUSH
+    ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
+    Freon DFSG    sync=HFLUSH   path=${path}

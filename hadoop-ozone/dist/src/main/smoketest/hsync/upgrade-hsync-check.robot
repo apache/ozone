@@ -19,51 +19,29 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../lib/fs.robot
+Resource            ../debug/ozone-debug.robot
 Default Tags        pre-finalized-hsync-tests
 Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Variables ***
-${OMSERVICEID}
-${VOLUME}
-${BUCKET}
-${KEY}
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
+${VOLUME}           upgrade-hsync-volume
+${BUCKET}           upgrade-hsync-bucket
+${KEY}              upgrade-hsync-key
 
 *** Keywords ***
-Get OM serviceId
-    ${confKey} =        Execute And Ignore Error        ozone getconf confKey ozone.om.service.ids
-    ${result} =         Evaluate                        "Configuration ozone.om.service.ids is missing" in """${confKey}"""
-    IF      ${result} == ${True}
-        Set Suite Variable  ${OMSERVICEID}         om
-    ELSE
-        Set Suite Variable  ${OMSERVICEID}         ${confKey}
-    END
-Create volume for upgrade test
-    ${random} =     Generate Random String  5  [LOWER]
-    ${volume} =     Set Variable        vol-${random}
-    ${result} =     Execute             ozone sh volume create /${volume}
-                    Should not contain  ${result}       Failed
-    Set Suite Variable      ${VOLUME}           ${volume}
-
-Create bucket for upgrade test
-    ${random} =     Generate Random String  5  [LOWER]
-    ${bucket} =     Set Variable        buc-${random}
-    ${result} =     Execute             ozone sh bucket create -l FILE_SYSTEM_OPTIMIZED /${volume}/${bucket}
-                    Should not contain  ${result}       Failed
-    Set Suite Variable      ${BUCKET}           ${bucket}
-
-Create key for upgrade test
-    ${random} =     Generate Random String  5  [LOWER]
-    ${key} =        Set Variable        key-${random}
-    ${result} =     Execute             ozone sh key put /${volume}/${bucket}/${key} /etc/hosts
-    Set Suite Variable      ${KEY}          ${key}
+Create volume bucket and put key
+    Execute             ozone sh volume create /${volume}
+    Execute             ozone sh bucket create /${volume}/${bucket}
+    Execute             ozone sh key put /${volume}/${bucket}/${key} /etc/hosts
 
 *** Test Cases ***
 Test HSync Prior To Finalization
-    Get OM serviceId
-    Create volume for upgrade test
-    Create bucket for upgrade test
-    Create key for upgrade test
-    ${result} =     Execute and checkrc        ozone debug recover --path=ofs://${OMSERVICEID}/${VOLUME}/${BUCKET}/${KEY}    255
+    Create volume bucket and put key
+    ${o3fs_path} =  Format FS URL          o3fs     ${VOLUME}    ${BUCKET}    ${KEY}
+    ${result} =     Execute and checkrc    ozone debug recover --path=${o3fs_path}    255
                     Should contain  ${result}  It belongs to the layout feature HBASE_SUPPORT, whose layout version is 7
-    ${result} =     Execute and checkrc        ozone debug recover --path=o3fs://${BUCKET}.${VOLUME}.${OMSERVICEID}/${KEY}    255
+    ${ofs_path} =   Format FS URL          ofs      ${VOLUME}    ${BUCKET}    ${KEY}
+    ${result} =     Execute and checkrc    ozone debug recover --path=${ofs_path}    255
                     Should contain  ${result}  It belongs to the layout feature HBASE_SUPPORT, whose layout version is 7
