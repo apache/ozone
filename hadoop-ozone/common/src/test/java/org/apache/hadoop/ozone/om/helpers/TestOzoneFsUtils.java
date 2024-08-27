@@ -52,7 +52,7 @@ public class TestOzoneFsUtils {
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  void testGetClientConfigConvertConfigs(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) {
+  void testGetClientConfigCopyConfigs(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, hbaseEnhancementsEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);

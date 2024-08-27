@@ -378,11 +378,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   /**
-   * All 3 scenarios below should reject key commit with HSync requested from a client.
-   *
-   * ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = false
-   * ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = true
-   * ozone.hbase.enhancements.enabled = true,  ozone.fs.hsync.enabled = false
+   * All 3 scenarios below should reject key commit with HSync requested from a client:
+   * 1. ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = false
+   * 2. ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = true
+   * 3. ozone.hbase.enhancements.enabled = true,  ozone.fs.hsync.enabled = false
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false"})
