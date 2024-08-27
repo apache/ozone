@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -150,8 +149,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSta
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
@@ -182,8 +179,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
@@ -2440,85 +2435,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
     return listStatus(args, recursive, startKey, numEntries, false);
-  }
-
-  @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
-      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
-      throws IOException {
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
-        "The volume name cannot be null or " +
-        "empty.  Please enter a valid volume name or use '*' as a wild card");
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(bucketName),
-        "The bucket name cannot be null or " +
-        "empty.  Please enter a valid bucket name or use '*' as a wild card");
-
-    ListTrashRequest trashRequest = ListTrashRequest.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setStartKeyName(startKeyName)
-        .setKeyPrefix(keyPrefix)
-        .setMaxKeys(maxKeys)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.ListTrash)
-        .setListTrashRequest(trashRequest)
-        .build();
-
-    ListTrashResponse trashResponse =
-        handleError(submitRequest(omRequest)).getListTrashResponse();
-
-    List<RepeatedOmKeyInfo> deletedKeyList =
-        new ArrayList<>(trashResponse.getDeletedKeysCount());
-
-    List<RepeatedOmKeyInfo> list = new ArrayList<>();
-    for (OzoneManagerProtocolProtos.RepeatedKeyInfo
-        repeatedKeyInfo : trashResponse.getDeletedKeysList()) {
-      RepeatedOmKeyInfo fromProto =
-          RepeatedOmKeyInfo.getFromProto(repeatedKeyInfo);
-      list.add(fromProto);
-    }
-    deletedKeyList.addAll(list);
-
-    return deletedKeyList;
-  }
-
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
-        "The volume name cannot be null or empty. " +
-        "Please enter a valid volume name.");
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(bucketName),
-        "The bucket name cannot be null or empty. " +
-        "Please enter a valid bucket name.");
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(keyName),
-        "The key name cannot be null or empty. " +
-        "Please enter a valid key name.");
-
-    Preconditions.checkArgument(Strings.isNullOrEmpty(destinationBucket),
-        "The destination bucket name cannot be null or empty. " +
-        "Please enter a valid destination bucket name.");
-
-    RecoverTrashRequest.Builder req = RecoverTrashRequest.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setDestinationBucket(destinationBucket);
-
-    OMRequest omRequest = createOMRequest(Type.RecoverTrash)
-        .setRecoverTrashRequest(req)
-        .build();
-
-    RecoverTrashResponse recoverResponse =
-        handleError(submitRequest(omRequest)).getRecoverTrashResponse();
-
-    return recoverResponse.getResponse();
   }
 
   @Override
