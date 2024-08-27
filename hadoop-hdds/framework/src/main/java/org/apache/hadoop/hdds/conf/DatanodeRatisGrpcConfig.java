@@ -36,7 +36,10 @@ public class DatanodeRatisGrpcConfig {
       type = ConfigType.SIZE,
       tags = {OZONE, CLIENT, PERFORMANCE},
       description = "Maximum message size allowed to be received by Grpc " +
-          "Channel (Server)."
+          "Channel (Server). This value must be at least 1MB greater than " +
+          "the log appender buffer byte limit, " +
+          "hdds.container.ratis.log.appender.queue.byte-limit, which is 32MB by default +" +
+          ". This is to avoid the issue mentioned in RATIS-2135."
   )
   private int maximumMessageSize = 33 * 1024 * 1024;
 
