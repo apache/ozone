@@ -2164,8 +2164,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
