@@ -117,6 +117,19 @@ public class KeyValueContainerCheck {
         return MetadataScanResult.fromErrors(metadataErrors);
       }
 
+      // Container file should be valid.
+      // If it is not, no further scanning can be done.
+      File containerFile = KeyValueContainer.getContainerFile(metadataPath, containerID);
+      try {
+        loadContainerData(containerFile);
+      } catch (FileNotFoundException ex) {
+        metadataErrors.add(new ContainerScanError(FailureType.MISSING_CONTAINER_FILE, containerFile, ex));
+        return MetadataScanResult.fromErrors(metadataErrors);
+      } catch (IOException ex) {
+        metadataErrors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, ex));
+        return MetadataScanResult.fromErrors(metadataErrors);
+      }
+
       // Chunks directory should exist.
       // The metadata scan can continue even if this fails, since it does not look at the data inside the chunks
       // directory.
@@ -132,19 +145,6 @@ public class KeyValueContainerCheck {
       if (!metadataDir.exists()) {
         metadataErrors.add(new ContainerScanError(FailureType.MISSING_METADATA_DIR, metadataDir,
             new FileNotFoundException("Metadata directory " + metadataDir + " not found.")));
-        return MetadataScanResult.fromErrors(metadataErrors);
-      }
-
-      // Container file should be valid.
-      // If it is not, no further scanning can be done.
-      File containerFile = KeyValueContainer.getContainerFile(metadataPath, containerID);
-      try {
-        loadContainerData(containerFile);
-      } catch (FileNotFoundException ex) {
-        metadataErrors.add(new ContainerScanError(FailureType.MISSING_CONTAINER_FILE, containerFile, ex));
-        return MetadataScanResult.fromErrors(metadataErrors);
-      } catch (IOException ex) {
-        metadataErrors.add(new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, containerFile, ex));
         return MetadataScanResult.fromErrors(metadataErrors);
       }
 
@@ -256,8 +256,7 @@ public class KeyValueContainerCheck {
     // TODO HDDS-10374 this tree will get updated with the container's contents as it is scanned.
     ContainerMerkleTree currentTree = new ContainerMerkleTree();
 
-    File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(onDiskContainerData);
+    File dbFile = onDiskContainerData.getDbFile();
 
     // If the DB cannot be loaded, we cannot proceed with the data scan.
     if (!dbFile.exists() || !dbFile.canRead()) {
@@ -267,8 +266,6 @@ public class KeyValueContainerCheck {
       errors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, dbFile, new IOException(dbFileErrorMsg)));
       return DataScanResult.fromErrors(errors, currentTree);
     }
-
-    onDiskContainerData.setDbFile(dbFile);
 
     boolean containerDeleted = false;
     try {
@@ -498,6 +495,7 @@ public class KeyValueContainerCheck {
     onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     onDiskContainerData.setVolume(volume);
+    onDiskContainerData.setDbFile(KeyValueContainerLocationUtil.getContainerDBFile(onDiskContainerData));
   }
 
   @VisibleForTesting
