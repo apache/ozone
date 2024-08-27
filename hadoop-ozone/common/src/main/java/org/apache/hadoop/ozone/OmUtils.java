@@ -243,7 +243,7 @@ public final class OmUtils {
     case ListKeys:
     case ListKeysLight:
     case ListTrash:
-      // This is deprecated by HDDS-11251. Keeping this in here
+      // ListTrash is deprecated by HDDS-11251. Keeping this in here
       // As protobuf currently doesn't support deprecating enum fields
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
@@ -307,7 +307,7 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
-      // This is deprecated by HDDS-11251. Keeping this in here
+      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
       // As protobuf currently doesn't support deprecating enum fields
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
