@@ -530,7 +530,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
     cancelMismatchedEndpointSignal = controller;
     request.then(mismatchContainersResponse => {
-      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse?.data?.containerDiscrepancyInfo;
+      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse?.data?.containerDiscrepancyInfo && [];
 
       this.setState({
         loading: false,
