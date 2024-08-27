@@ -82,7 +82,7 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
     if (!result.isHealthy()) {
-      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
+      logUnhealthyScanResult(containerID, result, LOG);
       boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
       if (containerMarkedUnhealthy) {
         metrics.incNumUnHealthyContainers();

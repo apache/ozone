@@ -37,6 +37,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.container.ozoneimpl.AbstractBackgroundContainerScanner.logUnhealthyScanResult;
+
 /**
  * Class for performing on demand scans of containers.
  */
@@ -137,7 +139,7 @@ public final class OnDemandContainerDataScanner {
         LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
       } else {
         if (!result.isHealthy()) {
-          LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerId, result);
+          logUnhealthyScanResult(containerId, result, LOG);
           boolean containerMarkedUnhealthy = instance.containerController
               .markContainerUnhealthy(containerId, result);
           if (containerMarkedUnhealthy) {

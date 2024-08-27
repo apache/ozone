@@ -93,7 +93,8 @@ public class BackgroundContainerDataScanner extends
       LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
     } else {
       if (!result.isHealthy()) {
-        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerId, result);
+        logUnhealthyScanResult(containerId, result, LOG);
+
         // Only increment the number of unhealthy containers if the container was not already unhealthy.
         if (controller.markContainerUnhealthy(containerId, result)) {
           metrics.incNumUnHealthyContainers();
