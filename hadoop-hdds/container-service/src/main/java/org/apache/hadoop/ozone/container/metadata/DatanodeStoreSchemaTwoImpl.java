@@ -31,7 +31,7 @@ import java.io.IOException;
  * 2. A metadata table.
  * 3. A Delete Transaction Table.
  */
-public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore
+public class DatanodeStoreSchemaTwoImpl extends DatanodeStoreWithIncrementalChunkList
     implements DeleteTransactionStore<Long> {
 
   private final Table<Long, DeletedBlocksTransaction>

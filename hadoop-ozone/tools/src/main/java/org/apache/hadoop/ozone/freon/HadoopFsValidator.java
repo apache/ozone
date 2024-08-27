@@ -16,22 +16,18 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.net.URI;
 import java.security.MessageDigest;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 /**
  * Data generator tool test om performance.
@@ -42,36 +38,24 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class HadoopFsValidator extends BaseFreonGenerator
+public class HadoopFsValidator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopFsValidator.class);
 
-  @Option(names = {"--path"},
-      description = "Hadoop FS file system path",
-      defaultValue = "o3fs://bucket1.vol1")
-  private String rootPath;
-
   private ContentGenerator contentGenerator;
 
   private Timer timer;
-
-  private FileSystem fileSystem;
 
   private byte[] referenceDigest;
 
   @Override
   public Void call() throws Exception {
+    super.init();
 
-    init();
-
-    OzoneConfiguration configuration = createOzoneConfiguration();
-
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
-
-    Path file = new Path(rootPath + "/" + generateObjectName(0));
-    try (FSDataInputStream stream = fileSystem.open(file)) {
+    Path file = new Path(getRootPath() + "/" + generateObjectName(0));
+    try (FSDataInputStream stream = getFileSystem().open(file)) {
       referenceDigest = getDigest(stream);
     }
 
@@ -83,10 +67,10 @@ public class HadoopFsValidator extends BaseFreonGenerator
   }
 
   private void validateFile(long counter) throws Exception {
-    Path file = new Path(rootPath + "/" + generateObjectName(counter));
+    Path file = new Path(getRootPath() + "/" + generateObjectName(counter));
 
     byte[] content = timer.time(() -> {
-      try (FSDataInputStream input = fileSystem.open(file)) {
+      try (FSDataInputStream input = getFileSystem().open(file)) {
         return IOUtils.toByteArray(input);
       }
     });

@@ -74,9 +74,9 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     scmId = UUID.randomUUID().toString();
   }
 
-  public ScmTestMock(String clusterId, String scmId) {
+  public ScmTestMock(String clusterId) {
     this.clusterId = clusterId;
-    this.scmId = scmId;
+    this.scmId = UUID.randomUUID().toString();
   }
 
   // Map of datanode to containers
@@ -366,6 +366,10 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
 
   public void setClusterId(String clusterId) {
     this.clusterId = clusterId;
+  }
+
+  public String getScmId() {
+    return scmId;
   }
 
   public void setScmId(String scmId) {

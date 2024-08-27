@@ -20,10 +20,11 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -33,11 +34,11 @@ import org.slf4j.LoggerFactory;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
  * Response for OMSnapshotPurgeRequest.
@@ -48,18 +49,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
   private final Map<String, SnapshotInfo> updatedSnapInfos;
-  private final Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos;
 
   public OMSnapshotPurgeResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull List<String> snapshotDbKeys,
-      Map<String, SnapshotInfo> updatedSnapInfos,
-      Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos
+      Map<String, SnapshotInfo> updatedSnapInfos
   ) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
     this.updatedSnapInfos = updatedSnapInfos;
-    this.updatedPreviousAndGlobalSnapInfos = updatedPreviousAndGlobalSnapInfos;
   }
 
   /**
@@ -71,7 +69,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     checkStatusNotOK();
     this.snapshotDbKeys = null;
     this.updatedSnapInfos = null;
-    this.updatedPreviousAndGlobalSnapInfos = null;
   }
 
   @Override
@@ -80,8 +77,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
-    updateSnapInfo(metadataManager, batchOperation,
-        updatedPreviousAndGlobalSnapInfos);
     updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
     for (String dbKey: snapshotDbKeys) {
       // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
@@ -116,15 +111,24 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
    */
   private void deleteCheckpointDirectory(OMMetadataManager omMetadataManager,
                                          SnapshotInfo snapshotInfo) {
-    RDBStore store = (RDBStore) omMetadataManager.getStore();
-    String checkpointPrefix = store.getDbLocation().getName();
-    Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
-    try {
-      FileUtils.deleteDirectory(snapshotDirPath.toFile());
-    } catch (IOException ex) {
-      LOG.error("Failed to delete snapshot directory {} for snapshot {}",
-          snapshotDirPath, snapshotInfo.getTableKey(), ex);
+    // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
+    // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
+    // directory can run in parallel along with this operation.
+    OMLockDetails omLockDetails = omMetadataManager.getLock()
+        .acquireWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+            snapshotInfo.getName());
+    boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
+    if (acquiredSnapshotLock) {
+      Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
+      try {
+        FileUtils.deleteDirectory(snapshotDirPath.toFile());
+      } catch (IOException ex) {
+        LOG.error("Failed to delete snapshot directory {} for snapshot {}",
+            snapshotDirPath, snapshotInfo.getTableKey(), ex);
+      } finally {
+        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
+            snapshotInfo.getBucketName(), snapshotInfo.getName());
+      }
     }
   }
 }

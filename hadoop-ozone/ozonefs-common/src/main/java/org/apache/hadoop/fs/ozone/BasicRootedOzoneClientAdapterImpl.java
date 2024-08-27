@@ -43,19 +43,28 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -67,8 +76,12 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -89,8 +102,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -241,11 +260,8 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  OzoneBucket getBucket(OFSPath ofsPath, boolean createIfNotExist)
-      throws IOException {
-
-    return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-        createIfNotExist);
+  OzoneBucket getBucket(OFSPath ofsPath, boolean createIfNotExist)throws IOException {
+    return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(), createIfNotExist);
   }
 
   /**
@@ -257,8 +273,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * @throws IOException Exceptions other than OMException with result code
    *                     VOLUME_NOT_FOUND or BUCKET_NOT_FOUND.
    */
-  private OzoneBucket getBucket(String volumeStr, String bucketStr,
-      boolean createIfNotExist) throws IOException {
+  private OzoneBucket getBucket(String volumeStr, String bucketStr, boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
 
@@ -268,7 +283,7 @@ public class BasicRootedOzoneClientAdapterImpl
           "getBucket: Invalid argument: given bucket string is empty.");
     }
 
-    OzoneBucket bucket;
+    OzoneBucket bucket = null;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
@@ -280,44 +295,8 @@ public class BasicRootedOzoneClientAdapterImpl
       OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
       if (createIfNotExist) {
-        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
-        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
-        // when ACL is disabled. Both exceptions need to be handled.
-        switch (ex.getResult()) {
-        case VOLUME_NOT_FOUND:
-          // Create the volume first when the volume doesn't exist
-          try {
-            objectStore.createVolume(volumeStr);
-          } catch (OMException newVolEx) {
-            // Ignore the case where another client created the volume
-            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-              throw newVolEx;
-            }
-          }
-          // No break here. Proceed to create the bucket
-        case BUCKET_NOT_FOUND:
-          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
-          // exists, so that we don't call create volume and incur
-          // unnecessary ACL checks which could lead to unwanted behavior.
-          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
-          // Create the bucket
-          try {
-            // Buckets created by OFS should be in FSO layout
-            volume.createBucket(bucketStr,
-                BucketArgs.newBuilder().setBucketLayout(
-                    this.defaultOFSBucketLayout).build());
-          } catch (OMException newBucEx) {
-            // Ignore the case where another client created the bucket
-            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
-              throw newBucEx;
-            }
-          }
-          break;
-        default:
-          // Throw unhandled exception
-          throw ex;
-        }
-        // Try get bucket again
+        handleVolumeOrBucketCreationOnException(volumeStr, bucketStr, ex);
+        // Try to get the bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
       } else {
         throw ex;
@@ -325,6 +304,41 @@ public class BasicRootedOzoneClientAdapterImpl
     }
 
     return bucket;
+  }
+
+  private void handleVolumeOrBucketCreationOnException(String volumeStr, String bucketStr, OMException ex)
+      throws IOException {
+    // OM can throw VOLUME_NOT_FOUND when the parent volume does not exist, and in this case we may create the volume,
+    // OM can also throw BUCKET_NOT_FOUND when the parent bucket does not exist, and so we also may create the bucket.
+    // This method creates the volume and the bucket when an exception marks that they don't exist.
+    switch (ex.getResult()) {
+    case VOLUME_NOT_FOUND:
+      // Create the volume first when the volume doesn't exist
+      try {
+        objectStore.createVolume(volumeStr);
+      } catch (OMException newVolEx) {
+        // Ignore the case where another client created the volume
+        if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+          throw newVolEx;
+        }
+      }
+      // No break here. Proceed to create the bucket
+    case BUCKET_NOT_FOUND:
+      // Create the bucket
+      try {
+        // Buckets created by OFS should be in FSO layout
+        BucketArgs defaultBucketArgs = BucketArgs.newBuilder().setBucketLayout(this.defaultOFSBucketLayout).build();
+        proxy.createBucket(volumeStr, bucketStr, defaultBucketArgs);
+      } catch (OMException newBucEx) {
+        // Ignore the case where another client created the bucket
+        if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
+          throw newBucEx;
+        }
+      }
+      break;
+    default:
+      throw ex;
+    }
   }
 
   /**
@@ -496,30 +510,40 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (ofsPath.getVolumeName().isEmpty()) {
+
+    String volumeName = ofsPath.getVolumeName();
+    if (volumeName.isEmpty()) {
       // Volume name unspecified, invalid param, return failure
       return false;
     }
-    if (ofsPath.getBucketName().isEmpty()) {
-      // Create volume only
-      objectStore.createVolume(ofsPath.getVolumeName());
+
+    String bucketName = ofsPath.getBucketName();
+    if (bucketName.isEmpty()) {
+      // Create volume only as path only contains one element the volume.
+      objectStore.createVolume(volumeName);
       return true;
     }
+
     String keyStr = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, true);
-      // Empty keyStr here indicates only volume and bucket is
-      // given in pathStr, so getBucket above should handle the creation
-      // of volume and bucket. We won't feed empty keyStr to
-      // bucket.createDirectory as that would be a NPE.
-      if (keyStr != null && keyStr.length() > 0) {
-        bucket.createDirectory(keyStr);
+      if (keyStr == null || keyStr.isEmpty()) {
+        // This is the case when the given path only contains volume and bucket.
+        // If the bucket does not exist, then this will throw and bucket will be created
+        // in handleVolumeOrBucketCreationOnException later.
+        proxy.getBucketDetails(volumeName, bucketName);
+      } else {
+        proxy.createDirectory(volumeName, bucketName, keyStr);
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
         throw new FileAlreadyExistsException(e.getMessage());
       }
-      throw e;
+      // Create volume and bucket if they do not exist, and retry key creation.
+      // This call will throw an exception if it fails, or the exception is different than it handles.
+      handleVolumeOrBucketCreationOnException(volumeName, bucketName, e);
+      if (keyStr != null && !keyStr.isEmpty()) {
+        proxy.createDirectory(volumeName, bucketName, keyStr);
+      }
     }
     return true;
   }
@@ -941,6 +965,11 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
+    return objectStore.getServerDefaults();
+  }
+
+  @Override
   public KeyProvider getKeyProvider() throws IOException {
     return objectStore.getKeyProvider();
   }
@@ -1345,30 +1374,105 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr, config);
     String key = ofsPath.getKeyName();
     if (ofsPath.isRoot() || ofsPath.isVolume()) {
-      throw new IOException("not a file");
+      throw new FileNotFoundException("Path is not a file.");
     } else {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-      if (ofsPath.isSnapshotPath()) {
-        throw new IOException("file is in a snapshot.");
-      } else {
-        OzoneFileStatus status = bucket.getFileStatus(key);
-        if (!status.isFile()) {
-          throw new IOException("not a file");
+      try {
+        OzoneBucket bucket = getBucket(ofsPath, false);
+        if (ofsPath.isSnapshotPath()) {
+          throw new IOException("file is in a snapshot.");
+        } else {
+          OzoneFileStatus status = bucket.getFileStatus(key);
+          if (!status.isFile()) {
+            throw new FileNotFoundException("Path is not a file.");
+          }
+          return !status.getKeyInfo().isHsync();
         }
-        return !status.getKeyInfo().isHsync();
+      } catch (OMException ome) {
+        if (ome.getResult() == FILE_NOT_FOUND ||
+            ome.getResult() == VOLUME_NOT_FOUND ||
+            ome.getResult() == BUCKET_NOT_FOUND) {
+          throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+        }
+        throw ome;
       }
     }
   }
 
   @Override
-  public boolean recoverLease(final String pathStr) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+  public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-    OzoneBucket bucket = getBucket(ofsPath, false);
-    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-            volume.getName(), bucket.getName(), ofsPath.getKeyName());
+    try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      ClientProtocol clientProtocol = ozoneClient.getProxy();
+      return clientProtocol.recoverLease(
+          bucket.getVolumeName(), bucket.getName(), ofsPath.getKeyName(), force);
+    } catch (OMException ome) {
+      if (ome.getResult() == NOT_A_FILE) {
+        throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
+      } else if (ome.getResult() == KEY_NOT_FOUND ||
+          ome.getResult() == DIRECTORY_NOT_FOUND ||
+          ome.getResult() == VOLUME_NOT_FOUND ||
+          ome.getResult() == BUCKET_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
+    }
+  }
+
+  @Override
+  public void recoverFile(OmKeyArgs keyArgs) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
+
+    ClientProtocol clientProtocol = ozoneClient.getProxy();
+    clientProtocol.recoverKey(keyArgs, 0L);
+  }
+
+  @Override
+  public long finalizeBlock(OmKeyLocationInfo block) throws IOException {
+    incrementCounter(Statistic.INVOCATION_FINALIZE_BLOCK, 1);
+    RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+    XceiverClientFactory xceiverClientFactory = rpcClient.getXceiverClientManager();
+    Pipeline pipeline = block.getPipeline();
+    XceiverClientSpi client = null;
+    try {
+      // If pipeline is still open
+      if (pipeline.isOpen()) {
+        client = xceiverClientFactory.acquireClient(pipeline);
+        ContainerProtos.FinalizeBlockResponseProto finalizeBlockResponseProto =
+            ContainerProtocolCalls.finalizeBlock(client, block.getBlockID().getDatanodeBlockIDProtobuf(),
+                block.getToken());
+        return BlockData.getFromProtoBuf(finalizeBlockResponseProto.getBlockData()).getSize();
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to execute finalizeBlock command", e);
+    } finally {
+      if (client != null) {
+        xceiverClientFactory.releaseClient(client, false);
+      }
+    }
+
+    // Try fetch block committed length from DN
+    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
+    if (!(replicationConfig instanceof ReplicatedReplicationConfig)) {
+      throw new IOException("ReplicationConfig type " + replicationConfig.getClass().getSimpleName() +
+          " is not supported in finalizeBlock");
+    }
+    StandaloneReplicationConfig newConfig = StandaloneReplicationConfig.getInstance(
+        ((ReplicatedReplicationConfig) replicationConfig).getReplicationFactor());
+    Pipeline.Builder builder = Pipeline.newBuilder().setReplicationConfig(newConfig).setId(PipelineID.randomId())
+        .setNodes(block.getPipeline().getNodes()).setState(Pipeline.PipelineState.OPEN);
+    try {
+      client = xceiverClientFactory.acquireClientForReadData(builder.build());
+      ContainerProtos.GetCommittedBlockLengthResponseProto responseProto =
+          ContainerProtocolCalls.getCommittedBlockLength(client, block.getBlockID(), block.getToken());
+      return responseProto.getBlockLength();
+    } finally {
+      if (client != null) {
+        xceiverClientFactory.releaseClient(client, false);
+      }
+    }
   }
 
   @Override

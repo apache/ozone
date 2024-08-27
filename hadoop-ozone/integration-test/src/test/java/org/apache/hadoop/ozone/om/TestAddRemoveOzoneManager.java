@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -285,6 +286,7 @@ public class TestAddRemoveOzoneManager {
    * 1. Stop 1 OM and update configs on rest, bootstrap new node -> fail
    * 2. Force bootstrap (with 1 node down and updated configs on rest) -> pass
    */
+  @Flaky("HDDS-11358")
   @Test
   public void testForceBootstrap() throws Exception {
     GenericTestUtils.setLogLevel(GrpcLogAppender.LOG, Level.ERROR);

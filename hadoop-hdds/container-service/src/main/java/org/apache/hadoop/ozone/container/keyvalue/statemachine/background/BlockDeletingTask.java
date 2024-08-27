@@ -22,6 +22,8 @@ import java.io.IOException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
@@ -325,6 +327,8 @@ public class BlockDeletingTask implements BackgroundTask {
     try {
       Table<String, BlockData> blockDataTable =
           meta.getStore().getBlockDataTable();
+      Table<String, BlockData> lastChunkInfoTable =
+          meta.getStore().getLastChunkInfoTable();
       DeleteTransactionStore<?> txnStore =
           (DeleteTransactionStore<?>) meta.getStore();
       Table<?, DeletedBlocksTransaction> deleteTxns =
@@ -374,7 +378,10 @@ public class BlockDeletingTask implements BackgroundTask {
         for (DeletedBlocksTransaction delTx : deletedBlocksTxs) {
           deleter.apply(deleteTxns, batch, delTx.getTxID());
           for (Long blk : delTx.getLocalIDList()) {
+            // delete from both blockDataTable and lastChunkInfoTable.
             blockDataTable.deleteWithBatch(batch,
+                containerData.getBlockKey(blk));
+            lastChunkInfoTable.deleteWithBatch(batch,
                 containerData.getBlockKey(blk));
           }
         }
@@ -424,14 +431,27 @@ public class BlockDeletingTask implements BackgroundTask {
       List<DeletedBlocksTransaction> delBlocks, Handler handler,
       Table<String, BlockData> blockDataTable, Container container)
       throws IOException {
+
     int blocksProcessed = 0;
     int blocksDeleted = 0;
     long bytesReleased = 0;
     List<DeletedBlocksTransaction> deletedBlocksTxs = new ArrayList<>();
     Instant startTime = Instant.now();
 
+    // Track deleted blocks to avoid duplicate deletion
+    Set<Long> deletedBlockSet = new HashSet<>();
+
     for (DeletedBlocksTransaction entry : delBlocks) {
       for (Long blkLong : entry.getLocalIDList()) {
+        // Increment blocksProcessed for every block processed
+        blocksProcessed++;
+
+        // Check if the block has already been deleted
+        if (deletedBlockSet.contains(blkLong)) {
+          LOG.debug("Skipping duplicate deletion for block {}", blkLong);
+          continue;
+        }
+
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
         LOG.debug("Deleting block {}", blkLong);
@@ -442,8 +462,6 @@ public class BlockDeletingTask implements BackgroundTask {
             LOG.error("Failed to delete files for unreferenced block {} of" +
                     " container {}", blkLong,
                 container.getContainerData().getContainerID(), e);
-          } finally {
-            blocksProcessed++;
           }
           continue;
         }
@@ -453,14 +471,14 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, blkInfo);
           blocksDeleted++;
           deleted = true;
+          // Track this block as deleted
+          deletedBlockSet.add(blkLong);
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,
           //  otherwise invalid numPendingDeletionBlocks could accumulate
           //  beyond the limit and the following deletion will stop.
           LOG.error("Failed to delete files for block {}", blkLong, e);
-        } finally {
-          blocksProcessed++;
         }
 
         if (deleted) {
