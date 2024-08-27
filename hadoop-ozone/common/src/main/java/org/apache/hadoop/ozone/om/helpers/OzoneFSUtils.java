@@ -18,10 +18,16 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
 import jakarta.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.file.Paths;
 import java.util.UUID;
 
@@ -32,6 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  * Utility class for OzoneFileSystem.
  */
 public final class OzoneFSUtils {
+  static final Logger LOG = LoggerFactory.getLogger(OzoneFSUtils.class);
 
   private OzoneFSUtils() { }
 
@@ -291,5 +298,52 @@ public final class OzoneFSUtils {
       res = res.getParent();
     }
     return res;
+  }
+
+  /**
+   * This differs from plain configSource.getObject(OzoneClientConfig.class) in
+   * that it injects some global conf values into the resulting OzoneClientConfig.
+   */
+  public static OzoneClientConfig getClientConfig(ConfigurationSource configSource) {
+    // Extract relevant global conf from OzoneConfigKeys to be injected to OzoneClientConfig
+    boolean hbaseEnhancementsEnabled = configSource.getBoolean(
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED_DEFAULT);
+    LOG.debug("ConfigurationSource has {} = {}",
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, hbaseEnhancementsEnabled);
+
+    boolean hsyncEnabled = configSource.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    LOG.debug("ConfigurationSource has {} = {}",
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, hsyncEnabled);
+
+    OzoneClientConfig ozoneClientConfig = configSource.getObject(OzoneClientConfig.class);
+    // Set ozone.client.hbase.enhancements.enabled to ozone.hbase.enhancements.enabled value
+    ozoneClientConfig.setHBaseEnhancementsEnabled(hbaseEnhancementsEnabled);
+    // Set ozone.client.fs.hsync.enabled to ozone.fs.hsync.enabled
+    ozoneClientConfig.setFsHsyncEnabled(hsyncEnabled);
+
+    return ozoneClientConfig;
+  }
+
+  /**
+   * Helper method to return whether Hsync can be enabled.
+   * And print warning when the config is ignored.
+   */
+  public static boolean canEnableHsync(ConfigurationSource conf) {
+    boolean confHBaseEnhancementsEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED_DEFAULT);
+
+    boolean confHsyncEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+
+    if (confHBaseEnhancementsEnabled) {
+      return confHsyncEnabled;
+    } else {
+      LOG.warn("Ignoring {} = {} because HBase enhancements are disabled. " +
+          "To enable it, set {} = true as well.",
+          OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, confHsyncEnabled,
+          OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED);
+      return false;
+    }
   }
 }

@@ -4217,11 +4217,29 @@
   </property>
 
   <property>
+    <name>ozone.hbase.enhancements.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT, OM</tag>
+    <description>
+      When set to false, HBase enhancement-related Ozone (experimental) features
+      are disabled regardless of whether those configs are set.
+
+      More precisely, here is the list of configs and values overridden when this config is set to false:
+      1. ozone.fs.hsync.enabled = false
+      2. ozone.client.incremental.chunk.list = false
+      3. ozone.client.stream.putblock.piggybacking = false
+      4. ozone.client.key.write.concurrency = 1
+
+      A warning message will be printed if any of the above configs are overridden by this.
+    </description>
+  </property>
+  <property>
     <name>ozone.fs.hsync.enabled</name>
     <value>false</value>
-    <tag>OZONE, CLIENT</tag>
+    <tag>OZONE, CLIENT, OM</tag>
     <description>
-      Enable hsync/hflush. By default they are disabled.
+      Enable hsync/hflush on the Ozone Manager and/or client side. Disabled by default.
+      Can be enabled only when ozone.hbase.enhancements.enabled = true
     </description>
   </property>
   <property>

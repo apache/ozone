@@ -132,6 +132,7 @@ public class TestOMKeyRequest {
         folder.toAbsolutePath().toString());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
+    ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, true);
     ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);

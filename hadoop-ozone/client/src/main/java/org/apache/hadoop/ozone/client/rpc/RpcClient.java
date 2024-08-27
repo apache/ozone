@@ -34,6 +34,7 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -250,7 +251,7 @@ public class RpcClient implements ClientProtocol {
     this.userRights = aclConfig.getUserDefaultRights();
     this.groupRights = aclConfig.getGroupDefaultRights();
 
-    this.clientConfig = conf.getObject(OzoneClientConfig.class);
+    this.clientConfig = OzoneFSUtils.getClientConfig(conf);
     this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
         "ec-reconstruct-reader-TID-%d"));
@@ -2489,9 +2490,7 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       KeyOutputStream keyOutputStream)
       throws IOException {
-    boolean enableHsync = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(conf);
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
@@ -2503,9 +2502,7 @@ public class RpcClient implements ClientProtocol {
 
   private OzoneOutputStream createSecureOutputStream(OpenKeySession openKey,
       OutputStream keyOutputStream, Syncable syncable) throws IOException {
-    boolean enableHsync = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(conf);
     final FileEncryptionInfo feInfo =
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
