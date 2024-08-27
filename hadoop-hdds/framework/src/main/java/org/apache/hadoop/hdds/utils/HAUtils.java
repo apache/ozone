@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -371,13 +370,6 @@ public final class HAUtils {
     }
     return sstList;
   }
-
-  private static List<X509Certificate> generateCAList(CertificateClient certClient) {
-    List<X509Certificate> caCertPemList = new ArrayList<>(certClient.getAllRootCaCerts());
-    caCertPemList.addAll(certClient.getAllCaCerts());
-    return caCertPemList;
-  }
-
 
   /**
    * Retry forever until CA list matches expected count.

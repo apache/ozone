@@ -728,9 +728,9 @@ public class TestContainerCommandsEC {
           Pipeline p = containerToDeletePipeline.get(j);
           org.apache.hadoop.ozone.container.common.helpers.BlockData[]
               blockData = ecContainerOperationClient.listBlock(
-              conID, p.getFirstNode(),
-              (ECReplicationConfig) p.getReplicationConfig(),
-              cToken);
+                  conID, p.getFirstNode(),
+                  (ECReplicationConfig) p.getReplicationConfig(),
+                  cToken);
           blockDataArrList.add(blockData);
           // Delete the first index container
           XceiverClientSpi client = xceiverClientManager.acquireClient(
@@ -881,7 +881,7 @@ public class TestContainerCommandsEC {
     StorageContainerException ex =
         assertThrows(StorageContainerException.class, () -> {
           try (ECContainerOperationClient client =
-                   new ECContainerOperationClient(config, certClient)) {
+              new ECContainerOperationClient(config, certClient)) {
             client.listBlock(conID, targetDNToCheckContainerCLeaned,
                 new ECReplicationConfig(3, 2), cToken);
           }
