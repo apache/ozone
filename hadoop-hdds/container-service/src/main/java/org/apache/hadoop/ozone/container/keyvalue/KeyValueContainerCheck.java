@@ -22,11 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -110,15 +110,8 @@ public class KeyValueContainerCheck {
 
     try {
       List<ContainerScanError> metadataErrors = scanMetadata();
-      try {
-        // We need to check if the container was deleted
-        // If the metadata scan came back with errors, check if they could have been caused by the container getting
-        // deleted. In this case the errors should be ignored.
-        if (!metadataErrors.isEmpty() && containerDataFromDisk != null && containerIsDeleted()) {
-          return MetadataScanResult.deleted();
-        }
-      } catch (IOException ex) {
-        metadataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, containerDataFromDisk.getDbFile(), ex));
+      if (containerIsDeleted()) {
+        return MetadataScanResult.deleted();
       }
       return MetadataScanResult.fromErrors(metadataErrors);
     } finally {
@@ -192,10 +185,10 @@ public class KeyValueContainerCheck {
     // If the metadata check fails, we cannot do the data check.
     // The DataScanResult will have an empty tree with 0 checksums to indicate this.
     MetadataScanResult metadataResult = fastCheck();
-    if (!metadataResult.isHealthy()) {
-      return DataScanResult.unhealthyMetadata(metadataResult);
-    } else if (metadataResult.isDeleted()) {
+    if (metadataResult.isDeleted()) {
       return DataScanResult.deleted();
+    } else if (!metadataResult.isHealthy()) {
+      return DataScanResult.unhealthyMetadata(metadataResult);
     }
 
     LOG.debug("Running data checks for container {}", containerID);
@@ -203,14 +196,8 @@ public class KeyValueContainerCheck {
       // TODO HDDS-10374 this tree will get updated with the container's contents as it is scanned.
       ContainerMerkleTree dataTree = new ContainerMerkleTree();
       List<ContainerScanError> dataErrors = scanData(dataTree, throttler, canceler);
-      try {
-        // If the data scan came back with errors, check if they could have been caused by the container getting
-        // deleted. In this case the errors should be ignored.
-        if (!dataErrors.isEmpty() && containerIsDeleted()) {
-          return DataScanResult.deleted();
-        }
-      } catch (IOException ex) {
-        dataErrors.add(new ContainerScanError(FailureType.INACCESSIBLE_DB, containerDataFromDisk.getDbFile(), ex));
+      if (containerIsDeleted()) {
+        return DataScanResult.deleted();
       }
       return DataScanResult.fromErrors(dataErrors, dataTree);
     } finally {
@@ -246,13 +233,9 @@ public class KeyValueContainerCheck {
                containerDataFromDisk.getContainerID(),
                containerDataFromDisk.getUnprefixedKeyFilter())) {
         // If the container was deleted during the scan, stop trying to process its data.
-        boolean containerDeleted = false;
-        while (kvIter.hasNext() && !containerDeleted) {
+        while (kvIter.hasNext() && !containerIsDeleted()) {
           List<ContainerScanError> blockErrors = scanBlock(db, dbFile, kvIter.nextBlock(), throttler, canceler,
               currentTree);
-          // In the common case there will be no errors reading the block. Only if there are errors do we need to
-          // check if the container was deleted during the scan.
-          containerDeleted = !blockErrors.isEmpty() && containerIsDeleted(db);
           errors.addAll(blockErrors);
         }
       }
@@ -314,35 +297,12 @@ public class KeyValueContainerCheck {
   }
 
   /**
-   * Checks if a container has been deleted using the database.
-   *
-   * A Schema V2 contianer is determined to be deleted if its database is no longer present on disk.
-   * A Schema V3 container is determined to be deleted if its entries have been removed from the DB.
-   * This method checks the block count key for existence since this is used by EC and Ratis containers.
+   * Checks if a container has been deleted based on its state in datanode memory. This state change is the first
+   * step in deleting a container on a datanode and is done in a thread-safe manner. See KeyValueHandler#deleteInternal.
    */
-  private boolean containerIsDeleted(DBHandle db) throws IOException {
-    if (containerDataFromMemory.hasSchema(OzoneConsts.SCHEMA_V3)) {
-      // TODO use iterator and check for entries.
-      return db.getStore().getMetadataTable().get(containerDataFromMemory.getBlockCountKey()) == null;
-    } else {
-      return !containerDataFromMemory.getDbFile().exists();
-    }
+  private boolean containerIsDeleted() {
+    return containerDataFromMemory.getState() == State.DELETED;
   }
-
-  /**
-   * Checks if a container has been deleted using the database. This method allocates a DB handle instance if the
-   * caller does not already have one.
-   *
-   * A Schema V2 container is determined to be deleted if its database is no longer present on disk.
-   * A Schema V3 container is determined to be deleted if its entries have been removed from the DB.
-   * This method checks the block count key for existence since this is used by EC and Ratis containers.
-   */
-  private boolean containerIsDeleted() throws IOException {
-    try (DBHandle db = BlockUtils.getDB(containerDataFromMemory, checkConfig)) {
-      return containerIsDeleted(db);
-    }
-  }
-
 
   /**
    *  Attempt to read the block data without the container lock.
