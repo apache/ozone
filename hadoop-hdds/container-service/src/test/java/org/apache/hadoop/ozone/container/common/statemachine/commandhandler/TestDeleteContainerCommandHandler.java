@@ -67,7 +67,8 @@ public class TestDeleteContainerCommandHandler {
   }
 
   @Test
-  public void testExpiredCommandsAreNotProcessed() throws IOException {
+  public void testExpiredCommandsAreNotProcessed()
+      throws IOException, InterruptedException {
     DeleteContainerCommandHandler handler = createSubject(clock, 1000);
 
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
@@ -79,9 +80,11 @@ public class TestDeleteContainerCommandHandler {
 
     clock.fastForward(15000);
     handler.handle(command1, ozoneContainer, null, null);
+    Thread.sleep(1000);
     assertEquals(1, handler.getTimeoutCount());
     handler.handle(command2, ozoneContainer, null, null);
     handler.handle(command3, ozoneContainer, null, null);
+    Thread.sleep(1000);
     assertEquals(1, handler.getTimeoutCount());
     assertEquals(3, handler.getInvocationCount());
     verify(controller, times(0))
