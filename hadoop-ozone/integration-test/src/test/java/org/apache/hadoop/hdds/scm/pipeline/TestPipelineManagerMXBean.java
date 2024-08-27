@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import java.lang.management.ManagementFactory;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 
@@ -71,19 +73,17 @@ public class TestPipelineManagerMXBean {
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
-    Map<String, Integer> pipelineStateCount = cluster
-        .getStorageContainerManager().getPipelineManager().getPipelineInfo();
 
     GenericTestUtils.waitFor(() -> {
       try {
+        Map<String, Integer> pipelineStateCount = cluster
+          .getStorageContainerManager().getPipelineManager().getPipelineInfo();
         final TabularData data = (TabularData) mbs.getAttribute(
             bean, "PipelineInfo");
         for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {
           final Integer count = entry.getValue();
           final Integer currentCount = getMetricsCount(data, entry.getKey());
           if (currentCount == null || !currentCount.equals(count)) {
-            LOG.error("PipelineState = {}: [currentCount = {}, PipelineCount = {}]",
-                entry.getKey(), currentCount, count);
             return false;
           }
         }
@@ -91,7 +91,7 @@ public class TestPipelineManagerMXBean {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500, 12000);
+    }, 500, 3000);
   }
 
   private Integer getMetricsCount(TabularData data, String state) {
