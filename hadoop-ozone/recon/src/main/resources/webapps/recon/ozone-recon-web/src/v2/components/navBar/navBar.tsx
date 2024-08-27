@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios, { AxiosResponse } from 'axios';
 import { Layout, Menu, Spin } from 'antd';
 import {
@@ -52,20 +52,20 @@ const NavBar: React.FC<NavBarProps> = ({
   onCollapse = () => { }
 }) => {
   const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(false);
-  let cancelDisabledFeatureSignal: AbortController;
+  const cancelDisabledFeatureSignal = useRef<AbortController>();
   const location = useLocation();
 
   const fetchDisabledFeatures = async () => {
     const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
     const { request, controller } = AxiosGetHelper(
       disabledfeaturesEndpoint,
-      cancelDisabledFeatureSignal
+      cancelDisabledFeatureSignal.current
     )
-    cancelDisabledFeatureSignal = controller;
+    cancelDisabledFeatureSignal.current = controller;
     try {
       const response: AxiosResponse<string[]> = await request;
       const heatmapDisabled = response?.data?.includes('HEATMAP')
-      setIsHeatmapEnabled(!heatmapDisabled)
+      setIsHeatmapEnabled(!heatmapDisabled);
     } catch (error: unknown) {
       showDataFetchError((error as Error).toString())
     }
@@ -76,7 +76,7 @@ const NavBar: React.FC<NavBarProps> = ({
     fetchDisabledFeatures();
     // Component will unmount
     return (() => {
-      cancelRequests([cancelDisabledFeatureSignal])
+      cancelRequests([cancelDisabledFeatureSignal.current!])
     })
   }, [])
 
