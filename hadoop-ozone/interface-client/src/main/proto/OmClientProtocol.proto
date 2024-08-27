@@ -743,10 +743,10 @@ message BucketInfo {
 }
 
 enum StorageTypeProto {
-    DISK = 1 [deprecated = true];
-    SSD = 2 [deprecated = true];
-    ARCHIVE = 3 [deprecated = true];
-    RAM_DISK = 4 [deprecated = true];
+    DISK = 1;
+    SSD = 2;
+    ARCHIVE = 3;
+    RAM_DISK = 4;
 }
 
 enum BucketLayoutProto {
