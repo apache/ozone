@@ -24,6 +24,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <packaging>pom</packaging>
 
   <modules>
+    <module>dev-support</module>
     <module>hadoop-hdds</module>
     <module>hadoop-ozone</module>
   </modules>
@@ -1708,25 +1709,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
         <version>${maven-remote-resources-plugin.version}</version>
-        <configuration>
-          <resourceBundles>
-            <resourceBundle>org.apache.hadoop:hadoop-build-tools:${hadoop.version}</resourceBundle>
-          </resourceBundles>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-build-tools</artifactId>
-            <version>${hadoop.version}</version>
-          </dependency>
-        </dependencies>
-        <executions>
-          <execution>
-            <goals>
-              <goal>process</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
