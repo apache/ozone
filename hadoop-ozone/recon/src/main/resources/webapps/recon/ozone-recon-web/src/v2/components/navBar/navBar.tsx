@@ -138,18 +138,16 @@ const NavBar: React.FC<NavBarProps> = ({
       <Link to='/DiskUsage' />
     </Menu.Item>
   ), (
-    isHeatmapEnabled
-      ? <>
-        <Menu.Item key='/Heatmap'
-          icon={<LayoutOutlined />}>
-          <span>Heatmap</span>
-          <Link to={{
-            pathname: '/Heatmap',
-            state: { isHeatmapEnabled: true }
-          }}
-          />
-        </Menu.Item></>
-      : <></>
+    isHeatmapEnabled &&
+    <Menu.Item key='/Heatmap'
+      icon={<LayoutOutlined />}>
+      <span>Heatmap</span>
+      <Link to={{
+        pathname: '/Heatmap',
+        state: { isHeatmapEnabled: true }
+      }}
+      />
+    </Menu.Item>
   )]
   return (
     <Layout.Sider
@@ -173,7 +171,7 @@ const NavBar: React.FC<NavBarProps> = ({
         defaultSelectedKeys={['/Dashboard']}
         mode='inline'
         selectedKeys={[location.pathname]} >
-          {...menuItems}
+        {...menuItems}
       </Menu>
     </Layout.Sider>
   );
