@@ -136,7 +136,7 @@ public class KeyValueContainerCheck {
       }
 
       // Container file should be valid.
-      // If it does not, no further scanning can be done.
+      // If it is not, no further scanning can be done.
       File containerFile = KeyValueContainer.getContainerFile(metadataPath, containerID);
       try {
         loadContainerData(containerFile);
