@@ -17,8 +17,13 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -32,7 +37,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.OptionalLong;
 
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -163,8 +167,10 @@ public class TestDeleteContainerCommandHandler {
 
   private static DeleteContainerCommandHandler createSubject(
       TestClock clock, int queueSize) {
-    return new DeleteContainerCommandHandler(clock,
-        newDirectExecutorService(), queueSize);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
+    ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.
+        newFixedThreadPool(1, threadFactory);
+    return new DeleteContainerCommandHandler(clock, executor, queueSize);
   }
 
   private static DeleteContainerCommandHandler createSubjectWithPoolSize(

@@ -63,22 +63,17 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return (int) supervisor.getReplicationRequestCount(
-        ECReconstructionCoordinatorTask.class);
+    return 0;
   }
 
   @Override
   public long getAverageRunTime() {
-    int invocationCount = getInvocationCount();
-    if (invocationCount > 0) {
-      return getTotalRunTime() / invocationCount;
-    }
     return 0;
   }
 
   @Override
   public long getTotalRunTime() {
-    return supervisor.getTotalTime(ECReconstructionCoordinatorTask.class);
+    return 0;
   }
 
   @Override

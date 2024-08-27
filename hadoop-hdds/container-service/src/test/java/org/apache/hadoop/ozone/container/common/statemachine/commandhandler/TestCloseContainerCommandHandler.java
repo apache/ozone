@@ -299,6 +299,15 @@ public class TestCloseContainerCommandHandler {
   public void testThreadPoolPoolSize() {
     assertEquals(1, subject.getThreadPoolMaxPoolSize());
     assertEquals(0, subject.getThreadPoolActivePoolSize());
+
+    CloseContainerCommandHandler closeContainerCommandHandler =
+        new CloseContainerCommandHandler(10, 10, "");
+    closeContainerCommandHandler.handle(closeWithUnknownPipeline(),
+        ozoneContainer, context, null);
+    closeContainerCommandHandler.handle(closeWithUnknownPipeline(),
+        ozoneContainer, context, null);
+    assertEquals(10, closeContainerCommandHandler.getThreadPoolMaxPoolSize());
+    assertEquals(2, closeContainerCommandHandler.getThreadPoolActivePoolSize());
   }
 
 }

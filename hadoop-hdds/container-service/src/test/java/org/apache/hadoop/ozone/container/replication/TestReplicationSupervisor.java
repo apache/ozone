@@ -82,7 +82,6 @@ import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerComman
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.mockito.Mockito.any;
@@ -165,33 +164,6 @@ public class TestReplicationSupervisor {
       assertEquals(1, metricsCollector.getRecords().size());
     } finally {
       metrics.unRegister();
-      supervisor.stop();
-    }
-  }
-
-  @ContainerLayoutTestInfo.ContainerTest
-  public void normal2(ContainerLayoutVersion layout) {
-    this.layoutVersion = layout;
-    // GIVEN
-    ReplicationSupervisor supervisor =
-        supervisorWithReplicator(FakeReplicator::new);
-    try {
-      //WHEN
-      supervisor.addTask(createTask(1L));
-      supervisor.addTask(createECTask(2L));
-      supervisor.addTask(createECTask(3L));
-      // Sleep 10s, wait all tasks processed
-      try {
-        Thread.sleep(10000);
-      } catch (InterruptedException e) {
-      }
-      assertTrue(supervisor.getTotalTime(ReplicationTask.class) > 0);
-      assertEquals(1,
-          supervisor.getReplicationRequestCount(ReplicationTask.class));
-      assertEquals(2,
-          supervisor.getReplicationRequestCount(
-              ECReconstructionCoordinatorTask.class));
-    } finally {
       supervisor.stop();
     }
   }

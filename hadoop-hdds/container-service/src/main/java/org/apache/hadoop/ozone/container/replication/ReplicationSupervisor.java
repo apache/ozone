@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Sta
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,15 +71,11 @@ public final class ReplicationSupervisor {
   private final StateContext context;
   private final Clock clock;
 
-  private final Map<Class<?>, AtomicLong> requestCounter =
-      new ConcurrentHashMap<>();
+  private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
   private final AtomicLong skippedCounter = new AtomicLong();
-  private final Map<Class<?>, AtomicLong> totalTimeCounter =
-      new ConcurrentHashMap<>();
-  private Object lock = new Object();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -226,22 +221,6 @@ public final class ReplicationSupervisor {
       return;
     }
 
-    if (totalTimeCounter.get(task.getClass()) == null) {
-      synchronized (lock) {
-        if (totalTimeCounter.get(task.getClass()) == null) {
-          totalTimeCounter.put(task.getClass(), new AtomicLong());
-        }
-      }
-    }
-
-    if (requestCounter.get(task.getClass()) == null) {
-      synchronized (lock) {
-        if (requestCounter.get(task.getClass()) == null) {
-          requestCounter.put(task.getClass(), new AtomicLong());
-        }
-      }
-    }
-
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes
@@ -350,9 +329,8 @@ public final class ReplicationSupervisor {
 
     @Override
     public void run() {
-      long startTime = Time.monotonicNow();
       try {
-        requestCounter.get(task.getClass()).incrementAndGet();
+        requestCounter.incrementAndGet();
 
         final long now = clock.millis();
         final long deadline = task.getDeadline();
@@ -399,10 +377,8 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.incrementAndGet();
       } finally {
-        long endTime = Time.monotonicNow();
         inFlight.remove(task);
         decrementTaskCounter(task);
-        totalTimeCounter.get(task.getClass()).addAndGet(endTime - startTime);
       }
     }
 
@@ -443,17 +419,7 @@ public final class ReplicationSupervisor {
   }
 
   public long getReplicationRequestCount() {
-    AtomicLong totalRequest = new AtomicLong();
-    requestCounter.forEach((key, value) -> {
-      totalRequest.set(totalRequest.get() + value.get());
-    });
-    return totalRequest.get();
-  }
-
-  public long getReplicationRequestCount(
-      Class<? extends AbstractReplicationTask> taskClass) {
-    AtomicLong counter = requestCounter.get(taskClass);
-    return counter == null ? 0 : counter.get();
+    return requestCounter.get();
   }
 
   public long getQueueSize() {
@@ -474,11 +440,6 @@ public final class ReplicationSupervisor {
 
   public long getReplicationSuccessCount() {
     return successCounter.get();
-  }
-
-  public long getTotalTime(Class<? extends AbstractReplicationTask> taskClass) {
-    AtomicLong counter = totalTimeCounter.get(taskClass);
-    return counter == null ? 0 : counter.get();
   }
 
   public long getReplicationFailureCount() {
