@@ -218,7 +218,7 @@ public class TestKeyValueContainerCheck
         sc.getBandwidthPerVolume());
     Canceler canceler = null;
 
-    ScanResult result = kvCheck.scanContainer(throttler, canceler);
+    ScanResult result = kvCheck.fullCheck(throttler, canceler);
 
     // A deleted container during a scan still counts as healthy.
     assertTrue(result.isHealthy());

@@ -89,6 +89,6 @@ class TestBackgroundContainerDataScannerIntegration
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
-    corruption.assertLogged(logCapturer);
+    corruption.assertLogged(containerID, logCapturer);
   }
 }

@@ -66,6 +66,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -335,11 +336,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
 
     /**
-     * Check that the correct corruption type was written to the container log.
+     * Check that the correct corruption type was written to the container log for the provided container.
      */
-    public void assertLogged(LogCapturer logCapturer) {
-      assertThat(logCapturer.getOutput())
-          .contains(expectedResult.toString());
+    public void assertLogged(long containerID, LogCapturer logCapturer) {
+      // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
+      // The log will have captured lines from all previous tests as well since we re-use the same cluster.
+      Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + expectedResult.toString());
+      assertThat(logCapturer.getOutput()).containsPattern(logLine);
     }
 
     /**
