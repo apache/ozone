@@ -73,6 +73,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
 
+  public static final String OZONE_OM_FEATURES_DISABLED =
+      "ozone.om.features.disabled";
+
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
