@@ -90,7 +90,6 @@ public class TestContainerCommandReconciliation {
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    conf.getBoolean(OZONE_SECURITY_ENABLED_KEY, OZONE_SECURITY_ENABLED_DEFAULT);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
