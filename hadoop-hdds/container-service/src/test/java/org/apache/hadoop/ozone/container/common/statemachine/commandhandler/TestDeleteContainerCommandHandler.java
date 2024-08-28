@@ -72,7 +72,6 @@ public class TestDeleteContainerCommandHandler {
   @Test
   public void testExpiredCommandsAreNotProcessed()
       throws IOException, InterruptedException {
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     CountDownLatch latch1 = new CountDownLatch(1);
     ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
     ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
@@ -117,13 +116,13 @@ public class TestDeleteContainerCommandHandler {
     when(context.getTermOfLeaderSCM())
         .thenReturn(OptionalLong.of(command.getTerm()));
 
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    TestClock testClock = new TestClock(Instant.now(), ZoneId.systemDefault());
     CountDownLatch latch = new CountDownLatch(1);
     ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
     ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
         threadFactory, latch);
     DeleteContainerCommandHandler subject = new DeleteContainerCommandHandler(
-        clock, executor, 100);
+        testClock, executor, 100);
 
     // WHEN
     subject.handle(command, ozoneContainer, context, null);
@@ -202,20 +201,20 @@ public class TestDeleteContainerCommandHandler {
   }
 
   static class ThreadPoolWithLockExecutor extends ThreadPoolExecutor {
-    CountDownLatch latch;
+    private CountDownLatch countDownLatch;
     ThreadPoolWithLockExecutor(ThreadFactory threadFactory, CountDownLatch latch) {
       super(1, 1, 0, TimeUnit.MILLISECONDS,
           new LinkedBlockingQueue<Runnable>(), threadFactory);
-      this.latch = latch;
+      this.countDownLatch = latch;
     }
 
     void setLatch(CountDownLatch latch) {
-      this.latch = latch;
+      this.countDownLatch = latch;
     }
 
     @Override
     protected void afterExecute(Runnable r, Throwable t) {
-      latch.countDown();
+      countDownLatch.countDown();
     }
   }
 }
