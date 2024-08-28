@@ -232,7 +232,7 @@ class TestContainerChecksumTreeManager {
     assertTrue(finalFile.exists());
 
     // Make the write to the tmp file fail by removing permissions on its parent.
-    assertTrue(finalFile.getParentFile().setWritable(false));
+    assertTrue(tmpFile.getParentFile().setWritable(false));
     try {
       checksumManager.writeContainerDataTree(container, tree);
       fail("Write to the tmp file should have failed.");
