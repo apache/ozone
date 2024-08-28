@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -303,9 +304,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           : excludedNodes;
 
       // placement with overloaded nodes excluded
+      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-          container, expectedTargetCount, usedNodes, excludedOrOverloadedNodes
-      );
+          container, expectedTargetCount, usedNodes, excludedOrOverloadedNodes, StorageType.DEFAULT);
       final int targetCount = selectedDatanodes.size();
 
       if (hasOverloaded &&
@@ -315,8 +316,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           !recoveryIsCritical) {
 
         // check if placement exists when overloaded nodes are not excluded
+        // TODO StoragePolicy replace this StorageType with container actual StorageType
         final List<DatanodeDetails> targetsMaybeOverloaded = getTargetDatanodes(
-            container, expectedTargetCount, usedNodes, excludedNodes);
+            container, expectedTargetCount, usedNodes, excludedNodes, StorageType.DEFAULT);
 
         if (targetsMaybeOverloaded.size() == expectedTargetCount) {
           final int overloadedCount = expectedTargetCount - targetCount;
@@ -408,12 +410,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private List<DatanodeDetails> getTargetDatanodes(
       ContainerInfo container, int requiredNodes,
       List<DatanodeDetails> usedNodes,
-      List<DatanodeDetails> excludedNodes
-  ) throws SCMException {
+      List<DatanodeDetails> excludedNodes,
+      StorageType storageType) throws SCMException {
     return ReplicationManagerUtil.getTargetDatanodes(
         containerPlacement, requiredNodes,
         usedNodes, excludedNodes,
-        currentContainerSize, container);
+        currentContainerSize, container, storageType);
   }
 
   /**
@@ -433,8 +435,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     if (!decomIndexes.isEmpty()) {
       LOG.debug("Processing decommissioning indexes {} for container {}.",
           decomIndexes, container.containerID());
+      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-          container, decomIndexes.size(), usedNodes, excludedNodes);
+          container, decomIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
 
       ContainerPlacementStatus placementStatusWithSelectedTargets =
           validatePlacement(container, availableSourceNodes, selectedDatanodes);
@@ -530,9 +533,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     LOG.debug("Number of maintenance replicas of container {} that need " +
             "additional copies: {}.", container.containerID(),
         additionalMaintenanceCopiesNeeded);
+    // TODO StoragePolicy replace this StorageType with container actual StorageType
     List<DatanodeDetails> targets = getTargetDatanodes(
-        container, maintIndexes.size(), usedNodes, excludedNodes
-    );
+        container, maintIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
     usedNodes.addAll(targets);
 
     Iterator<DatanodeDetails> iterator = targets.iterator();

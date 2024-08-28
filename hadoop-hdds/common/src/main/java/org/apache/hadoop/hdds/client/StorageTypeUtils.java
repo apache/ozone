@@ -43,6 +43,8 @@ public final class StorageTypeUtils {
       return HddsProtos.StorageTypeProto.PROVIDED;
     case RAM_DISK:
       return HddsProtos.StorageTypeProto.RAM_DISK;
+    case NVDIMM:
+      return HddsProtos.StorageTypeProto.NVDIMM;
     default:
       throw new IllegalArgumentException("Illegal Storage Type specified");
     }
@@ -61,6 +63,8 @@ public final class StorageTypeUtils {
       return StorageType.PROVIDED;
     case RAM_DISK:
       return StorageType.RAM_DISK;
+    case NVDIMM:
+      return StorageType.NVDIMM;
     default:
       throw new IllegalArgumentException("Illegal Storage Type specified");
     }
@@ -93,6 +97,7 @@ public final class StorageTypeUtils {
     case ARCHIVE:
     case PROVIDED:
     case RAM_DISK:
+    case NVDIMM:
       return proto.getNumber();
     default:
       throw new IllegalArgumentException("Illegal Storage Type specified");

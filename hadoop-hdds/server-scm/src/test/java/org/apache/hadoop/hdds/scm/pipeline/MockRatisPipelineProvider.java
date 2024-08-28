@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -64,12 +65,12 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(RatisReplicationConfig replicationConfig)
+  public Pipeline create(RatisReplicationConfig replicationConfig, StorageTier storageTier)
       throws IOException {
     if (autoOpenPipeline) {
-      return super.create(replicationConfig);
+      return super.create(replicationConfig, storageTier);
     } else {
-      Pipeline initialPipeline = super.create(replicationConfig);
+      Pipeline initialPipeline = super.create(replicationConfig, storageTier);
       Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED

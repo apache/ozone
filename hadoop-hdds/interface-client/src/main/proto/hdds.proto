@@ -159,6 +159,7 @@ enum StorageTypeProto {
   ARCHIVE = 3;
   RAM_DISK = 4;
   PROVIDED = 5;
+  NVDIMM = 6;
 }
 
 /**

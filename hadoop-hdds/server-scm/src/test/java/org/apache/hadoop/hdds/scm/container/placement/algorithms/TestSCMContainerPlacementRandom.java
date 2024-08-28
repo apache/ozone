@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -101,7 +102,7 @@ public class TestSCMContainerPlacementRandom {
     for (int i = 0; i < 100; i++) {
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15, 15);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15, StorageType.DEFAULT);
 
       //then
       assertEquals(1, datanodeDetails.size());
@@ -215,11 +216,11 @@ public class TestSCMContainerPlacementRandom {
             mock(SCMContainerPlacementMetrics.class));
 
     assertTrue(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L, StorageType.DEFAULT));
     assertFalse(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L, StorageType.DEFAULT));
     assertFalse(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L, StorageType.DEFAULT));
 
   }
 

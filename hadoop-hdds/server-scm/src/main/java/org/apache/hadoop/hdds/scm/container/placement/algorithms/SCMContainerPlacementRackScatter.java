@@ -29,6 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -98,7 +99,7 @@ public final class SCMContainerPlacementRackScatter
       List<DatanodeDetails> mutableFavoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired,
       int maxOuterLoopIterations, Map<Node, Integer> rackCntMap,
-      int maxReplicasPerRack) {
+      int maxReplicasPerRack, StorageType storageType) {
     if (nodesRequired <= 0) {
       return Collections.emptySet();
     }
@@ -156,7 +157,7 @@ public final class SCMContainerPlacementRackScatter
           continue;
         }
         Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
-                metadataSizeRequired, dataSizeRequired);
+                metadataSizeRequired, dataSizeRequired, storageType);
         if (node != null) {
           chosenNodes.add((DatanodeDetails) node);
           rackCntMap.merge(rack, 1, Math::addExact);
@@ -209,7 +210,7 @@ public final class SCMContainerPlacementRackScatter
           final List<DatanodeDetails> excludedNodes,
           final List<DatanodeDetails> favoredNodes,
           final int nodesRequired, final long metadataSizeRequired,
-          final long dataSizeRequired) throws SCMException {
+          final long dataSizeRequired, StorageType storageType) throws SCMException {
     if (nodesRequired <= 0) {
       String errorMsg = "num of nodes required to choose should bigger" +
           "than 0, but the given num is " + nodesRequired;
@@ -243,7 +244,7 @@ public final class SCMContainerPlacementRackScatter
       // Generate mutableFavoredNodes, only stores valid favoredNodes
       for (DatanodeDetails datanodeDetails : favoredNodes) {
         if (isValidNode(datanodeDetails, metadataSizeRequired,
-            dataSizeRequired)) {
+            dataSizeRequired, storageType)) {
           mutableFavoredNodes.add(datanodeDetails);
         }
       }
@@ -309,7 +310,7 @@ public final class SCMContainerPlacementRackScatter
         chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
             metadataSizeRequired, dataSizeRequired, maxReplicasPerRack,
-            usedRacksCntMap, maxReplicasPerRack));
+            usedRacksCntMap, maxReplicasPerRack, storageType));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -332,7 +333,7 @@ public final class SCMContainerPlacementRackScatter
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
               metadataSizeRequired, dataSizeRequired,
-              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack));
+              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack, storageType));
     }
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     if (nodesRequired != chosenNodes.size()) {
@@ -437,7 +438,7 @@ public final class SCMContainerPlacementRackScatter
    * @return the chosen datanode.
    */
   private Node chooseNode(String scope, List<Node> excludedNodes,
-      long metadataSizeRequired, long dataSizeRequired) {
+      long metadataSizeRequired, long dataSizeRequired, StorageType storageType) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
     while (true) {
       if (metrics != null) {
@@ -457,7 +458,7 @@ public final class SCMContainerPlacementRackScatter
       if (node != null) {
         DatanodeDetails datanodeDetails = (DatanodeDetails) node;
         if (isValidNode(datanodeDetails, metadataSizeRequired,
-            dataSizeRequired)) {
+            dataSizeRequired, storageType)) {
           if (metrics != null) {
             metrics.incrDatanodeChooseSuccessCount();
           }
