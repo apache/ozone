@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -70,7 +69,6 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       long trxnLogIndex) {
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
@@ -104,14 +102,12 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         }
 
         SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
+            SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, ozoneManager);
 
         // Step 1: Update the deep clean flag for the next active snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
         // Step 2: Update the snapshot chain.
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
-        // Remove and close snapshot's RocksDB instance from SnapshotCache.
-        omSnapshotManager.invalidateCacheEntry(fromSnapshot.getSnapshotId());
         // Step 3: Purge the snapshot from SnapshotInfoTable cache.
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));

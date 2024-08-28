@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -69,9 +70,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     try {
       if (fromSnapshot != null) {
-        fromSnapshotInfo = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable()
-            .get(fromSnapshot);
+        fromSnapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {

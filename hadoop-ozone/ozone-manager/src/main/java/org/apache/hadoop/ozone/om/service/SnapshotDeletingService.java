@@ -211,8 +211,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           }
 
           //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
-          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-              snapInfo, chainManager, omSnapshotManager);
+          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(snapInfo, chainManager);
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
