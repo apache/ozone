@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -278,8 +277,6 @@ public class TestOzoneManagerHASnapshot {
     }
   }
 
-
-
   /**
    * This is to simulate HDDS-11152 scenario. In which a follower's doubleBuffer is lagging and accumulates purgeKey
    * and purgeSnapshot in same batch.
@@ -354,10 +351,7 @@ public class TestOzoneManagerHASnapshot {
     store.createSnapshot(volName, buckName, snapName);
 
     String tableKey = SnapshotInfo.getTableKey(volName, buckName, snapName);
-    SnapshotInfo snapshotInfo = cluster.getOMLeader().getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(tableKey);
-
+    SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(cluster.getOMLeader(), tableKey);
     String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
@@ -369,9 +363,7 @@ public class TestOzoneManagerHASnapshot {
       throws InterruptedException, TimeoutException {
     GenericTestUtils.waitFor(() -> {
       try {
-        OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-        SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotTableKey);
-        return snapshotInfo == null;
+        return ozoneManager.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey) == null;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
