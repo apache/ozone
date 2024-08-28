@@ -66,8 +66,11 @@ public class ContainerChecksumTreeManager {
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
     fileLock = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
-    // TODO: TO unregister metrics on stop.
     metrics = ContainerMerkleTreeMetrics.create();
+  }
+
+  public void stop() {
+    ContainerMerkleTreeMetrics.unregister();
   }
 
   /**

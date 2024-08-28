@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -177,13 +179,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean shouldDeleteRatisLogDirectory;
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
+  private final HddsDatanodeService datanodeService;
 
-  private XceiverServerRatis(DatanodeDetails dd,
+  private XceiverServerRatis(HddsDatanodeService hddsDatanodeService, DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
       StateContext context, ConfigurationSource conf, Parameters parameters)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "DatanodeDetails == null");
+    datanodeService = hddsDatanodeService;
     datanodeDetails = dd;
     ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
@@ -241,7 +245,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return new ContainerStateMachine(gid, dispatcher, containerController,
+    return new ContainerStateMachine(datanodeService, gid, dispatcher, containerController,
         chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
@@ -276,11 +280,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final RpcType rpc = setRpcType(properties);
 
     // set raft segment size
-    setRaftSegmentAndWriteBufferSize(properties);
+    final int logAppenderBufferByteLimit = setRaftSegmentAndWriteBufferSize(properties);
+
+    // set grpc message size max
+    final int max = Math.max(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE, logAppenderBufferByteLimit);
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, max);
 
     // set raft segment pre-allocated size
-    final long raftSegmentPreallocatedSize =
-        setRaftSegmentPreallocatedSize(properties);
+    setRaftSegmentPreallocatedSize(properties);
 
     // setup ratis stream if datastream is enabled
     if (streamEnable) {
@@ -310,11 +317,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     storageDirPaths.forEach(d -> storageDirs.add(new File(d)));
 
     RaftServerConfigKeys.setStorageDir(properties, storageDirs);
-
-    // For grpc set the maximum message size
-    GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE
-                + raftSegmentPreallocatedSize));
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
@@ -404,17 +406,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setExpiryTime(properties, retryCacheTimeout);
   }
 
-  private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
+  private void setRaftSegmentPreallocatedSize(RaftProperties properties) {
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(raftSegmentPreallocatedSize));
-    return raftSegmentPreallocatedSize;
   }
 
-  private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
+  private int setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
     final int logAppenderQueueNumElements = conf.getInt(
         HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
         HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
@@ -443,6 +444,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         SizeInBytes.valueOf(raftSegmentSize));
     RaftServerConfigKeys.Log.setWriteBufferSize(properties,
         SizeInBytes.valueOf(raftSegmentBufferSize));
+    return logAppenderQueueByteLimit;
   }
 
   private void setStateMachineDataConfigurations(RaftProperties properties) {
@@ -521,14 +523,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .valueOf(pendingRequestsMegaBytesLimit, TraditionalBinaryPrefix.MEGA));
   }
 
-  public static XceiverServerRatis newXceiverServerRatis(
+  public static XceiverServerRatis newXceiverServerRatis(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
 
-    return new XceiverServerRatis(datanodeDetails, dispatcher,
+    return new XceiverServerRatis(hddsDatanodeService, datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);
   }
 
@@ -591,6 +593,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
+        LOG.info("Stopping {} {}", getClass().getSimpleName(), server.getId());
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();

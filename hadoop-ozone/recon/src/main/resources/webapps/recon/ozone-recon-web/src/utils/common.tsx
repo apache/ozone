@@ -44,9 +44,8 @@ const showInfoNotification = (title: string, description: string) => {
 
 export const showDataFetchError = (error: string) => {
   let title = 'Error while fetching data';
-  if (error.includes('CanceledError')) {
-    error = 'Previous request cancelled because context changed'
-  }
+  
+  if (error.includes('CanceledError')) return;
   if (error.includes('metadata')) {
     title = 'Metadata Initialization:';
     showInfoNotification(title, error);

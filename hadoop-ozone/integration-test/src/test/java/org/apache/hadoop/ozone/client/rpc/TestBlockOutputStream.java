@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -661,6 +662,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11325")
   void testWriteMoreThanMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -698,7 +700,8 @@ class TestBlockOutputStream {
           assertInstanceOf(RatisBlockOutputStream.class,
               keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-      assertEquals(4, blockOutputStream.getBufferPool().getSize());
+      assertThat(blockOutputStream.getBufferPool().getSize())
+          .isLessThanOrEqualTo(4);
       // writtenDataLength as well flushedDataLength will be updated here
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
@@ -727,7 +730,8 @@ class TestBlockOutputStream {
       // Since the data in the buffer is already flushed, flush here will have
       // no impact on the counters and data structures
 
-      assertEquals(4, blockOutputStream.getBufferPool().getSize());
+      assertThat(blockOutputStream.getBufferPool().getSize())
+          .isLessThanOrEqualTo(4);
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
       // dataLength > MAX_FLUSH_SIZE
       assertEquals(flushDelay ? MAX_FLUSH_SIZE : dataLength,

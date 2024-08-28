@@ -118,6 +118,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final int
       CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT = 10000;
 
+  private static final long
+      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
+  private static final int
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
+
   /**
    * Number of threads per volume that Datanode will use for chunk read.
    */
@@ -543,6 +548,24 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " files exceeds this threshold."
   )
   private int autoCompactionSmallSstFileNum = 512;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file.interval.minutes",
+      defaultValue = "120",
+      type = ConfigType.LONG,
+      tags = { DATANODE },
+      description = "Auto compact small SST files interval in minutes."
+  )
+  private long autoCompactionSmallSstFileIntervalMinutes =
+      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file.threads",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Auto compact small SST files threads."
+  )
+  private int autoCompactionSmallSstFileThreads =
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT;
 
   /**
    * Whether to check container directory or not to determine
@@ -982,5 +1005,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getContainerClientCacheStaleThreshold() {
     return containerClientCacheStaleThreshold;
+  }
+
+  public long getAutoCompactionSmallSstFileIntervalMinutes() {
+    return autoCompactionSmallSstFileIntervalMinutes;
+  }
+
+  public void setAutoCompactionSmallSstFileIntervalMinutes(
+      long autoCompactionSmallSstFileIntervalMinutes) {
+    this.autoCompactionSmallSstFileIntervalMinutes =
+        autoCompactionSmallSstFileIntervalMinutes;
+  }
+
+  public int getAutoCompactionSmallSstFileThreads() {
+    return autoCompactionSmallSstFileThreads;
+  }
+
+  public void setAutoCompactionSmallSstFileThreads(
+      int autoCompactionSmallSstFileThreads) {
+    this.autoCompactionSmallSstFileThreads =
+        autoCompactionSmallSstFileThreads;
   }
 }

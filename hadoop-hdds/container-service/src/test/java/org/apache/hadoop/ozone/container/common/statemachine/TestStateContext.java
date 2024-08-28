@@ -705,7 +705,7 @@ public class TestStateContext {
     ctx.addCommand(ReplicateContainerCommand.forTest(3));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
-    ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptyList()));
+    ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
 
     Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
     assertEquals(3,

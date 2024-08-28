@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -164,14 +166,15 @@ public class KeyValueHandler extends Handler {
                          ContainerSet contSet,
                          VolumeSet volSet,
                          ContainerMetrics metrics,
-                         IncrementalReportSender<Container> icrSender) {
+                         IncrementalReportSender<Container> icrSender,
+                         ContainerChecksumTreeManager checksumManager) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
-    checksumManager = new ContainerChecksumTreeManager(config);
+    this.checksumManager = checksumManager;
     try {
       volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
@@ -1322,7 +1325,8 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
+  public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+                                 Set<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
     long id = data.getContainerID();
