@@ -50,12 +50,15 @@ public final class DataScanResult extends MetadataScanResult {
     return new DataScanResult(result.getErrors(), new ContainerMerkleTree(), false);
   }
 
+  /**
+   * Constructs a data scan result representing a container that was deleted during the scan.
+   */
   public static DataScanResult deleted() {
     return DELETED;
   }
 
   /**
-   * Constructs an unhealthy data scan result which had a successful metadata scan but unhealthy data scan.
+   * Constructs a data scan result whose health will be determined based on the presence of errors.
    */
   public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
     return new DataScanResult(errors, dataTree, false);

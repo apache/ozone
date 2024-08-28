@@ -40,6 +40,9 @@ public class MetadataScanResult implements ScanResult {
     this.deleted = deleted;
   }
 
+  /**
+   * Constructs a metadata scan result whose health will be determined based on the presence of errors.
+   */
   public static MetadataScanResult fromErrors(List<ContainerScanError> errors) {
     if (errors.isEmpty()) {
       return HEALTHY_RESULT;
@@ -48,6 +51,9 @@ public class MetadataScanResult implements ScanResult {
     }
   }
 
+  /**
+   * Constructs a metadata scan result representing a container that was deleted during the scan.
+   */
   public static MetadataScanResult deleted() {
     return DELETED;
   }

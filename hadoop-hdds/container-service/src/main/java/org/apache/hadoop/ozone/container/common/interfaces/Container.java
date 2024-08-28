@@ -169,8 +169,8 @@ public interface Container<CONTAINERDATA extends ContainerData> {
 
   /**
    * check and report the structural integrity of the container.
-   * @return true if the integrity checks pass
-   * Scan the container metadata to detect corruption.
+   * @return A {@link MetadataScanResult} encapsulating the result of the scan.
+   * @throws InterruptedException if the scanning thread is interrupted before it completes.
    */
   MetadataScanResult scanMetaData() throws InterruptedException;
 
@@ -189,10 +189,8 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    *                        perform I/O bandwidth throttling
    * @param canceler        A reference of {@link Canceler} used to cancel the
    *                        I/O bandwidth throttling (e.g. for shutdown purpose).
-   * @param checksumManager
-   * @return true if the checksum verification succeeds
-   * false otherwise
-   * @throws InterruptedException if the scan is interrupted.
+   * @return A {@link DataScanResult} encapsulating the result of the scan.
+   * @throws InterruptedException if the scanning thread is interrupted before it completes.
    */
   DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
