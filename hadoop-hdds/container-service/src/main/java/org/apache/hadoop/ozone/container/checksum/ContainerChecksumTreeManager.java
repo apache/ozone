@@ -43,6 +43,7 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -203,7 +204,7 @@ public class ContainerChecksumTreeManager {
       // Write to a tmp file and rename it into place.
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
         checksumInfo.writeTo(tmpOutputStream);
-        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), REPLACE_EXISTING);
+        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), REPLACE_EXISTING, ATOMIC_MOVE);
       });
     } catch (IOException ex) {
       // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
