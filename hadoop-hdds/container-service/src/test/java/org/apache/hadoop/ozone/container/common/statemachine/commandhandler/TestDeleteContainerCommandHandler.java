@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -69,7 +72,13 @@ public class TestDeleteContainerCommandHandler {
   @Test
   public void testExpiredCommandsAreNotProcessed()
       throws IOException, InterruptedException {
-    DeleteContainerCommandHandler handler = createSubject(clock, 1000);
+    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    CountDownLatch latch1 = new CountDownLatch(1);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
+    ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
+        threadFactory, latch1);
+    DeleteContainerCommandHandler handler = new DeleteContainerCommandHandler(
+        clock, executor, 100);
 
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
     command1.setDeadline(clock.millis() + 10000);
@@ -80,11 +89,14 @@ public class TestDeleteContainerCommandHandler {
 
     clock.fastForward(15000);
     handler.handle(command1, ozoneContainer, null, null);
-    Thread.sleep(1000);
+    latch1.await();
     assertEquals(1, handler.getTimeoutCount());
+    CountDownLatch latch2 = new CountDownLatch(2);
+    executor.setLatch(latch2);
     handler.handle(command2, ozoneContainer, null, null);
     handler.handle(command3, ozoneContainer, null, null);
-    Thread.sleep(1000);
+    latch2.await();
+
     assertEquals(1, handler.getTimeoutCount());
     assertEquals(3, handler.getInvocationCount());
     verify(controller, times(0))
@@ -96,7 +108,8 @@ public class TestDeleteContainerCommandHandler {
   }
 
   @Test
-  public void testCommandForCurrentTermIsExecuted() throws IOException {
+  public void testCommandForCurrentTermIsExecuted()
+      throws IOException, InterruptedException {
     // GIVEN
     DeleteContainerCommand command = new DeleteContainerCommand(1L);
     command.setTerm(1);
@@ -104,10 +117,17 @@ public class TestDeleteContainerCommandHandler {
     when(context.getTermOfLeaderSCM())
         .thenReturn(OptionalLong.of(command.getTerm()));
 
-    DeleteContainerCommandHandler subject = createSubject();
+    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    CountDownLatch latch = new CountDownLatch(1);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
+    ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
+        threadFactory, latch);
+    DeleteContainerCommandHandler subject = new DeleteContainerCommandHandler(
+        clock, executor, 100);
 
     // WHEN
     subject.handle(command, ozoneContainer, context, null);
+    latch.await();
 
     // THEN
     verify(controller, times(1))
@@ -181,4 +201,21 @@ public class TestDeleteContainerCommandHandler {
     return new DeleteContainerCommandHandler(1, clock, queueSize, "");
   }
 
+  static class ThreadPoolWithLockExecutor extends ThreadPoolExecutor {
+    CountDownLatch latch;
+    ThreadPoolWithLockExecutor(ThreadFactory threadFactory, CountDownLatch latch) {
+      super(1, 1, 0, TimeUnit.MILLISECONDS,
+          new LinkedBlockingQueue<Runnable>(), threadFactory);
+      this.latch = latch;
+    }
+
+    void setLatch(CountDownLatch latch) {
+      this.latch = latch;
+    }
+
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+      latch.countDown();
+    }
+  }
 }
