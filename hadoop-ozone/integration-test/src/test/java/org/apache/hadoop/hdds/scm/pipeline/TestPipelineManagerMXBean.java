@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,8 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 @Timeout(3000)
 public class TestPipelineManagerMXBean {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestPipelineManagerMXBean.class);
   private MiniOzoneCluster cluster;
   private MBeanServer mbs;
 
