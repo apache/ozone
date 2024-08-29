@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import { Table } from 'antd';
 import { Link } from 'react-router-dom';
@@ -35,7 +35,7 @@ import Search from '@/v2/components/search/search';
 
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
+import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { useDebounce } from '@/v2/hooks/debounce.hook';
 
 import {
@@ -70,7 +70,7 @@ const LIMIT_OPTIONS: Option[] = [
 
 const Volumes: React.FC<{}> = () => {
 
-  let cancelSignal: AbortController;
+  const cancelSignal = useRef<AbortController>();
 
   const COLUMNS: ColumnsType<Volume> = [
     {
@@ -181,15 +181,17 @@ const Volumes: React.FC<{}> = () => {
 
   const loadData = () => {
     setLoading(true);
+    // Cancel any previous pending requests
+    cancelRequests([cancelSignal.current!]);
 
     const { request, controller } = AxiosGetHelper(
       '/api/v1/volumes',
-      cancelSignal,
+      cancelSignal.current,
       "",
       { limit: selectedLimit.value }
     );
 
-    cancelSignal = controller;
+    cancelSignal.current = controller;
     request.then(response => {
       const volumesResponse: VolumesResponse = response.data;
       const volumes: Volume[] = volumesResponse.volumes;
@@ -228,7 +230,7 @@ const Volumes: React.FC<{}> = () => {
     // Component will unmount
     return (() => {
       autoReloadHelper.stopPolling();
-      cancelSignal && cancelSignal.abort();
+      cancelRequests([cancelSignal.current!]);
     })
   }, []);
 

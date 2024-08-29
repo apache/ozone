@@ -60,7 +60,7 @@
     "@testing-library/react": "^12.1.5",
     "@types/react": "16.8.15",
     "@types/react-dom": "16.8.4",
-    "@types/react-router-dom": "^4.3.5",
+    "@types/react-router-dom": "^5.3.3",
     "@types/react-select": "^3.0.13",
     "@typescript-eslint/eslint-plugin": "^5.30.0",
     "@typescript-eslint/parser": "^5.30.0",
