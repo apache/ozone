@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,6 @@ import java.lang.management.ManagementFactory;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 
@@ -68,7 +66,6 @@ public class TestPipelineManagerMXBean {
    *
    * @throws Exception
    */
-  @Flaky("HDDS-11359")
   @Test
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
