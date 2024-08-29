@@ -205,7 +205,7 @@ public class ContainerChecksumTreeManager {
       // Write to a tmp file and rename it into place.
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
         checksumInfo.writeTo(tmpOutputStream);
-        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), REPLACE_EXISTING, ATOMIC_MOVE);
+        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), ATOMIC_MOVE);
       });
     } catch (IOException ex) {
       // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
