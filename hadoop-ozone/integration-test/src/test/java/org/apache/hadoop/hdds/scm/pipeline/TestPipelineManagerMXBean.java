@@ -69,7 +69,7 @@ public class TestPipelineManagerMXBean {
     GenericTestUtils.waitFor(() -> {
       try {
         Map<String, Integer> pipelineStateCount = cluster
-          .getStorageContainerManager().getPipelineManager().getPipelineInfo();
+            .getStorageContainerManager().getPipelineManager().getPipelineInfo();
         final TabularData data = (TabularData) mbs.getAttribute(
             bean, "PipelineInfo");
         for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {
