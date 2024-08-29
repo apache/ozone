@@ -341,6 +341,16 @@ public class ContainerBalancerTask implements Runnable {
         .max()
         .orElse(0);
 
+    // the balancing thread could go to sleep without having initialized findTargetStrategy, so we check for null here
+    Map<DatanodeDetails, Long> sizeEnteringNodes = Collections.emptyMap();
+    if (findTargetStrategy != null) {
+      sizeEnteringNodes = findTargetStrategy.getSizeEnteringNodes();
+    }
+    Map<DatanodeDetails, Long> sizeLeavingNodes = Collections.emptyMap();
+    if (findSourceStrategy != null) {
+      sizeLeavingNodes = findSourceStrategy.getSizeLeavingNodes();
+    }
+
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         lastIterationNumber + 1,
         null,
@@ -350,8 +360,7 @@ public class ContainerBalancerTask implements Runnable {
         metrics.getNumContainerMovesCompletedInLatestIteration(),
         metrics.getNumContainerMovesFailedInLatestIteration(),
         metrics.getNumContainerMovesTimeoutInLatestIteration(),
-        findTargetStrategy.getSizeEnteringNodes()
-            .entrySet()
+        sizeEnteringNodes.entrySet()
             .stream()
             .filter(Objects::nonNull)
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
@@ -360,8 +369,7 @@ public class ContainerBalancerTask implements Runnable {
                     entry -> entry.getValue() / OzoneConsts.GB
                 )
             ),
-        findSourceStrategy.getSizeLeavingNodes()
-            .entrySet()
+        sizeLeavingNodes.entrySet()
             .stream()
             .filter(Objects::nonNull)
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
