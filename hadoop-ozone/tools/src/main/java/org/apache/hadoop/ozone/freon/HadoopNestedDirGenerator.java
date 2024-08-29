@@ -16,13 +16,10 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.net.URI;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
@@ -41,16 +38,11 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @SuppressWarnings("java:S2245") // no need for secure random
-public class HadoopNestedDirGenerator extends BaseFreonGenerator
+public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
-
-  @Option(names = {"-r", "--rpath"},
-      description = "Hadoop FS directory system path",
-      defaultValue = "o3fs://bucket2.vol2")
-  private String rootPath;
 
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
@@ -70,8 +62,6 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       defaultValue = "10")
   private int length;
 
-  private FileSystem fileSystem;
-
   @Override
   public Void call() throws Exception {
     String s;
@@ -82,9 +72,7 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       s = "Invalid span value, span value should be greater or equal to zero!";
       print(s);
     } else {
-      init();
-      OzoneConfiguration configuration = createOzoneConfiguration();
-      fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+      super.init();
       runTests(this::createDir);
     }
     return null;
@@ -109,14 +97,14 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       dirString = dirString.concat("/").concat(RandomStringUtils.
           randomAlphanumeric(length));
     }
-    Path file = new Path(rootPath.concat("/").concat(dirString));
-    fileSystem.mkdirs(file.getParent());
+    Path file = new Path(getRootPath().concat("/").concat(dirString));
+    getFileSystem().mkdirs(file.getParent());
     String leafDir = dirString.substring(0, dirString.length() - length);
     String tmp = "/0";
     for (int i = 1; i <= span; i++) {
       String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);
-      Path dir = new Path(rootPath.concat("/").concat(childDir));
-      fileSystem.mkdirs(dir.getParent());
+      Path dir = new Path(getRootPath().concat("/").concat(childDir));
+      getFileSystem().mkdirs(dir.getParent());
     }
     String message = "\nSuccessfully created directories. " +
             "Total Directories with level = " + depth + " and span = " + span;

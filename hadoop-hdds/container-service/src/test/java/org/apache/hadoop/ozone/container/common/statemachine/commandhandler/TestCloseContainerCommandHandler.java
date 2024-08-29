@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -43,6 +44,8 @@ import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -292,4 +295,28 @@ public class TestCloseContainerCommandHandler {
     GenericTestUtils.waitFor(()
         -> closeHandler.getQueuedCount() <= 0, 10, 3000);
   }
+
+  @Test
+  public void testThreadPoolPoolSize() {
+    assertEquals(1, subject.getThreadPoolMaxPoolSize());
+    assertEquals(0, subject.getThreadPoolActivePoolSize());
+
+    CloseContainerCommandHandler closeContainerCommandHandler =
+        new CloseContainerCommandHandler(10, 10, "");
+    closeContainerCommandHandler.handle(new CloseContainerCommand(
+        CONTAINER_ID + 1, PipelineID.randomId()),
+        ozoneContainer, context, null);
+    closeContainerCommandHandler.handle(new CloseContainerCommand(
+        CONTAINER_ID + 2, PipelineID.randomId()),
+        ozoneContainer, context, null);
+    closeContainerCommandHandler.handle(new CloseContainerCommand(
+        CONTAINER_ID + 3, PipelineID.randomId()),
+        ozoneContainer, context, null);
+    closeContainerCommandHandler.handle(new CloseContainerCommand(
+        CONTAINER_ID + 4, PipelineID.randomId()),
+        ozoneContainer, context, null);
+    assertEquals(10, closeContainerCommandHandler.getThreadPoolMaxPoolSize());
+    assertTrue(closeContainerCommandHandler.getThreadPoolActivePoolSize() > 0);
+  }
+
 }

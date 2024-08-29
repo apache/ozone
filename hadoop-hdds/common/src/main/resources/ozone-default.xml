@@ -3407,14 +3407,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.list.trash.keys.max</name>
-    <value>1000</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      The maximum number of keys to return for a list trash request.
-    </description>
-  </property>
-  <property>
     <name>ozone.http.basedir</name>
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
@@ -3568,6 +3560,19 @@
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>
     <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.server-defaults.validity.period.ms</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>3600000</value>
+    <description>
+      The amount of milliseconds after which cached server defaults are updated.
+
+      By default this parameter is set to 1 hour.
+      Support multiple time unit suffix(case insensitive).
+      If no time unit is specified then milliseconds is assumed.
     </description>
   </property>
 
