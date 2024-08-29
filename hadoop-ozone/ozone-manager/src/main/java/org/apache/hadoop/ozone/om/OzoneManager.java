@@ -5008,4 +5008,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       getOmServerProtocol().awaitDoubleBufferFlush();
     }
   }
+
+  public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
+    String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
+    if (disabledFeatures.contains(feature.name())) {
+      throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
 }
