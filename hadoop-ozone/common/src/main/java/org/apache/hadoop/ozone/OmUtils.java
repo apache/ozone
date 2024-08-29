@@ -243,6 +243,10 @@ public final class OmUtils {
     case ListKeys:
     case ListKeysLight:
     case ListTrash:
+      // ListTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
     case ServiceList:
     case ListOpenFiles:
     case ListMultiPartUploadParts:
@@ -274,6 +278,7 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
+    case GetServerDefaults:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -303,6 +308,10 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
     case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:

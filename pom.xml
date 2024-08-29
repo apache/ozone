@@ -24,6 +24,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <packaging>pom</packaging>
 
   <modules>
+    <module>dev-support</module>
     <module>hadoop-hdds</module>
     <module>hadoop-ozone</module>
   </modules>
@@ -155,7 +156,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.43</jersey2.version>
+    <jersey2.version>2.44</jersey2.version>
 
     <!-- jackson versions -->
     <jackson1.version>1.9.13</jackson1.version>
@@ -296,7 +297,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj-plugin.version>1.15.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
-    <jgraphx.version>3.9.8.1</jgraphx.version>
+    <jgraphx.version>3.9.12</jgraphx.version>
 
     <spring.version>5.3.39</spring.version>
     <jooq.version>3.11.10</jooq.version>
@@ -308,7 +309,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.8</maven.core.version>
-    <snappy-java.version>1.1.10.5</snappy-java.version>
+    <snappy-java.version>1.1.10.6</snappy-java.version>
     <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>
@@ -1708,25 +1709,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
         <version>${maven-remote-resources-plugin.version}</version>
-        <configuration>
-          <resourceBundles>
-            <resourceBundle>org.apache.hadoop:hadoop-build-tools:${hadoop.version}</resourceBundle>
-          </resourceBundles>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-build-tools</artifactId>
-            <version>${hadoop.version}</version>
-          </dependency>
-        </dependencies>
-        <executions>
-          <execution>
-            <goals>
-              <goal>process</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -1769,7 +1751,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.hadoop.ozone.*</includes>
             </configuration>
           </execution>
         </executions>

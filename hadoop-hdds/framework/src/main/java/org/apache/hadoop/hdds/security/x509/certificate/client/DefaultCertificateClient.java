@@ -73,6 +73,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
@@ -984,43 +985,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public List<String> getCAList() {
-    pemEncodedCACertsLock.lock();
-    try {
-      return pemEncodedCACerts;
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  public List<String> listCA() throws IOException {
-    pemEncodedCACertsLock.lock();
-    try {
-      if (pemEncodedCACerts == null) {
-        updateCAList();
-      }
-      return pemEncodedCACerts;
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  @Override
-  public List<String> updateCAList() throws IOException {
-    pemEncodedCACertsLock.lock();
-    try {
-      pemEncodedCACerts = getScmSecureClient().listCACertificate();
-      return pemEncodedCACerts;
-    } catch (Exception e) {
-      getLogger().error("Error during updating CA list", e);
-      throw new CertificateException("Error during updating CA list", e,
-          CERTIFICATE_ERROR);
-    } finally {
-      pemEncodedCACertsLock.unlock();
-    }
-  }
-
-  @Override
   public ReloadingX509TrustManager getTrustManager() throws CertificateException {
     try {
       if (trustManager == null) {
@@ -1049,8 +1013,20 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  @Override
+  public ClientTrustManager createClientTrustManager() throws IOException {
+    CACertificateProvider caCertificateProvider = () -> {
+      List<X509Certificate> caCerts = new ArrayList<>();
+      caCerts.addAll(getAllCaCerts());
+      caCerts.addAll(getAllRootCaCerts());
+      return caCerts;
+    };
+    return new ClientTrustManager(caCertificateProvider, caCertificateProvider);
+  }
+
   /**
    * Register a receiver that will be called after the certificate renewed.
+   *
    * @param receiver
    */
   @Override
