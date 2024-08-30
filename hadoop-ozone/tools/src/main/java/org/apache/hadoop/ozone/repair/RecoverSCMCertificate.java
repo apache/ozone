@@ -61,7 +61,8 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
 /**
  * In case of accidental deletion of SCM certificates from local storage,
  * this tool restores the certs that are persisted into the SCM DB.
- * Note that this will only work if the SCM has persisted certs in its RocksDB.
+ * Note that this will only work if the SCM has persisted certs in its RocksDB
+ * and  private keys of the SCM are intact.
  */
 @CommandLine.Command(
     name = "cert-recover",
@@ -113,10 +114,11 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
       try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath, cfDescList,
           cfHandleList)) {
         cfHandle = getColumnFamilyHandle(cfHandleList, tableNameBytes);
+        SecurityConfig securityConfig = new SecurityConfig(parent.getOzoneConf());
 
         Map<BigInteger, X509Certificate> allCerts = getAllCerts(columnFamilyDefinition, cfHandle, db);
         out().println("All Certs in DB : " +  allCerts.keySet());
-        String hostName = InetAddress.getLocalHost().getCanonicalHostName();
+        String hostName = InetAddress.getLocalHost().getHostName();
         out().println("Host: " + hostName);
 
         X509Certificate subCertificate = getSubCertificate(allCerts, hostName);
@@ -131,7 +133,7 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
         if (caPrincipal.contains(hostName)) {
           isRootCA = true;
         }
-        storeCerts(subCertificate, rootCertificate, isRootCA);
+        storeCerts(subCertificate, rootCertificate, isRootCA, securityConfig);
       }
     } catch (RocksDBException | CertificateException exception) {
       err().print("Failed to recover scm cert");
@@ -173,7 +175,7 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
             .contains(OzoneConsts.SCM_SUB_CA_PREFIX) && c.getSubjectDN()
             .getName().contains(hostName)).findFirst();
     if (!cert.isPresent()) {
-      throw new Exception("Root CA Cert not found in the DB for this host, Certs in the DB : " + allCerts.keySet());
+      throw new Exception("Sub CA Cert not found in the DB for this host, Certs in the DB : " + allCerts.keySet());
     }
     return cert.get();
   }
@@ -208,9 +210,8 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
   }
 
   private void storeCerts(X509Certificate scmCertificate,
-      X509Certificate rootCertificate, boolean isRootCA)
+      X509Certificate rootCertificate, boolean isRootCA, SecurityConfig securityConfig)
       throws CertificateException, IOException {
-    SecurityConfig securityConfig = new SecurityConfig(parent.getOzoneConf());
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, SCMCertificateClient.COMPONENT_NAME);
 
