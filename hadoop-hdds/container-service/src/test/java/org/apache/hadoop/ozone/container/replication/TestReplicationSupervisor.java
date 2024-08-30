@@ -705,7 +705,7 @@ public class TestReplicationSupervisor {
     private final OzoneConfiguration conf = new OzoneConfiguration();
     private final ReplicationSupervisor supervisor;
 
-    public FakeECReconstructionCoordinator(ConfigurationSource conf,
+    FakeECReconstructionCoordinator(ConfigurationSource conf,
         CertificateClient certificateClient, SecretKeySignerClient secretKeyClient,
         StateContext context, ECReconstructionMetrics metrics, String threadNamePrefix,
         ReplicationSupervisor supervisor)
