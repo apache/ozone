@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 
 import java.util.Map;
 
@@ -71,12 +72,45 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
+        .addGauge(Interns.info("numSuccessReplications",
+            "Number of successful replications"),
+            supervisor.getReplicationSuccessCount())
+        .addGauge(Interns.info("numSuccessECReconstructions",
+            "Number of successful EC reconstructions"),
+            supervisor.getReplicationSuccessCount(ECReconstructionCoordinatorTask.class))
+        .addGauge(Interns.info("numSuccessContainerReplications",
+            "Number of successful container replications"),
+            supervisor.getReplicationSuccessCount(ReplicationTask.class))
+        .addGauge(Interns.info("numFailureReplications",
+            "Number of failure replications"),
+            supervisor.getReplicationFailureCount())
+        .addGauge(Interns.info("numFailureECReconstructions",
+            "Number of failure EC reconstructions"),
+            supervisor.getReplicationFailureCount(ECReconstructionCoordinatorTask.class))
+        .addGauge(Interns.info("numFailureContainerReplications",
+            "Number of failure container replications"),
+            supervisor.getReplicationFailureCount(ReplicationTask.class))
         .addGauge(Interns.info("numTimeoutReplications",
             "Number of replication requests timed out before being processed"),
             supervisor.getReplicationTimeoutCount())
+        .addGauge(Interns.info("numTimeoutECReconstructions",
+            "Number of EC reconstructions timed out before being processed"),
+            supervisor.getReplicationTimeoutCount(ECReconstructionCoordinatorTask.class))
+        .addGauge(Interns.info("numTimeoutContainerReplications",
+            "Number of container replications timed out before being processed"),
+            supervisor.getReplicationTimeoutCount(ReplicationTask.class))
         .addGauge(Interns.info("numSkippedReplications",
             "Number of replication requests skipped as the container is "
-            + "already present"), supervisor.getReplicationSkippedCount())
+            + "already present"),
+            supervisor.getReplicationSkippedCount())
+        .addGauge(Interns.info("numSkippedECReconstructions",
+            "Number of EC reconstructions skipped as the container is "
+            + "already present"),
+            supervisor.getReplicationSkippedCount(ECReconstructionCoordinatorTask.class))
+        .addGauge(Interns.info("numSkippedContainerReplications",
+            "Number of container replications skipped as the container is "
+            + "already present"),
+            supervisor.getReplicationSkippedCount(ReplicationTask.class))
         .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
             + "concurrent replication tasks which can run simultaneously"),
             supervisor.getMaxReplicationStreams());

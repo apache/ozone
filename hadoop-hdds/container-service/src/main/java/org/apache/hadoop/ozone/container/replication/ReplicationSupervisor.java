@@ -72,10 +72,10 @@ public final class ReplicationSupervisor {
   private final Clock clock;
 
   private final AtomicLong requestCounter = new AtomicLong();
-  private final AtomicLong successCounter = new AtomicLong();
-  private final AtomicLong failureCounter = new AtomicLong();
-  private final AtomicLong timeoutCounter = new AtomicLong();
-  private final AtomicLong skippedCounter = new AtomicLong();
+  private final Map<Class<?>, AtomicLong> successCounter = new ConcurrentHashMap<>();
+  private final Map<Class<?>, AtomicLong> failureCounter = new ConcurrentHashMap<>();
+  private final Map<Class<?>, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
+  private final Map<Class<?>, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -221,6 +221,17 @@ public final class ReplicationSupervisor {
       return;
     }
 
+    if (successCounter.get(task.getClass()) == null) {
+      synchronized (this) {
+        if (successCounter.get(task.getClass()) == null) {
+          successCounter.put(task.getClass(), new AtomicLong(0));
+          failureCounter.put(task.getClass(), new AtomicLong(0));
+          timeoutCounter.put(task.getClass(), new AtomicLong(0));
+          skippedCounter.put(task.getClass(), new AtomicLong(0));
+        }
+      }
+    }
+
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes
@@ -337,7 +348,7 @@ public final class ReplicationSupervisor {
         if (deadline > 0 && now > deadline) {
           LOG.info("Ignoring {} since the deadline has passed ({} < {})",
               this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
-          timeoutCounter.incrementAndGet();
+          timeoutCounter.get(task.getClass()).incrementAndGet();
           return;
         }
 
@@ -364,18 +375,18 @@ public final class ReplicationSupervisor {
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
-          failureCounter.incrementAndGet();
+          failureCounter.get(task.getClass()).incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
-          successCounter.incrementAndGet();
+          successCounter.get(task.getClass()).incrementAndGet();
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
-          skippedCounter.incrementAndGet();
+          skippedCounter.get(task.getClass()).incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
-        failureCounter.incrementAndGet();
+        failureCounter.get(task.getClass()).incrementAndGet();
       } finally {
         inFlight.remove(task);
         decrementTaskCounter(task);
@@ -438,20 +449,51 @@ public final class ReplicationSupervisor {
     }
   }
 
+  private long getCount(Map<Class<?>, AtomicLong> counter) {
+    if (counter.isEmpty()) {
+      return 0;
+    }
+    AtomicLong total = new AtomicLong(0);
+    counter.forEach((key, value) -> {
+      total.set(total.get() + value.get());
+    });
+    return total.get();
+  }
+
   public long getReplicationSuccessCount() {
-    return successCounter.get();
+    return getCount(successCounter);
+  }
+
+  public long getReplicationSuccessCount(Class<?> cls) {
+    AtomicLong counter = successCounter.get(cls);
+    return counter != null ? counter.get() : 0;
   }
 
   public long getReplicationFailureCount() {
-    return failureCounter.get();
+    return getCount(failureCounter);
+  }
+
+  public long getReplicationFailureCount(Class<?> cls) {
+    AtomicLong counter = failureCounter.get(cls);
+    return counter != null ? counter.get() : 0;
   }
 
   public long getReplicationTimeoutCount() {
-    return timeoutCounter.get();
+    return getCount(timeoutCounter);
+  }
+
+  public long getReplicationTimeoutCount(Class<?> cls) {
+    AtomicLong counter = timeoutCounter.get(cls);
+    return counter != null ? counter.get() : 0;
   }
 
   public long getReplicationSkippedCount() {
-    return skippedCounter.get();
+    return getCount(skippedCounter);
+  }
+
+  public long getReplicationSkippedCount(Class<?> cls) {
+    AtomicLong counter = skippedCounter.get(cls);
+    return counter != null ? counter.get() : 0;
   }
 
 }
