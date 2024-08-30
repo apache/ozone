@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -39,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -576,8 +576,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return cLimit + increment >= maxLimit;
   }
 
-  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
       throws IOException {
     SnapshotInfo currSnapInfo = snapInfo;
     while (chainManager.hasPreviousPathSnapshot(
@@ -586,7 +585,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       UUID prevPathSnapshot = chainManager.previousPathSnapshot(
           currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
       String tableKey = chainManager.getTableKey(prevPathSnapshot);
-      SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo prevSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
       if (prevSnapInfo.getSnapshotStatus() ==
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         return prevSnapInfo;

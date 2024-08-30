@@ -90,8 +90,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         continue;
       }
 
+      // Remove and close snapshot's RocksDB instance from SnapshotCache.
+      ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager()
+          .invalidateCacheEntry(snapshotInfo.getSnapshotId());
+      // Remove the snapshot from snapshotId to snapshotTableKey map.
+      ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
+          .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
+      // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
   }

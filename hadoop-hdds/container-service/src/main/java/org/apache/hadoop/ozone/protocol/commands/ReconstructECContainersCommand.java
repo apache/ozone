@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.HddsIdFactory;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -140,7 +140,7 @@ public class ReconstructECContainersCommand
             .collect(Collectors.joining(", "))).append("]")
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
-            StringUtils.bytes2String(missingContainerIndexes.asReadOnlyByteBuffer()));
+            Arrays.toString(missingContainerIndexes.toByteArray()));
     return sb.toString();
   }
   /**
