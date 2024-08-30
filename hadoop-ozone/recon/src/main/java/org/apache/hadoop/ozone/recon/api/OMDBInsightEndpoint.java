@@ -193,7 +193,7 @@ public class OMDBInsightEndpoint {
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
 
-    String lastKey = "";
+    String lastPath = "";
     List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
     for (BucketLayout layout : Arrays.asList(
         BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
@@ -226,17 +226,17 @@ public class OMDBInsightEndpoint {
         }
         while (keyIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-          String key = kv.getKey();
-          lastKey = key;
+          String path = kv.getKey();
+          lastPath = path;
           OmKeyInfo omKeyInfo = kv.getValue();
           // skip the prev key if prev key is present
-          if (skipPrevKey && key.equals(prevKey)) {
+          if (skipPrevKey && path.equals(prevKey)) {
             skipPrevKeyDone = true;
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-          keyEntityInfo.setKey(key);
-          keyEntityInfo.setPath(omKeyInfo.getKeyName());
+          keyEntityInfo.setKey(omKeyInfo.getKeyName());
+          keyEntityInfo.setPath(path);
           keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
           keyEntityInfo.setSize(omKeyInfo.getDataSize());
           keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
@@ -269,7 +269,7 @@ public class OMDBInsightEndpoint {
       }
     }
 
-    openKeyInsightInfo.setLastKey(lastKey);
+    openKeyInsightInfo.setLastKey(lastPath);
     return Response.ok(openKeyInsightInfo).build();
   }
 

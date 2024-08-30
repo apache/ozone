@@ -994,7 +994,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         }}
         dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
-        loading={loading} rowKey='key'
+        loading={loading} rowKey='path'
         pagination={paginationConfig}
         locale={{ filterTitle: "" }} />
     }
