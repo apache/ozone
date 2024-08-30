@@ -27,37 +27,40 @@ import java.util.UUID;
 public class ContainerBalancerTaskIterationStatusInfo {
   private final Integer iterationNumber;
   private final String iterationResult;
-  private final long sizeScheduledForMoveGB;
-  private final long dataSizeMovedGB;
+  private final long iterationDuration;
+  private final long sizeScheduledForMove;
+  private final long dataSizeMoved;
   private final long containerMovesScheduled;
   private final long containerMovesCompleted;
   private final long containerMovesFailed;
   private final long containerMovesTimeout;
-  private final Map<UUID, Long> sizeEnteringNodesGB;
-  private final Map<UUID, Long> sizeLeavingNodesGB;
+  private final Map<UUID, Long> sizeEnteringNodes;
+  private final Map<UUID, Long> sizeLeavingNodes;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerBalancerTaskIterationStatusInfo(
       Integer iterationNumber,
       String iterationResult,
-      long sizeScheduledForMoveGB,
-      long dataSizeMovedGB,
+      long iterationDuration,
+      long sizeScheduledForMove,
+      long dataSizeMoved,
       long containerMovesScheduled,
       long containerMovesCompleted,
       long containerMovesFailed,
       long containerMovesTimeout,
-      Map<UUID, Long> sizeEnteringNodesGB,
-      Map<UUID, Long> sizeLeavingNodesGB) {
+      Map<UUID, Long> sizeEnteringNodes,
+      Map<UUID, Long> sizeLeavingNodes) {
     this.iterationNumber = iterationNumber;
     this.iterationResult = iterationResult;
-    this.sizeScheduledForMoveGB = sizeScheduledForMoveGB;
-    this.dataSizeMovedGB = dataSizeMovedGB;
+    this.iterationDuration = iterationDuration;
+    this.sizeScheduledForMove = sizeScheduledForMove;
+    this.dataSizeMoved = dataSizeMoved;
     this.containerMovesScheduled = containerMovesScheduled;
     this.containerMovesCompleted = containerMovesCompleted;
     this.containerMovesFailed = containerMovesFailed;
     this.containerMovesTimeout = containerMovesTimeout;
-    this.sizeEnteringNodesGB = sizeEnteringNodesGB;
-    this.sizeLeavingNodesGB = sizeLeavingNodesGB;
+    this.sizeEnteringNodes = sizeEnteringNodes;
+    this.sizeLeavingNodes = sizeLeavingNodes;
   }
 
   public Integer getIterationNumber() {
@@ -68,12 +71,12 @@ public class ContainerBalancerTaskIterationStatusInfo {
     return iterationResult;
   }
 
-  public long getSizeScheduledForMoveGB() {
-    return sizeScheduledForMoveGB;
+  public long getSizeScheduledForMove() {
+    return sizeScheduledForMove;
   }
 
-  public long getDataSizeMovedGB() {
-    return dataSizeMovedGB;
+  public long getDataSizeMoved() {
+    return dataSizeMoved;
   }
 
   public long getContainerMovesScheduled() {
@@ -92,12 +95,16 @@ public class ContainerBalancerTaskIterationStatusInfo {
     return containerMovesTimeout;
   }
 
-  public Map<UUID, Long> getSizeEnteringNodesGB() {
-    return sizeEnteringNodesGB;
+  public Map<UUID, Long> getSizeEnteringNodes() {
+    return sizeEnteringNodes;
   }
 
-  public Map<UUID, Long> getSizeLeavingNodesGB() {
-    return sizeLeavingNodesGB;
+  public Map<UUID, Long> getSizeLeavingNodes() {
+    return sizeLeavingNodes;
+  }
+
+  public long getIterationDuration() {
+    return iterationDuration;
   }
 }
 

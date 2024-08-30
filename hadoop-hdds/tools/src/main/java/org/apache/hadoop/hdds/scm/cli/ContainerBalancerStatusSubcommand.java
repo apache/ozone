@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -60,12 +61,15 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     boolean isRunning = response.getIsRunning();
     ContainerBalancerStatusInfo balancerStatusInfo = response.getContainerBalancerStatusInfo();
     if (isRunning) {
+      Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
       LocalDateTime dateTime =
-          LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
+          LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
 
       if (verbose) {
-        System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        long balancingDuration = OffsetDateTime.now().toEpochSecond() - startedAtInstant.getEpochSecond();
+        System.out.printf("Balancing duration: %s%n%n", getPrettyIterationStatusInfo(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
         List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
@@ -78,7 +82,9 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
         if (verboseWithHistory) {
           System.out.println("Iteration history list:");
           System.out.println(
-              iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
+              iterationsStatusInfoList.subList(0, iterationsStatusInfoList.size() - 1)
+                  .stream()
+                  .map(this::getPrettyIterationStatusInfo)
                   .collect(Collectors.joining("\n"))
           );
         }
@@ -137,20 +143,22 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
     int iterationNumber = iterationStatusInfo.getIterationNumber();
     String iterationResult = iterationStatusInfo.getIterationResult();
-    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMoveGB();
-    long dataSizeMovedGB = iterationStatusInfo.getDataSizeMovedGB();
+    long iterationDuration = iterationStatusInfo.getIterationDuration();
+    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMove();
+    long dataSizeMoved = iterationStatusInfo.getDataSizeMoved();
     long containerMovesScheduled = iterationStatusInfo.getContainerMovesScheduled();
     long containerMovesCompleted = iterationStatusInfo.getContainerMovesCompleted();
     long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
     long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
-    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesGBList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolumeGB() + "\n")
+    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + getPrettySize(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
-    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesGBList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolumeGB() + "\n")
+    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + getPrettySize(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
     return String.format(
             "%-50s %s%n" +
+                    "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -163,16 +171,41 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %n%s",
             "Key", "Value",
             "Iteration number", iterationNumber,
+            "Iteration duration", getPrettyIterationStatusInfo(iterationDuration),
             "Iteration result",
             iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,
-            "Size scheduled to move", sizeScheduledForMove,
-            "Moved data size", dataSizeMovedGB,
+            "Size scheduled to move", getPrettySize(sizeScheduledForMove),
+            "Moved data size", getPrettySize(dataSizeMoved),
             "Scheduled to move containers", containerMovesScheduled,
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
             "Failed to move containers by timeout", containerMovesTimeout,
             "Entered data to nodes", enteringDataNodeList,
             "Exited data from nodes", leavingDataNodeList);
+  }
+
+  private String getPrettyIterationStatusInfo(long duration) {
+    String prettyDuration;
+    if (duration >= 0 && duration < 60) {
+      prettyDuration = duration + "s";
+    } else if (duration >= 60 && duration < 3600) {
+      prettyDuration = (duration / 60 + "m " + duration % 60 + "s");
+    } else if (duration >= 3600) {
+      prettyDuration = (duration / 60 / 60 + "h " + duration / 60 % 60 + "m " + duration % 60 + "s");
+    } else {
+      throw new IllegalStateException("Incorrect duration exception" + duration);
+    }
+    return prettyDuration;
+  }
+
+  public static String getPrettySize(long sizeInBytes) {
+    if (sizeInBytes / OzoneConsts.GB > 0) {
+      return sizeInBytes / OzoneConsts.GB + " Gb" + sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
+    } else if (sizeInBytes == 0) {
+      return "0";
+    } else {
+      return sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
+    }
   }
 }
 

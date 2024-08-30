@@ -74,7 +74,7 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  public void testContainerBalancerStatusInfoSubcommandRunning()
+  void testContainerBalancerStatusInfoSubcommandRunning()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 
@@ -98,34 +98,35 @@ class TestContainerBalancerSubCommand {
         StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
             .setIterationNumber(0)
             .setIterationResult("ITERATION_COMPLETED")
-            .setSizeScheduledForMoveGB(48)
-            .setDataSizeMovedGB(48)
+            .setIterationDuration(400L)
+            .setSizeScheduledForMove(48)
+            .setDataSizeMoved(48)
             .setContainerMovesScheduled(11)
             .setContainerMovesCompleted(11)
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                    .setDataVolumeGB(27)
+                    .setDataVolume(27)
                     .build()
             )
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                    .setDataVolumeGB(23L)
+                    .setDataVolume(23L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                    .setDataVolumeGB(24L)
+                    .setDataVolume(24L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                    .setDataVolumeGB(26L)
+                    .setDataVolume(26L)
                     .build()
             )
             .build();
@@ -133,69 +134,71 @@ class TestContainerBalancerSubCommand {
         StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
             .setIterationNumber(1)
             .setIterationResult("ITERATION_COMPLETED")
-            .setSizeScheduledForMoveGB(48)
-            .setDataSizeMovedGB(48)
+            .setIterationDuration(300L)
+            .setSizeScheduledForMove(48)
+            .setDataSizeMoved(48)
             .setContainerMovesScheduled(11)
             .setContainerMovesCompleted(11)
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                    .setDataVolumeGB(27L)
+                    .setDataVolume(27L)
                     .build()
             )
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                    .setDataVolumeGB(23L)
+                    .setDataVolume(23L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                    .setDataVolumeGB(24L)
+                    .setDataVolume(24L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                    .setDataVolumeGB(26L)
+                    .setDataVolume(26L)
                     .build()
             )
             .build();
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration2StatusInfo =
         StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
-            .setIterationNumber(1)
+            .setIterationNumber(2)
             .setIterationResult("")
-            .setSizeScheduledForMoveGB(48)
-            .setDataSizeMovedGB(48)
+            .setIterationDuration(4000L)
+            .setSizeScheduledForMove(48)
+            .setDataSizeMoved(48)
             .setContainerMovesScheduled(11)
             .setContainerMovesCompleted(11)
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                    .setDataVolumeGB(27L)
+                    .setDataVolume(27L)
                     .build()
             )
-            .addSizeEnteringNodesGB(
+            .addSizeEnteringNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                    .setDataVolumeGB(23L)
+                    .setDataVolume(23L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                    .setDataVolumeGB(24L)
+                    .setDataVolume(24L)
                     .build()
             )
-            .addSizeLeavingNodesGB(
+            .addSizeLeavingNodes(
                 StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                    .setDataVolumeGB(26L)
+                    .setDataVolume(26L)
                     .build()
             )
             .build();
@@ -217,7 +220,8 @@ class TestContainerBalancerSubCommand {
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Matcher m = p.matcher(output);
     assertTrue(m.find());
   }
 
@@ -226,7 +230,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 
-    //test status is running
+    //test status is not running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(
         ContainerBalancerStatusInfoResponseProto.newBuilder()
             .setIsRunning(false)

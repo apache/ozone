@@ -93,12 +93,16 @@ Run Balancer Verbose Status
                      Verify Verbose Balancer Status    ${result}
                      Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
                      Should Contain                  ${result}             Current iteration info:
+                     Should Contain                  ${result}             Balancing duration:
+                     Should Contain                  ${result}             Iteration duration
 
 Run Balancer Verbose History Status
     ${result} =    Execute                         ozone admin containerbalancer status -v --history
                    Verify Verbose Balancer Status          ${result}
                    Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
                    Should Contain                  ${result}             Iteration history list:
+                   Should Contain                  ${result}             Balancing duration:
+                   Should Contain                  ${result}             Iteration duration
 
 ContainerBalancer is Not Running
     ${result} =         Execute          ozone admin containerbalancer status

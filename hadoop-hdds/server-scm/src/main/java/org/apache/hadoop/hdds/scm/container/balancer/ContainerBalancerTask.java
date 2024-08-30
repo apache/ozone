@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -60,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static java.time.OffsetDateTime.now;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
@@ -118,7 +120,7 @@ public class ContainerBalancerTask implements Runnable {
   private int nextIterationIndex;
   private boolean delayStart;
   private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
-
+  private OffsetDateTime currentIterationStarted;
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
    *
@@ -207,6 +209,7 @@ public class ContainerBalancerTask implements Runnable {
     // leader change or restart
     int i = nextIterationIndex;
     for (; i < iterations && isBalancerRunning(); i++) {
+      currentIterationStarted = now();
       // reset some variables and metrics for this iteration
       resetState();
       if (config.getTriggerDuEnable()) {
@@ -302,8 +305,9 @@ public class ContainerBalancerTask implements Runnable {
     ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
             iterationNumber,
             iR.name(),
-            getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
-            metrics.getDataSizeMovedGBInLatestIteration(),
+        now().toEpochSecond() - currentIterationStarted.toEpochSecond(),
+            getSizeScheduledForMoveInLatestIteration(),
+            metrics.getDataSizeMovedInLatestIteration(),
             metrics.getNumContainerMovesScheduledInLatestIteration(),
             metrics.getNumContainerMovesCompletedInLatestIteration(),
             metrics.getNumContainerMovesFailedInLatestIteration(),
@@ -316,7 +320,7 @@ public class ContainerBalancerTask implements Runnable {
                     .collect(
                             Collectors.toMap(
                                     entry -> entry.getKey().getUuid(),
-                                    entry -> entry.getValue() / OzoneConsts.GB
+                                Map.Entry::getValue
                             )
                     ),
             findSourceStrategy.getSizeLeavingNodes()
@@ -327,7 +331,7 @@ public class ContainerBalancerTask implements Runnable {
                     .collect(
                             Collectors.toMap(
                                     entry -> entry.getKey().getUuid(),
-                                    entry -> entry.getValue() / OzoneConsts.GB
+                                    entry -> entry.getValue()
                             )
                     )
     );
@@ -340,12 +344,13 @@ public class ContainerBalancerTask implements Runnable {
         .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
         .max()
         .orElse(0);
-
+    long iterationDuration = getCurrentIterationDuration();
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         lastIterationNumber + 1,
         null,
-        getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
-        sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
+        iterationDuration,
+        getSizeScheduledForMoveInLatestIteration(),
+        sizeActuallyMovedInLatestIteration,
         metrics.getNumContainerMovesScheduledInLatestIteration(),
         metrics.getNumContainerMovesCompletedInLatestIteration(),
         metrics.getNumContainerMovesFailedInLatestIteration(),
@@ -357,7 +362,7 @@ public class ContainerBalancerTask implements Runnable {
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(Collectors.toMap(
                     entry -> entry.getKey().getUuid(),
-                    entry -> entry.getValue() / OzoneConsts.GB
+                    entry -> entry.getValue()
                 )
             ),
         findSourceStrategy.getSizeLeavingNodes()
@@ -368,13 +373,21 @@ public class ContainerBalancerTask implements Runnable {
             .collect(
                 Collectors.toMap(
                     entry -> entry.getKey().getUuid(),
-                    entry -> entry.getValue() / OzoneConsts.GB
+                    entry -> entry.getValue()
                 )
             )
     );
     List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
     resultList.add(currentIterationStatistic);
     return resultList;
+  }
+
+  private long getCurrentIterationDuration() {
+    if (currentIterationStarted == null) {
+      return -1L;
+    } else {
+      return now().toEpochSecond() - currentIterationStarted.toEpochSecond();
+    }
   }
 
   /**
@@ -717,8 +730,8 @@ public class ContainerBalancerTask implements Runnable {
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
         metrics.getNumContainerMovesTimeoutInLatestIteration());
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
+    metrics.incrementDataSizeMovedInLatestIteration(
+        sizeActuallyMovedInLatestIteration);
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
     metrics.incrementNumContainerMovesFailed(
@@ -1145,6 +1158,7 @@ public class ContainerBalancerTask implements Runnable {
     this.sizeScheduledForMoveInLatestIteration = 0;
     this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
+    metrics.resetDataSizeMovedInLatestIteration();
     metrics.resetNumContainerMovesScheduledInLatestIteration();
     metrics.resetNumContainerMovesCompletedInLatestIteration();
     metrics.resetNumContainerMovesTimeoutInLatestIteration();

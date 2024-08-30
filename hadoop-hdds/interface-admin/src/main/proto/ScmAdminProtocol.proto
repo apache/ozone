@@ -627,19 +627,20 @@ message ContainerBalancerStatusInfo {
 message ContainerBalancerTaskIterationStatusInfo {
   optional int32 iterationNumber = 1;
   optional string iterationResult = 2;
-  optional int64 sizeScheduledForMoveGB = 3;
-  optional int64 dataSizeMovedGB = 4;
+  optional int64 sizeScheduledForMove = 3;
+  optional int64 dataSizeMoved = 4;
   optional int64 containerMovesScheduled = 5;
   optional int64 containerMovesCompleted = 6;
   optional int64 containerMovesFailed = 7;
   optional int64 containerMovesTimeout = 8;
-  repeated NodeTransferInfo sizeEnteringNodesGB = 9;
-  repeated NodeTransferInfo sizeLeavingNodesGB = 10;
+  repeated NodeTransferInfo sizeEnteringNodes = 9;
+  repeated NodeTransferInfo sizeLeavingNodes = 10;
+  optional int64 iterationDuration = 11;
 }
 
 message NodeTransferInfo {
   optional string uuid = 1;
-  optional int64 dataVolumeGB = 2;
+  optional int64 dataVolume = 2;
 }
 
 message DecommissionScmRequestProto {
