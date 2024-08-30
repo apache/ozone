@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,7 +86,7 @@ class TestBlockOutputStream {
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    OzoneClientConfig clientConfig = OzoneFSUtils.getClientConfig(conf);
     clientConfig.setChecksumType(ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     clientConfig.setEnablePutblockPiggybacking(true);
@@ -95,6 +97,8 @@ class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 4, StorageUnit.MB);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 3);
+
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, true);
 
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
