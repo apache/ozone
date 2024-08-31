@@ -62,6 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -344,6 +345,32 @@ public class TestKeyValueHandler {
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
         "Close container should return Invalid container error");
+  }
+
+  @Test
+  public void testClusterId() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    MutableVolumeSet volumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerSet cset = new ContainerSet(1000);
+    int[] interval = new int[]{2};
+    ContainerMetrics metrics = new ContainerMetrics(interval);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    StateContext context = ContainerTestUtils.getMockContext(
+        datanodeDetails, conf);
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        context.getParent().getDatanodeDetails().getUuidString(), cset,
+        volumeSet, metrics, c -> {
+    });
+    String tmpClusterId = "test_cluster1";
+    keyValueHandler.setClusterID(tmpClusterId);
+    assertEquals(keyValueHandler.getClusterId(), tmpClusterId);
+    try {
+      keyValueHandler.setClusterID(null);
+    } catch (Exception e) {
+      assertTrue(true);
+    }
   }
 
   @Test

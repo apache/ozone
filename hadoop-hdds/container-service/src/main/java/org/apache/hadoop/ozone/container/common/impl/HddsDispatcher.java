@@ -647,12 +647,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void setClusterId(String clusterId) {
-    Preconditions.checkNotNull(clusterId, "clusterId Cannot be null");
-    if (this.clusterId == null) {
-      this.clusterId = clusterId;
-      for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
-        handlerMap.getValue().setClusterID(clusterId);
-      }
+    Preconditions.checkNotNull(clusterId, "clusterId cannot be null");
+    this.clusterId = clusterId;
+    for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
+      handlerMap.getValue().setClusterID(clusterId);
     }
   }
 
