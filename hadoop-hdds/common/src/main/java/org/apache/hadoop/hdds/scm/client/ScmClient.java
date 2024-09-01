@@ -393,6 +393,15 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Get the current SCM mode.
+   *
+   * @return `true` indicates that it is in RATIS mode,
+   * while `false` indicates that it is in STANDALONE mode.
+   * @throws IOException  an I/O exception of some sort has occurred.
+   */
+  boolean isSCMRatisEnable() throws IOException;
+
+  /**
    * Force generates new secret keys (rotate).
    *
    * @param force boolean flag that forcefully rotates the key on demand
