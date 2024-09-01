@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +39,14 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   static {
     Field f = null;
-    try {
-      f = ByteBuffer.class
-          .getDeclaredField("isReadOnly");
-      f.setAccessible(true);
-    } catch (NoSuchFieldException e) {
-      LOG.error("No isReadOnly field in ByteBuffer", e);
+    if (JavaUtils.isJavaVersionAtMost(8)) {
+      try {
+        f = ByteBuffer.class
+            .getDeclaredField("isReadOnly");
+        f.setAccessible(true);
+      } catch (NoSuchFieldException e) {
+        LOG.error("No isReadOnly field in ByteBuffer", e);
+      }
     }
     IS_READY_ONLY_FIELD = f;
   }
