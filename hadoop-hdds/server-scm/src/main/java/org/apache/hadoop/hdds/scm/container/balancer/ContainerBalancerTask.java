@@ -730,6 +730,8 @@ public class ContainerBalancerTask implements Runnable {
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
         metrics.getNumContainerMovesTimeoutInLatestIteration());
+    metrics.incrementDataSizeMovedGBInLatestIteration(
+        sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
     metrics.incrementDataSizeMovedInLatestIteration(
         sizeActuallyMovedInLatestIteration);
     metrics.incrementDataSizeMovedGB(
