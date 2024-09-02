@@ -133,6 +133,9 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
+    if (null == this.fileName) {
+      this.fileName = OzoneFSUtils.getFileName(this.keyName);
+    }
   }
 
   public String getVolumeName() {
