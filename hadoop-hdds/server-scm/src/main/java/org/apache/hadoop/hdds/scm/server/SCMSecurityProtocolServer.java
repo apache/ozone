@@ -434,24 +434,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @throws IOException
    */
   @Override
-  public List<String> listCertificate(NodeType role,
+  public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count) throws IOException {
-    List<X509Certificate> certificates = scmCertificateServer.listCertificate(role, startSerialId, count);
-    List<String> results = new ArrayList<>(certificates.size());
-    for (X509Certificate cert : certificates) {
-      try {
-        String certStr = getPEMEncodedString(cert);
-        results.add(certStr);
-      } catch (SCMSecurityException e) {
-        throw new SCMSecurityException("listCertificate operation failed.", e, e.getErrorCode());
-      }
-    }
-    return results;
+    return scmCertificateServer.listCertificate(role, startSerialId, count);
   }
 
   @Override
-  public List<String> listCACertificate() throws IOException {
-    List<String> caCerts =
+  public List<X509Certificate> listCACertificate() throws IOException {
+    List<X509Certificate> caCerts =
         listCertificate(NodeType.SCM, 0, 10);
     return caCerts;
   }
@@ -474,14 +464,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public List<String> removeExpiredCertificates() throws IOException {
+  public List<X509Certificate> removeExpiredCertificates() throws IOException {
     storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
-    List<String> pemEncodedCerts = new ArrayList<>();
-    for (X509Certificate cert : storageContainerManager.getCertificateStore()
-        .removeAllExpiredCertificates()) {
-      pemEncodedCerts.add(CertificateCodec.getPEMEncodedString(cert));
-    }
-    return pemEncodedCerts;
+    return storageContainerManager.getCertificateStore().removeAllExpiredCertificates();
   }
 
   private String getNextCertificateId() throws IOException {

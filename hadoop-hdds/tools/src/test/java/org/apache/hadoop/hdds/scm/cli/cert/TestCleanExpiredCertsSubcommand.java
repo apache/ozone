@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
 
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,8 +70,8 @@ class TestCleanExpiredCertsSubcommand {
     cmd = new CleanExpiredCertsSubcommand();
     KeyPair keyPair = CertificateTestUtils.aKeyPair(new OzoneConfiguration());
     X509Certificate cert = createSelfSignedCert(keyPair, "aCert");
-    ArrayList<String> certPemList = new ArrayList<>();
-    certPemList.add(CertificateCodec.getPEMEncodedString(cert));
+    ArrayList<X509Certificate> certPemList = new ArrayList<>();
+    certPemList.add(cert);
     when(scmSecurityProtocolMock.removeExpiredCertificates())
         .thenReturn(certPemList);
     cmd.execute(scmSecurityProtocolMock);

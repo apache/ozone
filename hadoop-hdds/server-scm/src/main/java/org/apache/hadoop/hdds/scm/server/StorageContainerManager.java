@@ -89,7 +89,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.Defaul
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
@@ -1612,18 +1611,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // TODO: see if we can avoid doing this during every restart.
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
-      List<String> pemEncodedCerts =
+      List<X509Certificate> certList =
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
-      for (String cert : pemEncodedCerts) {
-        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
-            cert, CertificateCodec::toIOException);
-        if (certificateStore.getCertificateByID(x509Certificate.getSerialNumber()) == null) {
+      for (X509Certificate cert : certList) {
+        if (certificateStore.getCertificateByID(cert.getSerialNumber()) == null) {
           LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
-                  "{}", x509Certificate.getSerialNumber(),
-              scmStorageConfig.getScmId());
-          certificateStore.storeValidScmCertificate(
-              x509Certificate.getSerialNumber(), x509Certificate);
+              "{}", cert.getSerialNumber(), scmStorageConfig.getScmId());
+          certificateStore.storeValidScmCertificate(cert.getSerialNumber(), cert);
         }
       }
     }

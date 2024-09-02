@@ -19,9 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +32,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
@@ -91,7 +88,7 @@ public class ListSubcommand extends ScmCertSubcommand {
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
     HddsProtos.NodeType nodeType = parseCertRole(role);
-    List<String> certPemList = client.listCertificate(nodeType, startSerialId, count);
+    List<X509Certificate> certPemList = client.listCertificate(nodeType, startSerialId, count);
     if (count == certPemList.size()) {
       err.println("The certificate list could be longer than the batch size: "
           + count + ". Please use the \"-c\" option to see more" +
@@ -100,18 +97,7 @@ public class ListSubcommand extends ScmCertSubcommand {
 
     if (json) {
       err.println("Certificate list:(BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
-      List<Certificate> certList = new ArrayList<>();
-      for (String certPemStr : certPemList) {
-        try {
-          X509Certificate cert =
-              CertificateCodec.getX509Certificate(certPemStr);
-          certList.add(new Certificate(cert));
-        } catch (CertificateException ex) {
-          err.println("Failed to parse certificate.");
-        }
-      }
-      System.out.println(
-          JsonUtils.toJsonStringWithDefaultPrettyPrinter(certList));
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(certPemList));
       return;
     }
 

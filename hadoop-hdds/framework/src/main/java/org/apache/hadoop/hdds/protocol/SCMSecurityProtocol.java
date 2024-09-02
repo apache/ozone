@@ -111,12 +111,12 @@ public interface SCMSecurityProtocol {
   /**
    * Get list of certificates meet the query criteria.
    *
-   * @param type            - node type: OM/SCM/DN.
-   * @param startSerialId   - start certificate serial id.
-   * @param count           - max number of certificates returned in a batch.
+   * @param type          - node type: OM/SCM/DN.
+   * @param startSerialId - start certificate serial id.
+   * @param count         - max number of certificates returned in a batch.
    * @return list of PEM encoded certificate strings.
    */
-  List<String> listCertificate(HddsProtos.NodeType type, long startSerialId, int count) throws IOException;
+  List<X509Certificate> listCertificate(HddsProtos.NodeType type, long startSerialId, int count) throws IOException;
 
   /**
    * Get Root CA certificate.
@@ -143,7 +143,7 @@ public interface SCMSecurityProtocol {
    *
    * @throws IOException
    */
-  List<String> listCACertificate() throws IOException;
+  List<X509Certificate> listCACertificate() throws IOException;
 
   /**
    * Get SCM signed certificate.
@@ -169,5 +169,5 @@ public interface SCMSecurityProtocol {
    * @return list of the removed certificates
    * @throws IOException
    */
-  List<String> removeExpiredCertificates() throws IOException;
+  List<X509Certificate> removeExpiredCertificates() throws IOException;
 }

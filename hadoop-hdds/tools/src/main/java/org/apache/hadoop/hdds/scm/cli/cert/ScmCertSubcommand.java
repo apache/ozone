@@ -19,11 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -38,20 +36,15 @@ public abstract class ScmCertSubcommand implements Callable<Void> {
 
   private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s%n";
 
-  protected void printCertList(List<String> pemEncodedCerts) {
-    if (pemEncodedCerts.isEmpty()) {
+  protected void printCertList(List<X509Certificate> certList) {
+    if (certList.isEmpty()) {
       System.out.println("No certificates to list");
       return;
     }
     System.out.printf(OUTPUT_FORMAT, "SerialNumber", "Valid From",
         "Expiry", "Subject", "Issuer");
-    for (String certPemStr : pemEncodedCerts) {
-      try {
-        X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-        printCert(cert);
-      } catch (CertificateException e) {
-        System.err.println("Failed to parse certificate: " + e.getMessage());
-      }
+    for (X509Certificate certificate : certList) {
+      printCert(certificate);
     }
   }
 

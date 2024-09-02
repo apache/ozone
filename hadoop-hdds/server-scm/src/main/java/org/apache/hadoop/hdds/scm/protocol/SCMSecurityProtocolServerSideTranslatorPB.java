@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 import java.io.IOException;
 import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -312,15 +313,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   public SCMListCertificateResponseProto listCertificate(
       SCMListCertificateRequestProto request) throws IOException {
-    List<String> certs = impl.listCertificate(request.getRole(),
-        request.getStartCertId(), request.getCount());
-
+    List<X509Certificate> certs = impl.listCertificate(request.getRole(), request.getStartCertId(), request.getCount());
+    List<String> encodedCertList = convertCertListToEncodedList(certs);
     SCMListCertificateResponseProto.Builder builder =
         SCMListCertificateResponseProto
             .newBuilder()
-            .setResponseCode(SCMListCertificateResponseProto
-                .ResponseCode.success)
-            .addAllCertificates(certs);
+            .setResponseCode(SCMListCertificateResponseProto.ResponseCode.success)
+            .addAllCertificates(encodedCertList);
     return builder.build();
 
   }
@@ -342,16 +341,24 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMListCertificateResponseProto listCACertificate()
       throws IOException {
 
-    List<String> certs = impl.listCACertificate();
-
+    List<X509Certificate> certs = impl.listCACertificate();
+    List<String> encodedList = convertCertListToEncodedList(certs);
     SCMListCertificateResponseProto.Builder builder =
         SCMListCertificateResponseProto
             .newBuilder()
             .setResponseCode(SCMListCertificateResponseProto
                 .ResponseCode.success)
-            .addAllCertificates(certs);
+            .addAllCertificates(encodedList);
     return builder.build();
 
+  }
+
+  private List<String> convertCertListToEncodedList(List<X509Certificate> certs) throws SCMSecurityException {
+    List<String> encodedCertList = new ArrayList<>();
+    for (X509Certificate cert : certs) {
+      encodedCertList.add(CertificateCodec.getPEMEncodedString(cert));
+    }
+    return encodedCertList;
   }
 
   private SCMSecurityException createNotHAException() {
@@ -376,7 +383,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificates()
       throws IOException {
     return SCMRemoveExpiredCertificatesResponseProto.newBuilder()
-        .addAllRemovedExpiredCertificates(impl.removeExpiredCertificates())
+        .addAllRemovedExpiredCertificates(convertCertListToEncodedList(impl.removeExpiredCertificates()))
         .build();
   }
 }

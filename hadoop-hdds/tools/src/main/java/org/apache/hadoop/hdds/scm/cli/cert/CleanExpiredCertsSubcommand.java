@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 /**
@@ -36,7 +37,7 @@ public class CleanExpiredCertsSubcommand extends ScmCertSubcommand {
 
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
-    List<String> pemEncodedCerts = client.removeExpiredCertificates();
+    List<X509Certificate> pemEncodedCerts = client.removeExpiredCertificates();
     System.out.println("List of removed expired certificates:");
     printCertList(pemEncodedCerts);
   }
