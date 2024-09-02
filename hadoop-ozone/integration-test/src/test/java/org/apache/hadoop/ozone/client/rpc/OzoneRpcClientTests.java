@@ -4281,6 +4281,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     omMetadataManager.getKeyTable(getBucketLayout())
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
             omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+            omKeyInfo, -1);
 
     //Step 5
     key = bucket.getKey(keyName);
