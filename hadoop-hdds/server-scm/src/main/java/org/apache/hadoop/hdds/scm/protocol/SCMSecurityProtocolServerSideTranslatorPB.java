@@ -370,7 +370,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMGetAllRootCaCertificatesResponseProto getAllRootCa()
       throws IOException {
     return SCMGetAllRootCaCertificatesResponseProto.newBuilder()
-        .addAllAllX509RootCaCertificates(impl.getAllRootCaCertificates())
+        .addAllAllX509RootCaCertificates(convertCertListToEncodedList(impl.getAllRootCaCertificates()))
         .build();
   }
 

@@ -333,8 +333,8 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
-    List<String> rootCaList = new ArrayList<>();
-    rootCaList.add(pemCert);
+    List<X509Certificate> rootCaList = new ArrayList<>();
+    rootCaList.add(newCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
     String certId = newCert.getSerialNumber().toString();
@@ -356,7 +356,7 @@ public class TestHddsSecureDatanodeInit {
 
     // test the second time certificate rotation, generate a new cert
     newCert = generateX509Cert(null, null, Duration.ofSeconds(CERT_LIFETIME));
-    rootCaList.remove(pemCert);
+    rootCaList.remove(newCert);
     pemCert = CertificateCodec.getPEMEncodedString(newCert);
     responseProto = SCMSecurityProtocolProtos.SCMGetCertResponseProto
         .newBuilder().setResponseCode(SCMSecurityProtocolProtos
@@ -367,7 +367,7 @@ public class TestHddsSecureDatanodeInit {
         .build();
     when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
-    rootCaList.add(pemCert);
+    rootCaList.add(newCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     String certId2 = newCert.getSerialNumber().toString();
 

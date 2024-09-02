@@ -162,7 +162,7 @@ public interface SCMSecurityProtocol {
    *
    * @return String     - pem encoded list of root CA certificates
    */
-  List<String> getAllRootCaCertificates() throws IOException;
+  List<X509Certificate> getAllRootCaCertificates() throws IOException;
 
   /**
    * Remove all expired certificates from the SCM metadata store.

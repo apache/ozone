@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -77,8 +76,8 @@ public class TestRootCaRotationPoller {
         LocalDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
-    List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
+    List<X509Certificate> certsFromScm = new ArrayList<>();
+    certsFromScm.add(knownCert);
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //When the scm returns the same set of root ca certificates, and they poll
@@ -111,9 +110,9 @@ public class TestRootCaRotationPoller {
         LocalDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
-    List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
+    List<X509Certificate> certsFromScm = new ArrayList<>();
+    certsFromScm.add(knownCert);
+    certsFromScm.add(newRootCa);
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //when the scm returns the unknown certificate to the poller
@@ -144,13 +143,12 @@ public class TestRootCaRotationPoller {
         LocalDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
-    List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
+    List<X509Certificate> certsFromScm = new ArrayList<>();
+    certsFromScm.add(knownCert);
+    certsFromScm.add(newRootCa);
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-    when(scmSecurityClient.getAllRootCaCertificates())
-        .thenReturn(certsFromScm);
+    when(scmSecurityClient.getAllRootCaCertificates()).thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     //When encountering an error for the first run:
     AtomicInteger runNumber = new AtomicInteger(1);

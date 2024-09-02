@@ -388,13 +388,14 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public List<String> getAllRootCaCertificates() throws IOException {
+  public List<X509Certificate> getAllRootCaCertificates() throws IOException {
     SCMGetAllRootCaCertificatesRequestProto protoIns =
         SCMGetAllRootCaCertificatesRequestProto.getDefaultInstance();
-    return submitRequest(Type.GetAllRootCaCertificates,
+    List<String> encodedRootCerts = submitRequest(Type.GetAllRootCaCertificates,
         builder -> builder.setGetAllRootCaCertificatesRequestProto(protoIns))
         .getAllRootCaCertificatesResponseProto()
         .getAllX509RootCaCertificatesList();
+    return OzoneSecurityUtil.convertToX509(encodedRootCerts);
   }
 
   @Override

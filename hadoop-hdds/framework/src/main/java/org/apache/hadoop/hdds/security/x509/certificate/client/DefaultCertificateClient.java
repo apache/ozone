@@ -1331,9 +1331,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   private void getAndStoreAllRootCAs(CertificateCodec certCodec, boolean renew)
       throws IOException {
-    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
-    for (String rootCAPem : rootCAPems) {
-      storeCertificate(rootCAPem, CAType.ROOT, certCodec,
+    List<X509Certificate> rootCaCerts = scmSecurityClient.getAllRootCaCertificates();
+    for (X509Certificate rootCAPem : rootCaCerts) {
+      storeCertificate(CertificateCodec.getPEMEncodedString(rootCAPem), CAType.ROOT, certCodec,
           false, !renew);
     }
   }

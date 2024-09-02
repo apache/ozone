@@ -82,7 +82,6 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 
 /**
@@ -254,17 +253,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public synchronized List<String> getAllRootCaCertificates()
-      throws IOException {
-    List<String> pemEncodedList = new ArrayList<>();
-    Set<X509Certificate> certList =
+  public synchronized List<X509Certificate> getAllRootCaCertificates() {
+    Set<X509Certificate> certSet =
         scmCertificateClient.getAllRootCaCerts().size() == 0 ?
             scmCertificateClient.getAllCaCerts() :
             scmCertificateClient.getAllRootCaCerts();
-    for (X509Certificate cert : certList) {
-      pemEncodedList.add(getPEMEncodedString(cert));
-    }
-    return pemEncodedList;
+    return new ArrayList<>(certSet);
   }
 
   /**
