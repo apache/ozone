@@ -202,7 +202,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
 
     return builder.build();
@@ -225,7 +225,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
 
     return builder.build();
@@ -275,7 +275,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .newBuilder()
             .setResponseCode(ResponseCode.success)
             .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
     return builder.build();
 
@@ -298,13 +298,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto request)
       throws IOException {
 
-    String certificate = impl.getCACertificate();
+    CertPath certificate = impl.getCACertificate();
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(certificate);
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(certificate));
     setRootCAIfNeeded(builder);
     return builder.build();
 

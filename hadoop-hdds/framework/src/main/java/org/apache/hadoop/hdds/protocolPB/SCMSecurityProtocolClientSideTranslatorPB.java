@@ -321,8 +321,8 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return serial   - Root certificate.
    */
   @Override
-  public String getCACertificate() throws IOException {
-    return getCACert().getX509Certificate();
+  public CertPath getCACertificate() throws IOException {
+    return CertificateCodec.getCertPathFromPemEncodedString(getCACert().getX509Certificate());
   }
 
   public SCMGetCertResponseProto getCACert() throws IOException {

@@ -106,7 +106,7 @@ public interface SCMSecurityProtocol {
    *
    * @return String         - pem encoded CA certificate.
    */
-  String getCACertificate() throws IOException;
+  CertPath getCACertificate() throws IOException;
 
   /**
    * Get list of certificates meet the query criteria.

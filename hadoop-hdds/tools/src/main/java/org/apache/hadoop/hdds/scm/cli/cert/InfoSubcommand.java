@@ -18,14 +18,12 @@
 package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
