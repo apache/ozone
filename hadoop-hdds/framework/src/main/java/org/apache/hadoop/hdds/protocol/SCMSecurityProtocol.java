@@ -120,10 +120,11 @@ public interface SCMSecurityProtocol {
 
   /**
    * Get Root CA certificate.
+   *
    * @return
    * @throws IOException
    */
-  String getRootCACertificate() throws IOException;
+  X509Certificate getRootCACertificate() throws IOException;
 
   /**
    * Returns all the individual SCM CA's along with Root CA.

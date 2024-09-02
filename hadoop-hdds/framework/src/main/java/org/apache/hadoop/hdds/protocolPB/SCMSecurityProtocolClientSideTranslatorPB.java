@@ -357,12 +357,13 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public String getRootCACertificate() throws IOException {
+  public X509Certificate getRootCACertificate() throws IOException {
     SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto
         .getDefaultInstance();
-    return submitRequest(Type.GetRootCACertificate,
+    String encodedRootCert = submitRequest(Type.GetRootCACertificate,
         builder -> builder.setGetCACertificateRequest(protoIns))
         .getGetCertResponseProto().getX509RootCACertificate();
+    return CertificateCodec.getX509Certificate(encodedRootCert, CertificateCodec::toIOException);
   }
 
   @Override

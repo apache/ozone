@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -447,20 +446,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public synchronized String getRootCACertificate() throws IOException {
+  public synchronized X509Certificate getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
     if (rootCertificateServer != null) {
       try {
-        return CertificateCodec.getPEMEncodedString(
-            rootCertificateServer.getCACertificate());
+        return rootCertificateServer.getCACertificate();
       } catch (CertificateException e) {
         LOGGER.error("Failed to get root CA certificate", e);
         throw new IOException("Failed to get root CA certificate", e);
       }
     }
-
-    return CertificateCodec.getPEMEncodedString(
-        scmCertificateClient.getCACertificate());
+    return scmCertificateClient.getCACertificate();
   }
 
   @Override
