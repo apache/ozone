@@ -476,7 +476,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Getting certificate with certSerialId:{}.",
         certId);
     try {
-      String pemEncodedCert = getScmSecureClient().getCertificate(certId);
+      X509Certificate certFromScm = getScmSecureClient().getCertificate(certId);
+      String pemEncodedCert = CertificateCodec.getPEMEncodedString(certFromScm);
       this.storeCertificate(pemEncodedCert, CAType.NONE);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {

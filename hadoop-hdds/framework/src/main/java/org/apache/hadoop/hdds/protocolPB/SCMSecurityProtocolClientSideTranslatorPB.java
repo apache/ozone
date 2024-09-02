@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.protocolPB;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -259,15 +260,16 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return string         - pem encoded certificate.
    */
   @Override
-  public String getCertificate(String certSerialId) throws IOException {
+  public X509Certificate getCertificate(String certSerialId) throws IOException {
     SCMGetCertificateRequestProto request = SCMGetCertificateRequestProto
         .newBuilder()
         .setCertSerialId(certSerialId)
         .build();
-    return submitRequest(Type.GetCertificate,
+    String encodedCertificate = submitRequest(Type.GetCertificate,
         builder -> builder.setGetCertificateRequest(request))
         .getGetCertResponseProto()
         .getX509Certificate();
+    return CertificateCodec.getX509Certificate(encodedCertificate, CertificateCodec::toIOException);
   }
 
   /**

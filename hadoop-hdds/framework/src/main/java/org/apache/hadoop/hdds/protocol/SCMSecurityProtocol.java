@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
 import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -93,12 +94,12 @@ public interface SCMSecurityProtocol {
    * Get SCM signed certificate for given certificate serial id if it exists.
    * Throws exception if it's not found.
    *
-   * @param certSerialId    - Certificate serial id.
+   * @param certSerialId - Certificate serial id.
    * @return String         - pem encoded SCM signed
-   *                          certificate with given cert id if it
-   *                          exists.
+   * certificate with given cert id if it
+   * exists.
    */
-  String getCertificate(String certSerialId) throws IOException;
+  X509Certificate getCertificate(String certSerialId) throws IOException;
 
   /**
    * Get CA certificate.

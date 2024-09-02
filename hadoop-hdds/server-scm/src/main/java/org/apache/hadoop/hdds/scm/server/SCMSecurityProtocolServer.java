@@ -392,14 +392,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return string         - pem encoded SCM signed certificate.
    */
   @Override
-  public String getCertificate(String certSerialId) throws IOException {
+  public X509Certificate getCertificate(String certSerialId) throws IOException {
     LOGGER.debug("Getting certificate with certificate serial id {}",
         certSerialId);
     try {
       X509Certificate certificate =
           scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
-        return getPEMEncodedString(certificate);
+        return certificate;
       }
     } catch (CertificateException e) {
       throw new SCMSecurityException("getCertificate operation failed. ", e,

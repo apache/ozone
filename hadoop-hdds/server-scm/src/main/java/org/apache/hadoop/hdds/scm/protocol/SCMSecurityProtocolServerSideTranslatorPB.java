@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
 import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -283,12 +284,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMGetCertResponseProto getCertificate(
       SCMGetCertificateRequestProto request) throws IOException {
 
-    String certificate = impl.getCertificate(request.getCertSerialId());
+    X509Certificate certificate = impl.getCertificate(request.getCertSerialId());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate);
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate));
     return builder.build();
 
   }

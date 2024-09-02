@@ -45,19 +45,13 @@ class InfoSubcommand extends ScmCertSubcommand {
 
   @Override
   public void execute(SCMSecurityProtocol client) throws IOException {
-    final String certPemStr =
+    final X509Certificate certificate =
         client.getCertificate(serialId);
-    Preconditions.checkNotNull(certPemStr,
+    Preconditions.checkNotNull(certificate,
         "Certificate can't be found");
 
     // Print container report info.
     System.out.printf("Certificate id: %s%n", serialId);
-    try {
-      X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-      System.out.println(cert);
-    } catch (CertificateException ex) {
-      System.err.println("Failed to get certificate id " + serialId);
-      throw new IOException("Fail to get certificate id " + serialId, ex);
-    }
+    System.out.println(certificate);
   }
 }
