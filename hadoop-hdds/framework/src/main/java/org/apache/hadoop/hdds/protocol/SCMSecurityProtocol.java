@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
+import java.security.cert.CertPath;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -49,19 +50,19 @@ public interface SCMSecurityProtocol {
    * @param certSignReq     - Certificate signing request.
    * @return byte[]         - SCM signed certificate.
    */
-  String getDataNodeCertificate(
+  CertPath getDataNodeCertificate(
       DatanodeDetailsProto dataNodeDetails,
       String certSignReq) throws IOException;
 
   /**
    * Get SCM signed certificate for OM.
    *
-   * @param omDetails       - DataNode Details.
-   * @param certSignReq     - Certificate signing request.
+   * @param omDetails   - DataNode Details.
+   * @param certSignReq - Certificate signing request.
    * @return String         - pem encoded SCM signed
-   *                          certificate.
+   * certificate.
    */
-  String getOMCertificate(OzoneManagerDetailsProto omDetails,
+  CertPath getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException;
 
 
@@ -73,7 +74,7 @@ public interface SCMSecurityProtocol {
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
-  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException;
 
   /**
@@ -85,7 +86,7 @@ public interface SCMSecurityProtocol {
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
-  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean isRenew) throws IOException;
 
   /**
@@ -151,7 +152,7 @@ public interface SCMSecurityProtocol {
    * @return String      - pem encoded SCM signed
    * certificate.
    */
-  String getCertificate(NodeDetailsProto nodeDetails,
+  CertPath getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException;
 
   /**

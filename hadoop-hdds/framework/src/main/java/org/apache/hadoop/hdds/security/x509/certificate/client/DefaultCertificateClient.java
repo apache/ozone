@@ -622,7 +622,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           rootCaCertificates.add(cert);
         }
       }
-    } catch (IOException | java.security.cert.CertificateException e) {
+    } catch (IOException e) {
       throw new CertificateException("Error while storing certificate.", e,
           CERTIFICATE_ERROR);
     }

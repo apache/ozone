@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.protocolPB;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.security.cert.CertPath;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemove
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -141,10 +143,11 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return byte[]         - SCM signed certificate.
    */
   @Override
-  public String getDataNodeCertificate(DatanodeDetailsProto dataNodeDetails,
+  public CertPath getDataNodeCertificate(DatanodeDetailsProto dataNodeDetails,
       String certSignReq) throws IOException {
-    return getDataNodeCertificateChain(dataNodeDetails, certSignReq)
-        .getX509Certificate();
+    return CertificateCodec.getCertPathFromPemEncodedString(getDataNodeCertificateChain(dataNodeDetails, certSignReq)
+        .getX509Certificate());
+
   }
 
   /**
@@ -155,39 +158,40 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return byte[]         - SCM signed certificate.
    */
   @Override
-  public String getOMCertificate(OzoneManagerDetailsProto omDetails,
+  public CertPath getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
-    return getOMCertChain(omDetails, certSignReq).getX509Certificate();
+    return CertificateCodec.getCertPathFromPemEncodedString(
+        getOMCertChain(omDetails, certSignReq).getX509Certificate());
   }
 
   /**
    * Get SCM signed certificate.
    *
    * @param nodeDetails - Node Details.
-   * @param certSignReq  - Certificate signing request.
+   * @param certSignReq - Certificate signing request.
    * @return String      - pem encoded SCM signed
-   *                         certificate.
+   * certificate.
    */
   @Override
-  public String getCertificate(NodeDetailsProto nodeDetails,
+  public CertPath getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException {
-    return getCertificateChain(nodeDetails, certSignReq)
-        .getX509Certificate();
+    return CertificateCodec.getCertPathFromPemEncodedString(getCertificateChain(nodeDetails, certSignReq)
+        .getX509Certificate());
   }
 
   /**
    * Get signed certificate for SCM node.
    *
-   * @param scmNodeDetails  - SCM Node Details.
-   * @param certSignReq     - Certificate signing request.
+   * @param scmNodeDetails - SCM Node Details.
+   * @param certSignReq    - Certificate signing request.
    * @return String         - pem encoded SCM signed
-   *                          certificate.
+   * certificate.
    */
   @Override
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
-    return getSCMCertChain(scmNodeDetails, certSignReq, false)
-        .getX509Certificate();
+    return CertificateCodec.getCertPathFromPemEncodedString(getSCMCertChain(scmNodeDetails, certSignReq, false)
+        .getX509Certificate());
   }
 
   /**
@@ -199,10 +203,10 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean renew) throws IOException {
-    return getSCMCertChain(scmNodeDetails, certSignReq, renew)
-        .getX509Certificate();
+    return CertificateCodec.getCertPathFromPemEncodedString(getSCMCertChain(scmNodeDetails, certSignReq, renew)
+        .getX509Certificate());
   }
 
   /**
@@ -282,9 +286,10 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
             .setCSR(certSignReq)
             .setDatanodeDetails(dnDetails)
             .build();
-    return submitRequest(Type.GetDataNodeCertificate,
-        builder -> builder.setGetDataNodeCertRequest(request))
-        .getGetCertResponseProto();
+    return
+        submitRequest(Type.GetDataNodeCertificate,
+            builder -> builder.setGetDataNodeCertRequest(request))
+            .getGetCertResponseProto();
   }
 
   /**

@@ -181,7 +181,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String         - SCM signed pem encoded certificate.
    */
   @Override
-  public String getDataNodeCertificate(
+  public CertPath getDataNodeCertificate(
       DatanodeDetailsProto dnDetails, String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
@@ -195,7 +195,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getCertificate(
+  public CertPath getCertificate(
       NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for {} {}, UUID: {}",
@@ -276,7 +276,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String         - SCM signed pem encoded certificate.
    */
   @Override
-  public String getOMCertificate(OzoneManagerDetailsProto omDetails,
+  public CertPath getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
@@ -292,12 +292,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   /**
    * Get signed certificate for SCM Node.
    *
-   * @param scmNodeDetails   - SCM Node Details.
-   * @param certSignReq      - Certificate signing request.
+   * @param scmNodeDetails - SCM Node Details.
+   * @param certSignReq    - Certificate signing request.
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
     return getSCMCertificate(scmNodeDetails, certSignReq, false);
   }
@@ -311,7 +311,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean isRenew) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
@@ -333,13 +333,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   /**
-   *  Request certificate for the specified role.
+   * Request certificate for the specified role.
+   *
    * @param certSignReq - Certificate signing request.
-   * @param nodeType - role OM/SCM/DATANODE
+   * @param nodeType    - role OM/SCM/DATANODE
    * @return String         - SCM signed pem encoded certificate.
    * @throws IOException
    */
-  private synchronized String getEncodedCertToString(String certSignReq,
+  private synchronized CertPath getEncodedCertToString(String certSignReq,
       NodeType nodeType) throws IOException {
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
@@ -351,7 +352,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           KERBEROS_TRUSTED, nodeType, getNextCertificateId());
     }
     try {
-      return getPEMEncodedString(future.get());
+      return future.get();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw generateException(e, nodeType);
