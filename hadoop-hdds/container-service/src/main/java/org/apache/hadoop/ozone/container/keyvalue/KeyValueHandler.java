@@ -903,6 +903,11 @@ public class KeyValueHandler extends Handler {
         // of order.
         blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
         boolean eob = writeChunk.getBlock().getEof();
+        if (eob) {
+          Preconditions.checkArgument(writeChunk.getBlock().getBlockData().getChunksList().isEmpty(),
+              "Client is not supposed to send empty EC blocks in piggybacking mode.");
+          chunkManager.finishWriteChunks(kvContainer, blockData);
+        }
         blockManager.putBlock(kvContainer, blockData, eob);
         blockDataProto = blockData.getProtoBufMessage();
         final long numBytes = blockDataProto.getSerializedSize();
