@@ -104,8 +104,8 @@ const renderStorageType = (bucketStorage: BucketStorage) => {
 const renderBucketLayout = (bucketLayout: BucketLayout) => {
   const bucketLayoutColorMap = {
     FILE_SYSTEM_OPTIMIZED: 'green',
-    OBJECT_STORE: 'blue',
-    LEGACY: 'gray'
+    OBJECT_STORE: 'orange',
+    LEGACY: 'blue'
   };
   const color = bucketLayout in bucketLayoutColorMap ?
     bucketLayoutColorMap[bucketLayout] : '';
