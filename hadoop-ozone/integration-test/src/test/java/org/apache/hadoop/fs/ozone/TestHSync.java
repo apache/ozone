@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -70,6 +71,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities;
 
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -83,7 +85,9 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -93,6 +97,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -358,11 +363,28 @@ public class TestHSync {
     String data = "random data";
     final Path file = new Path(dir, "file-hsync-then-close");
     try (FileSystem fs = FileSystem.get(CONF)) {
+      String chunkPath;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.write(data.getBytes(UTF_8), 0, data.length());
         outputStream.hsync();
+        // locate the block file on the DataNode.
+        // first, find the block ID of the first block in the output stream.
+        KeyOutputStream groupOutputStream =
+            ((OzoneFSOutputStream)outputStream.getWrappedStream()).getWrappedOutputStream().getKeyOutputStream();
+        List<OmKeyLocationInfo> locationInfoList =
+            groupOutputStream.getLocationInfoList();
+        OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+        HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+            cluster);
+        chunkPath = dn.getDatanodeStateMachine()
+            .getContainer().getContainerSet()
+            .getContainer(omKeyLocationInfo.getContainerID()).
+            getContainerData().getChunksPath();
+        assertFalse(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
       }
+      assertTrue(AbstractTestChunkManager.FuserCheck.isFileNotInUse(chunkPath));
     }
+
 
     OzoneManager ozoneManager = cluster.getOzoneManager();
     // Wait for double buffer to trigger all pending addToDBBatch(),

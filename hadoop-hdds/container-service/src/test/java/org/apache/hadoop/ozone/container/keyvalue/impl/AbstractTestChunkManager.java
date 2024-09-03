@@ -148,10 +148,13 @@ public abstract class AbstractTestChunkManager {
     }
   }
 
-  // check that all files under chunk path are closed.
   protected boolean checkChunkFilesClosed() throws IOException {
+    return checkChunkFilesClosed(keyValueContainerData.getChunksPath());
+  }
+
+  // check that all files under chunk path are closed.
+  public static boolean checkChunkFilesClosed(String path) {
     //As in Setup, we try to create container, these paths should exist.
-    String path = keyValueContainerData.getChunksPath();
     assertNotNull(path);
 
     File dir = new File(path);
