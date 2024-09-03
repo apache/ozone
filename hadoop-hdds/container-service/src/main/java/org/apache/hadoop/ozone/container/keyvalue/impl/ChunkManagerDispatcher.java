@@ -52,7 +52,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
  */
 public class ChunkManagerDispatcher implements ChunkManager {
 
-  private static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(ChunkManagerDispatcher.class);
 
   private final Map<ContainerLayoutVersion, ChunkManager> handlers

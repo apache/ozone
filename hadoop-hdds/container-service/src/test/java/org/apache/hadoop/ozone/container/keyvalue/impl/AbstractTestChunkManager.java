@@ -35,13 +35,18 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
@@ -126,6 +131,43 @@ public abstract class AbstractTestChunkManager {
     File[] files = dir.listFiles();
     assertNotNull(files);
     assertEquals(expected, files.length);
+  }
+
+  public static class FuserCheck {
+    public static boolean isFileNotInUse(String filePath) {
+      try {
+        Process process = new ProcessBuilder("fuser", filePath).start();
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        return reader.readLine() ==
+            null;  // If fuser returns no output, the file is not in use
+      } catch (Exception e) {
+        e.printStackTrace();
+        return false;  // On failure, assume the file is in use
+      }
+    }
+  }
+
+  // check that all files under chunk path are closed.
+  protected boolean checkChunkFilesClosed() throws IOException {
+    //As in Setup, we try to create container, these paths should exist.
+    String path = keyValueContainerData.getChunksPath();
+    assertNotNull(path);
+
+    File dir = new File(path);
+    assertTrue(dir.exists());
+
+    File[] files = dir.listFiles();
+    assertNotNull(files);
+    for (File file : files) {
+      assertTrue(file.exists());
+      assertTrue(file.isFile());
+      // check that the file is closed.
+      if (!FuserCheck.isFileNotInUse(file.getAbsolutePath())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   protected void checkWriteIOStats(long length, long opCount) {
