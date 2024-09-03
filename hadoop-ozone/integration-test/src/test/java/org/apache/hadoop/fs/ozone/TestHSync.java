@@ -19,7 +19,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -367,22 +366,12 @@ public class TestHSync {
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.write(data.getBytes(UTF_8), 0, data.length());
         outputStream.hsync();
-        // locate the block file on the DataNode.
-        // first, find the block ID of the first block in the output stream.
-        KeyOutputStream groupOutputStream =
-            ((OzoneFSOutputStream)outputStream.getWrappedStream()).getWrappedOutputStream().getKeyOutputStream();
-        List<OmKeyLocationInfo> locationInfoList =
-            groupOutputStream.getLocationInfoList();
-        OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-        HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
-            cluster);
-        chunkPath = dn.getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID()).
-            getContainerData().getChunksPath();
+        // locate the container chunk path on the first DataNode.
+        chunkPath = getChunkPathOnDataNode(outputStream);
         assertFalse(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
       }
-      assertTrue(AbstractTestChunkManager.FuserCheck.isFileNotInUse(chunkPath));
+      // After close, the chunk file should be closed.
+      assertTrue(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
     }
 
 
@@ -407,6 +396,22 @@ public class TestHSync {
         }
       }
     }
+  }
+
+  private static String getChunkPathOnDataNode(FSDataOutputStream outputStream)
+      throws IOException {
+    String chunkPath;
+    KeyOutputStream groupOutputStream =
+        ((OzoneFSOutputStream) outputStream.getWrappedStream()).getWrappedOutputStream().getKeyOutputStream();
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo, cluster);
+    chunkPath = dn.getDatanodeStateMachine()
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID()).
+        getContainerData().getChunksPath();
+    return chunkPath;
   }
 
   @ParameterizedTest

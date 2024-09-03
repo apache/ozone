@@ -239,11 +239,9 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
 
     BlockData blockData = Mockito.mock(BlockData.class);
     when(blockData.getBlockID()).thenReturn(getBlockID());
-
     assertFalse(checkChunkFilesClosed());
 
     chunkManager.finishWriteChunks(getKeyValueContainer(), blockData);
-
     assertTrue(checkChunkFilesClosed());
 
     // THEN

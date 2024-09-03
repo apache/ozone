@@ -34,10 +34,11 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.Buffer;
@@ -46,7 +47,6 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
@@ -58,6 +58,8 @@ import static org.mockito.Mockito.when;
  * Helpers for ChunkManager implementation tests.
  */
 public abstract class AbstractTestChunkManager {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractTestChunkManager.class);
 
   private HddsVolume hddsVolume;
   private KeyValueContainerData keyValueContainerData;
@@ -133,22 +135,23 @@ public abstract class AbstractTestChunkManager {
     assertEquals(expected, files.length);
   }
 
+  /**
+   * Helper class to check if a file is in use.
+   */
   public static class FuserCheck {
     public static boolean isFileNotInUse(String filePath) {
       try {
         Process process = new ProcessBuilder("fuser", filePath).start();
-        BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        return reader.readLine() ==
-            null;  // If fuser returns no output, the file is not in use
-      } catch (Exception e) {
-        e.printStackTrace();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        return reader.readLine() == null;  // If fuser returns no output, the file is not in use
+      } catch (IOException e) {
+        LOG.warn("Failed to check if file is in use: {}", filePath, e);
         return false;  // On failure, assume the file is in use
       }
     }
   }
 
-  protected boolean checkChunkFilesClosed() throws IOException {
+  protected boolean checkChunkFilesClosed() {
     return checkChunkFilesClosed(keyValueContainerData.getChunksPath());
   }
 
