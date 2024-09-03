@@ -46,7 +46,7 @@ class TestOzoneClientConfig {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
 
-    conf.setBoolean("ozone.fs.hsync.enabled", true);
+    // Note: ozone.fs.hsync.enabled is checked by OzoneFSUtils.canEnableHsync(), thus not checked here
     conf.setBoolean("ozone.client.incremental.chunk.list", true);
     conf.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     conf.setInt("ozone.client.key.write.concurrency", -1);
@@ -56,8 +56,6 @@ class TestOzoneClientConfig {
     assertTrue(subject.getIncrementalChunkList());
     assertTrue(subject.getEnablePutblockPiggybacking());
     assertEquals(-1, subject.getMaxConcurrentWritePerKey());
-
-    // TODO: Check OzoneFsUtils#canEnableHsync blocks hsync
   }
 
   @Test
@@ -67,7 +65,7 @@ class TestOzoneClientConfig {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", false);
 
-    conf.setBoolean("ozone.fs.hsync.enabled", true);
+    // Note: ozone.fs.hsync.enabled is checked by OzoneFSUtils.canEnableHsync(), thus not checked here
     conf.setBoolean("ozone.client.incremental.chunk.list", true);
     conf.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     conf.setInt("ozone.client.key.write.concurrency", -1);
@@ -77,7 +75,5 @@ class TestOzoneClientConfig {
     assertFalse(subject.getIncrementalChunkList());
     assertFalse(subject.getEnablePutblockPiggybacking());
     assertEquals(1, subject.getMaxConcurrentWritePerKey());
-
-    // TODO: Check OzoneFsUtils#canEnableHsync blocks hsync
   }
 }

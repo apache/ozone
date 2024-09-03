@@ -119,6 +119,7 @@ class TestOpenKeyCleanupService {
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.setQuietMode(false);
     OmTestManagers omTestManagers = new OmTestManagers(conf);

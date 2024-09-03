@@ -97,6 +97,7 @@ class TestBlockOutputStream {
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
 
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);

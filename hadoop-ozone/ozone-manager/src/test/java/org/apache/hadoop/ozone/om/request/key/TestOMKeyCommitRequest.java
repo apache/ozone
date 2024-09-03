@@ -388,6 +388,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   public void testRejectHsyncIfNotEnabled(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) throws Exception {
     OzoneConfiguration conf = ozoneManager.getConfiguration();
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, hbaseEnhancementsEnabled);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);
     BucketLayout bucketLayout = getBucketLayout();
 
@@ -404,6 +405,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Restore config after this test run
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 
