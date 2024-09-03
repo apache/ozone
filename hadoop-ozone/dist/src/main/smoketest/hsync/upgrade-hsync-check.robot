@@ -37,7 +37,7 @@ Create volume bucket and put key
     Execute             ozone sh key put /${volume}/${bucket}/${key} /etc/hosts
 
 *** Test Cases ***
-Test HSync Prior To Finalization
+Test HSync lease recover prior to finalization
     Create volume bucket and put key
     ${o3fs_path} =  Format FS URL          o3fs     ${VOLUME}    ${BUCKET}    ${KEY}
     ${result} =     Execute and checkrc    ozone debug recover --path=${o3fs_path}    255
@@ -45,3 +45,23 @@ Test HSync Prior To Finalization
     ${ofs_path} =   Format FS URL          ofs      ${VOLUME}    ${BUCKET}    ${KEY}
     ${result} =     Execute and checkrc    ozone debug recover --path=${ofs_path}    255
                     Should contain  ${result}  It belongs to the layout feature HBASE_SUPPORT, whose layout version is 7
+
+Generate key for o3fs by HSYNC prior to finalization
+    ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
+    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HSYNC -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
+                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+
+Generate key for o3fs by HFLUSH prior to finalization
+    ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
+    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HFLUSH -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
+                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+
+Generate key for ofs by HSYNC prior to finalization
+    ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
+    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HSYNC -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
+                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+
+Generate key for ofs by HFLUSH prior to finalization
+    ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
+    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HFLUSH -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
+                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
