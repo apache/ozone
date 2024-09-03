@@ -247,25 +247,21 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
-  // ozone.client.hbase.enhancements.enabled
-  @Config(key = "hbase.enhancements.enabled",
+  // ozone.client.hbase.enhancements.allowed
+  @Config(key = "hbase.enhancements.allowed",
       defaultValue = "false",
-      description = "DO NOT manually set this config. Set ozone.hbase.enhancements.enabled instead." +
-          "This config will be overridden by ozone.hbase.enhancements.enabled. " +
-          "When set to false, HBase enhancement-related Ozone (experimental) features " +
-          "are disabled regardless of whether those configs are set.",
+      description = "When set to false, client-side HBase enhancement-related Ozone (experimental) features " +
+          "are disabled (not allowed to be enabled) regardless of whether those configs are set.\n" +
+          "\n" +
+          "Here is the list of configs and values overridden when this config is set to false:\n" +
+          "1. ozone.fs.hsync.enabled = false\n" +
+          "2. ozone.client.incremental.chunk.list = false\n" +
+          "3. ozone.client.stream.putblock.piggybacking = false\n" +
+          "4. ozone.client.key.write.concurrency = 1\n" +
+          "\n" +
+          "A warning message will be printed if any of the above configs are overridden by this.",
       tags = ConfigTag.CLIENT)
-  private boolean hbaseEnhancementsEnabled = false;
-
-  // ozone.client.fs.hsync.enabled
-  @Config(key = "fs.hsync.enabled",
-      defaultValue = "false",
-      description = "DO NOT manually set this config. " +
-          "This config will be overridden by ozone.fs.hsync.enabled. " +
-          "Enable hsync/hflush on the Ozone client. " +
-          "Can be enabled only when ozone.hbase.enhancements.enabled = true",
-      tags = ConfigTag.CLIENT)
-  private boolean fsHsyncEnabled = false;
+  private boolean hbaseEnhancementsAllowed = false;
 
   // ozone.client.incremental.chunk.list
   @Config(key = "incremental.chunk.list",
@@ -274,7 +270,7 @@ public class OzoneClientConfig {
       description = "Client PutBlock request can choose incremental chunk " +
           "list rather than full chunk list to optimize performance. " +
           "Critical to HBase. EC does not support this feature. " +
-          "Can be enabled only when ozone.hbase.enhancements.enabled = true",
+          "Can be enabled only when ozone.client.hbase.enhancements.allowed = true",
       tags = ConfigTag.CLIENT)
   private boolean incrementalChunkList = false;
 
@@ -283,7 +279,7 @@ public class OzoneClientConfig {
           defaultValue = "false",
           type = ConfigType.BOOLEAN,
           description = "Allow PutBlock to be piggybacked in WriteChunk requests if the chunk is small. " +
-              "Can be enabled only when ozone.hbase.enhancements.enabled = true",
+              "Can be enabled only when ozone.client.hbase.enhancements.allowed = true",
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
@@ -293,7 +289,7 @@ public class OzoneClientConfig {
       description = "Maximum concurrent writes allowed on each key. " +
           "Defaults to 1 which matches the behavior before HDDS-9844. " +
           "For unlimited write concurrency, set this to -1 or any negative integer value. " +
-          "Any value other than 1 is effective only when ozone.hbase.enhancements.enabled = true",
+          "Any value other than 1 is effective only when ozone.client.hbase.enhancements.allowed = true",
       tags = ConfigTag.CLIENT)
   private int maxConcurrentWritePerKey = 1;
 
@@ -324,33 +320,32 @@ public class OzoneClientConfig {
     }
 
     // Verify client configs related to HBase enhancements
-    // Enforce ozone.hbase.enhancements.enabled master switch
-    if (!hbaseEnhancementsEnabled) {
-      // ozone.hbase.enhancements.enabled = false
-      if (fsHsyncEnabled) {
-        LOG.warn("Ignoring ozone.client.fs.hsync.enabled = {} because HBase enhancements are disabled. " +
-            "To enable it, set ozone.hbase.enhancements.enabled = true as well.", fsHsyncEnabled);
-        fsHsyncEnabled = false;
-        LOG.debug("ozone.client.fs.hsync.enabled = {}", fsHsyncEnabled);
-      }
+    // Enforce check on ozone.client.hbase.enhancements.allowed
+    if (!hbaseEnhancementsAllowed) {
+      // ozone.client.hbase.enhancements.allowed = false
       if (incrementalChunkList) {
-        LOG.warn("Ignoring ozone.client.incremental.chunk.list = {} because HBase enhancements are disabled. " +
-                "To enable it, set ozone.hbase.enhancements.enabled = true as well.", incrementalChunkList);
+        LOG.warn("Ignoring ozone.client.incremental.chunk.list = true " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.");
         incrementalChunkList = false;
-        LOG.debug("ozone.client.incremental.chunk.list = {}", incrementalChunkList);
+        LOG.debug("Final ozone.client.incremental.chunk.list = {}", incrementalChunkList);
       }
       if (enablePutblockPiggybacking) {
-        LOG.warn("Ignoring ozone.client.stream.putblock.piggybacking = {} because HBase enhancements are disabled. " +
-                "To enable it, set ozone.hbase.enhancements.enabled = true as well.", enablePutblockPiggybacking);
+        LOG.warn("Ignoring ozone.client.stream.putblock.piggybacking = true " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.");
         enablePutblockPiggybacking = false;
-        LOG.debug("ozone.client.stream.putblock.piggybacking = {}", enablePutblockPiggybacking);
+        LOG.debug("Final ozone.client.stream.putblock.piggybacking = {}", enablePutblockPiggybacking);
       }
       if (maxConcurrentWritePerKey != 1) {
-        LOG.warn("Ignoring ozone.client.key.write.concurrency = {} because HBase enhancements are disabled. " +
-                "To enable it, set ozone.hbase.enhancements.enabled = true as well.", maxConcurrentWritePerKey);
+        LOG.warn("Ignoring ozone.client.key.write.concurrency = {} " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.",
+            maxConcurrentWritePerKey);
         maxConcurrentWritePerKey = 1;
-        LOG.debug("ozone.client.key.write.concurrency = {}", maxConcurrentWritePerKey);
+        LOG.debug("Final ozone.client.key.write.concurrency = {}", maxConcurrentWritePerKey);
       }
+      // Note: ozone.fs.hsync.enabled is enforced by OzoneFSUtils#canEnableHsync, not here
     }
   }
 
@@ -540,20 +535,12 @@ public class OzoneClientConfig {
     this.datastreamPipelineMode = datastreamPipelineMode;
   }
 
-  public void setHBaseEnhancementsEnabled(boolean isHBaseEnhancementsEnabled) {
-    this.hbaseEnhancementsEnabled = isHBaseEnhancementsEnabled;
+  public void setHBaseEnhancementsAllowed(boolean isHBaseEnhancementsEnabled) {
+    this.hbaseEnhancementsAllowed = isHBaseEnhancementsEnabled;
   }
 
-  public boolean getHBaseEnhancementsEnabled() {
-    return this.hbaseEnhancementsEnabled;
-  }
-
-  public void setFsHsyncEnabled(boolean fsHsyncEnabled) {
-    this.fsHsyncEnabled = fsHsyncEnabled;
-  }
-
-  public boolean getFsHsyncEnabled() {
-    return this.fsHsyncEnabled;
+  public boolean getHBaseEnhancementsAllowed() {
+    return this.hbaseEnhancementsAllowed;
   }
 
   public void setIncrementalChunkList(boolean enable) {

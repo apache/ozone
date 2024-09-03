@@ -121,18 +121,18 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
-   * Flag to allow hbase-related features and enhancements to be enabled in the first place.
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
    */
-  public static final String OZONE_HBASE_ENHANCEMENTS_ENABLED
-      = "ozone.hbase.enhancements.enabled";
-  public static final boolean OZONE_HBASE_ENHANCEMENTS_ENABLED_DEFAULT
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
       = false;
 
   /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
-      = "ozone.fs.hsync.enabled";  // OzoneConfigKeys is not passed to BOS ?
+      = "ozone.fs.hsync.enabled";
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
       = false;
 

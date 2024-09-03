@@ -18,14 +18,8 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -43,22 +37,5 @@ public class TestOzoneFsUtils {
     assertFalse(OzoneFSUtils.isValidName("a/b"));
     assertFalse(OzoneFSUtils.isValidName("/a:/b"));
     assertFalse(OzoneFSUtils.isValidName("/a//b"));
-  }
-
-  /**
-   * Check that OzoneFSUtils.getClientConfig() will correct copy the value of:
-   * 1. ozone.hbase.enhancements.enabled to ozone.client.hbase.enhancements.enabled
-   * 2. ozone.fs.hsync.enabled           to ozone.client.fs.hsync.enabled
-   */
-  @ParameterizedTest
-  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  void testGetClientConfigCopyConfigs(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, hbaseEnhancementsEnabled);
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);
-
-    OzoneClientConfig clientConfig = OzoneFSUtils.getClientConfig(conf);
-    assertEquals(hbaseEnhancementsEnabled, clientConfig.getHBaseEnhancementsEnabled());
-    assertEquals(fsHsyncEnabled, clientConfig.getFsHsyncEnabled());
   }
 }

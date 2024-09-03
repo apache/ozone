@@ -379,15 +379,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   /**
    * All 3 scenarios below should reject key commit with HSync requested from a client:
-   * 1. ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = false
-   * 2. ozone.hbase.enhancements.enabled = false, ozone.fs.hsync.enabled = true
-   * 3. ozone.hbase.enhancements.enabled = true,  ozone.fs.hsync.enabled = false
+   * 1. ozone.hbase.enhancements.allowed = false, ozone.fs.hsync.enabled = false
+   * 2. ozone.hbase.enhancements.allowed = false, ozone.fs.hsync.enabled = true
+   * 3. ozone.hbase.enhancements.allowed = true,  ozone.fs.hsync.enabled = false
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false"})
   public void testRejectHsyncIfNotEnabled(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) throws Exception {
     OzoneConfiguration conf = ozoneManager.getConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, hbaseEnhancementsEnabled);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, hbaseEnhancementsEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);
     BucketLayout bucketLayout = getBucketLayout();
 
@@ -403,7 +403,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     doKeyCommit(false, allocatedKeyLocationList.subList(0, 5));
 
     // Restore config after this test run
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 

@@ -189,7 +189,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
       ConfigurationSource source = getConfSource();
-      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source);
+      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
       LOG.debug("hsyncEnabled = {}", hsyncEnabled);
       this.adapter = createAdapter(source, omHostOrServiceId, omPort);
       this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;

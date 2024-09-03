@@ -110,7 +110,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     boolean isHsync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
-    boolean enableHsync = OzoneFSUtils.canEnableHsync(ozoneManager.getConfiguration());
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(ozoneManager.getConfiguration(), false);
 
     // If hsynced is called for a file, then this file is hsynced, otherwise it's not hsynced.
     // Currently, file lease recovery by design only supports recover hsynced file

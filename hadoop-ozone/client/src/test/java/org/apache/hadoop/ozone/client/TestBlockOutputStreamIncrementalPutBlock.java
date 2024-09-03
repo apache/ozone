@@ -72,7 +72,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     ((InMemoryConfiguration)config).setFromObject(clientConfig);
 
     ((InMemoryConfiguration) config).setBoolean(
-        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ENABLED, true);
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     ((InMemoryConfiguration) config).setBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
 

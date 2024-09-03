@@ -194,7 +194,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       ConfigurationSource source = getConfSource();
-      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source);
+      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
       LOG.debug("hsyncEnabled = {}", hsyncEnabled);
       this.adapter =
           createAdapter(source, bucketStr,
