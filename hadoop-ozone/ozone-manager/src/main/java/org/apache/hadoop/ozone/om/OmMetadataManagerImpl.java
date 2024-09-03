@@ -1309,10 +1309,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       String key = entry.getKey().getCacheKey();
       OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
-      // Making sure that entry in cache is not for delete key request.
-
-      if (omKeyInfo != null
-          && key.startsWith(seekPrefix)
+      // cache copy of both key and deleted key, used to compare with db value
+      if (key.startsWith(seekPrefix)
           && key.compareTo(seekKey) >= 0) {
         cacheKeyMap.put(key, omKeyInfo);
       }
@@ -1329,12 +1327,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (currentCount < maxKeys + 1 && keyIter.hasNext()) {
         kv = keyIter.next();
         if (kv != null && kv.getKey().startsWith(seekPrefix)) {
-
-          // Entry should not be marked for delete, consider only those
-          // entries.
-          CacheValue<OmKeyInfo> cacheValue =
-              keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
-          if (cacheValue == null || cacheValue.getCacheValue() != null) {
+          if (cacheKeyMap.containsKey(kv.getKey())) {
+            // priority to cache value as latest, count if present
+            if (cacheKeyMap.get(kv.getKey()) != null) {
+              currentCount++;
+            }
+          } else {
             cacheKeyMap.put(kv.getKey(), kv.getValue());
             currentCount++;
           }
@@ -1367,7 +1365,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     currentCount = 0;
 
     for (Map.Entry<String, OmKeyInfo>  cacheKey : cacheKeyMap.entrySet()) {
-      if (cacheKey.getKey().equals(seekKey) && skipStartKey) {
+      // if first matching key that need skip OR deleted key, skip
+      if ((cacheKey.getKey().equals(seekKey) && skipStartKey) || cacheKey.getValue() == null) {
         continue;
       }
 
