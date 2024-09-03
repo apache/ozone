@@ -36,6 +36,11 @@ Create volume bucket and put key
     Execute             ozone sh bucket create /${volume}/${bucket}
     Execute             ozone sh key put /${volume}/${bucket}/${key} /etc/hosts
 
+Freon DFSG
+    [arguments]    ${prefix}=dfsg    ${n}=1000    ${path}={EMPTY}    ${sync}=HSYNC    ${buffer}=1024    ${copy-buffer}=1024    ${size}=10240
+    ${result} =    Execute and checkrc   ozone freon dfsg -n ${n} --sync ${sync} -s ${size} --path ${path} --buffer ${buffer} --copy-buffer ${copy-buffer} -p ${prefix}    255
+                   Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+
 *** Test Cases ***
 Test HSync lease recover prior to finalization
     Create volume bucket and put key
@@ -48,20 +53,16 @@ Test HSync lease recover prior to finalization
 
 Generate key for o3fs by HSYNC prior to finalization
     ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
-    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HSYNC -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
-                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+    Freon DFSG    sync=HSYNC    path=${path}
 
 Generate key for o3fs by HFLUSH prior to finalization
     ${path} =     Format FS URL         o3fs     ${VOLUME}    ${BUCKET}
-    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HFLUSH -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
-                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+    Freon DFSG    sync=HFLUSH    path=${path}
 
 Generate key for ofs by HSYNC prior to finalization
     ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
-    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HSYNC -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
-                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+    Freon DFSG    sync=HSYNC    path=${path}
 
 Generate key for ofs by HFLUSH prior to finalization
     ${path} =     Format FS URL         ofs     ${VOLUME}    ${BUCKET}
-    ${result} =   Execute and checkrc   ozone freon dfsg -n 100 --sync HFLUSH -s 10240 --path ${path} --buffer 1024 --copy-buffer 1024 -p dfsg
-                  Should contain   ${result}   NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION
+    Freon DFSG    sync=HFLUSH    path=${path}
