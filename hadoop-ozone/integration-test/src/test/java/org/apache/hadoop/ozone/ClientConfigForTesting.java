@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -115,7 +116,7 @@ public final class ClientConfigForTesting {
       blockSize = 2 * streamBufferMaxSize;
     }
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    OzoneClientConfig clientConfig = OzoneFSUtils.getClientConfig(conf);
     clientConfig.setStreamBufferSize(streamBufferSize);
     clientConfig.setStreamBufferMaxSize(streamBufferMaxSize);
     clientConfig.setStreamBufferFlushSize(streamBufferFlushSize);
