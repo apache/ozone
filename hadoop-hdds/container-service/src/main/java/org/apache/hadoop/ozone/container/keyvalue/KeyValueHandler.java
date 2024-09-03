@@ -1294,7 +1294,6 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
-    createContainerMerkleTree(container);
     container.writeLock();
     try {
       final State state = container.getContainerState();
@@ -1318,11 +1317,12 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
-      ContainerLogger.logClosed(container.getContainerData());
-      sendICR(container);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logClosed(container.getContainerData());
+    sendICR(container);
   }
 
   @Override
