@@ -324,6 +324,8 @@ public class TestHSync {
   }
 
   @Test
+  // Making this the second test to be run to avoid lingering block files from previous tests
+  @Order(2)
   public void testEmptyHsync() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.
