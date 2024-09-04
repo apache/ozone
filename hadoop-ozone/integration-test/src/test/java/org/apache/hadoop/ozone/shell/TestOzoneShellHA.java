@@ -712,7 +712,7 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    clientConf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
@@ -829,7 +829,7 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    clientConf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
