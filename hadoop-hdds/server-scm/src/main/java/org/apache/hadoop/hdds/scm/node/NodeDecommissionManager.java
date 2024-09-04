@@ -431,8 +431,9 @@ public class NodeDecommissionManager {
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
           if ((inServiceTotal - numDecom) < reqNodes) {
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
-                " nodes of which " + numDecom + " nodes were valid. Cluster has " + inServiceTotal +
-                " IN-SERVICE nodes, " + reqNodes + " of which are required for minimum replication. ";
+                " nodes out of " + inServiceTotal + " IN-SERVICE nodes. Cannot decommission because we need " +
+                (reqNodes - (inServiceTotal - numDecom)) + " more IN-SERVICE nodes " +
+                "to maintain replication factor. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;
@@ -595,8 +596,9 @@ public class NodeDecommissionManager {
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
-                " nodes of which " + numMaintenance + " nodes were valid. Cluster has " + inServiceTotal +
-                " IN-SERVICE nodes, " + minInService + " of which are required for minimum replication. ";
+                " nodes out of " + inServiceTotal + " IN-SERVICE nodes. Cannot enter maintenance mode because " +
+                "we need " + (minInService - (inServiceTotal - numMaintenance)) +
+                " more IN-SERVICE nodes to maintain minimum replication. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;
