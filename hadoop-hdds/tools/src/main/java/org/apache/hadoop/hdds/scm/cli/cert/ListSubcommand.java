@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -97,7 +99,11 @@ public class ListSubcommand extends ScmCertSubcommand {
 
     if (json) {
       err.println("Certificate list:(BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
-      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(certPemList));
+      ArrayList<Certificate> certificates =
+          certPemList.stream()
+              .map(Certificate::new)
+              .collect(Collectors.toCollection(ArrayList::new));
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(certificates));
       return;
     }
 
