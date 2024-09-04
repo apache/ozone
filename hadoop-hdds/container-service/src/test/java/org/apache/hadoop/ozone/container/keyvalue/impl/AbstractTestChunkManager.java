@@ -142,7 +142,12 @@ public abstract class AbstractTestChunkManager {
     try {
       Process process = new ProcessBuilder("fuser", filePath).start();
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), UTF_8))) {
-        return reader.readLine() == null;  // If fuser returns no output, the file is not in use
+        String output = reader.readLine();  // If fuser returns no output, the file is not in use
+        if (output == null) {
+          return true;
+        }
+        LOG.debug("File is in use: {}", filePath);
+        return false;
       } finally {
         process.destroy();
       }
