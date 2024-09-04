@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -33,17 +35,25 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -53,6 +63,8 @@ public class TestDNRPCLoadGenerator {
 
   private static MiniOzoneCluster cluster = null;
   private static ContainerWithPipeline container;
+  @TempDir
+  private static File dir;
 
   private static void startCluster(OzoneConfiguration conf) throws Exception {
     DatanodeRatisServerConfig ratisServerConfig =
@@ -67,11 +79,19 @@ public class TestDNRPCLoadGenerator {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
+    conf.setBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT, true);
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,  new File(dir, "ozone-dn-socket").getAbsolutePath());
+    conf.setInt(OZONE_OM_HANDLER_COUNT_KEY, 5);
+    conf.setInt(OZONE_SCM_HANDLER_COUNT_KEY, 2);
+    conf.setInt(OZONE_SCM_CLIENT_HANDLER_COUNT_KEY, 2);
+    conf.setInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY, 2);
+    conf.setInt(OZONE_SCM_DATANODE_HANDLER_COUNT_KEY, 2);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5).build();
+        .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
-        180000);
+//    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+//        180000);
 
     StorageContainerLocationProtocolClientSideTranslatorPB
         storageContainerLocationClient = cluster
@@ -106,29 +126,55 @@ public class TestDNRPCLoadGenerator {
 
   private static Stream<Arguments> provideParameters() {
     return Stream.of(
-        Arguments.of(true, true),
-        Arguments.of(true, false),
-        Arguments.of(false, true),
-        Arguments.of(false, false)
+//        Arguments.of(true, "ratis", "0", "0"),
+//        Arguments.of(false, "ratis", "0", "0"),
+//        Arguments.of(true, "grpc", "0", "0"),
+//        Arguments.of(false, "grpc", "0", "0"),
+//        Arguments.of(true, "grpc", "1", "1"),
+//        Arguments.of(true, "grpc", "4", "4"),
+//        Arguments.of(true, "grpc", "16", "16"),
+//        Arguments.of(true, "grpc", "64", "64"),
+//        Arguments.of(true, "grpc", "128", "128"),
+//        Arguments.of(true, "grpc", "1024", "1024"),
+//        Arguments.of(false, "short-circuit", "0", "0"),
+//        Arguments.of(true, "short-circuit", "0", "1"),
+//        Arguments.of(true, "short-circuit", "1", "0"),
+//        Arguments.of(true, "short-circuit", "1", "1"),
+//        Arguments.of(true, "short-circuit", "4", "4"),
+//        Arguments.of(true, "short-circuit", , "64", "64"),
+////        Arguments.of(true, "short-cir"16", "16"),
+//        Arguments.of(true, "short-circuit"cuit", "128", "128"),
+        Arguments.of(true, "grpc", "1", "128"),
+        Arguments.of(true, "short-circuit", "1", "128"),
+        Arguments.of(true, "grpc", "1", "64"),
+        Arguments.of(true, "short-circuit", "1", "64"),
+        Arguments.of(true, "grpc", "1", "32"),
+        Arguments.of(true, "short-circuit", "1", "32")
     );
   }
 
   @ParameterizedTest
   @MethodSource("provideParameters")
-  public void test(boolean readOnly, boolean ratis) {
+  public void test(boolean readOnly, String type, String requestSizeKB, String responseSizeKB) throws Exception {
     DNRPCLoadGenerator randomKeyGenerator =
         new DNRPCLoadGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     List<String> cmdArgs = new ArrayList<>(Arrays.asList(
         "--container-id", Long.toString(container.getContainerInfo().getContainerID()),
-        "--clients", "5",
-        "-t", "10"));
+        "--channel-type", type,
+        "--clients", "1",
+        "--payload-req",  requestSizeKB,
+        "--payload-resp", responseSizeKB,
+        "-n", "1000000",
+        "-t", "100"));
 
     if (readOnly) {
       cmdArgs.add("--read-only");
-    }
-    if (ratis) {
-      cmdArgs.add("--ratis");
+      try (XceiverClientFactory factory = new XceiverClientCreator(cluster.getConf());
+           XceiverClientSpi client = factory.acquireClient(container.getPipeline())) {
+        ContainerProtocolCalls.closeContainer(client,
+            container.getContainerInfo().getContainerID(), null);
+      }
     }
 
     int exitCode = cmd.execute(cmdArgs.toArray(new String[0]));

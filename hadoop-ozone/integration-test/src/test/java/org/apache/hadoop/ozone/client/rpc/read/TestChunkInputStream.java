@@ -65,7 +65,7 @@ class TestChunkInputStream extends TestInputStreamBase {
   private void testChunkReadBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), dataLength);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -126,7 +126,7 @@ class TestChunkInputStream extends TestInputStreamBase {
 
   private void testCloseReleasesBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
-    bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       BlockInputStream block0Stream =
@@ -149,7 +149,7 @@ class TestChunkInputStream extends TestInputStreamBase {
    */
   private void testBufferRelease(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
-    byte[] inputData = bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 

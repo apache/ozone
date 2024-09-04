@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -30,6 +32,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -42,7 +45,7 @@ abstract class TestInputStreamBase {
   static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
   static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
-  protected static MiniOzoneCluster newCluster(
+  protected MiniOzoneCluster newCluster(
       ContainerLayoutVersion containerLayout) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -64,6 +67,7 @@ abstract class TestInputStreamBase {
         conf.getObject(ReplicationManagerConfiguration.class);
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
+    setCustomizedProperties(conf);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -73,12 +77,22 @@ abstract class TestInputStreamBase {
         .applyTo(conf);
 
     return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(getDatanodeCount())
         .build();
   }
 
-  static String getNewKeyName() {
+  String getNewKeyName() {
     return UUID.randomUUID().toString();
   }
 
+  int getDatanodeCount() {
+    return 5;
+  }
+
+  void setCustomizedProperties(OzoneConfiguration configuration) {
+  }
+
+  ReplicationConfig getRepConfig() {
+    return RatisReplicationConfig.getInstance(THREE);
+  }
 }

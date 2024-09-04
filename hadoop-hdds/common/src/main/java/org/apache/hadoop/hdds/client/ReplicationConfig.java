@@ -49,6 +49,8 @@ public interface ReplicationConfig {
       return RatisReplicationConfig.getInstance(factor);
     case STAND_ALONE:
       return StandaloneReplicationConfig.getInstance(factor);
+    case SHORT_CIRCUIT:
+      return ShortCircuitReplicationConfig.getInstance(factor);
     default:
       throw new UnsupportedOperationException(
           "Not supported replication: " + type);
@@ -102,6 +104,7 @@ public interface ReplicationConfig {
       return new ECReplicationConfig(ecConfig);
     case RATIS:
     case STAND_ALONE:
+    case SHORT_CIRCUIT:
       return fromProtoTypeAndFactor(type, factor);
     default:
       throw new UnsupportedOperationException(

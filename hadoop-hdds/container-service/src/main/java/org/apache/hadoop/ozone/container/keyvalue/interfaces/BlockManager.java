@@ -61,6 +61,7 @@ public interface BlockManager {
   BlockData getBlock(Container container, BlockID blockID) throws IOException;
 
 
+
   /**
    * Deletes an existing block.
    *

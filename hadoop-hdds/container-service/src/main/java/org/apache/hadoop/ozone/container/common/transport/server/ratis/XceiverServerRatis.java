@@ -608,6 +608,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
+  public boolean isStarted() {
+    return isStarted;
+  }
+
+  @Override
   public int getIPCPort() {
     return clientPort;
   }

@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -41,6 +43,8 @@ public class XceiverClientCreator implements XceiverClientFactory {
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
   private final boolean securityEnabled;
+  private boolean shortCircuitEnabled;
+  private DomainSocketFactory domainSocketFactory;
 
   public XceiverClientCreator(ConfigurationSource conf) {
     this(conf, null);
@@ -56,13 +60,26 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (securityEnabled) {
       Preconditions.checkNotNull(trustManager);
     }
+    shortCircuitEnabled = conf.getBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT,
+        OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT_DEFAULT);
+    if (shortCircuitEnabled) {
+      domainSocketFactory = DomainSocketFactory.getInstance(conf);
+    }
   }
 
   public boolean isSecurityEnabled() {
     return securityEnabled;
   }
 
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled && domainSocketFactory.isServiceReady();
+  }
+
   protected XceiverClientSpi newClient(Pipeline pipeline) throws IOException {
+    return newClient(pipeline, null);
+  }
+
+  protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) throws IOException {
     XceiverClientSpi client;
     switch (pipeline.getType()) {
     case RATIS:
@@ -73,6 +90,9 @@ public class XceiverClientCreator implements XceiverClientFactory {
       break;
     case EC:
       client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
+      break;
+    case SHORT_CIRCUIT:
+      client = new XceiverClientShortCircuit(pipeline, conf, dn);
       break;
     case CHAINED:
     default:
@@ -97,7 +117,14 @@ public class XceiverClientCreator implements XceiverClientFactory {
   }
 
   @Override
-  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline) throws IOException {
+  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline, boolean allowShortCircuit)
+      throws IOException {
+    return acquireClient(pipeline);
+  }
+
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
+      throws IOException {
     return acquireClient(pipeline);
   }
 
@@ -108,7 +135,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
 
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware) throws IOException {
-    return newClient(pipeline);
+    return newClient(pipeline, null);
   }
 
   @Override
@@ -117,7 +144,10 @@ public class XceiverClientCreator implements XceiverClientFactory {
   }
 
   @Override
-  public void close() throws Exception {
-    // clients are not tracked, closing each client is the responsibility of users of this class
+  public void close() {
+    // clients are not tracked, closing each client is the responsibility of users of this classclass
+    if (domainSocketFactory != null) {
+      domainSocketFactory.close();
+    }
   }
 }

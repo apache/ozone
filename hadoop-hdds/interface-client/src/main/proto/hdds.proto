@@ -286,6 +286,7 @@ enum ReplicationType {
     STAND_ALONE = 2;
     CHAINED = 3;
     EC = 4;
+    SHORT_CIRCUIT = 5;
     NONE = -1; // Invalid Type
 }
 
