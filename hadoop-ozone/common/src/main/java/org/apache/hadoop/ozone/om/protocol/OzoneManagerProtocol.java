@@ -1162,8 +1162,8 @@ public interface OzoneManagerProtocol
   String getQuotaRepairStatus() throws IOException;
 
   /**
-   * trigger quota repair in OM.
+   * start quota repair in OM.
    * @throws IOException
    */
-  void triggerQuotaRepair(List<String> buckets) throws IOException;
+  void startQuotaRepair(List<String> buckets) throws IOException;
 }

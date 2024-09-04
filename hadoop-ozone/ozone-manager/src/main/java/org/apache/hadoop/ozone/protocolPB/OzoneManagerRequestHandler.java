@@ -382,15 +382,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
                 .setServerDefaults(impl.getServerDefaults().getProtobuf())
                 .build());
         break;
-      case QuotaRepairStatus:
-        OzoneManagerProtocolProtos.QuotaRepairStatusResponse quotaRepairStatusRsp =
-            getQuotaRepairStatus(request.getQuotaRepairStatusRequest());
-        responseBuilder.setQuotaRepairStatusResponse(quotaRepairStatusRsp);
+      case GetQuotaRepairStatus:
+        OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse quotaRepairStatusRsp =
+            getQuotaRepairStatus(request.getGetQuotaRepairStatusRequest());
+        responseBuilder.setGetQuotaRepairStatusResponse(quotaRepairStatusRsp);
         break;
-      case QuotaRepairTrigger:
-        OzoneManagerProtocolProtos.QuotaRepairTriggerResponse quotaRepairTriggerRsp =
-            triggerQuotaRepair(request.getQuotaRepairTriggerRequest());
-        responseBuilder.setQuotaRepairTriggerResponse(quotaRepairTriggerRsp);
+      case StartQuotaRepair:
+        OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepairRsp =
+            startQuotaRepair(request.getStartQuotaRepairRequest());
+        responseBuilder.setStartQuotaRepairResponse(startQuotaRepairRsp);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1532,15 +1532,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
   }
 
-  private OzoneManagerProtocolProtos.QuotaRepairStatusResponse getQuotaRepairStatus(
-      OzoneManagerProtocolProtos.QuotaRepairStatusRequest req) throws IOException {
-    return OzoneManagerProtocolProtos.QuotaRepairStatusResponse.newBuilder()
+  private OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse getQuotaRepairStatus(
+      OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest req) throws IOException {
+    return OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse.newBuilder()
         .setStatus(impl.getQuotaRepairStatus())
         .build();
   }
-  private OzoneManagerProtocolProtos.QuotaRepairTriggerResponse triggerQuotaRepair(
-      OzoneManagerProtocolProtos.QuotaRepairTriggerRequest req) throws IOException {
-    impl.triggerQuotaRepair(req.getBucketsList());
-    return OzoneManagerProtocolProtos.QuotaRepairTriggerResponse.newBuilder().build();
+  private OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepair(
+      OzoneManagerProtocolProtos.StartQuotaRepairRequest req) throws IOException {
+    impl.startQuotaRepair(req.getBucketsList());
+    return OzoneManagerProtocolProtos.StartQuotaRepairResponse.newBuilder().build();
   }
 }

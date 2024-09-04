@@ -151,8 +151,8 @@ enum Type {
   ListOpenFiles = 132;
   QuotaRepair = 133;
   GetServerDefaults = 134;
-  QuotaRepairStatus = 135;
-  QuotaRepairTrigger = 136;
+  GetQuotaRepairStatus = 135;
+  StartQuotaRepair = 136;
 }
 
 enum SafeMode {
@@ -293,8 +293,8 @@ message OMRequest {
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
-  optional QuotaRepairStatusRequest         QuotaRepairStatusRequest       = 133;
-  optional QuotaRepairTriggerRequest        QuotaRepairTriggerRequest      = 134;
+  optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
+  optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
 }
 
 message OMResponse {
@@ -423,8 +423,8 @@ message OMResponse {
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
   optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
-  optional QuotaRepairStatusResponse            QuotaRepairStatusResponse        = 136;
-  optional QuotaRepairTriggerResponse            QuotaRepairTriggerResponse        = 137;
+  optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
+  optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
 
 enum Status {
@@ -2232,15 +2232,15 @@ message ServerDefaultsResponse {
   required FsServerDefaultsProto serverDefaults = 1;
 }
 
-message QuotaRepairStatusRequest {
+message GetQuotaRepairStatusRequest {
 }
-message QuotaRepairStatusResponse {
+message GetQuotaRepairStatusResponse {
     optional string status = 1;
 }
-message QuotaRepairTriggerRequest {
+message StartQuotaRepairRequest {
     repeated string buckets = 1;
 }
-message QuotaRepairTriggerResponse {
+message StartQuotaRepairResponse {
 }
 
 message OMLockDetailsProto {

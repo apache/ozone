@@ -2581,25 +2581,25 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public String getQuotaRepairStatus() throws IOException {
-    OzoneManagerProtocolProtos.QuotaRepairStatusRequest quotaRepairStatusRequest =
-        OzoneManagerProtocolProtos.QuotaRepairStatusRequest.newBuilder()
+    OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest quotaRepairStatusRequest =
+        OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest.newBuilder()
             .build();
 
-    OMRequest omRequest = createOMRequest(Type.QuotaRepairStatus)
-        .setQuotaRepairStatusRequest(quotaRepairStatusRequest).build();
+    OMRequest omRequest = createOMRequest(Type.GetQuotaRepairStatus)
+        .setGetQuotaRepairStatusRequest(quotaRepairStatusRequest).build();
 
-    OzoneManagerProtocolProtos.QuotaRepairStatusResponse quotaRepairStatusResponse
-        = handleError(submitRequest(omRequest)).getQuotaRepairStatusResponse();
+    OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse quotaRepairStatusResponse
+        = handleError(submitRequest(omRequest)).getGetQuotaRepairStatusResponse();
     return quotaRepairStatusResponse.getStatus();
   }
 
   @Override
-  public void triggerQuotaRepair(List<String> buckets) throws IOException {
-    OzoneManagerProtocolProtos.QuotaRepairTriggerRequest quotaRepairTriggerRequest =
-        OzoneManagerProtocolProtos.QuotaRepairTriggerRequest.newBuilder()
+  public void startQuotaRepair(List<String> buckets) throws IOException {
+    OzoneManagerProtocolProtos.StartQuotaRepairRequest startQuotaRepairRequest =
+        OzoneManagerProtocolProtos.StartQuotaRepairRequest.newBuilder()
             .build();
-    OMRequest omRequest = createOMRequest(Type.QuotaRepairTrigger)
-        .setQuotaRepairTriggerRequest(quotaRepairTriggerRequest).build();
+    OMRequest omRequest = createOMRequest(Type.StartQuotaRepair)
+        .setStartQuotaRepairRequest(startQuotaRepairRequest).build();
     handleError(submitRequest(omRequest));
   }
 

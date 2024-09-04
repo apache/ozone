@@ -91,7 +91,7 @@ public class QuotaRepairTask {
     // lock in progress operation and reject any other
     if (!IN_PROGRESS.compareAndSet(false, true)) {
       LOG.info("quota repair task already running");
-      throw new OMException("Operation in progress", OMException.ResultCodes.QUOTA_ERROR);
+      throw new OMException("Quota repair is already running", OMException.ResultCodes.QUOTA_ERROR);
     }
     REPAIR_STATUS.reset(RUN_CNT.get() + 1);
     return CompletableFuture.supplyAsync(() -> repairTask(buckets));

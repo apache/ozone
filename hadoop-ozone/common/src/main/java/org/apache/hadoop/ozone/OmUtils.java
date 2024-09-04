@@ -279,8 +279,8 @@ public final class OmUtils {
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
     case GetServerDefaults:
-    case QuotaRepairStatus:
-    case QuotaRepairTrigger:
+    case GetQuotaRepairStatus:
+    case StartQuotaRepair:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

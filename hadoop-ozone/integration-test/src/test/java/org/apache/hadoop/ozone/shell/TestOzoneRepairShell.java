@@ -144,7 +144,7 @@ public class TestOzoneRepairShell {
     String[] args = new String[] {"quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
-    args = new String[] {"quota", "trigger", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
+    args = new String[] {"quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
     exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     GenericTestUtils.waitFor(() -> {

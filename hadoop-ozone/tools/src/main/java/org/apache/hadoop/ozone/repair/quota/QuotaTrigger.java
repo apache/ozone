@@ -36,7 +36,7 @@ import picocli.CommandLine;
  * Tool to trigger quota repair.
  */
 @CommandLine.Command(
-    name = "trigger",
+    name = "start",
     description = "CLI to trigger quota repair.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
@@ -66,7 +66,7 @@ public class QuotaTrigger implements Callable<Void>, SubcommandWithParent  {
 
   @CommandLine.Option(names = {"--buckets"},
       required = false,
-      description = "trigger quota repair for specific buckets. Input will be list of uri separated by comma as" +
+      description = "start quota repair for specific buckets. Input will be list of uri separated by comma as" +
           " /<volume>/<bucket>[,...]")
   private String buckets;
 
@@ -80,7 +80,7 @@ public class QuotaTrigger implements Callable<Void>, SubcommandWithParent  {
     OzoneManagerProtocol ozoneManagerClient =
         parent.createOmClient(omServiceId, omHost, false);
     try {
-      ozoneManagerClient.triggerQuotaRepair(bucketList);
+      ozoneManagerClient.startQuotaRepair(bucketList);
       System.out.println(ozoneManagerClient.getQuotaRepairStatus());
     } catch (Exception ex) {
       System.out.println(ex.getMessage());
