@@ -369,14 +369,10 @@ public class TestHSync {
         // locate the container chunk path on the first DataNode.
         chunkPath = getChunkPathOnDataNode(outputStream);
         assertFalse(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
-
-        // TODO: the next assertion will fail if the following line is commented out.
-        outputStream.write(data.getBytes(UTF_8), 0, data.length());
       }
       // After close, the chunk file should be closed.
       assertTrue(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
     }
-
 
     OzoneManager ozoneManager = cluster.getOzoneManager();
     // Wait for double buffer to trigger all pending addToDBBatch(),
