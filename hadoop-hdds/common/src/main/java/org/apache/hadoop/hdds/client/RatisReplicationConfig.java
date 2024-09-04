@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import net.jcip.annotations.Immutable;
@@ -53,6 +54,17 @@ public final class RatisReplicationConfig
    * @return RatisReplicationConfig object of the requested factor
    */
   public static RatisReplicationConfig getInstance(ReplicationFactor factor) {
+    if (factor == ONE) {
+      return RATIS_ONE_CONFIG;
+    } else if (factor == THREE) {
+      return RATIS_THREE_CONFIG;
+    }
+    return new RatisReplicationConfig(factor);
+  }
+
+  @JsonCreator
+  public static RatisReplicationConfig getInstance(@JsonProperty("replicationFactor") ReplicationFactor factor,
+                                                   @JsonProperty("replicationType") ReplicationType type) {
     if (factor == ONE) {
       return RATIS_ONE_CONFIG;
     } else if (factor == THREE) {

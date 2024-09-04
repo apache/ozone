@@ -82,6 +82,10 @@ public class ECReplicationConfig implements ReplicationConfig {
     this.ecChunkSize = ecChunkSize;
   }
 
+  public ECReplicationConfig() {
+    this(0, 0, EcCodec.RS, 0);
+  }
+
   /**
    * Create an ECReplicationConfig object from a string representing the
    * various parameters. Acceptable patterns are like:

@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -54,6 +56,7 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
+@JsonDeserialize(builder = OmKeyInfo.Builder.class)
 public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
@@ -458,6 +461,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder extends WithParentObjectId.Builder {
     private String volumeName;
     private String bucketName;
@@ -512,6 +516,11 @@ public final class OmKeyInfo extends WithParentObjectId
         this.omKeyLocationInfoGroups.addAll(omKeyLocationInfoList);
       }
       return this;
+    }
+
+    public Builder setKeyLocationVersions(
+        List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
+      return setOmKeyLocationInfos(omKeyLocationInfoList);
     }
 
     public Builder addOmKeyLocationInfoGroup(OmKeyLocationInfoGroup
@@ -606,6 +615,10 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setIsFile(boolean isAFile) {
+      return setFile(isAFile);
+    }
+
     public Builder addTag(String key, String value) {
       tags.put(key, value);
       return this;
@@ -614,6 +627,10 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder addAllTags(Map<String, String> keyTags) {
       tags.putAll(keyTags);
       return this;
+    }
+
+    public Builder setTags(Map<String, String> keyTags) {
+      return addAllTags(keyTags);
     }
 
     public Builder setExpectedDataGeneration(Long existingGeneration) {

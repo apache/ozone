@@ -38,6 +38,10 @@ public class OmKeyLocationInfoGroup {
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
+  public OmKeyLocationInfoGroup() {
+    locationVersionMap = null;
+    version = 0;
+  }
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
     this(version, locations, false);
@@ -77,6 +81,14 @@ public class OmKeyLocationInfoGroup {
   }
 
   public boolean isMultipartKey() {
+    return isMultipartKey;
+  }
+
+  public void setIsMultipartKey(boolean isMpu) {
+    this.isMultipartKey = isMpu;
+  }
+
+  public boolean getIsMultipartKey() {
     return isMultipartKey;
   }
 

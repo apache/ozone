@@ -40,6 +40,11 @@ public class DefaultReplicationConfig {
     }
   }
 
+  public DefaultReplicationConfig() {
+    this.ecReplicationConfig = null;
+    this.replicationConfig = null;
+  }
+
   public static DefaultReplicationConfig fromProto(
       HddsProtos.DefaultReplicationConfig proto) {
     if (proto == null) {
@@ -63,6 +68,9 @@ public class DefaultReplicationConfig {
 
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
+  }
+  public ECReplicationConfig getEcReplicationConfig() {
+    return ecReplicationConfig;
   }
 
   public HddsProtos.DefaultReplicationConfig toProto() {

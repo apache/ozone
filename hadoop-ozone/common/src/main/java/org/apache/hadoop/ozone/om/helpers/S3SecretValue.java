@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -52,6 +54,19 @@ public final class S3SecretValue {
         Objects.requireNonNull(kerberosID),
         Objects.requireNonNull(awsSecret),
         false,
+        transactionLogIndex
+    );
+  }
+
+  @JsonCreator
+  public static S3SecretValue of(@JsonProperty("kerberosID") String kerberosID,
+                                 @JsonProperty("awsSecret") String awsSecret,
+                                 @JsonProperty("transactionLogIndex") long transactionLogIndex,
+                                 @JsonProperty("isDeleted") boolean isDeleted) {
+    return new S3SecretValue(
+        Objects.requireNonNull(kerberosID),
+        Objects.requireNonNull(awsSecret),
+        isDeleted,
         transactionLogIndex
     );
   }

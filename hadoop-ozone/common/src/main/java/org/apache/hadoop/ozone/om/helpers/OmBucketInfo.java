@@ -26,6 +26,8 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -44,6 +46,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
+@JsonDeserialize(builder = OmBucketInfo.Builder.class)
 public final class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
@@ -381,6 +384,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * Builder for OmBucketInfo.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder extends WithObjectID.Builder {
     private String volumeName;
     private String bucketName;

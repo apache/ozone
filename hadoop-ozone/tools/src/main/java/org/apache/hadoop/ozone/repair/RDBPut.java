@@ -21,19 +21,23 @@
  */
 package org.apache.hadoop.ozone.repair;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.ImmutableListDeserializer;
 import org.apache.hadoop.ozone.utils.DBDefinitionFactory;
-import org.jooq.meta.derby.sys.Sys;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -121,7 +125,6 @@ public class RDBPut
 
       Class<?> valueClass = columnFamilyDefinition.getValueType();
       Class<?> keyClass = columnFamilyDefinition.getKeyType();
-    //Class<?> c = OmVolumeArgs.class;
       System.out.println("7. class of value type:  " + valueClass);
 
       Object newValue;
@@ -129,6 +132,11 @@ public class RDBPut
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
         objectMapper.enable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(ImmutableList.class, new ImmutableListDeserializer(DatanodeDetails.class));
+        module.addKeySerializer(DatanodeDetails.class, new DatanodeDetailsKeySerializer());
+        module.addKeyDeserializer(DatanodeDetails.class, new DatanodeDetailsKeyDeserializer());
+        objectMapper.registerModule(module);
 
         newValue = objectMapper.readValue(value, valueClass);
         System.out.println("After objectMapper");
@@ -160,20 +168,14 @@ public class RDBPut
       System.out.println("Key Bytes: " + keyBytes);
       System.out.println("Value Bytes: " + valueBytes);
 
-      Method m = valueClass.getDeclaredMethod("getObjectInfo");
-      m.setAccessible(true);
-      System.out.println("\n\nnew value class: " + newValue.getClass());
-      System.out.println("\n\nnew value: \n" + newValue);
-      System.out.println("\n\nnew value: \n" + m.invoke(newValue));
-
       Object oldValue = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
-      System.out.println("The original value was \n" + m.invoke(oldValue));
+      System.out.println("The original value was \n" + oldValue);
 
 
       System.out.println("------------------------");
-      db.get().put(columnFamilyHandle, keyBytes, valueBytes);
+      //db.get().put(columnFamilyHandle, keyBytes, valueBytes);
       Object newValuee = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
-      System.out.println("The new value is \n" + m.invoke(newValuee));
+      System.out.println("The new value is \n" + newValuee);
       System.out.println("------------------------");
 
     } catch (RocksDBException exception) {
@@ -200,4 +202,18 @@ public class RDBPut
     return RDBRepair.class;
   }
 
+}
+
+class DatanodeDetailsKeySerializer extends JsonSerializer<DatanodeDetails> {
+  @Override
+  public void serialize(DatanodeDetails value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+    gen.writeBinary(value.toProto(ClientVersion.DEFAULT_VERSION.toProtoValue()).toByteArray());
+  }
+}
+
+class DatanodeDetailsKeyDeserializer extends KeyDeserializer {
+  @Override
+  public DatanodeDetails deserializeKey(String p, DeserializationContext context) throws IOException {
+    return DatanodeDetails.getFromProtoBuf(HddsProtos.DatanodeDetailsProto.parseFrom(p.getBytes()));
+  }
 }

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -35,6 +37,7 @@ import java.util.Objects;
  * in the user given path and a pointer to its parent directory element in the
  * path. Also, it stores directory node related metdata details.
  */
+@JsonDeserialize(builder = OmDirectoryInfo.Builder.class)
 public class OmDirectoryInfo extends WithParentObjectId
     implements CopyObject<OmDirectoryInfo> {
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
@@ -75,6 +78,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder extends WithParentObjectId.Builder {
     private String name;
     private String owner;
