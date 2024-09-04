@@ -558,7 +558,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   public static OMRequest disallowHsync(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.HSYNC)) {
+        .isAllowed(OMLayoutFeature.HBASE_SUPPORT)) {
       CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
       boolean isHSync = commitKeyRequest.hasHsync() &&
           commitKeyRequest.getHsync();
