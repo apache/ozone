@@ -507,6 +507,7 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
+  }
   
   public boolean isStreamReadBlock() {
     return streamReadBlock;
