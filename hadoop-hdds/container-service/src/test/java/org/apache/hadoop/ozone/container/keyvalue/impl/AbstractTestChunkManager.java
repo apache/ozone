@@ -136,18 +136,19 @@ public abstract class AbstractTestChunkManager {
   }
 
   /**
-   * Helper class to check if a file is in use.
+   * Helper method to check if a file is in use.
    */
-  public static class FuserCheck {
-    public static boolean isFileNotInUse(String filePath) {
-      try {
-        Process process = new ProcessBuilder("fuser", filePath).start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+  public static boolean isFileNotInUse(String filePath) {
+    try {
+      Process process = new ProcessBuilder("fuser", filePath).start();
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), UTF_8))) {
         return reader.readLine() == null;  // If fuser returns no output, the file is not in use
-      } catch (IOException e) {
-        LOG.warn("Failed to check if file is in use: {}", filePath, e);
-        return false;  // On failure, assume the file is in use
+      } finally {
+        process.destroy();
       }
+    } catch (IOException e) {
+      LOG.warn("Failed to check if file is in use: {}", filePath, e);
+      return false;  // On failure, assume the file is in use
     }
   }
 
@@ -155,7 +156,9 @@ public abstract class AbstractTestChunkManager {
     return checkChunkFilesClosed(keyValueContainerData.getChunksPath());
   }
 
-  // check that all files under chunk path are closed.
+  /**
+   * check that all files under chunk path are closed.
+  */
   public static boolean checkChunkFilesClosed(String path) {
     //As in Setup, we try to create container, these paths should exist.
     assertNotNull(path);
@@ -169,7 +172,7 @@ public abstract class AbstractTestChunkManager {
       assertTrue(file.exists());
       assertTrue(file.isFile());
       // check that the file is closed.
-      if (!FuserCheck.isFileNotInUse(file.getAbsolutePath())) {
+      if (!isFileNotInUse(file.getAbsolutePath())) {
         return false;
       }
     }
