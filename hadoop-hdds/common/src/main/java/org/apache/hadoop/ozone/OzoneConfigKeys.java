@@ -162,7 +162,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE =
       "ozone.metastore.rocksdb.block.cache.size";
   public static final String
-      OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE_DEFAULT = "256MB";
+      OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE_DEFAULT = "1GB";
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_BLOCK_SIZE =
       "ozone.metastore.rocksdb.block.size";

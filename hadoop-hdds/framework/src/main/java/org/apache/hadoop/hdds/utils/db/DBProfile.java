@@ -91,7 +91,6 @@ public enum DBProfile {
 
     @Override
     public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
-      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
       final long blockCacheSize = (long) CONF.getStorageSize(
           OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE,
           OZONE_METADATA_STORE_ROCKSDB_BLOCK_CACHE_SIZE_DEFAULT,
