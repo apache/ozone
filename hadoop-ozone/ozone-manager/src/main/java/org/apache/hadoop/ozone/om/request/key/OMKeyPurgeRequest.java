@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -74,14 +75,12 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     try {
       SnapshotInfo fromSnapshotInfo = null;
       if (fromSnapshot != null) {
-        fromSnapshotInfo = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable().get(fromSnapshot);
+        fromSnapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
       }
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
           keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
     } catch (IOException ex) {
-      omClientResponse = new OMKeyPurgeResponse(
-          createErrorOMResponse(omResponse, ex));
+      omClientResponse = new OMKeyPurgeResponse(createErrorOMResponse(omResponse, ex));
     }
 
     return omClientResponse;

@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -58,11 +57,11 @@ public class CloseContainerCommandHandler implements CommandHandler {
 
   private final AtomicLong invocationCount = new AtomicLong(0);
   private final AtomicInteger queuedCount = new AtomicInteger(0);
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private long totalTime;
 
   /**
-   * Constructs a ContainerReport handler.
+   * Constructs a close container command handler.
    */
   public CloseContainerCommandHandler(
       int threadPoolSize, int queueSize, String threadNamePrefix) {
@@ -219,5 +218,15 @@ public class CloseContainerCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return queuedCount.get();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return executor.getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return executor.getActiveCount();
   }
 }

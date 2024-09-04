@@ -124,7 +124,6 @@ abstract class AbstractCommitWatcher<BUFFER> {
    *
    * @param commitIndex log index to watch for
    * @return minimum commit index replicated to all nodes
-   * @throws IOException IOException in case watch gets timed out
    */
   CompletableFuture<XceiverClientReply> watchForCommitAsync(long commitIndex) {
     final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier

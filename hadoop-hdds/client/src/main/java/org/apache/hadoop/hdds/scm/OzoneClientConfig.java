@@ -255,21 +255,29 @@ public class OzoneClientConfig {
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @Config(key = "incremental.chunk.list",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       description = "Client PutBlock request can choose incremental chunk " +
           "list rather than full chunk list to optimize performance. " +
-          "Critical to HBase.",
+          "Critical to HBase. EC does not support this feature.",
       tags = ConfigTag.CLIENT)
   private boolean incrementalChunkList = true;
 
   @Config(key = "stream.putblock.piggybacking",
-      defaultValue = "false",
-      type = ConfigType.BOOLEAN,
-      description = "Allow PutBlock to be piggybacked in WriteChunk " +
-          "requests if the chunk is small.",
+          defaultValue = "true",
+          type = ConfigType.BOOLEAN,
+          description = "Allow PutBlock to be piggybacked in WriteChunk " +
+                  "requests if the chunk is small.",
+          tags = ConfigTag.CLIENT)
+  private boolean enablePutblockPiggybacking = true;
+
+  @Config(key = "key.write.concurrency",
+      defaultValue = "1",
+      description = "Maximum concurrent writes allowed on each key. " +
+          "Defaults to 1 which matches the behavior before HDDS-9844. " +
+          "For unlimited write concurrency, set this to -1 or any negative integer value.",
       tags = ConfigTag.CLIENT)
-  private boolean enablePutblockPiggybacking = false;
+  private int maxConcurrentWritePerKey = 1;
 
   @PostConstruct
   public void validate() {
@@ -493,6 +501,13 @@ public class OzoneClientConfig {
     return this.incrementalChunkList;
   }
 
+  public void setMaxConcurrentWritePerKey(int maxConcurrentWritePerKey) {
+    this.maxConcurrentWritePerKey = maxConcurrentWritePerKey;
+  }
+
+  public int getMaxConcurrentWritePerKey() {
+    return this.maxConcurrentWritePerKey;
+  
   public boolean isStreamReadBlock() {
     return streamReadBlock;
   }
