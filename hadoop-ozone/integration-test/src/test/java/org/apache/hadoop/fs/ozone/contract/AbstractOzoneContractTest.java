@@ -95,6 +95,7 @@ abstract class AbstractOzoneContractTest {
     conf.addResource(CONTRACT_XML);
 
     conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
 
     return conf;
