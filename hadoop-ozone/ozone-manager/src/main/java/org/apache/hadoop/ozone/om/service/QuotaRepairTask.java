@@ -51,14 +51,12 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,22 +192,7 @@ public class QuotaRepairTask {
   private OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManagerProtocolProtos.OMRequest omRequest, ClientId clientId) throws Exception {
     try {
-      if (om.isRatisEnabled()) {
-        OzoneManagerRatisServer server = om.getOmRatisServer();
-        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(om.getOmRatisServer().getRaftPeerId())
-            .setGroupId(om.getOmRatisServer().getRaftGroupId())
-            .setCallId(RUN_CNT.getAndIncrement())
-            .setMessage(Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build();
-        return server.submitRequest(omRequest, raftClientRequest);
-      } else {
-        RUN_CNT.getAndIncrement();
-        return om.getOmServerProtocol().submitRequest(
-            null, omRequest);
-      }
+      OzoneManagerRatisUtils.submitRequest(om, omRequest, clientId, RUN_CNT.getAndIncrement());
     } catch (ServiceException e) {
       LOG.error("repair quota count " + omRequest.getCmdType() + " request failed.", e);
       throw e;
