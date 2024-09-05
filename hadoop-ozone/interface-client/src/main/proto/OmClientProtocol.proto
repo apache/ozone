@@ -149,7 +149,6 @@ enum Type {
   RenameSnapshot = 131;
 
   ListOpenFiles = 132;
-  SnapshotPurgeAndMove = 133;
 }
 
 enum SafeMode {
@@ -1356,6 +1355,8 @@ message DeletedKeys {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    optional hadoop.hdds.UUID  expectedPathPreviousSnapshotUUID = 4;
+    repeated string renamedKeys = 5;
 }
 
 message PurgeKeysRequest {
@@ -1397,6 +1398,9 @@ message PurgePathRequest {
   optional string deletedDir = 3;
   repeated KeyInfo deletedSubFiles = 4;
   repeated KeyInfo markDeletedSubDirs = 5;
+  optional hadoop.hdds.UUID  expectedPathPreviousSnapshotUUID = 6;
+  optional string volumeName = 7;
+  optional string bucketName = 8;
 }
 
 message DeleteOpenKeysRequest {
@@ -1958,11 +1962,13 @@ message PrintCompactionLogDagRequest {
 }
 
 message SnapshotMoveDeletedKeysRequest {
-  optional SnapshotInfo fromSnapshot = 1;
+  optional SnapshotInfo fromSnapshot = 1 [deprecated = true];
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
-  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3 [deprecated = true];
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
   repeated string deletedDirsToMove = 5;
+  optional bool purgeMovedKeys = 6;
+  optional hadoop.hdds.UUID fromSnapshotID = 7;
 }
 
 message SnapshotMoveKeyInfos {
@@ -1986,6 +1992,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotDirSize = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility

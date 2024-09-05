@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -88,7 +89,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
   private final KeyManager manager;
 
-  private boolean runningOnAOS;
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
@@ -113,7 +113,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.snapshotSeekMap = new HashMap<>();
-    this.runningOnAOS = false;
   }
 
   /**
@@ -165,10 +164,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = keyLimitPerTask;
   }
 
-  public boolean isRunningOnAOS() {
-    return runningOnAOS;
-  }
-
   /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
@@ -177,6 +172,20 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * DB.
    */
   private class KeyDeletingTask implements BackgroundTask {
+
+    private void processDeletions(SnapshotInfo snapshotInfo) {
+      // if snapshotInfo is null, then the function should run for AOS.
+      final String volume;
+      final String bucket;
+      if (snapshotInfo == null) {
+        volume = null;
+        bucket = null;
+
+      }
+      String volume = snapshotInfo == null ? null : snapshotInfo.getVolumeName();
+      String bucket = snapshotInfo == null ? null : snapshotInfo.getBucketName();
+
+    }
 
     @Override
     public int getPriority() {
@@ -188,7 +197,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
-        runningOnAOS = true;
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
 
@@ -246,6 +254,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         while (delCount < keyLimitPerTask && iterator.hasNext()) {
           List<BlockGroup> keysToPurge = new ArrayList<>();
           HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+          Map<String, String> renamedKeyMap = new HashMap<>();
           SnapshotInfo currSnapInfo = iterator.next().getValue();
 
           // Deep clean only on snapshots whose deleted directory table has been deep cleaned. This is to avoid
@@ -359,18 +368,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 RepeatedOmKeyInfo newRepeatedOmKeyInfo =
                     new RepeatedOmKeyInfo();
                 for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
-                  if (previousSnapshot != null) {
-                    // Calculates the exclusive size for the previous
-                    // snapshot. See Java Doc for more info.
-                    calculateExclusiveSize(previousSnapshot,
-                        previousToPrevSnapshot, keyInfo, bucketInfo, volumeId,
-                        snapRenamedTable, previousKeyTable, prevRenamedTable,
-                        previousToPrevKeyTable, exclusiveSizeMap,
-                        exclusiveReplicatedSizeMap);
-                  }
-
+                  HddsProtos.KeyValue.Builder renamedKey = HddsProtos.KeyValue.newBuilder();
                   if (isKeyReclaimable(previousKeyTable, snapRenamedTable,
-                      keyInfo, bucketInfo, volumeId, null)) {
+                      keyInfo, bucketInfo, volumeId, renamedKey)) {
                     List<BlockGroup> blocksForKeyDelete = currOmSnapshot
                         .getMetadataManager()
                         .getBlocksForKeyDelete(deletedKey);
@@ -378,8 +378,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                       blockGroupList.addAll(blocksForKeyDelete);
                     }
                     delCount++;
+                    renamedKeyMap.put(deletedKey, renamedKey.getKey());
                   } else {
                     newRepeatedOmKeyInfo.addOmKeyInfo(keyInfo);
+                    calculateExclusiveSize(previousSnapshot,
+                        previousToPrevSnapshot, keyInfo, bucketInfo, volumeId,
+                        snapRenamedTable, previousKeyTable, prevRenamedTable,
+                        previousToPrevKeyTable, exclusiveSizeMap,
+                        exclusiveReplicatedSizeMap);
                   }
                 }
 
@@ -417,7 +423,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
               if (!keysToPurge.isEmpty()) {
                 processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
-                    keysToModify, currSnapInfo.getTableKey());
+                    keysToModify, renamedKeyMap,currSnapInfo.getTableKey());
               }
             } finally {
               IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);

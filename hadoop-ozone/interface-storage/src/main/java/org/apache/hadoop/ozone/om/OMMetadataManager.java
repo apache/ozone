@@ -117,6 +117,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getBucketKey(String volume, String bucket);
 
   /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - User name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefix(String volume, String bucket);
+
+  /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - User name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB key.
    *
    * @param volume - volume name
@@ -618,6 +634,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB rename key as String.
    */
   String getRenameKey(String volume, String bucket, long objectID);
+
+  /**
+   * Given renameKey, return the volume, bucket & objectID from the key.
+   */
+  String[] splitRenameKey(String renameKey);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store

@@ -18,9 +18,9 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -28,10 +28,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -43,12 +40,12 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
+import org.apache.hadoop.ozone.util.CheckExceptionOperation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -59,18 +56,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.setKeyNameAndFileName;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 
 /**
@@ -145,82 +139,28 @@ public class SnapshotDirectoryCleaningService
   private class SnapshotAOSDirCleanupTask implements BackgroundTask {
 
     //Expands deleted directory from active AOS if it is not referenced in the previous and breaks the dfs iteration.
-    private boolean expandDirectoryAndPurgeIfDirNotReferenced(
-        Table.KeyValue<String, OmKeyInfo> deletedDir,
-        Table<String, OmDirectoryInfo> previousDirTable,
-        Table<String, String> renamedTable,
-        AtomicLong remainNum, AtomicInteger consumedSize, AtomicLong dirNum,
-        AtomicLong subDirNum, AtomicLong subFileNum,
-        List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList,
-        List<Pair<String, OmKeyInfo>> allSubDirList,
-        KeyManager keyManager) throws IOException {
-      if (isDirReclaimable(deletedDir, previousDirTable, renamedTable)) {
-        OzoneManagerProtocolProtos.PurgePathRequest request = prepareDeleteDirRequest(
-            remainNum.get(), deletedDir.getValue(), deletedDir.getKey(),
-            allSubDirList, keyManager);
-        if (isBufferLimitCrossed(ratisByteLimit, consumedSize.get(),
-            request.getSerializedSize())) {
-          if (purgePathRequestList.size() != 0) {
-            // if message buffer reaches max limit, avoid sending further
-            remainNum.set(0);
-            return false;
-          }
-          // if directory itself is having a lot of keys / files,
-          // reduce capacity to minimum level
-          remainNum.set(MIN_ERR_LIMIT_PER_TASK);
-          request = prepareDeleteDirRequest(
-              remainNum.get(), deletedDir.getValue(), deletedDir.getKey(),
-              allSubDirList, keyManager);
-        }
-        consumedSize.addAndGet(request.getSerializedSize());
-        purgePathRequestList.add(request);
-        remainNum.addAndGet(-1 * request.getDeletedSubFilesCount());
-        remainNum.addAndGet(-1 * request.getMarkDeletedSubDirsCount());
-        // Count up the purgeDeletedDir, subDirs and subFiles
-        boolean dirDeleted = false;
-        if (request.getDeletedDir() != null
-            && !request.getDeletedDir().isEmpty()) {
-          dirNum.incrementAndGet();
-          dirDeleted = true;
-        }
-        subDirNum.addAndGet(request.getMarkDeletedSubDirsCount());
-        subFileNum.addAndGet(request.getDeletedSubFilesCount());
-        // returning true if there are only files and all files along with the directory is removed. Otherwise this
-        // directory needs another iteration to cleanup.
-        return request.getMarkDeletedSubDirsCount() == 0 && dirDeleted;
-      }
-      return true;
+    private Pair<Boolean, String> expandDirectoryAndPurgeIfDirNotReferenced(
+        Table.KeyValue<String, OmKeyInfo> deletedDir, Table<String, OmDirectoryInfo> previousDirTable,
+        Table<String, String> renamedTable) throws IOException {
+      HddsProtos.KeyValue.Builder renamedEntry = HddsProtos.KeyValue.newBuilder();
+      boolean isDirReclaimable = isDirReclaimable(deletedDir, previousDirTable, renamedTable, renamedEntry);
+      return Pair.of(isDirReclaimable, renamedEntry.hasKey() ? renamedEntry.getKey() : null);
     }
 
     //Removes deleted file from AOS and moves if it is not referenced in the previous snapshot.
-    // Returns
+    // Returns True if it can be deleted and false if it cannot be deleted.
     private boolean deleteKeyIfNotReferencedInPreviousSnapshot(
         long volumeId, OmBucketInfo bucketInfo,
-        Table.KeyValue<String, OmKeyInfo> deletedKeyInfoEntry,
-        SnapshotInfo prevSnapshotInfo, SnapshotInfo prevPrevSnapshotInfo,
+        OmKeyInfo deletedKeyInfo, SnapshotInfo prevSnapshotInfo, SnapshotInfo prevPrevSnapshotInfo,
         Table<String, String> renamedTable, Table<String, String> prevRenamedTable,
-        Table<String, OmKeyInfo> previousKeyTable, Table<String, OmKeyInfo> previousPrevKeyTable,
-        List<OzoneManagerProtocolProtos.KeyInfo> deletedKeyInfos,
-        AtomicLong remainNum, AtomicInteger consumedSize) throws IOException {
-      OmKeyInfo deletedKeyInfo = deletedKeyInfoEntry.getValue();
+        Table<String, OmKeyInfo> previousKeyTable, Table<String, OmKeyInfo> previousPrevKeyTable) throws IOException {
       if (isKeyReclaimable(previousKeyTable, renamedTable, deletedKeyInfo, bucketInfo, volumeId, null)) {
-        OzoneManagerProtocolProtos.KeyInfo keyInfo = deletedKeyInfo.getProtobuf(true,
-            ClientVersion.CURRENT_VERSION);
-        if (isBufferLimitCrossed(ratisByteLimit, consumedSize.get(),
-            keyInfo.getSerializedSize()) && consumedSize.get() > 0) {
-          // if message buffer reaches max limit, avoid sending further
-          remainNum.set(0);
-          return false;
-        }
-        deletedKeyInfos.add(keyInfo);
-        remainNum.decrementAndGet();
-        consumedSize.addAndGet(keyInfo.getSerializedSize());
-      } else {
-        calculateExclusiveSize(prevSnapshotInfo, prevPrevSnapshotInfo, deletedKeyInfo, bucketInfo, volumeId,
-            renamedTable, previousKeyTable, prevRenamedTable, previousPrevKeyTable, exclusiveSizeMap,
-            exclusiveReplicatedSizeMap);
+        return true;
       }
-      return true;
+      calculateExclusiveSize(prevSnapshotInfo, prevPrevSnapshotInfo, deletedKeyInfo, bucketInfo, volumeId,
+          renamedTable, previousKeyTable, prevRenamedTable, previousPrevKeyTable, exclusiveSizeMap,
+          exclusiveReplicatedSizeMap);
+      return false;
     }
 
     @Override
@@ -260,7 +200,7 @@ public class SnapshotDirectoryCleaningService
           }
 
           ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
-          ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
+          ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot;
           try {
             long volumeId = metadataManager
                 .getVolumeId(currSnapInfo.getVolumeName());
@@ -291,19 +231,16 @@ public class SnapshotDirectoryCleaningService
             final Table<String, OmKeyInfo> previousToPrevKeyTable;
 
             if (previousSnapshot != null) {
-              rcPrevOmSnapshot = omSnapshotManager.getActiveSnapshot(
+              rcPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousSnapshot.getVolumeName(),
                   previousSnapshot.getBucketName(),
                   previousSnapshot.getName());
               OmSnapshot omPreviousSnapshot = rcPrevOmSnapshot.get();
 
-              previousKeyTable = omPreviousSnapshot.getMetadataManager()
-                  .getKeyTable(bucketInfo.getBucketLayout());
-              prevRenamedTable = omPreviousSnapshot
-                  .getMetadataManager().getSnapshotRenamedTable();
+              previousKeyTable = omPreviousSnapshot.getMetadataManager().getKeyTable(bucketInfo.getBucketLayout());
+              prevRenamedTable = omPreviousSnapshot.getMetadataManager().getSnapshotRenamedTable();
               previousDirTable = omPreviousSnapshot.getMetadataManager().getDirectoryTable();
-              previousToPrevSnapshot = getPreviousSnapshot(
-                  previousSnapshot, snapChainManager, omSnapshotManager);
+              previousToPrevSnapshot = getPreviousSnapshot(previousSnapshot, snapChainManager, omSnapshotManager);
             } else {
               previousKeyTable = null;
               previousDirTable = null;
@@ -313,7 +250,7 @@ public class SnapshotDirectoryCleaningService
 
 
             if (previousToPrevSnapshot != null) {
-              rcPrevToPrevOmSnapshot = omSnapshotManager.getActiveSnapshot(
+              rcPrevToPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousToPrevSnapshot.getVolumeName(),
                   previousToPrevSnapshot.getBucketName(),
                   previousToPrevSnapshot.getName());
@@ -345,41 +282,67 @@ public class SnapshotDirectoryCleaningService
                 long startTime = Time.monotonicNow();
                 List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = new ArrayList<>();
                 List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
-                List<OzoneManagerProtocolProtos.KeyInfo> deletedSubKeyInfos = new ArrayList<>();
-                Operation<Table.KeyValue<String, OmKeyInfo>, Boolean> operationOnDirectory =
-                    deletedDirectoryEntry -> expandDirectoryAndPurgeIfDirNotReferenced(deletedDirectoryEntry, previousDirTable,
-                    snapRenameTable, remainNum, consumedSize, dirNum, subDirNum, subFileNum,
-                    purgePathRequestList, allSubDirList, getOzoneManager().getKeyManager());;
 
-                Operation<Table.KeyValue<String, OmKeyInfo>, Boolean> operationOnFile =
+                CheckExceptionOperation<OmKeyInfo, Boolean> checkExceptionOperationOnFile =
                     deletedKeyInfo -> deleteKeyIfNotReferencedInPreviousSnapshot(volumeId, bucketInfo, deletedKeyInfo,
                     previousSnapshot, previousToPrevSnapshot, snapRenameTable, prevRenamedTable,
-                        previousKeyTable, previousToPrevKeyTable, deletedSubKeyInfos, remainNum, consumedSize);;
-                Supplier<Boolean> breakConditionSupplier = () -> remainNum.get() > 0;
-                boolean retVal = true;
+                        previousKeyTable, previousToPrevKeyTable);
+
                 while (deletedDirIterator.hasNext()) {
                   Table.KeyValue<String, OmKeyInfo> deletedDirInfo =
                       deletedDirIterator.next();
-                  if (breakConditionSupplier.get()) {
-                    retVal = false;
-                    break;
+
+                  HddsProtos.KeyValue.Builder renamedEntry = HddsProtos.KeyValue.newBuilder();
+
+                  // Check if the directory is reclaimable. If it is not we cannot delete the directory.
+                  boolean isDirReclaimable = isDirReclaimable(deletedDirInfo, previousDirTable, snapRenameTable,
+                      renamedEntry);
+                  Optional<OzoneManagerProtocolProtos.PurgePathRequest> request = prepareDeleteDirRequest(
+                      remainNum.get(), deletedDirInfo.getValue(), deletedDirInfo.getKey(),
+                      allSubDirList, getOzoneManager().getKeyManager(), renamedEntry.hasKey() ?
+                          renamedEntry.getKey() : null, isDirReclaimable, checkExceptionOperationOnFile);
+                  if (!request.isPresent()) {
+                    continue;
                   }
-                  // For each deleted directory we do an in-memory DFS and
-                  // do a deep clean based on the previous snapshot.
-                  retVal = retVal && iterateDirectoryTree(deletedDirInfo, volumeId, bucketInfo,
-                      operationOnFile, operationOnDirectory,
-                      breakConditionSupplier, metadataManager);
+                  if (isBufferLimitCrossed(ratisByteLimit, consumedSize.get(),
+                      request.get().getSerializedSize())) {
+                    if (purgePathRequestList.size() != 0) {
+                      // if message buffer reaches max limit, avoid sending further
+                      remainNum.set(0);
+                    }
+                    // if directory itself is having a lot of keys / files,
+                    // reduce capacity to minimum level
+                    remainNum.set(MIN_ERR_LIMIT_PER_TASK);
+                    request = prepareDeleteDirRequest(
+                        remainNum.get(), deletedDirInfo.getValue(), deletedDirInfo.getKey(),
+                        allSubDirList, getOzoneManager().getKeyManager(), renamedEntry.getKey(), isDirReclaimable,
+                        checkExceptionOperationOnFile);
+                  }
+                  if (request.isPresent()) {
+                    OzoneManagerProtocolProtos.PurgePathRequest requestVal = request.get();
+                    consumedSize.addAndGet(requestVal.getSerializedSize());
+                    purgePathRequestList.add(requestVal);
+                    remainNum.addAndGet(-1 * requestVal.getDeletedSubFilesCount());
+                    remainNum.addAndGet(-1 * requestVal.getMarkDeletedSubDirsCount());
+                    // Count up the purgeDeletedDir, subDirs and subFiles
+                    if (requestVal.hasDeletedDir() && !requestVal.getDeletedDir().isEmpty()) {
+                      dirNum.incrementAndGet();
+                    }
+                    subDirNum.addAndGet(requestVal.getMarkDeletedSubDirsCount());
+                    subFileNum.addAndGet(requestVal.getDeletedSubFilesCount());
+                  }
                 }
-                if (deletedSubKeyInfos.size() > 0) {
-                  purgePathRequestList.add(wrapPurgeRequest(volumeId, bucketInfo.getObjectID(), deletedSubKeyInfos));
-                }
-                retVal = retVal && optimizeDirDeletesAndSubmitRequest(0, dirNum.get(), subDirNum.get(),
-                    subFileNum.get(),
-                    allSubDirList, purgePathRequestList, currSnapInfo.getTableKey(), startTime, 0,
-                    getOzoneManager().getKeyManager()).getRight().map(OzoneManagerProtocolProtos.OMResponse::getSuccess)
-                    .orElse(false);
+
+                boolean retVal = optimizeDirDeletesAndSubmitRequest(remainNum.get(), dirNum.get(), subDirNum.get(),
+                    subFileNum.get(), allSubDirList, purgePathRequestList,
+                    currSnapInfo.getTableKey(), startTime, 0, getOzoneManager().getKeyManager(),
+                    (deletedDir) -> expandDirectoryAndPurgeIfDirNotReferenced(deletedDir, previousDirTable,
+                        snapRenameTable), checkExceptionOperationOnFile).getRight()
+                    .map(OzoneManagerProtocolProtos.OMResponse::getSuccess)
+                    .orElse(true);
+
                 List<SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
-                if (retVal && subDirNum.get() == 0) {
+                if (retVal && remainNum.get() == keyLimitPerSnapshot) {
                   if (previousSnapshot != null) {
                     setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(previousSnapshot.getTableKey()));
                   }
@@ -401,108 +364,6 @@ public class SnapshotDirectoryCleaningService
     }
   }
 
-  /**
-   * Performs a DFS iteration on a given deleted directory and performs operation on the sub deleted directories and
-   * subfiles in the tree.
-   * @param deletedDirInfo
-   * @param volumeId
-   * @param bucketInfo
-   * @param operationOnFile
-   * @param operationOnDirectory
-   * @param breakConditionSupplier
-   * @param metadataManager
-   * @return True if complete directory was iterated and all operations returned a true otherwise false.
-   * middle of iteration.
-   * @throws IOException
-   */
-  private boolean iterateDirectoryTree(
-      Table.KeyValue<String, OmKeyInfo> deletedDirInfo,
-      long volumeId, OmBucketInfo bucketInfo, Operation<Table.KeyValue<String, OmKeyInfo>, Boolean> operationOnFile,
-      Operation<Table.KeyValue<String, OmKeyInfo>, Boolean> operationOnDirectory,
-      Supplier<Boolean> breakConditionSupplier,
-      OMMetadataManager metadataManager) throws IOException {
-    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
-    Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
-    Stack<StackNode> stackNodes = new Stack<>();
-    OmDirectoryInfo omDeletedDirectoryInfo = getDirectoryInfo(deletedDirInfo.getValue());
-    String dirPathDbKey = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
-        omDeletedDirectoryInfo);
-    StackNode topLevelDir = new StackNode();
-    topLevelDir.setDirKey(dirPathDbKey);
-    topLevelDir.setDirValue(deletedDirInfo.getValue());
-    stackNodes.push(topLevelDir);
-    String bucketPrefixKeyFSO = getOzonePathKeyForFso(metadataManager, bucketInfo.getVolumeName(),
-        bucketInfo.getBucketName());
-    boolean retVal = true;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-             directoryIterator = dirTable.iterator(bucketPrefixKeyFSO);
-         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-             fileTable.iterator(bucketPrefixKeyFSO)) {
-      while (!stackNodes.isEmpty()) {
-        StackNode stackTop = stackNodes.peek();
-        // We are doing a pre order traversal here meaning, first process the current directory and all the files
-        // and then do a DFS for directory. This is so that we can exit early avoiding unnecessary traversal.
-        if (StringUtils.isEmpty(stackTop.getSubDirSeek())) {
-          boolean directoryOpReturnValue = operationOnDirectory.apply(Table.newKeyValue(stackTop.getDirKey(),
-              stackTop.getDirValue()));
-          if (!directoryOpReturnValue) {
-            retVal = false;
-            stackNodes.pop();
-          }
-          if (breakConditionSupplier.get()) {
-            return retVal;
-          }
-          String subFileSeekValue = metadataManager.getOzonePathKey(volumeId,
-              bucketInfo.getObjectID(),
-              stackTop.getDirValue().getObjectID(), "");
-          fileIterator.seek(subFileSeekValue);
-          while (fileIterator.hasNext()) {
-            Table.KeyValue<String, OmKeyInfo> fileEntry = fileIterator.next();
-            OmKeyInfo omKeyInfo = fileEntry.getValue();
-            if (!OMFileRequest.isImmediateChild(omKeyInfo.getParentObjectID(),
-                stackTop.getDirValue().getObjectID())) {
-              break;
-            }
-            setKeyNameAndFileName(stackTop.getDirValue(), omKeyInfo);
-            if(!operationOnFile.apply(fileEntry)) {
-              retVal = false;
-              stackNodes.pop();
-              break;
-            }
-            if (breakConditionSupplier.get()) {
-              return retVal;
-            }
-          }
-          // Format : /volId/bucketId/parentId/
-          String seekDirInDB = metadataManager
-              .getOzonePathKey(volumeId, bucketInfo.getObjectID(),
-                  stackTop.getDirValue().getObjectID(), "");
-          stackTop.setSubDirSeek(seekDirInDB);
-        } else {
-          // Adding \0 to seek the next greater element.
-          directoryIterator.seek(stackTop.getSubDirSeek() + "\0");
-          if (directoryIterator.hasNext()) {
-            Table.KeyValue<String, OmDirectoryInfo> deletedSubDirInfo = directoryIterator.next();
-            String deletedSubDirKey = deletedSubDirInfo.getKey();
-            String prefixCheck = metadataManager.getOzoneDeletePathDirKey(stackTop.getSubDirSeek());
-            // Exit if it is out of the sub dir prefix scope.
-            if (!deletedSubDirKey.startsWith(prefixCheck)) {
-              stackNodes.pop();
-            } else {
-              stackTop.setSubDirSeek(deletedSubDirKey);
-              StackNode nextSubDir = new StackNode();
-              nextSubDir.setDirKey(deletedSubDirInfo.getKey());
-              nextSubDir.setDirValue(getOmKeyInfo(stackTop.getDirValue(), deletedSubDirInfo.getValue()));
-              stackNodes.push(nextSubDir);
-            }
-          } else {
-            stackNodes.pop();
-          }
-        }
-      }
-    }
-    return retVal;
-  }
 
   private SetSnapshotPropertyRequest getSetSnapshotRequestUpdatingExclusiveSize(String prevSnapshotKeyTable) {
     SnapshotSize snapshotSize = SnapshotSize.newBuilder()
@@ -605,10 +466,5 @@ public class SnapshotDirectoryCleaningService
           ", subDirSeek='" + subDirSeek + '\'' +
           '}';
     }
-  }
-
-  private interface Operation<T, R> {
-    R apply(T t) throws IOException;
-
   }
 }

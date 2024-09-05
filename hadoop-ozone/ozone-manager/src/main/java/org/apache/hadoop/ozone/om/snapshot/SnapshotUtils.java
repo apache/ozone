@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -39,6 +40,8 @@ import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -87,6 +90,12 @@ public final class SnapshotUtils {
           KEY_NOT_FOUND);
     }
     return snapshotInfo;
+  }
+
+  public static SnapshotInfo getSnapshotInfo(SnapshotChainManager chainManager, UUID snapshotId,
+                                             OmSnapshotManager omSnapshotManager) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    return omSnapshotManager.getSnapshotInfo(tableKey);
   }
 
   public static void dropColumnFamilyHandle(
@@ -141,41 +150,12 @@ public final class SnapshotUtils {
     }
   }
 
-  public static SnapshotInfo getSnapshotInfo(SnapshotChainManager chainManager, UUID snapshotId,
-                                             OmSnapshotManager omSnapshotManager) throws IOException {
-    String tableKey = chainManager.getTableKey(snapshotId);
-    return omSnapshotManager.getSnapshotInfo(tableKey);
-  }
-
   /**
-   * Get the next non deleted snapshot in the snapshot chain.
-   */
-  public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager) throws IOException {
-    do {
-      snapInfo = getNextSnapshot(snapInfo, chainManager, omSnapshotManager);
-    } while (snapInfo != null && !snapInfo.getSnapshotStatus().equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE));
-    return snapInfo;
-  }
-
-  /**
-   * Set Sanspho
+   * Set transactionInfo in snapshotInfo.
    */
   public static void setTransactionInfoInSnapshot(SnapshotInfo snapshot, TermIndex termIndex) throws IOException {
     TransactionInfo transactionInfo = TransactionInfo.valueOf(termIndex);
     snapshot.setLastTransactionInfo(TransactionInfo.getCodec().toPersistedFormat(transactionInfo));
-  }
-
-  /**
-   * Get the previous non deleted snapshot in the snapshot chain.
-   */
-  public static SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
-                                                       SnapshotChainManager chainManager,
-                                                       OmSnapshotManager omSnapshotManager) throws IOException {
-    do {
-      snapInfo = getPreviousSnapshot(snapInfo, chainManager, omSnapshotManager);
-    } while (snapInfo != null && !snapInfo.getSnapshotStatus().equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE));
-    return snapInfo;
   }
 
   /**
@@ -212,6 +192,16 @@ public final class SnapshotUtils {
                                                  SnapshotChainManager chainManager,
                                                  OmSnapshotManager omSnapshotManager)
       throws IOException {
+    UUID previousSnapshotId = getPreviousSnapshotId(snapInfo, chainManager);
+    return previousSnapshotId == null ? null : getSnapshotInfo(chainManager, previousSnapshotId, omSnapshotManager);
+  }
+
+  /**
+   * Get the previous in the snapshot chain.
+   */
+  public static UUID getPreviousSnapshotId(SnapshotInfo snapInfo,
+                                           SnapshotChainManager chainManager)
+      throws IOException {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
@@ -221,9 +211,8 @@ public final class SnapshotUtils {
     try {
       if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
           snapInfo.getSnapshotId())) {
-        UUID previousPathSnapshot = chainManager.previousPathSnapshot(snapInfo.getSnapshotPath(),
+        return chainManager.previousPathSnapshot(snapInfo.getSnapshotPath(),
             snapInfo.getSnapshotId());
-        return getSnapshotInfo(chainManager, previousPathSnapshot, omSnapshotManager);
       }
     } catch (NoSuchElementException ex) {
       LOG.error("The snapshot {} is not longer in snapshot chain, It " +
@@ -296,5 +285,63 @@ public final class SnapshotUtils {
     final long volumeId = metadataManager.getVolumeId(volumeName);
     final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
+
+  public static SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
+                                                   SnapshotChainManager snapshotChainManager,
+                                                   OmSnapshotManager snapshotManager) throws IOException {
+    Optional<UUID> latestPathSnapshot = Optional.ofNullable(
+        getLatestSnapshotId(volumeName, bucketName, snapshotChainManager));
+    return latestPathSnapshot.isPresent() ?
+        getSnapshotInfo(snapshotChainManager, latestPathSnapshot.get(), snapshotManager) : null;
+  }
+
+  /**
+   * Get the latest OmSnapshot for a snapshot path. If snapshot is not active should return null if isActive argument
+   * is true.
+   */
+  public static ReferenceCounted<OmSnapshot> getLatestSnapshot(String volumeName, String bucketName,
+                                                               SnapshotChainManager snapshotChainManager,
+                                                               OmSnapshotManager snapshotManager, boolean isActive)
+      throws IOException {
+    Optional<SnapshotInfo> snapshotInfo = Optional.ofNullable(
+        SnapshotUtils.getLatestSnapshotInfo(volumeName, bucketName, snapshotChainManager, snapshotManager));
+    if (isActive && snapshotInfo.map(si -> si.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
+        .orElse(false)) {
+      return null;
+    }
+    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot = snapshotInfo.isPresent() ?
+        Optional.ofNullable(snapshotManager.getSnapshot(volumeName, bucketName, snapshotInfo.get().getName())) :
+        Optional.empty();
+
+    return rcOmSnapshot.orElse(null);
+  }
+
+  public static UUID getLatestSnapshotId(String volumeName, String bucketName,
+                                         SnapshotChainManager snapshotChainManager) throws IOException {
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
+  }
+
+  // Validates previous snapshotId given a snapshotInfo or volumeName & bucketName. Incase snapshotInfo is null, this
+  // would be considered as AOS and previous snapshot becomes the latest snapshot for the bucket in the snapshot chain.
+  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo, String volumeName, String bucketName,
+                                                   SnapshotChainManager snapshotChainManager,
+                                                   UUID expectedPreviousSnapshotId) {
+    try {
+      if (snapshotInfo != null && (!snapshotInfo.getVolumeName().equals(volumeName) ||
+          !snapshotInfo.getBucketName().equals(bucketName))) {
+        LOG.error("Volume & Bucket mismatch expected volume: {}, expected bucket: {} for snapshot: {}",
+            volumeName, bucketName, snapshotInfo);
+        return false;
+      }
+      UUID previousSnapshotId = snapshotInfo == null ? SnapshotUtils.getLatestSnapshotId(volumeName, bucketName,
+          snapshotChainManager) : SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
+      return Objects.equals(expectedPreviousSnapshotId, previousSnapshotId);
+    } catch (IOException e) {
+      LOG.error("Error while validating previous snapshot for volume: {}, bucket: {}, snapshot: {}", volumeName,
+          bucketName, snapshotInfo == null ? null : snapshotInfo.getName(), e);
+    }
+    return false;
   }
 }

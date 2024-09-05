@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -58,11 +59,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -183,8 +186,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // TODO: [SNAPSHOT] Assign actual data size once we have the
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
-
-      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, termIndex.getIndex());
+      SnapshotUtils.setTransactionInfoInSnapshot(snapshotInfo, termIndex);
+      addSnapshotInfoToSnapshotChainAndCache(ozoneManager.getOmSnapshotManager(), omMetadataManager,
+          termIndex.getIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
@@ -246,6 +250,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
+      OmSnapshotManager omSnapshotManager,
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
@@ -264,6 +269,21 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
       snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
+      Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getLatestSnapshotInfo(
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+          snapshotChainManager, omSnapshotManager));
+      Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?
+          Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(previousSnapshot.get(), snapshotChainManager,
+              omSnapshotManager)) : Optional.empty();
+
+      // Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
+      // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't
+      // get purged.
+      boolean deepCleanFlag =
+          !(previousSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE &&
+          previousPrevSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE);
+      snapshotInfo.setDeepCleanedDeletedDir(deepCleanFlag);
+      snapshotInfo.setDeepClean(deepCleanFlag);
 
       try {
         snapshotChainManager.addSnapshot(snapshotInfo);

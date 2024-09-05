@@ -23,13 +23,21 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+
+import com.google.common.collect.Maps;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -45,8 +53,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
 
 /**
  * Handles purging of keys from OM DB.
@@ -66,22 +76,38 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
-
-    SnapshotInfo fromSnapshotInfo = null;
+    List<OzoneManagerProtocolProtos.PurgePathRequest> validPurgePathRequests = Lists.newArrayList();
+    final SnapshotInfo fromSnapshotInfo;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
-      if (fromSnapshot != null) {
-        fromSnapshotInfo = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable()
-            .get(fromSnapshot);
-      }
+      fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot) : null;
+
+      Map<Pair<String, String>, Boolean> previousSnapshotValidatedMap = Maps.newHashMap();
+
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
+        // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
+        // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
+        // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
+        // file/directory would be present in the newly created snapshot.
+        // Validating previous snapshot can ensure the chain hasn't changed.
+        boolean isPreviousSnapshotValid = previousSnapshotValidatedMap.computeIfAbsent(Pair.of(path.getVolumeName(),
+            path.getBucketName()),
+            (volumeBucketPair) -> validatePreviousSnapshotId(fromSnapshotInfo, volumeBucketPair.getLeft(),
+                volumeBucketPair.getRight(), omMetadataManager.getSnapshotChainManager(),
+                path.hasExpectedPathPreviousSnapshotUUID()
+                    ? fromProtobuf(path.getExpectedPathPreviousSnapshotUUID()) : null));
+
+        if (!isPreviousSnapshotValid) {
+          continue;
+        }
+
+        validPurgePathRequests.add(path);
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
@@ -174,7 +200,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
-        omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
+        omResponse.build(), validPurgePathRequests, ozoneManager.isRatisEnabled(),
             getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
 
     return omClientResponse;

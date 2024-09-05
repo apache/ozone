@@ -44,7 +44,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
+
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 
 /**
  * Handles OMSnapshotPurge Request.
@@ -101,10 +104,20 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         }
 
         SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
+            SnapshotUtils.getNextSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
+        Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(fromSnapshot,
+            snapshotChainManager, omSnapshotManager));
+        Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?
+            Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(previousSnapshot.get(), snapshotChainManager,
+                omSnapshotManager)) : Optional.empty();
+        // Step 1: Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
+        // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't
+        // get purged.
+        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex, updatedSnapInfos,
+            !(previousSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE &&
+            previousPrevSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE));
 
-        // Step 1: Update the deep clean flag for the next active snapshot
-        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex, updatedSnapInfos);
+
         // Step 2: Update the snapshot chain.
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex,
             updatedPathPreviousAndGlobalSnapshots);
@@ -133,15 +146,15 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
-      OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
-                                          Map<String, SnapshotInfo> updatedSnapInfos) throws IOException {
+  private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo, OmMetadataManagerImpl omMetadataManager,
+                                          long trxnLogIndex, Map<String, SnapshotInfo> updatedSnapInfos,
+                                          boolean flagValue) throws IOException {
     if (snapInfo != null) {
       // Setting next snapshot deep clean to false, Since the
       // current snapshot is deleted. We can potentially
       // reclaim more keys in the next snapshot.
-      snapInfo.setDeepClean(false);
-      snapInfo.setDeepCleanedDeletedDir(false);
+      snapInfo.setDeepClean(flagValue);
+      snapInfo.setDeepCleanedDeletedDir(flagValue);
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),

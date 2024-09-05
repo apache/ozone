@@ -286,6 +286,16 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Add key entry to SnapshotRenamedTable
+   */
+  public static String addRenamedEntryToTable(long trxnLogIndex, String volumeName, String bucketName, String key,
+                                            OMMetadataManager omMetadataManager) throws Exception {
+    String renameKey = omMetadataManager.getRenameKey(volumeName, bucketName, trxnLogIndex);
+    omMetadataManager.getSnapshotRenamedTable().put(renameKey, key);
+    return renameKey;
+  }
+
+  /**
    * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
    * to openKeyTable, else add's it to keyTable.
    * @throws Exception

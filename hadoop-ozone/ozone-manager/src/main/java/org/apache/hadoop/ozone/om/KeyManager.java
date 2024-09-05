@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -34,9 +35,11 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.util.CheckExceptionOperation;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -137,7 +140,24 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(
+      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
+  /**
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
+   *
+   * @param count max number of keys to return.
+   * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
+   * and a hashmap for key-value pair to be updated in the deletedTable.
+   * @throws IOException
+   */
+  PendingKeysDeletion getPendingDeletionKeys(
+      String volume, String bucket, String startKey,
+      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -237,6 +257,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
 
   /**
+   * Returns an iterator for pending deleted directories.
+   * @throws IOException
+   */
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs() throws IOException;
+
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(String volume, String bucket)
+      throws IOException;
+
+  /**
    * Returns all sub directories under the given parent directory.
    *
    * @param parentInfo
@@ -244,8 +273,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries) throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubDirs(
+      long volumeId, long bucketId, OmKeyInfo parentInfo,
+      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      long numEntries) throws IOException;
+
+
 
   /**
    * Returns all sub files under the given parent directory.
@@ -255,9 +288,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries)
-          throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId, long bucketId, OmKeyInfo parentInfo,
+                                             CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean,
+                                             IOException> filter,
+                                             long numEntries) throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.
@@ -294,4 +328,5 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   SnapshotDirectoryCleaningService getSnapshotDirectoryService();
+
 }

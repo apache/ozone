@@ -23,26 +23,35 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Return class for OMMetadataManager#getPendingDeletionKeys.
  */
 public class PendingKeysDeletion {
 
-  private HashMap<String, RepeatedOmKeyInfo> keysToModify;
+  private Map<String, RepeatedOmKeyInfo> keysToModify;
   private List<BlockGroup> keyBlocksList;
 
+  private String nextPageStartKey;
+
   public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
-       HashMap<String, RepeatedOmKeyInfo> keysToModify) {
+                             Map<String, RepeatedOmKeyInfo> keysToModify,
+                             String nextPageStartKey) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
+    this.nextPageStartKey = nextPageStartKey;
   }
 
-  public HashMap<String, RepeatedOmKeyInfo> getKeysToModify() {
+  public Map<String, RepeatedOmKeyInfo> getKeysToModify() {
     return keysToModify;
   }
 
   public List<BlockGroup> getKeyBlocksList() {
     return keyBlocksList;
+  }
+
+  public String getNextPageStartKey() {
+    return nextPageStartKey;
   }
 }
