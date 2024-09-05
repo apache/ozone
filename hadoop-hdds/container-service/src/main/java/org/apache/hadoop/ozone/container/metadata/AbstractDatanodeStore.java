@@ -47,6 +47,8 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -91,7 +93,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    cfOptions = dbProfile.getColumnFamilyOptions(config);
+    cfOptions = dbProfile.getColumnFamilyOptions(CONTAINER_DB_NAME, StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY));
 
     this.dbDef = dbDef;
     this.openReadOnly = openReadOnly;
@@ -102,7 +104,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      ManagedDBOptions options = dbProfile.getDBOptions();
+      ManagedDBOptions options = dbProfile.getDBOptions(CONTAINER_DB_NAME);
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 

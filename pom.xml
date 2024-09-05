@@ -231,7 +231,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <netty.version>4.1.109.Final</netty.version>
     <io.grpc.version>1.58.0</io.grpc.version>
 
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>8.8.1</rocksdb.version>
     <sqlite.version>3.46.1.0</sqlite.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
@@ -1532,6 +1532,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
                       <allowedImport>org.rocksdb.TickerType</allowedImport>
                       <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
+                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>
 
                       <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
                       <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>

@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 
@@ -50,7 +51,9 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
       if (!((ManagedBlockBasedTableConfig) previous).isClosed()) {
         throw new IllegalStateException("Overriding an unclosed value.");
       }
-    } else if (previous != null) {
+    } else if (!(previous instanceof BlockBasedTableConfig) && previous != null) {
+      //Note that the type of tableFormatConfig read directly from
+      //the ini file is org.rocksdb.BlockBasedTableConfig
       throw new UnsupportedOperationException("Overwrite is not supported for "
           + previous.getClass());
     }
