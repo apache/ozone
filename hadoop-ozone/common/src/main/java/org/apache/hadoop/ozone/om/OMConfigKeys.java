@@ -623,4 +623,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_ROCKSDB_MANUAL_WAL_FLUSH = "ozone.om.rocksdb.manual.wal.flush";
+  public static final boolean OZONE_OM_ROCKSDB_MANUAL_WAL_FLUSH_DEFAULT = false;
 }

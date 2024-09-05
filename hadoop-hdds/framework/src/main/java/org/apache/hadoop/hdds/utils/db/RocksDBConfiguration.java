@@ -76,6 +76,13 @@ public class RocksDBConfiguration {
       description = "The lifetime of WAL log files. Default 1200 seconds.")
   private long walTTL = 1200;
 
+  @Config(key = "rocksdb.manual_wal_flush",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = {OM, SCM, DATANODE},
+      description = "The disable auto flush for WAL logs.")
+  private boolean manualWalFlush = false;
+
   @Config(key = "rocksdb.WAL_size_limit_MB",
       type = ConfigType.SIZE,
       defaultValue = "0MB",
@@ -139,5 +146,13 @@ public class RocksDBConfiguration {
 
   public int getKeepLogFileNum() {
     return rocksdbKeepLogFileNum;
+  }
+
+  public void setManualWalFlush(boolean bManualWallFlush) {
+    this.manualWalFlush = bManualWallFlush;
+  }
+
+  public boolean getManualWalFlush() {
+    return manualWalFlush;
   }
 }

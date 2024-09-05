@@ -4512,4 +4512,12 @@
       maximum number of buckets across all volumes.
     </description>
   </property>
+  <property>
+    <name>ozone.om.rocksdb.manual.wal.flush</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      control the manual flush of Rocksdb WAL log when db commit happens.
+    </description>
+  </property>
 </configuration>
