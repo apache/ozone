@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
@@ -40,6 +41,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -55,6 +57,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -90,6 +93,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -2288,5 +2292,31 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(0, f1.length);
     assertEquals(2, f2.length);
     assertEquals(3, f3.length);
+  }
+
+  @Test
+  public void testSetReplication() throws IOException {
+    String testKeyName = "testKey" + RandomStringUtils.randomNumeric(4);
+    Path testKeyPath = new Path("/" + testKeyName);
+    try (OzoneOutputStream outputStream = client.getObjectStore()
+        .getVolume(volumeName).getBucket(bucketName)
+        .createKey(testKeyName, 1,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.RATIS,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals(ReplicationFactor.ONE.toString(),
+        key.getReplicationConfig().getReplication());
+    o3fs.setReplication(testKeyPath, (short) 3);
+    key = getKey(testKeyPath, false);
+    assertEquals(ReplicationFactor.THREE.toString(),
+        key.getReplicationConfig().getReplication());
+    IOException exception = assertThrows(IOException.class,
+        () -> o3fs.setReplication(testKeyPath, (short) 5),
+        "Does not throw IOException");
+    assertTrue(exception.getMessage().contains("not supported"));
   }
 }

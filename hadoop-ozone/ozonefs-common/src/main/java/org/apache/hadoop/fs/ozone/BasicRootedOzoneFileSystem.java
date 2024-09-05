@@ -599,6 +599,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  @Override
+  public boolean setReplication(Path src, short replication)
+      throws IOException {
+    adapterImpl.setReplication(pathToKey(src), replication);
+    return true;
+  }
+
   /**
    * To be used only by recursiveBucketDelete().
    */

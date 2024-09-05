@@ -115,4 +115,6 @@ public interface OzoneClientAdapter {
 
   boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException;
+
+  void setReplication(String key, short replication) throws IOException;
 }

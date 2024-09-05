@@ -945,6 +945,13 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public boolean setReplication(Path src, short replication)
+      throws IOException {
+    adapter.setReplication(pathToKey(src), replication);
+    return true;
+  }
+
+  @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
