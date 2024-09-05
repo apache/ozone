@@ -820,7 +820,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public void setReplication(String key, short replication) throws IOException {
-    OzoneKeyDetails keyDetails = bucket.getKey(key);
+    OzoneKeyDetails keyDetails = null;
+    try {
+      keyDetails = bucket.getKey(key);
+    } catch (OMException ome) {
+      if (ome.getResult() == KEY_NOT_FOUND) {
+        return;
+      }
+      throw ome;
+    }
     ReplicationConfig newReplication = OzoneClientUtils
         .resolveClientSideReplicationConfig(replication, null,
             null, config);

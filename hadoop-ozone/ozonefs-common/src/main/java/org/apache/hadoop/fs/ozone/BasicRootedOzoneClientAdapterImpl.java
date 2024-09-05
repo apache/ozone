@@ -401,7 +401,16 @@ public class BasicRootedOzoneClientAdapterImpl
   public void setReplication(String key, short replication) throws IOException {
     OFSPath ofsPath = new OFSPath(key, config);
     OzoneBucket bucket = getBucket(ofsPath, false);
-    OzoneKeyDetails keyDetails = bucket.getKey(ofsPath.getKeyName());
+    OzoneKeyDetails keyDetails = null;
+    try {
+      keyDetails = bucket.getKey(key);
+    } catch (OMException ome) {
+      // if key does not exist, do nothing
+      if (ome.getResult() == KEY_NOT_FOUND) {
+        return;
+      }
+      throw ome;
+    }
     ReplicationConfig newReplication = OzoneClientUtils
         .resolveClientSideReplicationConfig(replication, null,
             null, config);
