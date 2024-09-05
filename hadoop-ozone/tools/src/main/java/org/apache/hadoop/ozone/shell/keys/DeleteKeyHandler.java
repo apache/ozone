@@ -106,7 +106,7 @@ public class DeleteKeyHandler extends KeyHandler {
 
       if (bucket.getFileStatus(keyName).isDirectory()) {
         List<OzoneFileStatus> ozoneFileStatusList =
-            bucket.listStatus(keyName, false, "", 1);
+            bucket.listStatus(keyName, false, "", 1, false);
         if (ozoneFileStatusList != null && !ozoneFileStatusList.isEmpty()) {
           out().printf("Directory is not empty %n");
           return;

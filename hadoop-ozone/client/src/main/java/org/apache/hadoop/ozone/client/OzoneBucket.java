@@ -38,13 +38,11 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1357,10 +1355,9 @@ public class OzoneBucket extends WithMetadata {
         }
       }
 
-      // 2. Get immediate children by listStatusLight method
-      List<OzoneFileStatusLight> statuses =
-          proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
-              startKey, listCacheSize, false);
+      // 2. Get immediate children by listStatus method
+      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
+          delimiterKeyPrefix, false, startKey, listCacheSize, false);
 
       if (addedKeyPrefix && statuses.size() > 0) {
         // previous round already include the startKey, so remove it
@@ -1383,7 +1380,7 @@ public class OzoneBucket extends WithMetadata {
     }
 
     protected List<OzoneKey> buildKeysWithKeyPrefix(
-        List<OzoneFileStatusLight> statuses) {
+        List<OzoneFileStatus> statuses) {
       return statuses.stream()
           .map(OzoneBucket::toOzoneKey)
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
@@ -1392,8 +1389,8 @@ public class OzoneBucket extends WithMetadata {
 
   }
 
-  private static OzoneKey toOzoneKey(OzoneFileStatusLight status) {
-    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+  private static OzoneKey toOzoneKey(OzoneFileStatus status) {
+    OmKeyInfo keyInfo = status.getKeyInfo();
     String keyName = keyInfo.getKeyName();
     final Map<String, String> metadata;
     if (status.isDirectory()) {
@@ -1600,8 +1597,8 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatus method.
-      List<OzoneFileStatusLight> statuses =
-          proxy.listStatusLight(volumeName, name, getDelimiterKeyPrefix(),
+      List<OzoneFileStatus> statuses =
+          proxy.listStatus(volumeName, name, getDelimiterKeyPrefix(),
               false, startKey, listCacheSize, false);
 
       if (!statuses.isEmpty()) {
@@ -1760,7 +1757,7 @@ public class OzoneBucket extends WithMetadata {
       startKey = startKey == null ? "" : startKey;
 
       // 1. Get immediate children of keyPrefix, starting with startKey
-      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(volumeName,
+      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName,
           name, keyPrefix, false, startKey, listCacheSize, true);
       boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
@@ -1779,8 +1776,8 @@ public class OzoneBucket extends WithMetadata {
       // 4. Iterating over the resultStatuses list and add each key to the
       // resultList.
       for (int indx = 0; indx < statuses.size(); indx++) {
-        OzoneFileStatusLight status = statuses.get(indx);
-        BasicOmKeyInfo keyInfo = status.getKeyInfo();
+        OzoneFileStatus status = statuses.get(indx);
+        OmKeyInfo keyInfo = status.getKeyInfo();
         OzoneKey ozoneKey = toOzoneKey(status);
         keysResultList.add(ozoneKey);
 
@@ -1808,7 +1805,7 @@ public class OzoneBucket extends WithMetadata {
     }
 
     private void removeStartKeyIfExistsInStatusList(String startKey,
-        List<OzoneFileStatusLight> statuses) {
+        List<OzoneFileStatus> statuses) {
 
       if (!statuses.isEmpty()) {
         String firstElement = statuses.get(0).getKeyInfo().getKeyName();

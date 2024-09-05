@@ -53,6 +53,12 @@ public class OzoneFileStatus {
     this.blockSize = blockSize;
   }
 
+  public OzoneFileStatus(OzoneFileStatusLight b) {
+    this.keyInfo = new OmKeyInfo(b.getKeyInfo());
+    this.isDirectory = b.isDirectory();
+    this.blockSize = b.getBlockSize();
+  }
+
   public OmKeyInfo getKeyInfo() {
     return keyInfo;
   }

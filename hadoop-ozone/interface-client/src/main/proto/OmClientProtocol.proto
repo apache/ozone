@@ -1152,6 +1152,7 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+    optional string eTag = 23;
 }
 
 message BasicKeyInfo {

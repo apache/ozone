@@ -88,6 +88,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * Support OFS use-case to identify if the key is a file or a directory.
    */
   private boolean isFile;
+  private final String eTag;
 
   /**
    * Represents leaf node name. This also will be used when the keyName is
@@ -133,6 +134,22 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.eTag = b.eTag;
+  }
+
+  public OmKeyInfo(BasicOmKeyInfo b) {
+    this.volumeName = b.getVolumeName();
+    this.bucketName = b.getBucketName();
+    this.keyName = b.getKeyName();
+    this.dataSize = b.getDataSize();
+    this.creationTime = b.getCreationTime();
+    this.modificationTime = b.getModificationTime();
+    this.replicationConfig = b.getReplicationConfig();
+    this.isFile = b.isFile();
+    this.eTag = b.getETag();
+    this.ownerName = b.getOwnerName();
+    this.fileChecksum = null;
+    this.acls = null;
   }
 
   public String getVolumeName() {
@@ -161,6 +178,10 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public long getReplicatedSize() {
     return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
+  }
+
+  public String getETag() {
+    return eTag;
   }
 
   public void setDataSize(long size) {
@@ -451,6 +472,7 @@ public final class OmKeyInfo extends WithParentObjectId
         ", fileChecksum=" + fileChecksum +
         ", isFile=" + isFile +
         ", fileName='" + fileName + '\'' +
+        ", eTag=" + eTag + '\'' +
         ", acls=" + acls +
         '}';
   }
@@ -476,6 +498,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
+    private String eTag;
     private final Map<String, String> tags = new HashMap<>();
     private Long expectedDataGeneration = null;
 
@@ -606,6 +629,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setETag(String etag) {
+      this.eTag = etag;
+      return this;
+    }
+
     public Builder addTag(String key, String value) {
       tags.put(key, value);
       return this;
@@ -702,6 +730,9 @@ public final class OmKeyInfo extends WithParentObjectId
     } else {
       kb.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
+    if (eTag != null) {
+      kb.setETag(eTag);
+    }
     kb.setLatestVersion(latestVersion)
         .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
@@ -778,6 +809,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
+    }
+    if (keyInfo.hasETag()) {
+      builder.setETag(keyInfo.getETag());
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
@@ -902,6 +936,9 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    if (eTag != null) {
+      builder.setETag(eTag);
     }
 
     return builder.build();
