@@ -544,7 +544,7 @@ const Buckets: React.FC<{}> = () => {
               loading={loading}
               rowKey='volume'
               pagination={paginationConfig}
-              scroll={{ x: 'max-content', y: 400, scrollToFirstRowOnChange: true }}
+              scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
               locale={{ filterTitle: '' }}
             />
           </div>

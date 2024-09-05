@@ -552,7 +552,7 @@ const Datanodes: React.FC<{}> = () => {
               loading={loading}
               rowKey='uuid'
               pagination={paginationConfig}
-              scroll={{ x: 'max-content', y: 400, scrollToFirstRowOnChange: true }}
+              scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
               locale={{ filterTitle: '' }} />
           </div>
         </div>
