@@ -72,6 +72,12 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
+        .addGauge(Interns.info("numRequestedECReconstructions",
+            "Number of requested EC reconstructions"),
+            supervisor.getReplicationRequestCount(ECReconstructionCoordinatorTask.class))
+        .addGauge(Interns.info("numRequestedContainerReplications",
+            "Number of requested container replications"),
+            supervisor.getReplicationRequestCount(ReplicationTask.class))
         .addGauge(Interns.info("numSuccessReplications",
             "Number of successful replications"),
             supervisor.getReplicationSuccessCount())

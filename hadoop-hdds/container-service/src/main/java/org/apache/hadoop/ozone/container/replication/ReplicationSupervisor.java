@@ -71,7 +71,7 @@ public final class ReplicationSupervisor {
   private final StateContext context;
   private final Clock clock;
 
-  private final AtomicLong requestCounter = new AtomicLong();
+  private final Map<Class<?>, AtomicLong> requestCounter = new ConcurrentHashMap<>();
   private final Map<Class<?>, AtomicLong> successCounter = new ConcurrentHashMap<>();
   private final Map<Class<?>, AtomicLong> failureCounter = new ConcurrentHashMap<>();
   private final Map<Class<?>, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
@@ -221,9 +221,10 @@ public final class ReplicationSupervisor {
       return;
     }
 
-    if (successCounter.get(task.getClass()) == null) {
+    if (requestCounter.get(task.getClass()) == null) {
       synchronized (this) {
-        if (successCounter.get(task.getClass()) == null) {
+        if (requestCounter.get(task.getClass()) == null) {
+          requestCounter.put(task.getClass(), new AtomicLong(0));
           successCounter.put(task.getClass(), new AtomicLong(0));
           failureCounter.put(task.getClass(), new AtomicLong(0));
           timeoutCounter.put(task.getClass(), new AtomicLong(0));
@@ -341,7 +342,7 @@ public final class ReplicationSupervisor {
     @Override
     public void run() {
       try {
-        requestCounter.incrementAndGet();
+        requestCounter.get(task.getClass()).incrementAndGet();
 
         final long now = clock.millis();
         final long deadline = task.getDeadline();
@@ -430,7 +431,12 @@ public final class ReplicationSupervisor {
   }
 
   public long getReplicationRequestCount() {
-    return requestCounter.get();
+    return getCount(requestCounter);
+  }
+
+  public long getReplicationRequestCount(Class<?> cls) {
+    AtomicLong counter = requestCounter.get(cls);
+    return counter != null ? counter.get() : 0;
   }
 
   public long getQueueSize() {
