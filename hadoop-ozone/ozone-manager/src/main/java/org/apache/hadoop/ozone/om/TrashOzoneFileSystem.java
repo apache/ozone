@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
