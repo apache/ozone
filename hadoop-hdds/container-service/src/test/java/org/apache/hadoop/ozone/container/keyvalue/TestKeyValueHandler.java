@@ -69,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.Assertions;
@@ -77,7 +78,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
@@ -93,6 +93,8 @@ public class TestKeyValueHandler {
 
   @TempDir
   private Path tempDir;
+  @TempDir
+  private Path dbFile;
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
@@ -317,13 +319,20 @@ public class TestKeyValueHandler {
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
-    long containerID = 1234L;
+    KeyValueHandler keyValueHandler = createKeyValueHandler();
     OzoneConfiguration conf = new OzoneConfiguration();
-    KeyValueContainerData kvData = new KeyValueContainerData(containerID,
+    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
         layoutVersion,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    ContainerCommandRequestProto createContainerRequest =
+        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
+    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+
+    // Make the container state as invalid.
     kvData.setState(ContainerProtos.ContainerDataProto.State.INVALID);
 
     // Create Close container request
@@ -337,12 +346,10 @@ public class TestKeyValueHandler {
             .build();
     dispatcher.dispatch(closeContainerRequest, null);
 
-    when(handler.handleCloseContainer(any(), any()))
-        .thenCallRealMethod();
-    doCallRealMethod().when(handler).closeContainer(any());
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
-        handler.handleCloseContainer(closeContainerRequest, container);
+        keyValueHandler.handleCloseContainer(closeContainerRequest, container);
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
@@ -487,5 +494,26 @@ public class TestKeyValueHandler {
                 .setContainerType(ContainerType.KeyValueContainer).build())
         .setContainerID(containerID).setPipelineID(UUID.randomUUID().toString())
         .build();
+  }
+
+  private KeyValueHandler createKeyValueHandler() throws IOException {
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    final ConfigurationSource conf = new OzoneConfiguration();
+    final ContainerSet containerSet = new ContainerSet(1000);
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString()).conf(conf)
+        .clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+    final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet);
+    kvHandler.setClusterID(clusterId);
+    return kvHandler;
   }
 }
