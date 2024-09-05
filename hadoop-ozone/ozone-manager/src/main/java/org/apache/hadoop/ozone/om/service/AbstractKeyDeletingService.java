@@ -672,8 +672,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return cLimit + increment >= maxLimit;
   }
 
-  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
       throws IOException {
     SnapshotInfo currSnapInfo = snapInfo;
     while (chainManager.hasPreviousPathSnapshot(
@@ -682,7 +681,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       UUID prevPathSnapshot = chainManager.previousPathSnapshot(
           currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
       String tableKey = chainManager.getTableKey(prevPathSnapshot);
-      SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo prevSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
       if (prevSnapInfo.getSnapshotStatus() ==
           SNAPSHOT_ACTIVE) {
         return prevSnapInfo;

@@ -174,6 +174,7 @@ class TestBlockOutputStreamCorrectness {
 
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
+        -1,
         xcm,
         pipeline,
         bufferPool,

@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -44,6 +45,9 @@ import org.apache.hadoop.crypto.Encryptor;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.ErrorInjector;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -66,6 +70,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities;
 
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -79,7 +84,9 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -89,11 +96,17 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -290,17 +303,49 @@ public class TestHSync {
 
       // Clean up
       assertTrue(fs.delete(file, false));
-      // Wait for KeyDeletingService to finish to avoid interfering other tests
-      Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
-      GenericTestUtils.waitFor(
-          () -> {
-            try {
-              return deletedTable.isEmpty();
-            } catch (IOException e) {
-              return false;
-            }
-          }, 250, 10000);
+      waitForEmptyDeletedTable();
     }
+  }
+
+  private void waitForEmptyDeletedTable()
+      throws TimeoutException, InterruptedException {
+    // Wait for KeyDeletingService to finish to avoid interfering other tests
+    OMMetadataManager omMetadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+    Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            return deletedTable.isEmpty();
+          } catch (IOException e) {
+            return false;
+          }
+        }, 250, 10000);
+  }
+
+  @Test
+  // Making this the second test to be run to avoid lingering block files from previous tests
+  @Order(2)
+  public void testEmptyHsync() throws Exception {
+    // Check that deletedTable should not have keys with the same block as in
+    // keyTable's when a key is hsync()'ed then close()'d.
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    final Path file = new Path(dir, "file-hsync-empty");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.write(new byte[0], 0, 0);
+        outputStream.hsync();
+      }
+    }
+    waitForEmptyDeletedTable();
   }
 
   @Test
@@ -319,10 +364,16 @@ public class TestHSync {
     String data = "random data";
     final Path file = new Path(dir, "file-hsync-then-close");
     try (FileSystem fs = FileSystem.get(CONF)) {
+      String chunkPath;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.write(data.getBytes(UTF_8), 0, data.length());
         outputStream.hsync();
+        // locate the container chunk path on the first DataNode.
+        chunkPath = getChunkPathOnDataNode(outputStream);
+        assertFalse(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
       }
+      // After close, the chunk file should be closed.
+      assertTrue(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
     }
 
     OzoneManager ozoneManager = cluster.getOzoneManager();
@@ -346,6 +397,22 @@ public class TestHSync {
         }
       }
     }
+  }
+
+  private static String getChunkPathOnDataNode(FSDataOutputStream outputStream)
+      throws IOException {
+    String chunkPath;
+    KeyOutputStream groupOutputStream =
+        ((OzoneFSOutputStream) outputStream.getWrappedStream()).getWrappedOutputStream().getKeyOutputStream();
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo, cluster);
+    chunkPath = dn.getDatanodeStateMachine()
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID()).
+        getContainerData().getChunksPath();
+    return chunkPath;
   }
 
   @ParameterizedTest
@@ -487,6 +554,7 @@ public class TestHSync {
 
   @Test
   public void testUncommittedBlocks() throws Exception {
+    waitForEmptyDeletedTable();
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -665,6 +733,99 @@ public class TestHSync {
         return false;
       }
     }, 500, 3000);
+  }
+
+
+  public static Stream<Arguments> concurrentExceptionHandling() {
+    return Stream.of(
+        Arguments.of(4, 1),
+        Arguments.of(4, 4),
+        Arguments.of(8, 4)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("concurrentExceptionHandling")
+  public void testConcurrentExceptionHandling(int syncerThreads, int errors) throws Exception {
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    ErrorInjectorImpl errorInjector = new ErrorInjectorImpl();
+    XceiverClientManager.enableErrorInjection(errorInjector);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "exceptionhandling");
+      byte[] data = new byte[8];
+      ThreadLocalRandom.current().nextBytes(data);
+      int writes;
+      try (FSDataOutputStream out = fs.create(file, true)) {
+        writes = runConcurrentWriteHSyncWithException(file, out, data, syncerThreads, errors, errorInjector);
+      }
+      validateWrittenFile(file, fs, data, writes);
+      fs.delete(file, false);
+    }
+  }
+
+  private int runConcurrentWriteHSyncWithException(Path file,
+      final FSDataOutputStream out, byte[] data, int syncThreadsCount, int errors,
+      ErrorInjectorImpl errorInjector) throws Exception {
+
+    AtomicReference<Exception> writerException = new AtomicReference<>();
+    AtomicReference<Exception> syncerException = new AtomicReference<>();
+
+    LOG.info("runConcurrentWriteHSyncWithException {} with size {}", file, data.length);
+    AtomicInteger writes = new AtomicInteger();
+    final long start = Time.monotonicNow();
+
+    Runnable syncer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.write(data);
+          writes.incrementAndGet();
+          out.hsync();
+        } catch (Exception e) {
+          LOG.error("Error calling hsync", e);
+          syncerException.compareAndSet(null, e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Thread[] syncThreads = new Thread[syncThreadsCount];
+    for (int i = 0; i < syncThreadsCount; i++) {
+      syncThreads[i] = new Thread(syncer);
+      syncThreads[i].setName("Syncer-" + i);
+      syncThreads[i].start();
+    }
+
+    // Inject error at 3rd second.
+    Runnable startErrorInjector = () -> {
+      while ((Time.monotonicNow() - start <= 3000)) {
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      errorInjector.start(errors);
+      LOG.info("Enabled error injection in XceiverClientRatis");
+    };
+
+    new Thread(startErrorInjector).start();
+
+    for (Thread sync : syncThreads) {
+      sync.join();
+    }
+
+    if (syncerException.get() != null) {
+      throw syncerException.get();
+    }
+    if (writerException.get() != null) {
+      throw writerException.get();
+    }
+    return writes.get();
   }
 
   private int runConcurrentWriteHSync(Path file,
@@ -1288,5 +1449,34 @@ public class TestHSync {
       }
     }
     return keys;
+  }
+
+  private static class ErrorInjectorImpl implements ErrorInjector {
+    private final AtomicInteger remaining = new AtomicInteger();
+    void start(int count) {
+      remaining.set(count);
+    }
+    @Override
+    public RaftClientReply getResponse(ContainerProtos.ContainerCommandRequestProto request, ClientId clientId,
+        Pipeline pipeline) {
+      int errorNum = remaining.decrementAndGet();
+      if (errorNum >= 0) {
+        ContainerProtos.ContainerCommandResponseProto proto = ContainerProtos.ContainerCommandResponseProto.newBuilder()
+            .setResult(ContainerProtos.Result.CLOSED_CONTAINER_IO)
+            .setMessage("Simulated error #" + errorNum)
+            .setCmdType(request.getCmdType())
+            .build();
+        RaftClientReply reply = RaftClientReply.newBuilder()
+            .setSuccess(true)
+            .setMessage(Message.valueOf(proto.toByteString()))
+            .setClientId(clientId)
+            .setServerId(RaftPeerId.getRaftPeerId(pipeline.getLeaderId().toString()))
+            .setGroupId(RaftGroupId.randomId())
+            .build();
+        return reply;
+      }
+
+      return null;
+    }
   }
 }

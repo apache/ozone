@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.net.URI;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -54,16 +53,11 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void> {
+public class HsyncGenerator extends HadoopNestedDirGenerator implements Callable<Void> {
   private static final Logger LOG = LoggerFactory.getLogger(HsyncGenerator.class);
 
   @CommandLine.ParentCommand
   private Freon freon;
-
-  @Option(names = {"--path"},
-      description = "Hadoop FS file system path. Use full path.",
-      defaultValue = "o3fs://bucket1.vol1")
-  private String rootPath;
 
   @Option(names = {"--bytes-per-write"},
       description = "Size of each write",
@@ -78,7 +72,6 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
   private Timer timer;
 
   private OzoneConfiguration configuration;
-  private FileSystem[] fileSystems;
   private FSDataOutputStream[] outputStreams;
   private Path[] files;
   private AtomicInteger[] callsPerFile;
@@ -94,23 +87,20 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
 
   @Override
   public Void call() throws Exception {
-    init();
+    super.init();
 
     if (configuration == null) {
       configuration = freon.createOzoneConfiguration();
     }
-    URI uri = URI.create(rootPath);
 
-    fileSystems = new FileSystem[numberOfFiles];
     outputStreams = new FSDataOutputStream[numberOfFiles];
     files = new Path[numberOfFiles];
     callsPerFile = new AtomicInteger[numberOfFiles];
+    FileSystem fileSystem = getFileSystem();
     for (int i = 0; i < numberOfFiles; i++) {
-      FileSystem fileSystem = FileSystem.get(uri, configuration);
-      Path file = new Path(rootPath + "/" + generateObjectName(i));
+      Path file = new Path(getRootPath() + "/" + generateObjectName(i));
       fileSystem.mkdirs(file.getParent());
       outputStreams[i] = fileSystem.create(file);
-      fileSystems[i] = fileSystem;
       files[i] = file;
       callsPerFile[i] = new AtomicInteger();
 
@@ -125,9 +115,6 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     } finally {
       for (FSDataOutputStream outputStream : outputStreams) {
         outputStream.close();
-      }
-      for (FileSystem fs : fileSystems) {
-        fs.close();
       }
     }
 
