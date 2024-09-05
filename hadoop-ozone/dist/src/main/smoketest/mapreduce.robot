@@ -46,6 +46,6 @@ Execute WordCount
     ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
     ${dir} =        Format FS URL    ${SCHEME}    ${volume}    ${bucket}   input/
     ${result} =     Format FS URL    ${SCHEME}    ${volume}    ${bucket}   wordcount-${random}.txt
-    ${output} =     Execute          yarn jar ${exampleJar} wordcount  -Dmapreduce.client.submit.file.replication=3 -D fs.defaultFS=${root} ${dir} ${result}
+    ${output} =     Execute          yarn jar ${exampleJar} wordcount -Dmapreduce.client.submit.file.replication=3 -D fs.defaultFS=${root} ${dir} ${result}
                     Should Contain   ${output}               map tasks=3
                     Should Contain   ${output}               completed successfully
