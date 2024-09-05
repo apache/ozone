@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
@@ -59,7 +58,7 @@ public class ContainerMerkleTree {
    * @param blockID The ID of the block that these chunks belong to.
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
-  public void addChunks(long blockID, Collection<ChunkInfo> chunks) {
+  public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
     id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
   }
 
@@ -109,8 +108,8 @@ public class ContainerMerkleTree {
      *
      * @param chunks A list of chunks to add to this block.
      */
-    public void addChunks(Collection<ChunkInfo> chunks) {
-      for (ChunkInfo chunk: chunks) {
+    public void addChunks(Collection<ContainerProtos.ChunkInfo> chunks) {
+      for (ContainerProtos.ChunkInfo chunk: chunks) {
         offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
       }
     }
@@ -152,9 +151,9 @@ public class ContainerMerkleTree {
    * This class computes one checksum for the whole chunk by aggregating these.
    */
   private static class ChunkMerkleTree {
-    private final ChunkInfo chunk;
+    private final ContainerProtos.ChunkInfo chunk;
 
-    ChunkMerkleTree(ChunkInfo chunk) {
+    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
       this.chunk = chunk;
     }
 
@@ -166,7 +165,7 @@ public class ContainerMerkleTree {
      */
     public ContainerProtos.ChunkMerkleTree toProto() {
       ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
-      for (ByteString checksum: chunk.getChecksumData().getChecksums()) {
+      for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());
       }
 

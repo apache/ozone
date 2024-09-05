@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.FileInputStream;
@@ -42,7 +45,7 @@ public final class ContainerMerkleTreeTestUtils {
   private ContainerMerkleTreeTestUtils() { }
 
   public static void assertTreesSortedAndMatch(ContainerProtos.ContainerMerkleTree expectedTree,
-      ContainerProtos.ContainerMerkleTree actualTree) {
+                                               ContainerProtos.ContainerMerkleTree actualTree) {
     assertEquals(expectedTree.getDataChecksum(), actualTree.getDataChecksum());
     assertEquals(expectedTree.getBlockMerkleTreeCount(), actualTree.getBlockMerkleTreeCount());
 
@@ -87,8 +90,8 @@ public final class ContainerMerkleTreeTestUtils {
    *     "bytesPerChecksum" amount of data and are assumed to be contiguous.
    * @return The ChunkInfo proto object built from this information.
    */
-  public static ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock, ByteBuffer... chunkChecksums)
-      throws IOException {
+  public static ContainerProtos.ChunkInfo buildChunk(ConfigurationSource config, int indexInBlock,
+                                                     ByteBuffer... chunkChecksums) {
     final long chunkSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     final int bytesPerChecksum = config.getObject(OzoneClientConfig.class).getBytesPerChecksum();
@@ -102,13 +105,12 @@ public final class ContainerMerkleTreeTestUtils {
             .collect(Collectors.toList()))
         .build();
 
-    return ChunkInfo.getFromProtoBuf(
-        ContainerProtos.ChunkInfo.newBuilder()
+    return ContainerProtos.ChunkInfo.newBuilder()
             .setChecksumData(checksumData)
             .setChunkName("chunk")
             .setOffset(indexInBlock * chunkSize)
             .setLen(chunkSize)
-            .build());
+            .build();
   }
 
   /**
@@ -125,19 +127,32 @@ public final class ContainerMerkleTreeTestUtils {
    * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
    * structure is preserved throughout serialization, deserialization, and API calls.
    */
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) throws Exception {
-    ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
-    ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
-    ChunkInfo b2c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
-    ChunkInfo b3c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
-    ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
+  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
+    final long blockID1 = 1;
+    final long blockID2 = 2;
+    final long blockID3 = 3;
+    ContainerProtos.ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    ContainerProtos.ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
+    ContainerProtos.ChunkInfo b2c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
+    ContainerProtos.ChunkInfo b3c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
+    ContainerProtos.ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
 
     ContainerMerkleTree tree = new ContainerMerkleTree();
-    tree.addChunks(1, Arrays.asList(b1c1, b1c2));
-    tree.addChunks(2, Arrays.asList(b2c1, b2c2));
-    tree.addChunks(3, Arrays.asList(b3c1, b3c2));
+    tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
+    tree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
+    tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
 
     return tree;
+  }
+
+  /**
+   * This function checks whether the container checksum file exists.
+   */
+  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
+                                                    ContainerInfo containerInfo) {
+    OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
+    Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
+    return ContainerChecksumTreeManager.checksumFileExist(container);
   }
 }

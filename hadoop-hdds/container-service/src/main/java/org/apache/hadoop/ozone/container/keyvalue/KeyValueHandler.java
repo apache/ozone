@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -542,6 +543,30 @@ public class KeyValueHandler extends Handler {
     }
 
     return getSuccessResponse(request);
+  }
+
+  private void createContainerMerkleTree(Container container) {
+    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
+      return;
+    }
+
+    try {
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      ContainerMerkleTree merkleTree = new ContainerMerkleTree();
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
+           BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+               getBlockIterator(containerData.getContainerID())) {
+        while (blockIterator.hasNext()) {
+          BlockData blockData = blockIterator.nextBlock();
+          List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+          merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+        }
+      }
+      checksumManager.writeContainerDataTree(containerData, merkleTree);
+    } catch (IOException ex) {
+      LOG.error("Cannot create container checksum for container {} , Exception: ",
+          container.getContainerData().getContainerID(), ex);
+    }
   }
 
   /**
@@ -1212,20 +1237,22 @@ public class KeyValueHandler extends Handler {
           ContainerLogger.logRecovered(container.getContainerData());
         }
         container.markContainerForClose();
-        ContainerLogger.logClosing(container.getContainerData());
-        sendICR(container);
       }
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logClosing(container.getContainerData());
+    sendICR(container);
   }
 
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
-      throws StorageContainerException {
+      throws IOException {
     container.writeLock();
+    long containerID = 0L;
     try {
-      long containerID = container.getContainerData().getContainerID();
+      containerID = container.getContainerData().getContainerID();
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
@@ -1240,22 +1267,19 @@ public class KeyValueHandler extends Handler {
             "already failed volume {}", containerID, containerVolume);
         return;
       }
-
-      try {
-        container.markContainerUnhealthy();
-      } catch (StorageContainerException ex) {
-        LOG.warn("Unexpected error while marking container {} unhealthy",
-            containerID, ex);
-      } finally {
-        // Even if the container file is corrupted/missing and the unhealthy
-        // update fails, the unhealthy state is kept in memory and sent to
-        // SCM. Write a corresponding entry to the container log as well.
-        ContainerLogger.logUnhealthy(container.getContainerData(), reason);
-        sendICR(container);
-      }
+      container.markContainerUnhealthy();
+    } catch (StorageContainerException ex) {
+      LOG.warn("Unexpected error while marking container {} unhealthy",
+          containerID, ex);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    // Even if the container file is corrupted/missing and the unhealthy
+    // update fails, the unhealthy state is kept in memory and sent to
+    // SCM. Write a corresponding entry to the container log as well.
+    ContainerLogger.logUnhealthy(container.getContainerData(), reason);
+    sendICR(container);
   }
 
   @Override
@@ -1278,11 +1302,12 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.quasiClose();
-      ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
-      sendICR(container);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
+    sendICR(container);
   }
 
   @Override
@@ -1311,11 +1336,12 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
-      ContainerLogger.logClosed(container.getContainerData());
-      sendICR(container);
     } finally {
       container.writeUnlock();
     }
+    createContainerMerkleTree(container);
+    ContainerLogger.logClosed(container.getContainerData());
+    sendICR(container);
   }
 
   @Override

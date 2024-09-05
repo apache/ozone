@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -97,6 +96,7 @@ import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -279,7 +279,7 @@ public class TestOzoneContainerWithTLS {
           ContainerProtocolCalls.getContainerChecksumInfo(client,
               containerId, containerToken);
       // Getting container merkle tree with valid container token
-      assertEquals(response.getContainerChecksumInfo(), ByteString.EMPTY);
+      assertFalse(response.getContainerChecksumInfo().isEmpty());
 
       // Getting container merkle tree with invalid container token
       XceiverClientSpi finalClient = client;
