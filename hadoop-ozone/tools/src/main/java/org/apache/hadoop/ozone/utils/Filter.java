@@ -70,7 +70,7 @@ public class Filter {
 
   /**
    * Operation of the filter.
-   * */
+   */
   public enum FilterOperator {
     EQUALS,
     MAX,
