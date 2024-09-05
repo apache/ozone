@@ -864,18 +864,18 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
       if (responseProto == null) {
-        audit(action, eventType, msg, AuditEventStatus.SUCCESS, null);
+        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.SUCCESS, null);
       } else {
         OnDemandContainerDataScanner.scanContainer(container);
-        audit(action, eventType, msg, AuditEventStatus.FAILURE,
+        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
         streamObserver.onNext(responseProto);
       }
       perf.appendOpLatencyMs(oPLatencyMS);
-      performanceAudit(action, msg, perf, oPLatencyMS);
+      performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
 
     } catch (StorageContainerException sce) {
-      audit(action, eventType, msg, AuditEventStatus.FAILURE, sce);
+      audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
     } catch (IOException ioe) {
       final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
