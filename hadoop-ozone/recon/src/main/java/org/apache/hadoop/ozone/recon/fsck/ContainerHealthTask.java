@@ -278,9 +278,11 @@ public class ContainerHealthTask extends ReconScmTask {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
+          // Set the current container if it's not already set
           if (currentContainer == null) {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
+          // If the container ID has changed, finish processing the previous one
           if (currentContainer.getContainerID() != rec.getContainerId()) {
             completeProcessingContainer(
                 currentContainer, existingRecords, currentTime,
@@ -288,24 +290,32 @@ public class ContainerHealthTask extends ReconScmTask {
             existingRecords.clear();
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
-          if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec
-              )) {
-            // Check if the missing container is deleted in SCM
-            if (currentContainer.isMissing() &&
-                containerDeletedInSCM(currentContainer.getContainer())) {
-              rec.delete();
-            }
-            existingRecords.add(rec.getContainerState());
-            if (rec.changed()) {
-              rec.update();
-            }
-          } else {
+
+          //  Unhealthy Containers such as MISSING, EMPTY_MISSING, UNDER_REPLICATED,
+          // OVER_REPLICATED, MIS_REPLICATED can have their unhealthy states changed or retained.
+          if (!ContainerHealthRecords.retainOrUpdateRecord(currentContainer, rec)) {
             LOG.info("DELETED existing unhealthy container record...for Container: {}",
                 currentContainer.getContainerID());
             rec.delete();
+            continue;
+          }
+
+          // If the container is marked as MISSING and it's deleted in SCM, remove the record
+          if (currentContainer.isMissing() && containerDeletedInSCM(currentContainer.getContainer())) {
+            rec.delete();
+          }
+
+          // If the container is in the EMPTY_MISSING state, delete the record
+          if (currentContainer.isEmptyMissing()) {
+            rec.delete();
+          }
+          existingRecords.add(rec.getContainerState());
+          // If the record was changed, update it
+          if (rec.changed()) {
+            rec.update();
           }
         } catch (ContainerNotFoundException cnf) {
+          // If the container is not found, delete the record and reset currentContainer
           rec.delete();
           currentContainer = null;
         }
@@ -384,8 +394,7 @@ public class ContainerHealthTask extends ReconScmTask {
         ) {
           containerManager.updateContainerState(containerInfo.containerID(),
               HddsProtos.LifeCycleEvent.CLEANUP);
-          LOG.info("Successfully changed container {} state from DELETING to DELETED.",
-              containerInfo.containerID());
+          LOG.info("Successfully Deleted container {} from Recon.", containerInfo.containerID());
         }
         return true;
       }
@@ -519,7 +528,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
           LOG.debug("Empty container {} is missing. Kindly check the " +
               "consolidated container stats per UNHEALTHY state logged as " +
-              "starting with **Container State Stats:**");
+              "starting with **Container State Stats:**", container.getContainerID());
 
           records.add(
               recordForState(container, EMPTY_MISSING,

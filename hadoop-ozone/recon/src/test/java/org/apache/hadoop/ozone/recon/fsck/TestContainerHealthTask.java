@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
 
 import java.io.IOException;
 import java.time.Duration;
@@ -530,6 +533,106 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertThat(negativeSizeContainers).hasSize(3);
   }
 
+  @Test
+  public void testMissingAndEmptyMissingContainerDeletion() throws Exception {
+    // Setup mock DAOs and managers
+    UnhealthyContainersDao unHealthyContainersTableHandle =
+        getDao(UnhealthyContainersDao.class);
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unHealthyContainersTableHandle);
+    ReconStorageContainerManagerFacade scmMock =
+        mock(ReconStorageContainerManagerFacade.class);
+    MockPlacementPolicy placementMock = new MockPlacementPolicy();
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
+    StorageContainerServiceProvider scmClientMock =
+        mock(StorageContainerServiceProvider.class);
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        mock(ReconContainerMetadataManager.class);
+    mock(ReconContainerMetadataManager.class);
+
+    // Create 2 containers. They start in CLOSED state in Recon.
+    List<ContainerInfo> mockContainers = getMockContainers(2);
+    when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
+    when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
+    when(containerManagerMock.getContainers(any(ContainerID.class),
+        anyInt())).thenReturn(mockContainers);
+
+    // Mark both containers as initially CLOSED in Recon
+    for (ContainerInfo c : mockContainers) {
+      when(containerManagerMock.getContainer(c.containerID())).thenReturn(c);
+    }
+
+    // Simulate SCM reporting the containers as DELETED
+    ContainerInfo deletedContainer1 = getMockDeletedContainer(1);
+    ContainerInfo deletedContainer2 = getMockDeletedContainer(2);
+
+    when(scmClientMock.getContainerWithPipeline(1))
+        .thenReturn(new ContainerWithPipeline(deletedContainer1, null));
+    when(scmClientMock.getContainerWithPipeline(2))
+        .thenReturn(new ContainerWithPipeline(deletedContainer2, null));
+
+    // Both containers start as CLOSED in Recon (MISSING or EMPTY_MISSING)
+    when(containerManagerMock.getContainer(ContainerID.valueOf(1L)).getState())
+        .thenReturn(HddsProtos.LifeCycleState.CLOSED);
+    when(containerManagerMock.getContainer(ContainerID.valueOf(2L)).getState())
+        .thenReturn(HddsProtos.LifeCycleState.CLOSED);
+
+    // Replicas are empty, so both containers should be considered for deletion
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
+        .thenReturn(Collections.emptySet());
+    when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
+        .thenReturn(Collections.emptySet());
+
+    // Initialize UnhealthyContainers in DB (MISSING and EMPTY_MISSING)
+    // Create and set up the first UnhealthyContainer for a MISSING container
+    UnhealthyContainers container1 = new UnhealthyContainers();
+    container1.setContainerId(1L);
+    container1.setContainerState("MISSING");
+    container1.setExpectedReplicaCount(3);
+    container1.setActualReplicaCount(0);
+    container1.setReplicaDelta(3);
+    container1.setInStateSince(System.currentTimeMillis());
+
+    // Create and set up the second UnhealthyContainer for an EMPTY_MISSING container
+    UnhealthyContainers container2 = new UnhealthyContainers();
+    container2.setContainerId(2L);
+    container2.setContainerState("EMPTY_MISSING");
+    container2.setExpectedReplicaCount(3);
+    container2.setActualReplicaCount(0);
+    container2.setReplicaDelta(3);
+    container2.setInStateSince(System.currentTimeMillis());
+
+    unHealthyContainersTableHandle.insert(container1);
+    unHealthyContainersTableHandle.insert(container2);
+
+    when(reconContainerMetadataManager.getKeyCountForContainer(1L)).thenReturn(5L);
+    when(reconContainerMetadataManager.getKeyCountForContainer(2L)).thenReturn(0L);
+
+    // Start the container health task
+    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
+    ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
+    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
+    ContainerHealthTask containerHealthTask =
+        new ContainerHealthTask(scmMock.getContainerManager(),
+            scmMock.getScmServiceProvider(),
+            reconTaskStatusDao, containerHealthSchemaManager,
+            placementMock, reconTaskConfig,
+            reconContainerMetadataManager, new OzoneConfiguration());
+
+    containerHealthTask.start();
+
+    // Wait for the task to complete and ensure that updateContainerState is invoked for
+    // container IDs 1 and 2 to mark the containers as DELETED, since they are DELETED in SCM.
+    LambdaTestUtils.await(60000, 1000, () -> {
+      verify(containerManagerMock, times(1))
+          .updateContainerState(ContainerID.valueOf(1L), HddsProtos.LifeCycleEvent.DELETE);
+      verify(containerManagerMock, times(1))
+          .updateContainerState(ContainerID.valueOf(2L), HddsProtos.LifeCycleEvent.DELETE);
+      return true;
+    });
+  }
 
   private Set<ContainerReplica> getMockReplicas(
       long containerId, State...states) {
