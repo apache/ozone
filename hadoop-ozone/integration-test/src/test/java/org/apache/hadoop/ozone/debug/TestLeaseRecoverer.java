@@ -70,6 +70,8 @@ public class TestLeaseRecoverer {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
