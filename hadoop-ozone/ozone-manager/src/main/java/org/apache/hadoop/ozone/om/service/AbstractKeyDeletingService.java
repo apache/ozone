@@ -131,13 +131,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return false;
   }
 
-  protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
+  protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       Map<String, RepeatedOmKeyInfo> keysToModify,
       String snapTableKey) throws IOException {
 
     long startTime = Time.monotonicNow();
-    int delCount = 0;
+    Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send {} key(s) to SCM: {}",
           keyBlocksList.size(), keyBlocksList);
@@ -156,17 +156,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (blockDeletionResults != null) {
       startTime = Time.monotonicNow();
       if (isRatisEnabled()) {
-        delCount = submitPurgeKeysRequest(blockDeletionResults, keysToModify, snapTableKey);
+        purgeResult = submitPurgeKeysRequest(blockDeletionResults, keysToModify, snapTableKey);
       } else {
         // TODO: Once HA and non-HA paths are merged, we should have
         //  only one code path here. Purge keys should go through an
         //  OMRequest model.
-        delCount = deleteAllKeys(blockDeletionResults, manager);
+        purgeResult = deleteAllKeys(blockDeletionResults, manager);
       }
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
+          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - startTime);
     }
-    return delCount;
+    return purgeResult;
   }
 
   /**
@@ -175,12 +175,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param results DeleteBlockGroups returned by SCM.
    * @throws IOException      on Error
    */
-  private int deleteAllKeys(List<DeleteBlockGroupResult> results,
+  private Pair<Integer, Boolean> deleteAllKeys(List<DeleteBlockGroupResult> results,
       KeyManager manager) throws IOException {
     Table<String, RepeatedOmKeyInfo> deletedTable =
         manager.getMetadataManager().getDeletedTable();
     DBStore store = manager.getMetadataManager().getStore();
-
+    boolean purgeSuccess = true;
     // Put all keys to delete in a single transaction and call for delete.
     int deletedCount = 0;
     try (BatchOperation writeBatch = store.initBatchOperation()) {
@@ -193,12 +193,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
           }
           deletedCount++;
+        } else {
+          purgeSuccess = false;
         }
       }
       // Write a single transaction for delete.
       store.commitBatchOperation(writeBatch);
     }
-    return deletedCount;
+    return Pair.of(deletedCount, purgeSuccess);
   }
 
   /**
@@ -207,13 +209,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param results DeleteBlockGroups returned by SCM.
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey) {
+  private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
+      String snapTableKey) {
     Map<Pair<String, String>, Pair<List<String>, List<String>>> purgeKeysMapPerBucket =
         new HashMap<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
+    boolean purgeSuccess = true;
     for (DeleteBlockGroupResult result : results) {
       if (result.isSuccess()) {
         // Add key to PurgeKeys list.
@@ -232,6 +236,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           }
         }
         deletedCount++;
+      } else {
+        purgeSuccess = false;
       }
     }
 
@@ -284,14 +290,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     try {
       RaftClientRequest raftClientRequest =
           createRaftClientRequestForPurge(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest,
+      OzoneManagerProtocolProtos.OMResponse omResponse = ozoneManager.getOmRatisServer().submitRequest(omRequest,
           raftClientRequest);
+      if (omResponse != null) {
+        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+      }
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.");
-      return 0;
+      return Pair.of(0, false);
     }
 
-    return deletedCount;
+    return Pair.of(deletedCount, purgeSuccess);
   }
 
   protected void submitRequest(OMRequest omRequest, ClientId clientId) {
@@ -672,25 +681,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return cLimit + increment >= maxLimit;
   }
 
-  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
-      throws IOException {
-    SnapshotInfo currSnapInfo = snapInfo;
-    while (chainManager.hasPreviousPathSnapshot(
-        currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
-
-      UUID prevPathSnapshot = chainManager.previousPathSnapshot(
-          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
-      String tableKey = chainManager.getTableKey(prevPathSnapshot);
-      SnapshotInfo prevSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
-      if (prevSnapInfo.getSnapshotStatus() ==
-          SNAPSHOT_ACTIVE) {
-        return prevSnapInfo;
-      }
-      currSnapInfo = prevSnapInfo;
-    }
-    return null;
-  }
-
   protected SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo,
                                              SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
       throws IOException {
@@ -991,14 +981,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             "key in volume: " + volume + " bucket: " + bucket);
       }
       SnapshotInfo expectedPreviousSnapshotInfo = currentSnapshotInfo == null
-          ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, snapshotChainManager, omSnapshotManager)
-          : SnapshotUtils.getPreviousSnapshot(currentSnapshotInfo, snapshotChainManager, omSnapshotManager);
+          ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, ozoneManager, snapshotChainManager)
+          : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, currentSnapshotInfo);
       List<SnapshotInfo> snapshotInfos = new ArrayList<>();
       snapshotInfos.add(expectedPreviousSnapshotInfo);
       SnapshotInfo snapshotInfo = expectedPreviousSnapshotInfo;
       while (snapshotInfos.size() < numberOfPreviousSnapshotsFromChain) {
         snapshotInfo = snapshotInfo == null ? null
-            : SnapshotUtils.getPreviousSnapshot(expectedPreviousSnapshotInfo, snapshotChainManager, omSnapshotManager);
+            : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, expectedPreviousSnapshotInfo);
         snapshotInfos.add(snapshotInfo);
         // If changes made to the snapshot have not been flushed to disk, throw exception immediately, next run of
         // garbage collection would process the snapshot.

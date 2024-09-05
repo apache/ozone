@@ -69,8 +69,6 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.util.CheckExceptionOperation;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -101,7 +99,6 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -137,7 +134,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -149,10 +145,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
@@ -163,7 +155,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -203,7 +194,6 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
-  private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
   private DNSToSwitchMapping dnsToSwitchMapping;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
@@ -321,22 +311,6 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    if (snapshotDirectoryCleaningService == null &&
-        ozoneManager.isFilesystemSnapshotEnabled()) {
-      long dirDeleteInterval = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      long serviceTimeout = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT,
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      snapshotDirectoryCleaningService = new SnapshotDirectoryCleaningService(
-          dirDeleteInterval, TimeUnit.MILLISECONDS, serviceTimeout,
-          ozoneManager, scmClient.getBlockClient());
-      snapshotDirectoryCleaningService.start();
-    }
-
     if (multipartUploadCleanupService == null) {
       long serviceInterval = configuration.getTimeDuration(
           OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL,
@@ -392,10 +366,6 @@ public class KeyManagerImpl implements KeyManager {
     if (multipartUploadCleanupService != null) {
       multipartUploadCleanupService.shutdown();
       multipartUploadCleanupService = null;
-    }
-    if (snapshotDirectoryCleaningService != null) {
-      snapshotDirectoryCleaningService.shutdown();
-      snapshotDirectoryCleaningService = null;
     }
   }
 
@@ -728,6 +698,41 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
+      String volume, String bucket, String startKey,
+      CheckExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter,
+      int count) throws IOException {
+    // Bucket prefix would be empty if volume is empty i.e. either null or "".
+    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
+        .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
+    List<Table.KeyValue<String, String>> renamedEntries = new ArrayList<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+             renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
+
+      /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
+         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
+       */
+      if (startKey != null) {
+        renamedKeyIter.seek(startKey);
+      }
+      int currentCount = 0;
+      while (renamedKeyIter.hasNext() && currentCount < count) {
+        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
+        Table.KeyValue<String, String> kv = renamedKeyIter.next();
+        if (kv != null) {
+
+          // Multiple keys with the same path can be queued in one DB entry
+          if (filter.apply(kv)) {
+            renamedEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
+            currentCount++;
+          }
+        }
+      }
+    }
+    return renamedEntries;
+  }
+
+  @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout, Duration leaseThreshold) throws IOException {
     return metadataManager.getExpiredOpenKeys(expireThreshold, count,
@@ -775,10 +780,6 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
-  }
-
-  public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
-    return snapshotDirectoryCleaningService;
   }
 
   public boolean isSstFilteringSvcEnabled() {

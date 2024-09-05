@@ -130,13 +130,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         Iterator<UUID> iterator = snapshotChainManager.iterator(true);
         long snapshotLimit = snapshotDeletionPerTask;
         while (iterator.hasNext() && snapshotLimit > 0) {
-          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(chainManager, iterator.next(), omSnapshotManager);
+          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           // Only Iterate in deleted snapshot & only if all the changes have been flushed into disk.
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
 
-          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(snapInfo, chainManager, omSnapshotManager);
+          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
           if (nextSnapshot != null &&  nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {

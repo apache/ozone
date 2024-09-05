@@ -92,10 +92,11 @@ public final class SnapshotUtils {
     return snapshotInfo;
   }
 
-  public static SnapshotInfo getSnapshotInfo(SnapshotChainManager chainManager, UUID snapshotId,
-                                             OmSnapshotManager omSnapshotManager) throws IOException {
+  public static SnapshotInfo getSnapshotInfo(OzoneManager ozoneManager,
+                                             SnapshotChainManager chainManager,
+                                             UUID snapshotId) throws IOException {
     String tableKey = chainManager.getTableKey(snapshotId);
-    return omSnapshotManager.getSnapshotInfo(tableKey);
+    return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
   public static void dropColumnFamilyHandle(
@@ -161,9 +162,9 @@ public final class SnapshotUtils {
   /**
    * Get the next in the snapshot chain.
    */
-  public static SnapshotInfo getNextSnapshot(SnapshotInfo snapInfo,
+  public static SnapshotInfo getNextSnapshot(OzoneManager ozoneManager,
                                              SnapshotChainManager chainManager,
-                                             OmSnapshotManager omSnapshotManager)
+                                             SnapshotInfo snapInfo)
       throws IOException {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
@@ -175,7 +176,7 @@ public final class SnapshotUtils {
       if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
           snapInfo.getSnapshotId())) {
         UUID nextPathSnapshot = chainManager.nextPathSnapshot(snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
-        return getSnapshotInfo(chainManager, nextPathSnapshot, omSnapshotManager);
+        return getSnapshotInfo(ozoneManager, chainManager, nextPathSnapshot);
       }
     } catch (NoSuchElementException ex) {
       LOG.error("The snapshot {} is not longer in snapshot chain, It " +
@@ -188,12 +189,12 @@ public final class SnapshotUtils {
   /**
    * Get the previous in the snapshot chain.
    */
-  public static SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo,
+  public static SnapshotInfo getPreviousSnapshot(OzoneManager ozoneManager,
                                                  SnapshotChainManager chainManager,
-                                                 OmSnapshotManager omSnapshotManager)
+                                                 SnapshotInfo snapInfo)
       throws IOException {
     UUID previousSnapshotId = getPreviousSnapshotId(snapInfo, chainManager);
-    return previousSnapshotId == null ? null : getSnapshotInfo(chainManager, previousSnapshotId, omSnapshotManager);
+    return previousSnapshotId == null ? null : getSnapshotInfo(ozoneManager, chainManager, previousSnapshotId);
   }
 
   /**
@@ -288,33 +289,12 @@ public final class SnapshotUtils {
   }
 
   public static SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
-                                                   SnapshotChainManager snapshotChainManager,
-                                                   OmSnapshotManager snapshotManager) throws IOException {
+                                                   OzoneManager ozoneManager,
+                                                   SnapshotChainManager snapshotChainManager) throws IOException {
     Optional<UUID> latestPathSnapshot = Optional.ofNullable(
         getLatestSnapshotId(volumeName, bucketName, snapshotChainManager));
     return latestPathSnapshot.isPresent() ?
-        getSnapshotInfo(snapshotChainManager, latestPathSnapshot.get(), snapshotManager) : null;
-  }
-
-  /**
-   * Get the latest OmSnapshot for a snapshot path. If snapshot is not active should return null if isActive argument
-   * is true.
-   */
-  public static ReferenceCounted<OmSnapshot> getLatestSnapshot(String volumeName, String bucketName,
-                                                               SnapshotChainManager snapshotChainManager,
-                                                               OmSnapshotManager snapshotManager, boolean isActive)
-      throws IOException {
-    Optional<SnapshotInfo> snapshotInfo = Optional.ofNullable(
-        SnapshotUtils.getLatestSnapshotInfo(volumeName, bucketName, snapshotChainManager, snapshotManager));
-    if (isActive && snapshotInfo.map(si -> si.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
-        .orElse(false)) {
-      return null;
-    }
-    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot = snapshotInfo.isPresent() ?
-        Optional.ofNullable(snapshotManager.getSnapshot(volumeName, bucketName, snapshotInfo.get().getName())) :
-        Optional.empty();
-
-    return rcOmSnapshot.orElse(null);
+        getSnapshotInfo(ozoneManager, snapshotChainManager, latestPathSnapshot.get()) : null;
   }
 
   public static UUID getLatestSnapshotId(String volumeName, String bucketName,

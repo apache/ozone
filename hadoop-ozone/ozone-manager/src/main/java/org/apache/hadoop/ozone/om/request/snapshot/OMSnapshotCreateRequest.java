@@ -187,7 +187,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
       SnapshotUtils.setTransactionInfoInSnapshot(snapshotInfo, termIndex);
-      addSnapshotInfoToSnapshotChainAndCache(ozoneManager.getOmSnapshotManager(), omMetadataManager,
+      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager,
           termIndex.getIndex());
 
       omResponse.setCreateSnapshotResponse(
@@ -250,7 +250,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
-      OmSnapshotManager omSnapshotManager,
+      OzoneManager ozoneManager,
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
@@ -270,11 +270,10 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
       snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
       Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getLatestSnapshotInfo(
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-          snapshotChainManager, omSnapshotManager));
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), ozoneManager, snapshotChainManager));
       Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?
-          Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(previousSnapshot.get(), snapshotChainManager,
-              omSnapshotManager)) : Optional.empty();
+          Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(ozoneManager,
+              snapshotChainManager, previousSnapshot.get())) : Optional.empty();
 
       // Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
       // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't

@@ -78,10 +78,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
-      fromSnapshot = moveDeletedKeysRequest.hasFromSnapshotID() ? SnapshotUtils.getSnapshotInfo(snapshotChainManager,
-          fromProtobuf(moveDeletedKeysRequest.getFromSnapshotID()), omSnapshotManager) :
+      fromSnapshot = moveDeletedKeysRequest.hasFromSnapshotID() ? SnapshotUtils.getSnapshotInfo(ozoneManager,
+          snapshotChainManager, fromProtobuf(moveDeletedKeysRequest.getFromSnapshotID())) :
           SnapshotInfo.getFromProtobuf(moveDeletedKeysRequest.getFromSnapshot());
-      nextSnapshot = SnapshotUtils.getNextSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
+      nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager,fromSnapshot);
 
       // Only skip the move operation for newer requests. Newer requests would always have the purgeMovedKeys in the
       // request. Skip move operation if the next snapshot is not active.

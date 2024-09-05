@@ -79,6 +79,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
         omMetadataManager.getSnapshotChainManager();
+    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
 
     OMClientResponse omClientResponse = null;
 
@@ -108,7 +109,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         }
 
         SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
+            SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
         Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(fromSnapshot,
             snapshotChainManager, omSnapshotManager));
         Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?

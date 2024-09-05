@@ -211,6 +211,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           = new ArrayList<>((int) remainNum);
       String volume = currentSnapshotInfo == null ? null : currentSnapshotInfo.getVolumeName();
       String bucket = currentSnapshotInfo == null ? null : currentSnapshotInfo.getBucketName();
+      String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
       Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
 
       try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -221,8 +222,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
         ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager, snapshotChainManager,
             currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-        ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager, snapshotChainManager,
-            currentSnapshotInfo, keyManager.getMetadataManager(), lock);
+        ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager,
+            snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
         long startTime = Time.monotonicNow();
         while (remainNum > 0 && deletedDirsIterator.hasNext()) {
           pendingDeletedDirInfo = deletedDirsIterator.next();
@@ -268,20 +269,25 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
         Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> retVal = optimizeDirDeletesAndSubmitRequest(
             remainNum, dirNum, subDirNum, subFileNum,
-            allSubDirList, purgePathRequestList, null, startTime,
+            allSubDirList, purgePathRequestList, snapshotTableKey, startTime,
             ratisByteLimit - consumedSize,
             getOzoneManager().getKeyManager(), reclaimableDirFilter, reclaimableSubFileFilter);
         remainNum = retVal.getKey();
-        List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+
         if (remainNum == initialRemainNum &&
             retVal.getValue().map(OzoneManagerProtocolProtos.OMResponse::getSuccess).orElse(true)) {
+          List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
           Map<String, Long> exclusiveReplicatedSizeMap = reclaimableSubFileFilter.getExclusiveReplicatedSizeMap();
           Map<String, Long> exclusiveSizeMap = reclaimableSubFileFilter.getExclusiveSizeMap();
           for (String snapshot : Stream.of(exclusiveSizeMap.keySet(),
               exclusiveReplicatedSizeMap.keySet()).flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
             setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
                 exclusiveReplicatedSizeMap, snapshot));
-            setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(snapshot));
+          }
+          //Updating directory deep clean flag of snapshot.
+          if (currentSnapshotInfo != null) {
+            setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(
+                currentSnapshotInfo.getTableKey()));
           }
 
           submitSetSnapshotRequest(setSnapshotPropertyRequests);
@@ -325,7 +331,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           while (iterator.hasNext() && remainNum > 0) {
             UUID snapshotId =  iterator.next();
             try {
-              SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(chainManager, snapshotId, omSnapshotManager);
+              SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(getOzoneManager(), chainManager, snapshotId);
               // Wait for snapshot changes to be flushed to disk.
               if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(
                   getOzoneManager().getMetadataManager(), snapInfo)) {
