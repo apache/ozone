@@ -156,13 +156,13 @@ public class WritableRatisContainerProvider
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
-    pipelineManager.acquireReadLock();
+    pipelineManager.acquireReadLock(repConfig);
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
-      pipelineManager.releaseReadLock();
+      pipelineManager.releaseReadLock(repConfig);
     }
   }
 
