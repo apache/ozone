@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.shell.checknative;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
+
+import java.util.Collections;
+
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 /**
  * CLI command to check if native libraries are loaded.
@@ -32,9 +34,6 @@ import picocli.CommandLine;
 @CommandLine.Command(name = "ozone checknative",
     description = "Checks if native libraries are loaded")
 public class CheckNative extends GenericCli {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CheckNative.class);
 
   public static void main(String[] argv) {
     new CheckNative().run(argv);
@@ -62,17 +61,13 @@ public class CheckNative extends GenericCli {
         hadoopLibraryName);
     System.out.printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
 
-    // Attempt to load the rocks tools lib
-    try {
-      ManagedRawSSTFileReader.loadLibrary();
-    } catch (NativeLibraryNotLoadedException e) {
-      LOG.debug("Failed to load rocks-tools library", e);
-    }
-
-    boolean nativeRocksToolsLoaded = org.apache.hadoop.hdds.utils.NativeLibraryLoader.isLibraryLoaded();
+    // Attempt to load the rocks-tools lib
+    boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
+        ROCKS_TOOLS_NATIVE_LIBRARY_NAME,
+        Collections.singletonList(ManagedRocksObjectUtils.getRocksDBLibFileName()));
     String rocksToolsDetail = "";
     if (nativeRocksToolsLoaded) {
-      rocksToolsDetail = org.apache.hadoop.hdds.utils.NativeLibraryLoader.getJniLibraryFileName();
+      rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
     }
     System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
     return null;
