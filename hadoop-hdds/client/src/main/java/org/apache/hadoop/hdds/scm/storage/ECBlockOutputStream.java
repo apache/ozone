@@ -142,8 +142,16 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     if (checksumBlockData != null) {
-      List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
+
+      // We need to determine the size of the chunklist
+      // for verification based on the size of the blockgrouplength.
+      int chunkSize = calcEffectiveChunkSize(blockData, totalNodes, blockGroupLength);
       List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
+      if (chunkSize > 0) {
+        checksumBlockDataChunks = checksumBlockData.getChunks().subList(0, chunkSize);
+      }
+
+      List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
 
       Preconditions.checkArgument(
           currentChunks.size() == checksumBlockDataChunks.size(),
@@ -175,6 +183,24 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     return executePutBlock(close, force, blockGroupLength);
+  }
+
+  private int calcEffectiveChunkSize(BlockData[] blockGroup,
+      int replicaCount, long blockGroupLength) {
+    Preconditions.checkState(blockGroup.length == replicaCount);
+    int effectiveChunkSize = 0;
+    for (int i = 0; i < replicaCount; i++) {
+      if (blockGroup[i] == null) {
+        continue;
+      }
+      String lenStr = blockGroup[i].getMetadata().
+          get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
+      long calcBlockGroupLength = Long.parseLong(lenStr);
+      if (blockGroupLength == calcBlockGroupLength) {
+        effectiveChunkSize = Math.max(effectiveChunkSize, blockGroup[i].getChunks().size());
+      }
+    }
+    return effectiveChunkSize;
   }
 
   public CompletableFuture<ContainerProtos.
