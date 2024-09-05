@@ -153,7 +153,7 @@ public class TestOzoneRepairShell {
       String[] targs = new String[]{"quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
       cmd.execute(targs);
       try {
-        return !out.toString(DEFAULT_ENCODING).contains("\"lastRunFinishedTime\":0");
+        return !out.toString(DEFAULT_ENCODING).contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {
         // do nothing
       }

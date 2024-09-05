@@ -501,8 +501,9 @@ public class QuotaRepairTask {
       }
       Map<String, Object> status = new HashMap<>();
       status.put("taskId", taskId);
-      status.put("lastRunStartTime", lastRunStartTime);
-      status.put("lastRunFinishedTime", lastRunFinishedTime);
+      status.put("lastRunStartTime", lastRunStartTime > 0 ? new java.util.Date(lastRunStartTime).toString() : "");
+      status.put("lastRunFinishedTime", lastRunFinishedTime > 0 ? new java.util.Date(lastRunFinishedTime).toString()
+          : "");
       status.put("errorMsg", errorMsg);
       status.put("bucketCountDiffMap", bucketCountDiffMap);
       try {
