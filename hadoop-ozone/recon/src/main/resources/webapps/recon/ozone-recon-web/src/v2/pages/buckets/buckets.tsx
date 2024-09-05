@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import { Table, Tag } from 'antd';
 import {
@@ -44,7 +44,7 @@ import MultiSelect from '@/v2/components/select/multiSelect';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
+import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { nullAwareLocaleCompare, showDataFetchError } from '@/utils/common';
 import { useDebounce } from '@/v2/hooks/debounce.hook';
 
@@ -269,7 +269,7 @@ function getFilteredBuckets(
 
 const Buckets: React.FC<{}> = () => {
 
-  let cancelSignal: AbortController;
+  const cancelSignal = useRef<AbortController>();
 
   const [state, setState] = useState<BucketsState>({
     totalCount: 0,
@@ -383,11 +383,11 @@ const Buckets: React.FC<{}> = () => {
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
       '/api/v1/buckets',
-      cancelSignal,
+      cancelSignal.current,
       '',
       { limit: selectedLimit.value }
     );
-    cancelSignal = controller;
+    cancelSignal.current = controller;
     request.then(response => {
       const bucketsResponse: BucketResponse = response.data;
       const totalCount = bucketsResponse.totalCount;
@@ -443,7 +443,7 @@ const Buckets: React.FC<{}> = () => {
     });
   }
 
-  let autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
+  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
 
   useEffect(() => {
     autoReloadHelper.startPolling();
@@ -459,7 +459,7 @@ const Buckets: React.FC<{}> = () => {
 
     return (() => {
       autoReloadHelper.stopPolling();
-      cancelSignal && cancelSignal.abort();
+      cancelRequests([cancelSignal.current!]);
     })
   }, []);
 
@@ -544,7 +544,7 @@ const Buckets: React.FC<{}> = () => {
               loading={loading}
               rowKey='volume'
               pagination={paginationConfig}
-              scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+              scroll={{ x: 'max-content', y: 400, scrollToFirstRowOnChange: true }}
               locale={{ filterTitle: '' }}
             />
           </div>
