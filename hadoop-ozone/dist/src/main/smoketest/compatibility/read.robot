@@ -31,8 +31,8 @@ Dir Can Be Listed
     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
 
 Dir Can Be Listed Using Shell
-    Execute    ozone sh key list vol1/bucket1
-    Execute    ozone sh key list vol1/bucket1/dir-${SUFFIX}
+    Execute    ozone sh key list /vol1/bucket1
+    Should Contain    ${result}    key-${SUFFIX}
 
 File Can Be Get
     Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX} /tmp/
