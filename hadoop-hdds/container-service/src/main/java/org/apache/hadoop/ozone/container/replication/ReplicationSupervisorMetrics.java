@@ -88,8 +88,8 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             + "concurrent replication tasks which can run simultaneously"),
             supervisor.getMaxReplicationStreams());
 
-    if (!ReplicationSupervisor.METRICS_MAP.isEmpty()) {
-      ReplicationSupervisor.METRICS_MAP.forEach((metricsName, descriptionSegment) -> {
+    if (!ReplicationSupervisor.metricsMap.isEmpty()) {
+      ReplicationSupervisor.metricsMap.forEach((metricsName, descriptionSegment) -> {
         if (!metricsName.equals("")) {
           builder.addGauge(Interns.info("numRequested" + metricsName,
               "Number of requested " + descriptionSegment),
