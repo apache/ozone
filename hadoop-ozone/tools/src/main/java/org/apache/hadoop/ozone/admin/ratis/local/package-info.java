@@ -17,6 +17,6 @@
  */
 
 /**
- * Ratis Local related tools
+ * Ratis Local related tools.
  */
 package org.apache.hadoop.ozone.admin.ratis.local;

@@ -17,6 +17,6 @@
  */
 
 /**
- * Ratis related Admin Tools
+ * Ratis related Admin Tools.
  */
 package org.apache.hadoop.ozone.admin.ratis;
