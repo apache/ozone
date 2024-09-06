@@ -36,7 +36,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -78,16 +80,16 @@ public class TestRatisLocalRaftMetaConfSubCommand {
 
     // Create a LogEntryProto with a dummy index and peer
     RaftProtos.RaftPeerProto raftPeerProto = RaftProtos.RaftPeerProto.newBuilder()
-      .setId(ByteString.copyFromUtf8("peer1"))
-      .setAddress("localhost:8000")
-      .setStartupRole(RaftProtos.RaftPeerRole.FOLLOWER)
-      .build();
+        .setId(ByteString.copyFromUtf8("peer1"))
+        .setAddress("localhost:8000")
+        .setStartupRole(RaftProtos.RaftPeerRole.FOLLOWER)
+        .build();
 
     RaftProtos.LogEntryProto logEntryProto = RaftProtos.LogEntryProto.newBuilder()
-      .setConfigurationEntry(RaftProtos.RaftConfigurationProto.newBuilder()
-        .addPeers(raftPeerProto).build())
-      .setIndex(1)
-      .build();
+        .setConfigurationEntry(RaftProtos.RaftConfigurationProto.newBuilder()
+          .addPeers(raftPeerProto).build())
+        .setIndex(1)
+        .build();
 
     // Write the logEntryProto to the raft-meta.conf file
     try (OutputStream out = Files.newOutputStream(raftMetaConfFile)) {
@@ -159,7 +161,8 @@ public class TestRatisLocalRaftMetaConfSubCommand {
     CommandLine cmd = new CommandLine(raftCmd);
 
     IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
-      cmd.parseArgs("-peers", "peer1|localhost8080", "-path", "/dummy/path"); //invalid peers format (missing ':' separator)
+      //invalid peers format (missing ':' separator)
+      cmd.parseArgs("-peers", "peer1|localhost8080", "-path", "/dummy/path");
       raftCmd.execute(scmClient);
     });
 

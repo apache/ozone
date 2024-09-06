@@ -38,13 +38,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Handler to generate a new raft-meta.conf
+ * Handler to generate a new raft-meta.conf.
  */
 @CommandLine.Command(
-   name = "raftMetaConf",
-   description = "Generates a new raft-meta.conf",
-   mixinStandardHelpOptions = true,
-   versionProvider = HddsVersionProvider.class
+    name = "raftMetaConf",
+    description = "Generates a new raft-meta.conf",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class
 )
 
 public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
@@ -76,19 +76,19 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
 
       if (peerIdWithAddressArray.length < 1 || peerIdWithAddressArray.length > 2) {
         System.err.println(
-          "Failed to parse peer's ID and address for: " + idWithAddress + ", from option: -peers " + peers +
-          ". Please provide list of peers in format " +
-          "<[P0_ID|]P0_HOST:P0_PORT,[P1_ID|]P1_HOST:P1_PORT,[P2_ID|]P2_HOST:P2_PORT>");
+            "Failed to parse peer's ID and address for: " + idWithAddress + ", from option: -peers " + peers +
+            ". Please provide list of peers in format " +
+            "<[P0_ID|]P0_HOST:P0_PORT,[P1_ID|]P1_HOST:P1_PORT,[P2_ID|]P2_HOST:P2_PORT>");
         return;
       }
 
       InetSocketAddress inetSocketAddress = parseInetSocketAddress(
-        peerIdWithAddressArray[peerIdWithAddressArray.length - 1]);
+          peerIdWithAddressArray[peerIdWithAddressArray.length - 1]);
       String addressString = inetSocketAddress.getHostString() + ":" + inetSocketAddress.getPort();
 
       if (addresses.contains(addressString)) {
         System.err.println("Found duplicated address: " + addressString +
-          ". Please ensure the address of peers have no duplicated value.");
+            ". Please ensure the address of peers have no duplicated value.");
         return;
       }
       addresses.add(addressString);
@@ -99,7 +99,7 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
 
         if (ids.contains(peerId)) {
           System.err.println("Found duplicated ID: " + peerId +
-            ". Please ensure the ID of peers have no duplicated value.");
+              ". Please ensure the ID of peers have no duplicated value.");
           return;
         }
         ids.add(peerId);
@@ -108,23 +108,23 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
       }
 
       raftPeerProtos.add(RaftProtos.RaftPeerProto.newBuilder()
-        .setId(ByteString.copyFrom(peerId.getBytes(StandardCharsets.UTF_8)))
-        .setAddress(addressString)
-        .setStartupRole(RaftProtos.RaftPeerRole.FOLLOWER)
-        .build());
+          .setId(ByteString.copyFrom(peerId.getBytes(StandardCharsets.UTF_8)))
+          .setAddress(addressString)
+          .setStartupRole(RaftProtos.RaftPeerRole.FOLLOWER)
+          .build());
     }
 
     try (InputStream in = Files.newInputStream(Paths.get(path, "raft-meta.conf"));
-      OutputStream out = Files.newOutputStream(Paths.get(path, "new-raft-meta.conf"))) {
+        OutputStream out = Files.newOutputStream(Paths.get(path, "new-raft-meta.conf"))) {
 
       long index = RaftProtos.LogEntryProto.newBuilder().mergeFrom(in).build().getIndex();
       System.out.println("Index in the original file is: " + index);
 
       RaftProtos.LogEntryProto newLogEntryProto = RaftProtos.LogEntryProto.newBuilder()
-        .setConfigurationEntry(RaftProtos.RaftConfigurationProto.newBuilder()
-          .addAllPeers(raftPeerProtos).build())
-        .setIndex(index + 1)
-        .build();
+          .setConfigurationEntry(RaftProtos.RaftConfigurationProto.newBuilder()
+            .addAllPeers(raftPeerProtos).build())
+          .setIndex(index + 1)
+          .build();
 
       System.out.println("Generated new LogEntryProto info:\n" + newLogEntryProto);
       newLogEntryProto.writeTo(out);
