@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -77,7 +78,11 @@ public final class ReplicationSupervisor {
   private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
 
-  public static final Map<String, String> METRICS_MAP = new HashMap<>();
+  private static final Map<String, String> METRICS_MAP;
+
+  static {
+    METRICS_MAP = new HashMap<>();
+  }
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -188,6 +193,10 @@ public final class ReplicationSupervisor {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public static Map<String, String> getMetricsMap() {
+    return Collections.unmodifiableMap(METRICS_MAP);
   }
 
   private ReplicationSupervisor(StateContext context, ExecutorService executor,
