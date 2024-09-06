@@ -75,6 +75,8 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final OpenFiles files = new OpenFiles();
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
+  private final int readMappedBufferMaxCount;
+  private final MappedBufferManager mappedBufferManager;
   private final VolumeSet volumeSet;
 
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
@@ -84,7 +86,15 @@ public class FilePerBlockStrategy implements ChunkManager {
         manager.getDefaultReadBufferCapacity();
     this.readMappedBufferThreshold = manager == null ? 0
         : manager.getReadMappedBufferThreshold();
+    this.readMappedBufferMaxCount = manager == null ? 0
+        : manager.getReadMappedBufferMaxCount();
+    LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
+    if (this.readMappedBufferMaxCount > 0) {
+      mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
+    } else {
+      mappedBufferManager = null;
+    }
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -192,10 +202,10 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     final long len = info.getLen();
     long offset = info.getOffset();
-    int bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
+    int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold);
+        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
   }
 
   @Override

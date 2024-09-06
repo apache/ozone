@@ -57,7 +57,8 @@ public interface ChunkBuffer {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
-  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer},
+   * with a function called when buffers are released.*/
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
     Objects.requireNonNull(buffers, "buffers == null");
     if (buffers.size() == 1) {

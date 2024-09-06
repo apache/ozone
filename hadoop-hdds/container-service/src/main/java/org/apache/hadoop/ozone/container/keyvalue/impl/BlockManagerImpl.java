@@ -59,6 +59,7 @@ public class BlockManagerImpl implements BlockManager {
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
+  private final int readMappedBufferMaxCount;
 
   /**
    * Constructs a Block Manager.
@@ -74,6 +75,9 @@ public class BlockManagerImpl implements BlockManager {
     this.readMappedBufferThreshold = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
+    this.readMappedBufferMaxCount = config.getInt(
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_DEFAULT);
   }
 
   @Override
@@ -248,6 +252,11 @@ public class BlockManagerImpl implements BlockManager {
 
   public int getReadMappedBufferThreshold() {
     return readMappedBufferThreshold;
+  }
+
+  /** @return the max count of memory mapped buffers for read. */
+  public int getReadMappedBufferMaxCount() {
+    return readMappedBufferMaxCount;
   }
 
   /**
