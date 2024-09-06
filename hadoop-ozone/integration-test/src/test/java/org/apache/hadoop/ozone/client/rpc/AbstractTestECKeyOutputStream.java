@@ -126,6 +126,8 @@ abstract class AbstractTestECKeyOutputStream {
         zeroCopyEnabled);
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // "Enable" hsync to verify that hsync would be blocked by ECKeyOutputStream
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
