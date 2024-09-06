@@ -586,6 +586,16 @@ public class TestReplicationSupervisor {
     }
 
     @Override
+    protected String getMetricName() {
+      return "Blockings";
+    }
+
+    @Override
+    protected String getMetricDescriptionSegment() {
+      return "blockings";
+    }
+
+    @Override
     public void runTask() {
       runningLatch.countDown();
       assertDoesNotThrow(() -> waitForCompleteLatch.await(),
@@ -609,6 +619,16 @@ public class TestReplicationSupervisor {
       this.name = name;
       this.completeLatch = completeLatch;
       setPriority(priority);
+    }
+
+    @Override
+    protected String getMetricName() {
+      return "Ordereds";
+    }
+
+    @Override
+    protected String getMetricDescriptionSegment() {
+      return "ordereds";
     }
 
     @Override

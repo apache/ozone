@@ -71,13 +71,9 @@ public abstract class AbstractReplicationTask {
     queued = Instant.now(clock);
   }
   
-  protected String getMetricName() {
-    return "";
-  }
+  protected abstract String getMetricName();
 
-  protected String getMetricDescriptionSegment() {
-    return "";
-  }
+  protected abstract String getMetricDescriptionSegment();
 
   public long getContainerId() {
     return containerId;
