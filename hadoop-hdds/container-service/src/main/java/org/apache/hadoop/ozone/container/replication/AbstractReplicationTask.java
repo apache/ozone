@@ -70,6 +70,14 @@ public abstract class AbstractReplicationTask {
     this.term = term;
     queued = Instant.now(clock);
   }
+  
+  protected String getMetricName() {
+    return "";
+  }
+
+  protected String getMetricDescriptionSegment() {
+    return "";
+  }
 
   public long getContainerId() {
     return containerId;

@@ -26,7 +26,6 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 
 import java.util.Map;
 
@@ -72,54 +71,45 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
-        .addGauge(Interns.info("numRequestedECReconstructions",
-            "Number of requested EC reconstructions"),
-            supervisor.getReplicationRequestCount(ECReconstructionCoordinatorTask.class))
-        .addGauge(Interns.info("numRequestedContainerReplications",
-            "Number of requested container replications"),
-            supervisor.getReplicationRequestCount(ReplicationTask.class))
         .addGauge(Interns.info("numSuccessReplications",
             "Number of successful replications"),
             supervisor.getReplicationSuccessCount())
-        .addGauge(Interns.info("numSuccessECReconstructions",
-            "Number of successful EC reconstructions"),
-            supervisor.getReplicationSuccessCount(ECReconstructionCoordinatorTask.class))
-        .addGauge(Interns.info("numSuccessContainerReplications",
-            "Number of successful container replications"),
-            supervisor.getReplicationSuccessCount(ReplicationTask.class))
         .addGauge(Interns.info("numFailureReplications",
             "Number of failure replications"),
             supervisor.getReplicationFailureCount())
-        .addGauge(Interns.info("numFailureECReconstructions",
-            "Number of failure EC reconstructions"),
-            supervisor.getReplicationFailureCount(ECReconstructionCoordinatorTask.class))
-        .addGauge(Interns.info("numFailureContainerReplications",
-            "Number of failure container replications"),
-            supervisor.getReplicationFailureCount(ReplicationTask.class))
         .addGauge(Interns.info("numTimeoutReplications",
             "Number of replication requests timed out before being processed"),
             supervisor.getReplicationTimeoutCount())
-        .addGauge(Interns.info("numTimeoutECReconstructions",
-            "Number of EC reconstructions timed out before being processed"),
-            supervisor.getReplicationTimeoutCount(ECReconstructionCoordinatorTask.class))
-        .addGauge(Interns.info("numTimeoutContainerReplications",
-            "Number of container replications timed out before being processed"),
-            supervisor.getReplicationTimeoutCount(ReplicationTask.class))
         .addGauge(Interns.info("numSkippedReplications",
             "Number of replication requests skipped as the container is "
             + "already present"),
             supervisor.getReplicationSkippedCount())
-        .addGauge(Interns.info("numSkippedECReconstructions",
-            "Number of EC reconstructions skipped as the container is "
-            + "already present"),
-            supervisor.getReplicationSkippedCount(ECReconstructionCoordinatorTask.class))
-        .addGauge(Interns.info("numSkippedContainerReplications",
-            "Number of container replications skipped as the container is "
-            + "already present"),
-            supervisor.getReplicationSkippedCount(ReplicationTask.class))
         .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
             + "concurrent replication tasks which can run simultaneously"),
             supervisor.getMaxReplicationStreams());
+
+    if (!ReplicationSupervisor.METRICS_MAP.isEmpty()) {
+      ReplicationSupervisor.METRICS_MAP.forEach((metricsName, descriptionSegment) -> {
+        if (!metricsName.equals("")) {
+          builder.addGauge(Interns.info("numRequested" + metricsName,
+              "Number of requested " + descriptionSegment),
+                  supervisor.getReplicationRequestCount(metricsName))
+              .addGauge(Interns.info("numSuccess" + metricsName,
+                  "Number of successful " + descriptionSegment),
+                  supervisor.getReplicationSuccessCount(metricsName))
+              .addGauge(Interns.info("numFailure" + metricsName,
+                  "Number of failure " + descriptionSegment),
+                  supervisor.getReplicationFailureCount(metricsName))
+              .addGauge(Interns.info("numTimeout" + metricsName,
+                  "Number of " + descriptionSegment + " timed out before being processed"),
+                  supervisor.getReplicationTimeoutCount(metricsName))
+              .addGauge(Interns.info("numSkipped" + metricsName,
+                  "Number of " + descriptionSegment + " skipped as the container is "
+                  + "already present"),
+                  supervisor.getReplicationSkippedCount(metricsName));
+        }
+      });
+    }
 
     Map<String, Integer> tasks = supervisor.getInFlightReplicationSummary();
     for (Map.Entry<String, Integer> entry : tasks.entrySet()) {

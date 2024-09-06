@@ -457,36 +457,36 @@ public class TestReplicationSupervisor {
       //THEN
       assertEquals(2, replicationSupervisor.getReplicationSuccessCount());
       assertEquals(2, replicationSupervisor.getReplicationSuccessCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
       assertEquals(1, replicationSupervisor.getReplicationFailureCount());
       assertEquals(1, replicationSupervisor.getReplicationFailureCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
       assertEquals(1, replicationSupervisor.getReplicationSkippedCount());
       assertEquals(1, replicationSupervisor.getReplicationSkippedCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
       assertEquals(1, replicationSupervisor.getReplicationTimeoutCount());
       assertEquals(1, replicationSupervisor.getReplicationTimeoutCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
       assertEquals(5, replicationSupervisor.getReplicationRequestCount());
       assertEquals(5, replicationSupervisor.getReplicationRequestCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
       assertEquals(0, replicationSupervisor.getReplicationRequestCount(
-          ECReconstructionCoordinatorTask.class));
+          task2.getMetricName()));
 
       assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount());
       assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount(
-          ECReconstructionCoordinatorTask.class));
+          task2.getMetricName()));
       assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount());
       assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount(
-          ECReconstructionCoordinatorTask.class));
+          task2.getMetricName()));
       assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount());
       assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount(
-          ECReconstructionCoordinatorTask.class));
+          task2.getMetricName()));
       assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount());
       assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount(
-          ECReconstructionCoordinatorTask.class));
+          task2.getMetricName()));
       assertEquals(0, ecReconstructionSupervisor.getReplicationRequestCount(
-          ReplicationTask.class));
+          task1.getMetricName()));
 
       MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
       replicationMetrics.getMetrics(replicationMetricsCollector, true);

@@ -71,11 +71,14 @@ public final class ReplicationSupervisor {
   private final StateContext context;
   private final Clock clock;
 
-  private final Map<Class<?>, AtomicLong> requestCounter = new ConcurrentHashMap<>();
-  private final Map<Class<?>, AtomicLong> successCounter = new ConcurrentHashMap<>();
-  private final Map<Class<?>, AtomicLong> failureCounter = new ConcurrentHashMap<>();
-  private final Map<Class<?>, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
-  private final Map<Class<?>, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> requestCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> successCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> failureCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
+
+  @SuppressWarnings({"checkstyle:VisibilityModifier", "checkstyle:StaticVariableName"})
+  public static Map<String, String> METRICS_MAP = new HashMap<>();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -221,14 +224,15 @@ public final class ReplicationSupervisor {
       return;
     }
 
-    if (requestCounter.get(task.getClass()) == null) {
+    if (requestCounter.get(task.getMetricName()) == null) {
       synchronized (this) {
-        if (requestCounter.get(task.getClass()) == null) {
-          requestCounter.put(task.getClass(), new AtomicLong(0));
-          successCounter.put(task.getClass(), new AtomicLong(0));
-          failureCounter.put(task.getClass(), new AtomicLong(0));
-          timeoutCounter.put(task.getClass(), new AtomicLong(0));
-          skippedCounter.put(task.getClass(), new AtomicLong(0));
+        if (requestCounter.get(task.getMetricName()) == null) {
+          requestCounter.put(task.getMetricName(), new AtomicLong(0));
+          successCounter.put(task.getMetricName(), new AtomicLong(0));
+          failureCounter.put(task.getMetricName(), new AtomicLong(0));
+          timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
+          skippedCounter.put(task.getMetricName(), new AtomicLong(0));
+          METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
     }
@@ -342,14 +346,14 @@ public final class ReplicationSupervisor {
     @Override
     public void run() {
       try {
-        requestCounter.get(task.getClass()).incrementAndGet();
+        requestCounter.get(task.getMetricName()).incrementAndGet();
 
         final long now = clock.millis();
         final long deadline = task.getDeadline();
         if (deadline > 0 && now > deadline) {
           LOG.info("Ignoring {} since the deadline has passed ({} < {})",
               this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
-          timeoutCounter.get(task.getClass()).incrementAndGet();
+          timeoutCounter.get(task.getMetricName()).incrementAndGet();
           return;
         }
 
@@ -376,18 +380,18 @@ public final class ReplicationSupervisor {
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
-          failureCounter.get(task.getClass()).incrementAndGet();
+          failureCounter.get(task.getMetricName()).incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
-          successCounter.get(task.getClass()).incrementAndGet();
+          successCounter.get(task.getMetricName()).incrementAndGet();
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
-          skippedCounter.get(task.getClass()).incrementAndGet();
+          skippedCounter.get(task.getMetricName()).incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
-        failureCounter.get(task.getClass()).incrementAndGet();
+        failureCounter.get(task.getMetricName()).incrementAndGet();
       } finally {
         inFlight.remove(task);
         decrementTaskCounter(task);
@@ -434,8 +438,8 @@ public final class ReplicationSupervisor {
     return getCount(requestCounter);
   }
 
-  public long getReplicationRequestCount(Class<?> cls) {
-    AtomicLong counter = requestCounter.get(cls);
+  public long getReplicationRequestCount(String metricsName) {
+    AtomicLong counter = requestCounter.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 
@@ -455,7 +459,7 @@ public final class ReplicationSupervisor {
     }
   }
 
-  private long getCount(Map<Class<?>, AtomicLong> counter) {
+  private long getCount(Map<String, AtomicLong> counter) {
     if (counter.isEmpty()) {
       return 0;
     }
@@ -470,8 +474,8 @@ public final class ReplicationSupervisor {
     return getCount(successCounter);
   }
 
-  public long getReplicationSuccessCount(Class<?> cls) {
-    AtomicLong counter = successCounter.get(cls);
+  public long getReplicationSuccessCount(String metricsName) {
+    AtomicLong counter = successCounter.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 
@@ -479,8 +483,8 @@ public final class ReplicationSupervisor {
     return getCount(failureCounter);
   }
 
-  public long getReplicationFailureCount(Class<?> cls) {
-    AtomicLong counter = failureCounter.get(cls);
+  public long getReplicationFailureCount(String metricsName) {
+    AtomicLong counter = failureCounter.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 
@@ -488,8 +492,8 @@ public final class ReplicationSupervisor {
     return getCount(timeoutCounter);
   }
 
-  public long getReplicationTimeoutCount(Class<?> cls) {
-    AtomicLong counter = timeoutCounter.get(cls);
+  public long getReplicationTimeoutCount(String metricsName) {
+    AtomicLong counter = timeoutCounter.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 
@@ -497,8 +501,8 @@ public final class ReplicationSupervisor {
     return getCount(skippedCounter);
   }
 
-  public long getReplicationSkippedCount(Class<?> cls) {
-    AtomicLong counter = skippedCounter.get(cls);
+  public long getReplicationSkippedCount(String metricsName) {
+    AtomicLong counter = skippedCounter.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 
