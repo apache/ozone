@@ -48,43 +48,10 @@ import {
 } from '@/v2/types/pipelines.types';
 
 import './pipelines.less';
+import { getDurationFromTimestamp, getTimeDiffFromTimestamp } from '@/v2/utils/momentUtils';
 
 // TODO: When Datanodes PR gets merged remove these declarations
 // And import from datanodes.types
-const DatanodeStateList = ['HEALTHY', 'STALE', 'DEAD'] as const;
-type DatanodeStateType = typeof DatanodeStateList;
-type DatanodeState = DatanodeStateType[number];
-
-// Corresponds to HddsProtos.NodeOperationalState
-const DatanodeOpStateList = [
-  'IN_SERVICE',
-  'DECOMMISSIONING',
-  'DECOMMISSIONED',
-  'ENTERING_MAINTENANCE',
-  'IN_MAINTENANCE'
-] as const;
-type DatanodeOpState = typeof DatanodeOpStateList[number];
-
-type Datanode = {
-  hostname: string;
-  state: DatanodeState;
-  opState: DatanodeOpState;
-  lastHeartbeat: string;
-  storageUsed: number;
-  storageTotal: number;
-  storageRemaining: number;
-  storageCommitted: number;
-  pipelines: Pipeline[];
-  containers: number;
-  openContainers: number;
-  leaderCount: number;
-  uuid: string;
-  version: string;
-  setupTime: number;
-  revision: string;
-  buildDate: string;
-  networkLocation: string;
-}
 
 type SummaryDatanodeDetails = {
   level: number;
@@ -196,14 +163,14 @@ const COLUMNS: ColumnsType<Pipeline> = [
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      prettyMilliseconds(lastLeaderElection, { compact: true }) + ' ago' : 'NA',
+      getTimeDiffFromTimestamp(lastLeaderElection) : 'NA',
     sorter: (a: Pipeline, b: Pipeline) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
     title: 'Lifetime',
     dataIndex: 'duration',
     key: 'duration',
-    render: (duration: number) => prettyMilliseconds(duration, { compact: true }),
+    render: (duration: number) => getDurationFromTimestamp(duration),
     sorter: (a: Pipeline, b: Pipeline) => a.duration - b.duration
   },
   {
@@ -288,6 +255,12 @@ const Pipelines: React.FC<{}> = () => {
     )
   }
 
+  function getFilteredData(data: Pipeline[]) {
+    return data.filter(
+      (pipeline: Pipeline) => pipeline['pipelineId'].includes(debouncedSearch)
+    )
+  }
+
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
@@ -340,7 +313,7 @@ const Pipelines: React.FC<{}> = () => {
           </div>
           <div>
             <Table
-              dataSource={activeDataSource}
+              dataSource={getFilteredData(activeDataSource)}
               columns={filterSelectedColumns()}
               loading={loading}
               rowKey='pipelineId'

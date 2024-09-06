@@ -17,7 +17,6 @@
  */
 
 import { Acl } from "@/v2/types/acl.types";
-import { Option } from "@/v2/components/select/singleSelect";
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
