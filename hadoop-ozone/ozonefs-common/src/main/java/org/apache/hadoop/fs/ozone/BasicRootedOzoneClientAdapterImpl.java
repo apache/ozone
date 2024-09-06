@@ -403,7 +403,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket = getBucket(ofsPath, false);
     OzoneKeyDetails keyDetails = null;
     try {
-      keyDetails = bucket.getKey(key);
+      keyDetails = bucket.getKey(ofsPath.getKeyName());
     } catch (OMException ome) {
       // if key does not exist, do nothing
       if (ome.getResult() == KEY_NOT_FOUND) {
