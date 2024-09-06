@@ -20,7 +20,7 @@ import axios, { AxiosResponse } from 'axios';
 
 export const AxiosGetHelper = (
   url: string,
-  controller: AbortController,
+  controller: AbortController | undefined,
   message: string = '',
   params: any = {},
 ): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
@@ -50,7 +50,7 @@ export const AxiosPutHelper = (
 
 export const PromiseAllSettledGetHelper = (
   urls: string[],
-  controller: AbortController,
+  controller: AbortController | undefined,
   message: string = ''
 ): { requests: Promise<PromiseSettledResult<AxiosResponse<any, any>>[]>; controller: AbortController } => {
 

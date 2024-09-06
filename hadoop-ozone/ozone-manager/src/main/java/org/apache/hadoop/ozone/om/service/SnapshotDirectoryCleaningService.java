@@ -176,8 +176,7 @@ public class SnapshotDirectoryCleaningService
                   "unexpected state.");
             }
 
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-                currSnapInfo, snapChainManager, omSnapshotManager);
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(currSnapInfo, snapChainManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -194,8 +193,7 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
               prevRenamedTable = omPreviousSnapshot
                   .getMetadataManager().getSnapshotRenamedTable();
-              previousToPrevSnapshot = getPreviousActiveSnapshot(
-                  previousSnapshot, snapChainManager, omSnapshotManager);
+              previousToPrevSnapshot = getPreviousActiveSnapshot(previousSnapshot, snapChainManager);
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;

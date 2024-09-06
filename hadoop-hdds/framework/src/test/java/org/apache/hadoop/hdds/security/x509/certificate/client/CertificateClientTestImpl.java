@@ -48,6 +48,7 @@ import java.util.function.Function;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
@@ -257,16 +258,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     return rootCerts;
   }
 
-  @Override
-  public List<String> getCAList() {
-    return null;
-  }
-
-  @Override
-  public List<String> updateCAList() throws IOException  {
-    return null;
-  }
-
   public void renewRootCA() throws Exception {
     LocalDateTime start = LocalDateTime.now();
     Duration rootCACertDuration = securityConfig.getMaxCertificateDuration();
@@ -362,6 +353,17 @@ public class CertificateClientTestImpl implements CertificateClient {
     } catch (IOException | GeneralSecurityException e) {
       throw new CertificateException("Failed to init trustManager", e);
     }
+  }
+
+  @Override
+  public ClientTrustManager createClientTrustManager() throws IOException {
+    CACertificateProvider caCertificateProvider = () -> {
+      List<X509Certificate> caCerts = new ArrayList<>();
+      caCerts.addAll(getAllCaCerts());
+      caCerts.addAll(getAllRootCaCerts());
+      return caCerts;
+    };
+    return new ClientTrustManager(caCertificateProvider, caCertificateProvider);
   }
 
   @Override

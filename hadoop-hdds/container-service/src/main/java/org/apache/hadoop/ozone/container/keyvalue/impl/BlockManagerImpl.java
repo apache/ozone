@@ -343,7 +343,7 @@ public class BlockManagerImpl implements BlockManager {
                 .getSequentialRangeKVs(startKey, count,
                     cData.containerPrefix(), cData.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry : range) {
-          result.add(entry.getValue());
+          result.add(db.getStore().getCompleteBlockData(entry.getValue(), null, entry.getKey()));
         }
         return result;
       }

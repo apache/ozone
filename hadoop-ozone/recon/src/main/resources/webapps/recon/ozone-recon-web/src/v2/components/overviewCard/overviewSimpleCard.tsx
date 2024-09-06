@@ -130,7 +130,8 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
       hoverable={hoverable}
       title={(linkToUrl) ? titleElement : title}
       headStyle={cardHeadStyle}
-      bodyStyle={cardBodyStyle}>
+      bodyStyle={cardBodyStyle}
+      data-testid={`overview-${title}`}>
       <Row
         align='middle'>
         <Col>

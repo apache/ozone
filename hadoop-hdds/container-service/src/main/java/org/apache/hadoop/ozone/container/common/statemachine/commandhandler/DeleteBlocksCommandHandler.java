@@ -168,12 +168,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   @Override
   public int getThreadPoolMaxPoolSize() {
-    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+    return executor.getMaximumPoolSize();
   }
 
   @Override
   public int getThreadPoolActivePoolSize() {
-    return ((ThreadPoolExecutor)executor).getActiveCount();
+    return executor.getActiveCount();
   }
 
   /**

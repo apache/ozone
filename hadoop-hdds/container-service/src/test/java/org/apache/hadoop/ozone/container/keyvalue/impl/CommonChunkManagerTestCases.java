@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,7 +40,9 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.when;
 
 /**
  * Common test cases for ChunkManager implementation tests.
@@ -220,6 +223,28 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
 
     // THEN
     checkReadIOStats(len * count, count);
+  }
+
+  @Test
+  public void testFinishWrite() throws Exception {
+    // GIVEN
+    ChunkManager chunkManager = createTestSubject();
+    checkChunkFileCount(0);
+    checkWriteIOStats(0, 0);
+
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(),
+        getChunkInfo(), getData(),
+        WRITE_STAGE);
+
+    BlockData blockData = Mockito.mock(BlockData.class);
+    when(blockData.getBlockID()).thenReturn(getBlockID());
+
+    chunkManager.finishWriteChunks(getKeyValueContainer(), blockData);
+    assertTrue(checkChunkFilesClosed());
+
+    // THEN
+    checkChunkFileCount(1);
+    checkWriteIOStats(getChunkInfo().getLen(), 1);
   }
 
 }
