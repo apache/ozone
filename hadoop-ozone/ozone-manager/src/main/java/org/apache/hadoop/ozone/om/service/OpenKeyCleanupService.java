@@ -265,7 +265,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     private OMResponse submitRequest(OMRequest omRequest) {
       try {
-        OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
       } catch (ServiceException e) {
         LOG.error("Open key " + omRequest.getCmdType()
             + " request failed. Will retry at next run.", e);
