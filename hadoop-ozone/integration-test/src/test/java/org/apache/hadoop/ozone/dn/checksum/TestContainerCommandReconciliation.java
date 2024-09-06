@@ -60,12 +60,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -159,10 +156,9 @@ public class TestContainerCommandReconciliation {
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
     File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
-    // TODO Prior to HDDS-10379 the file will never exist. After that change, the file will always exist after close
-    //  and this line needs to be updated to:
-    //  assertTrue(treeFile.delete());
-    assertFalse(treeFile.exists());
+    // Closing the container should have generated the tree file.
+    assertTrue(treeFile.exists());
+    assertTrue(treeFile.delete());
 
     StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
         dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
@@ -182,9 +178,6 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
-    // TODO After HDDS-10379 the file will already exist and we do not need to create one.
-    ContainerMerkleTree tree = buildTestTree(conf);
-    writeChecksumFileToDatanodes(containerID, tree);
     File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
     assertTrue(treeFile.exists());
     // Make the server unable to read the file.
@@ -227,7 +220,9 @@ public class TestContainerCommandReconciliation {
         .getContainerSet().getContainer(containerID);
     File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
     // TODO After HDDS-10379 the file will already exist and need to be overwritten.
-    assertTrue(treeFile.createNewFile());
+    assertTrue(treeFile.exists());
+    Files.write(treeFile.toPath(), new byte[]{},
+        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
     assertEquals(0, treeFile.length());
 
     // The client will get an empty byte string back. It should raise this as an error instead of returning a default
