@@ -45,6 +45,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
@@ -66,6 +68,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   private AtomicInteger heartbeatCount = new AtomicInteger(0);
   private AtomicInteger rpcCount = new AtomicInteger(0);
   private AtomicInteger containerReportsCount = new AtomicInteger(0);
+  private AtomicInteger lifelineCount = new AtomicInteger(0);
   private String clusterId;
   private String scmId;
 
@@ -305,6 +308,18 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     }
   }
 
+  @Override
+  public SCMLifelineResponseProto sendLifeline(
+      SCMLifelineRequestProto lifelineRequest) throws IOException {
+    rpcCount.incrementAndGet();
+    lifelineCount.incrementAndGet();
+    DatanodeDetailsProto datanodeDetailsProto =
+        lifelineRequest.getDatanodeDetails();
+    updateNodeReport(datanodeDetailsProto, lifelineRequest.getNodeReport());
+    sleepIfNeeded();
+    return SCMLifelineResponseProto.newBuilder().
+        setDatanodeUUID(datanodeDetailsProto.getUuid()).build();
+  }
 
   /**
    * Return the number of StorageReports of a datanode.

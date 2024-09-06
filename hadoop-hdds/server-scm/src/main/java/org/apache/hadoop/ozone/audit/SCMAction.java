@@ -24,6 +24,7 @@ public enum SCMAction implements AuditAction {
   GET_VERSION,
   REGISTER,
   SEND_HEARTBEAT,
+  LIFE_LINE,
   GET_SCM_INFO,
   ALLOCATE_BLOCK,
   DELETE_KEY_BLOCK,

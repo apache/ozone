@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandS
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -52,7 +53,6 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
  * This class tests the behavior of SCMDatanodeHeartbeatDispatcher.
  */
 public class TestSCMDatanodeHeartbeatDispatcher {
-
 
   @Test
   public void testNodeReportDispatcher() throws IOException {
@@ -167,5 +167,33 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     // is not registered, it should send a Re-Register command back to the node.
     verify(mockNodeManager, times(1)).addDatanodeCommand(
         any(UUID.class), any(ReregisterCommand.class));
+  }
+
+  @Test
+  public void testScmLifeline() {
+    AtomicInteger eventReceived = new AtomicInteger();
+    NodeReportProto nodeReport = NodeReportProto.getDefaultInstance();
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any()))
+        .thenReturn(true);
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, new EventPublisher() {
+          @Override
+          public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+              EVENT event, PAYLOAD payload) {
+            assertEquals(event, NODE_REPORT);
+            eventReceived.incrementAndGet();
+            assertEquals(nodeReport, ((NodeReportFromDatanode)payload).getReport());
+          }
+        });
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    SCMLifelineRequestProto lifeline = SCMLifelineRequestProto.newBuilder()
+        .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+        .setNodeReport(nodeReport)
+        .build();
+    dispatcher.lifeline(lifeline);
+    verify(mockNodeManager, times(1)).processLifeline(datanodeDetails);
+    assertEquals(1, eventReceived.get());
   }
 }

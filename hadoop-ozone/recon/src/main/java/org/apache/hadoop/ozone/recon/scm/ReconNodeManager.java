@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -84,7 +85,7 @@ public class ReconNodeManager extends SCMNodeManager {
    * Map that contains mapping between datanodes
    * and their last heartbeat time.
    */
-  private Map<UUID, Long> datanodeHeartbeatMap = new HashMap<>();
+  private Map<UUID, Long> datanodeHeartbeatMap = new ConcurrentHashMap<>();
   private Map<UUID, DatanodeDetails> inMemDatanodeDetails = new HashMap<>();
 
   private long reconDatanodeOutdatedTime;
@@ -253,6 +254,12 @@ public class ReconNodeManager extends SCMNodeManager {
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());
+  }
+
+  @Override
+  public void processLifeline(DatanodeDetails datanodeDetails) {
+    super.processLifeline(datanodeDetails);
+    datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
   }
 
   @Override

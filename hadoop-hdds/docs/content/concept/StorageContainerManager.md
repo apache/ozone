@@ -71,6 +71,9 @@ For a detailed view of Storage Container Manager this section gives a quick over
    * From Datanode to SCM (30 sec by default)
    * Datanodes report the status of containers, node...
    * SCM can add commands to the response
+ * Datanode Lifeline protocol
+   * From Datanode to SCM (30 sec by default)
+   * Datanodes report the status of node
 
 Note: client doesn't connect directly to the SCM
 

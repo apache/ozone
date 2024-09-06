@@ -16,7 +16,10 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineResponseProto;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -25,8 +28,11 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for StorageContainerDatanodeProtocolProtos.
@@ -49,5 +55,21 @@ public class TestSCMDatanodeProtocolServer {
         .Type.replicateContainerCommand, proto.getCommandType());
     assertEquals(5L, proto.getTerm());
     assertEquals(1234L, proto.getDeadlineMsSinceEpoch());
+  }
+
+  @Test
+  public void testSendLifeline() throws Exception {
+    SCMDatanodeProtocolServer server = mock(SCMDatanodeProtocolServer.class);
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    SCMLifelineRequestProto lifelineRequest = SCMLifelineRequestProto.newBuilder()
+        .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+        .build();
+    when(server.sendLifeline(any()))
+        .thenReturn(SCMLifelineResponseProto.newBuilder()
+            .setDatanodeUUID(datanodeDetails.getUuidString()).setTerm(1).build());
+
+    SCMLifelineResponseProto lifelineResponse = server.sendLifeline(lifelineRequest);
+    assertEquals(lifelineResponse.getDatanodeUUID(), datanodeDetails.getUuidString());
+    assertEquals(lifelineResponse.getTerm(), 1);
   }
 }

@@ -118,6 +118,12 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setRegisterResponse(register(request.getRegisterRequest()))
             .build();
+      case Lifeline:
+        return SCMDatanodeResponse.newBuilder()
+            .setCmdType(cmdType)
+            .setStatus(Status.OK)
+            .setLifelineResponse(impl.sendLifeline(request.getLifelineRequest()))
+            .build();
       default:
         throw new ServiceException("Unknown command type: " + cmdType);
       }

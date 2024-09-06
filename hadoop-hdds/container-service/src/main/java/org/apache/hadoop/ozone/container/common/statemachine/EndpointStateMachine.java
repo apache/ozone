@@ -53,6 +53,7 @@ public class EndpointStateMachine
   private EndPointStates state = EndPointStates.FIRST;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
+  private ZonedDateTime lastSuccessfulLifeline;
   private boolean isPassive;
   private final ExecutorService executorService;
 
@@ -300,6 +301,15 @@ public class EndpointStateMachine
   public void setLastSuccessfulHeartbeat(
       ZonedDateTime lastSuccessfulHeartbeat) {
     this.lastSuccessfulHeartbeat = lastSuccessfulHeartbeat;
+  }
+
+  @Override
+  public long getLastSuccessfulLifeline() {
+    return lastSuccessfulLifeline == null ? 0 : lastSuccessfulLifeline.toEpochSecond();
+  }
+
+  public void setLastSuccessfulLifeline(ZonedDateTime lastSuccessfulLifeline) {
+    this.lastSuccessfulLifeline = lastSuccessfulLifeline;
   }
 
   @Override

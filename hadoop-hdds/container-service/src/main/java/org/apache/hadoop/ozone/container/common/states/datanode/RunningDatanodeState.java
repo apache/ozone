@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -25,12 +26,14 @@ import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManage
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
+import org.apache.hadoop.ozone.container.common.states.endpoint.LifelineEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -51,6 +54,7 @@ public class RunningDatanodeState implements DatanodeState {
   private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
+  private List<Thread> lifelineThreads;
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -58,6 +62,31 @@ public class RunningDatanodeState implements DatanodeState {
     this.connectionManager = connectionManager;
     this.conf = conf;
     this.context = context;
+    boolean lifelineEnable = conf.getBoolean(HddsConfigKeys.HDDS_LIFELINE_REPORT_ENABLE,
+        HddsConfigKeys.HDDS_LIFELINE_REPORT_ENABLE_DEFAULT);
+    if (lifelineEnable) {
+      startLifelineThread();
+    }
+  }
+
+  /**
+   * Start the Lifeline thread set.
+   */
+  private void startLifelineThread() {
+    this.lifelineThreads = new ArrayList<>();
+    for (EndpointStateMachine endpoint : connectionManager.getValues()) {
+      LifelineEndpointTask task = new LifelineEndpointTask(endpoint, context,
+          context.getParent().getContainer(),
+          context.getParent().getDatanodeDetails());
+      Thread thread = new Thread(task);
+      this.lifelineThreads.add(thread);
+      thread.start();
+    }
+  }
+
+  @VisibleForTesting
+  public List<Thread> getLifelineThreads() {
+    return this.lifelineThreads;
   }
 
   /**

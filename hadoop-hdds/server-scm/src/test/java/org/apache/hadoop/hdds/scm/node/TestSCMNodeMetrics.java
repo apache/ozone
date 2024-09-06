@@ -112,6 +112,23 @@ public class TestSCMNodeMetrics {
         "NumHBProcessingFailed");
   }
 
+  @Test
+  public void testLifelineProcessing() {
+    long lifelineProcessed = getCounter("NumLifelineProcessed");
+    createNodeReport();
+    nodeManager.processLifeline(registeredDatanode);
+    assertEquals(lifelineProcessed + 1, getCounter("NumLifelineProcessed"),
+        "NumLifelineProcessed");
+  }
+
+  @Test
+  public void testLifelineProcessingFailure() {
+    long lifelineProcessedFailed = getCounter("NumLifelineProcessingFailed");
+    nodeManager.processLifeline(MockDatanodeDetails.randomDatanodeDetails());
+    assertEquals(lifelineProcessedFailed + 1, getCounter("NumLifelineProcessingFailed"),
+        "NumLifelineProcessingFailed");
+  }
+
   /**
    * Verifies node report processing count.
    *

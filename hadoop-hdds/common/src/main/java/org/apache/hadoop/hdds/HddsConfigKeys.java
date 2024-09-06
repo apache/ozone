@@ -46,6 +46,9 @@ public final class HddsConfigKeys {
       "hdds.command.status.report.interval";
   public static final String HDDS_COMMAND_STATUS_REPORT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_LIFELINE_REPORT_ENABLE =
+      "hdds.lifeline.report.enable";
+  public static final boolean HDDS_LIFELINE_REPORT_ENABLE_DEFAULT = false;
   public static final String HDDS_CONTAINER_ACTION_MAX_LIMIT =
       "hdds.container.action.max.limit";
   public static final int HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT =

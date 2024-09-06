@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.Type;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
@@ -178,5 +180,18 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
     return submitRequest(Type.Register,
         (builder) -> builder.setRegisterRequest(req))
         .getRegisterResponse();
+  }
+
+  /**
+   * Send by datanode to SCM.
+   * @param lifelineRequest Lifeline request containing the message body.
+   * @return Lifeline Response.
+   */
+  @Override
+  public SCMLifelineResponseProto sendLifeline(SCMLifelineRequestProto lifelineRequest)
+      throws IOException {
+    return submitRequest(Type.Lifeline,
+        (builder) -> builder.setLifelineRequest(lifelineRequest))
+            .getLifelineResponse();
   }
 }

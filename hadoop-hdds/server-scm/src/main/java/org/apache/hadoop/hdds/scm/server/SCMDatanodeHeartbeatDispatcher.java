@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
@@ -85,6 +87,31 @@ public final class SCMDatanodeHeartbeatDispatcher {
     this.eventPublisher = eventPublisher;
   }
 
+  public void lifeline(SCMLifelineRequestProto lifelineRequest) {
+    DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
+        lifelineRequest.getDatanodeDetails());
+    if (nodeManager.isNodeRegistered(datanodeDetails)) {
+      LayoutVersionProto layoutVersion = null;
+      if (!lifelineRequest.hasDataNodeLayoutVersion()) {
+        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+            INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = lifelineRequest.getDataNodeLayoutVersion();
+      }
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Processing DataNode lifeline. datanodeDetails = {}, " +
+            "layoutVersion = {}", datanodeDetails, layoutVersion);
+      }
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
+      nodeManager.processLifeline(datanodeDetails);
+      if (lifelineRequest.hasNodeReport()) {
+        eventPublisher.fireEvent(NODE_REPORT,
+            new NodeReportFromDatanode(datanodeDetails,
+                lifelineRequest.getNodeReport()));
+      }
+    }
+  }
 
   /**
    * Dispatches heartbeat to registered event handlers.

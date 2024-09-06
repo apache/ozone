@@ -36,6 +36,9 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
+    .SCMLifelineResponseProto;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -88,5 +91,13 @@ public interface StorageContainerDatanodeProtocol {
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports,
       LayoutVersionProto layoutInfo) throws IOException;
+
+  /**
+   * Used by data node to send a Heartbeat.
+   * @param lifelineRequest Lifeline request containing the message body.
+   * @return Lifeline Response.
+   */
+  SCMLifelineResponseProto sendLifeline(SCMLifelineRequestProto lifelineRequest)
+      throws IOException;
 
 }

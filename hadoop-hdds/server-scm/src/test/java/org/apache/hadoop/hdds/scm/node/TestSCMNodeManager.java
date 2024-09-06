@@ -77,6 +77,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
+import org.apache.ratis.util.Preconditions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -232,6 +233,21 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
           "Heartbeat thread should have picked up the scheduled heartbeats.");
+    }
+  }
+
+  @Test
+  public void testScmLifeline() throws AuthenticationException, IOException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      int registeredNodes = 5;
+      for (int x = 0; x < registeredNodes; x++) {
+        DatanodeDetails datanodeDetails = HddsTestUtils
+            .createRandomDatanodeAndRegister(nodeManager);
+        long markTime = Time.monotonicNow();
+        nodeManager.processLifeline(datanodeDetails);
+        long lastHeartbeatTime = nodeManager.getLastHeartbeat(datanodeDetails);
+        Preconditions.assertTrue(lastHeartbeatTime >= markTime);
+      }
     }
   }
 

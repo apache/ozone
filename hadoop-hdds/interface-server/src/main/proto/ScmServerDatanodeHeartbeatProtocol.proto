@@ -44,6 +44,7 @@ message SCMDatanodeRequest {
   optional SCMVersionRequestProto getVersionRequest = 3;
   optional SCMRegisterRequestProto registerRequest = 4;
   optional SCMHeartbeatRequestProto sendHeartbeatRequest = 5;
+  optional SCMLifelineRequestProto lifelineRequest = 6;
 }
 
 message SCMDatanodeResponse {
@@ -60,6 +61,7 @@ message SCMDatanodeResponse {
   optional SCMVersionResponseProto getVersionResponse = 6;
   optional SCMRegisteredResponseProto registerResponse = 7;
   optional SCMHeartbeatResponseProto sendHeartbeatResponse = 8;
+  optional SCMLifelineResponseProto lifelineResponse = 9;
 
 }
 
@@ -67,6 +69,7 @@ enum Type {
   GetVersion = 1;
   Register = 2;
   SendHeartbeat = 3;
+  Lifeline = 4;
 }
 
 enum Status {
@@ -155,6 +158,21 @@ message SCMHeartbeatResponseProto {
 
   // Same as term in SCMCommandProto
   optional int64 term = 3;
+}
+
+/**
+ * Generic response that is send to a lifeline request.
+ */
+message SCMLifelineRequestProto {
+  required DatanodeDetailsProto datanodeDetails = 1;
+  optional NodeReportProto nodeReport = 2;
+  optional LayoutVersionProto dataNodeLayoutVersion = 3;
+}
+
+message SCMLifelineResponseProto {
+  required string datanodeUUID = 1;
+  // Same as term in SCMCommandProto
+  optional int64 term = 2;
 }
 
 message SCMNodeAddressList {

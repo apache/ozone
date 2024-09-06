@@ -558,6 +558,21 @@ public class SCMNodeManager implements NodeManager {
         != dnDetails.getPersistedOpStateExpiryEpochSec();
   }
 
+  @Override
+  public void processLifeline(DatanodeDetails datanodeDetails) {
+    Preconditions.checkNotNull(datanodeDetails, "Lifeline is missing " +
+        "DatanodeDetails.");
+    try {
+      nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
+      metrics.incNumLifelineProcessed();
+      updateDatanodeOpState(datanodeDetails);
+    } catch (NodeNotFoundException e) {
+      metrics.incNumLifelineProcessingFailed();
+      LOG.error("SCM trying to process lifeline from an " +
+          "unregistered node {}. Ignoring the lifeline.", datanodeDetails);
+    }
+  }
+
   /**
    * This method should only be called when processing the heartbeat.
    *

@@ -70,7 +70,7 @@ further processing by OM db tasks via [Recon Task Framework](#task-framework).
 <br/>
 
 Recon also acts as a passive SCM for datanodes. When Recon is configured in the
-cluster, all the datanodes register with Recon and send heartbeats, container 
+cluster, all the datanodes register with Recon and send heartbeats, lifeline, container 
 reports, incremental container reports etc. to Recon similar to SCM. Recon uses
 all the information it gets from datanodes to construct its own copy of SCM rocks db 
 locally. Recon never sends any command to datanodes in response and just acts as

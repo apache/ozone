@@ -48,6 +48,8 @@ public final class SCMNodeMetrics implements MetricsSource {
 
   private @Metric MutableCounterLong numHBProcessed;
   private @Metric MutableCounterLong numHBProcessingFailed;
+  private @Metric MutableCounterLong numLifelineProcessed;
+  private @Metric MutableCounterLong numLifelineProcessingFailed;
   private @Metric MutableCounterLong numNodeReportProcessed;
   private @Metric MutableCounterLong numNodeReportProcessingFailed;
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
@@ -97,6 +99,20 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   void incNumHBProcessingFailed() {
     numHBProcessingFailed.incr();
+  }
+
+  /**
+   * Increments number of lifeline processed count.
+   */
+  void incNumLifelineProcessed() {
+    numLifelineProcessed.incr();
+  }
+
+  /**
+   * Increments number of lifeline processing failed count.
+   */
+  void incNumLifelineProcessingFailed() {
+    numLifelineProcessingFailed.incr();
   }
 
   /**

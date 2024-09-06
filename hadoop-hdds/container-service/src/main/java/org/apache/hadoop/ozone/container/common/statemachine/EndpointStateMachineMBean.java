@@ -32,5 +32,7 @@ public interface EndpointStateMachineMBean {
 
   long getLastSuccessfulHeartbeat();
 
+  long getLastSuccessfulLifeline();
+
   String getType();
 }

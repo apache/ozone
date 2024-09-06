@@ -1578,6 +1578,15 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>hdds.lifeline.report.enable</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, MANAGEMENT</tag>
+    <description>
+      Whether to enable Datanode to send lifeline to SCM and Recon.
+      The default value is false.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.destroy.timeout</name>
     <value>66s</value>
     <tag>OZONE, SCM, PIPELINE</tag>

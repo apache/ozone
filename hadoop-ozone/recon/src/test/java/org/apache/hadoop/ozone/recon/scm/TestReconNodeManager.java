@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -280,5 +281,24 @@ public class TestReconNodeManager {
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());
 
+  }
+
+  @Test
+  public void testProcessLifeline() throws IOException {
+    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf,
+        new ReconUtils());
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    Table<UUID, DatanodeDetails> nodeTable =
+        ReconSCMDBDefinition.NODES.getTable(store);
+    ReconNodeManager reconNodeManager = new ReconNodeManager(conf, scmStorageConfig,
+        mock(EventQueue.class), clusterMap, nodeTable, versionManager, reconContext);
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    datanodeDetails.setHostName("hostname1");
+    reconNodeManager.register(datanodeDetails, null, null);
+
+    long markTime = Time.now();
+    reconNodeManager.processLifeline(datanodeDetails);
+    long lastHeartbeatTime = reconNodeManager.getLastHeartbeat(datanodeDetails);
+    assertTrue(lastHeartbeatTime >= markTime);
   }
 }

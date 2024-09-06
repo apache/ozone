@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMLifelineResponseProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -311,6 +313,34 @@ public class SCMDatanodeProtocolServer implements
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.SEND_HEARTBEAT, auditMap)
         );
+      }
+    }
+  }
+
+  @Override
+  public SCMLifelineResponseProto sendLifeline(
+      SCMLifelineRequestProto lifelineRequest) throws IOException {
+    final OptionalLong term = getTermIfLeader();
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("datanodeUUID", lifelineRequest.getDatanodeDetails().getUuid());
+    term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
+    try {
+      heartbeatDispatcher.lifeline(lifelineRequest);
+      SCMLifelineResponseProto.Builder builder =
+          SCMLifelineResponseProto.newBuilder()
+              .setDatanodeUUID(lifelineRequest.getDatanodeDetails().getUuid());
+      term.ifPresent(builder::setTerm);
+      return builder.build();
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.LIFE_LINE,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.LIFE_LINE,
+            auditMap));
       }
     }
   }

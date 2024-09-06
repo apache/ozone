@@ -88,6 +88,8 @@ public interface StorageContainerNodeProtocol {
   List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto queueReport);
 
+  default void processLifeline(DatanodeDetails datanodeDetails) { }
+
   /**
    * Check if node is registered or not.
    * Return true if Node is registered and false otherwise.
