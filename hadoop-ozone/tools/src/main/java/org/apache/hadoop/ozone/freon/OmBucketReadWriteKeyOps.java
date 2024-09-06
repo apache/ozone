@@ -130,7 +130,7 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
       throws IOException {
     List<OzoneFileStatus> ozoneFileStatusList = bucket.listStatus(
         OzoneConsts.OM_KEY_PREFIX + readPath + OzoneConsts.OM_KEY_PREFIX, true,
-        "/", keyCountForRead, false);
+        "/", keyCountForRead);
     readCount += ozoneFileStatusList.size();
     return readCount;
   }

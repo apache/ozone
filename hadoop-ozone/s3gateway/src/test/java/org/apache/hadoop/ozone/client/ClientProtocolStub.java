@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -560,6 +561,13 @@ public class ClientProtocolStub implements ClientProtocol {
                                           String startKey, long numEntries,
                                           boolean allowPartialPrefixes)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
+      String bucketName, String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
     return null;
   }
 

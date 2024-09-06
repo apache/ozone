@@ -2459,7 +2459,7 @@ public class TestOzoneShellHA {
     // Check number of keys
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    List<OzoneFileStatus> files = bucket.listStatus("", true, "", 5, false);
+    List<OzoneFileStatus> files = bucket.listStatus("", true, "", 5);
     // Two keys should still exist, dirPath and keyPath
     assertEquals(2, files.size());
 
