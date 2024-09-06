@@ -45,7 +45,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
