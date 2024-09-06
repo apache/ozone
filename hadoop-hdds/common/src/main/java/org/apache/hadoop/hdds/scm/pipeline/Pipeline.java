@@ -119,7 +119,7 @@ public final class Pipeline {
     nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
-    stateEnterTime = Instant.now();
+    stateEnterTime = b.stateEnterTime != null ? b.stateEnterTime : Instant.now();
   }
 
   /**

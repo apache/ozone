@@ -22,6 +22,8 @@ import java.time.Instant;
 import java.util.Comparator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -39,6 +41,7 @@ import org.apache.ratis.util.Preconditions;
 /**
  * Class wraps ozone container info.
  */
+@JsonDeserialize(builder = ContainerInfo.Builder.class)
 public final class ContainerInfo implements Comparable<ContainerInfo> {
   private static final Comparator<ContainerInfo> COMPARATOR
       = Comparator.comparingLong(info -> info.getLastUsed().toEpochMilli());
@@ -359,11 +362,13 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   /**
    * Builder class for ContainerInfo.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
     private Clock clock = Clock.systemUTC();
+    private Instant lastUsed;
     private long stateEnterTime = clock.millis();
     private String owner;
     private long containerID;
@@ -398,9 +403,17 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
+    public Builder setUsed(long bytesUsed) {
+      return setUsedBytes(bytesUsed);
+    }
+
     public Builder setNumberOfKeys(long keyCount) {
       this.keys = keyCount;
       return this;
+    }
+
+    public Builder setKeys(long keyCount) {
+      return setNumberOfKeys(keyCount);
     }
 
     public Builder setStateEnterTime(long time) {
@@ -430,6 +443,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       this.clock = clock;
       this.stateEnterTime = clock.millis();
       return this;
+    }
+
+    public void setLastUsed(long lastUsed) {
+      this.lastUsed = Instant.ofEpochMilli(lastUsed);
     }
 
     public ContainerInfo build() {

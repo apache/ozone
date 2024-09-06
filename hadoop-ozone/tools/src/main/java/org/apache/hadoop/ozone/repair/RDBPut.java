@@ -22,7 +22,12 @@
 package org.apache.hadoop.ozone.repair;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.KeyDeserializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -46,8 +51,10 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -128,16 +135,15 @@ public class RDBPut
       System.out.println("7. class of value type:  " + valueClass);
 
       Object newValue;
+      ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+      objectMapper.enable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+      SimpleModule module = new SimpleModule();
+      module.addDeserializer(ImmutableList.class, new ImmutableListDeserializer(DatanodeDetails.class));
+      module.addKeySerializer(DatanodeDetails.class, new DatanodeDetailsKeySerializer());
+      module.addKeyDeserializer(DatanodeDetails.class, new DatanodeDetailsKeyDeserializer());
+      objectMapper.registerModule(module);
       try {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-        objectMapper.enable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
-        SimpleModule module = new SimpleModule();
-        module.addDeserializer(ImmutableList.class, new ImmutableListDeserializer(DatanodeDetails.class));
-        module.addKeySerializer(DatanodeDetails.class, new DatanodeDetailsKeySerializer());
-        module.addKeyDeserializer(DatanodeDetails.class, new DatanodeDetailsKeyDeserializer());
-        objectMapper.registerModule(module);
-
         newValue = objectMapper.readValue(value, valueClass);
         System.out.println("After objectMapper");
         System.out.println(newValue);
@@ -153,20 +159,24 @@ public class RDBPut
           .filter((m) -> m.getName().equals("toPersistedFormat"))
           .findFirst()
           .get();
-      System.out.println(" valueCodecClassToPersistedFormat: " + valueCodecClassToPersistedFormat.getName() + valueCodecClassToPersistedFormat.getReturnType());
+      System.out.println(" valueCodecClassToPersistedFormat: " + valueCodecClassToPersistedFormat.getName() +
+          valueCodecClassToPersistedFormat.getReturnType());
 
       Class<?> keyCodecClass = columnFamilyDefinition.getKeyCodec().getClass();
       Method keyCodecClassToPersistedFormat = Stream.of(keyCodecClass.getMethods())
           .filter((m) -> m.getName().equals("toPersistedFormat"))
           .findFirst()
           .get();
-      System.out.println(" mm2: " + keyCodecClassToPersistedFormat.getName() + keyCodecClassToPersistedFormat.getReturnType());
+      System.out.println(" mm2: " + keyCodecClassToPersistedFormat.getName() +
+          keyCodecClassToPersistedFormat.getReturnType());
 
-      byte[] valueBytes = (byte[]) valueCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getValueCodec(), valueClass.cast(newValue));
-      byte[] keyBytes = (byte[]) keyCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getKeyCodec(), keyClass.cast(key));
+      byte[] valueBytes = (byte[]) valueCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getValueCodec(),
+          valueClass.cast(newValue));
+      byte[] keyBytes = (byte[]) keyCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getKeyCodec(),
+          keyClass.cast(objectMapper.readValue(key, keyClass)));
 
-      System.out.println("Key Bytes: " + keyBytes);
-      System.out.println("Value Bytes: " + valueBytes);
+      System.out.println("Key Bytes: " + Arrays.toString(keyBytes));
+      System.out.println("Value Bytes: " + Arrays.toString(valueBytes));
 
       Object oldValue = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
       System.out.println("The original value was \n" + oldValue);
@@ -189,14 +199,6 @@ public class RDBPut
     return null;
   }
 
-
-/*
-  { \"\/voltest1\": {\r\n  \"metadata\" : { },\r\n  \"objectID\" : -4611686018427000000,\r\n  \"updateID\" : -1,\r\n  \"adminName\" : \"om\",\r\n  \"ownerName\" : \"om\",\r\n  \"volume\" : \"voltest1\",\r\n  \"creationTime\" : 1722579699999,\r\n  \"modificationTime\" : 1722579979329,\r\n  \"quotaInBytes\" : -1,\r\n  \"quotaInNamespace\" : -1,\r\n  \"usedNamespace\" : 0,\r\n  \"acls\" : [ {\r\n    \"type\" : \"USER\",\r\n    \"name\" : \"om\",\r\n    \"aclScope\" : \"ACCESS\"\r\n  }, {\r\n    \"type\" : \"GROUP\",\r\n    \"name\" : \"om\",\r\n    \"aclScope\" : \"ACCESS\"\r\n  } ],\r\n  \"refCount\" : 0\r\n}\r\n }
-
-  { \"\/voltest1\": {  \"metadata\" : { },  \"objectID\" : -4611686018427000000,  \"updateID\" : -1,  \"adminName\" : \"om\",  \"ownerName\" : \"om\",  \"volume\" : \"voltest1\",  \"creationTime\" : 1722579699999,  \"modificationTime\" : 1722579979329,  \"quotaInBytes\" : -1,  \"quotaInNamespace\" : -1,  \"usedNamespace\" : 0,  \"acls\" : [ {    \"type\" : \"USER\",    \"name\" : \"om\",    \"aclScope\" : \"ACCESS\"  }, {    \"type\" : \"GROUP\",    \"name\" : \"om\",    \"aclScope\" : \"ACCESS\"  } ],  \"refCount\" : 0} }
-
-  */
-
   @Override
   public Class<?> getParentType() {
     return RDBRepair.class;
@@ -214,6 +216,7 @@ class DatanodeDetailsKeySerializer extends JsonSerializer<DatanodeDetails> {
 class DatanodeDetailsKeyDeserializer extends KeyDeserializer {
   @Override
   public DatanodeDetails deserializeKey(String p, DeserializationContext context) throws IOException {
-    return DatanodeDetails.getFromProtoBuf(HddsProtos.DatanodeDetailsProto.parseFrom(p.getBytes()));
+    return DatanodeDetails.getFromProtoBuf(HddsProtos.DatanodeDetailsProto
+        .parseFrom(p.getBytes(StandardCharsets.UTF_8)));
   }
 }
