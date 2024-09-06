@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-const PipelineStatusList = [
+export const PipelineStatusList = [
   'OPEN',
   'CLOSING',
   'QUASI_CLOSED',
@@ -35,7 +35,7 @@ export type Pipeline = {
   leaderNode: string;
 }
 
-interface IPipelineResponse {
+export type PipelineResponse = {
   pipelineId: string;
   status: PipelineStatus;
   replicationType: string;
@@ -48,14 +48,14 @@ interface IPipelineResponse {
   containers: number;
 }
 
-interface IPipelinesResponse {
+export type PipelinesResponse = {
   totalCount: number;
-  pipelines: IPipelineResponse[];
+  pipelines: PipelineResponse[];
 }
 
-interface IPipelinesState {
+export type PipelinesState = {
   activeLoading: boolean;
-  activeDataSource: IPipelineResponse[];
+  activeDataSource: PipelineResponse[];
   activeTotalCount: number;
   lastUpdated: number;
 }
