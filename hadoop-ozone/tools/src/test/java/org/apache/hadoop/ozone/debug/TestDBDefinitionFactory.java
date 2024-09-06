@@ -34,7 +34,6 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_D
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import org.apache.hadoop.ozone.utils.DBDefinitionFactory;
 import org.junit.jupiter.api.Test;
 
 /**

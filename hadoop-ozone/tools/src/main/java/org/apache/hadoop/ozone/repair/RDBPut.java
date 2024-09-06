@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.ImmutableListDeserializer;
-import org.apache.hadoop.ozone.utils.DBDefinitionFactory;
+import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyDescriptor;
