@@ -15,28 +15,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
-const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
-const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
+import { Option } from "@/v2/components/select/multiSelect";
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  },
-  {
-    path: '/Buckets',
-    component: Buckets
-  },
-  {
-    path: '/Pipelines',
-    component: Pipelines
-  }
-];
+export const PipelineStatusList = [
+  'OPEN',
+  'CLOSING',
+  'QUASI_CLOSED',
+  'CLOSED',
+  'UNHEALTHY',
+  'INVALID',
+  'DELETED',
+  'DORMANT'
+] as const;
+export type PipelineStatus = typeof PipelineStatusList[number];
+
+export type Pipeline = {
+  pipelineId: string;
+  status: PipelineStatus;
+  replicationType: string;
+  leaderNode: string;
+  datanodes: string[];
+  lastLeaderElection: number;
+  duration: number;
+  leaderElections: number;
+  replicationFactor: string;
+  containers: number;
+}
+
+export type PipelinesResponse = {
+  totalCount: number;
+  pipelines: Pipeline[];
+}
+
+export type PipelinesState = {
+  activeDataSource: Pipeline[];
+  columnOptions: Option[];
+  lastUpdated: number;
+}
