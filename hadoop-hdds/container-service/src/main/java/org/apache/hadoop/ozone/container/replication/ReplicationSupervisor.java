@@ -77,7 +77,7 @@ public final class ReplicationSupervisor {
   private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
 
-  public static final Map<String, String> metricsMap = new HashMap<>();
+  public static final Map<String, String> METRICS_MAP = new HashMap<>();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -231,7 +231,7 @@ public final class ReplicationSupervisor {
           failureCounter.put(task.getMetricName(), new AtomicLong(0));
           timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
           skippedCounter.put(task.getMetricName(), new AtomicLong(0));
-          metricsMap.put(task.getMetricName(), task.getMetricDescriptionSegment());
+          METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
     }
