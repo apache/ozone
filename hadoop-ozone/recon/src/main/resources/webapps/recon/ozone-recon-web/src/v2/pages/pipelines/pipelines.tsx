@@ -86,6 +86,35 @@ type Datanode = {
   networkLocation: string;
 }
 
+type SummaryDatanodeDetails = {
+  level: number;
+  parent: unknown | null;
+  cost: number;
+  uuid: string;
+  uuidString: string;
+  ipAddress: string;
+  hostName: string;
+  ports: {
+    name: string;
+    value: number
+  }[];
+  certSerialId: null,
+  version: string | null;
+  setupTime: number;
+  revision: string | null;
+  buildDate: string;
+  persistedOpState: string;
+  persistedOpStateExpiryEpochSec: number;
+  initialVersion: number;
+  currentVersion: number;
+  signature: number;
+  decommissioned: boolean;
+  networkName: string;
+  networkLocation: string;
+  networkFullPath: string;
+  numOfLeaves: number;
+}
+
 const COLUMNS: ColumnsType<Pipeline> = [
   {
     title: 'Pipeline ID',
@@ -134,9 +163,20 @@ const COLUMNS: ColumnsType<Pipeline> = [
     title: 'Datanodes',
     dataIndex: 'datanodes',
     key: 'datanodes',
-    render: (datanodes: Datanode[]) => <div> {datanodes && datanodes.map(datanode =>
-      console.log(datanode))}
-    </div>
+    render: (datanodes: SummaryDatanodeDetails[]) => (
+      <div>
+        {datanodes.map(datanode => (
+          <div className='uuid-tooltip'>
+            <Tooltip
+              placement='top'
+              title={`UUID: ${datanode?.uuid ?? 'NA'}`}
+              getPopupContainer={(triggerNode) => triggerNode}>
+              {datanode?.hostName ?? 'N/A'}
+            </Tooltip>
+          </div>
+        ))}
+      </div>
+    )
   },
   {
     title: 'Leader',
@@ -145,13 +185,14 @@ const COLUMNS: ColumnsType<Pipeline> = [
     sorter: (a: Pipeline, b: Pipeline) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
-    title:
+    title: () => (
       <span>
         Last Leader Election&nbsp;
         <Tooltip title='Elapsed time since the current leader got elected. Only available if any metrics service providers like Prometheus is configured.'>
           <InfoCircleOutlined />
         </Tooltip>
-      </span>,
+      </span>
+    ),
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
@@ -166,13 +207,14 @@ const COLUMNS: ColumnsType<Pipeline> = [
     sorter: (a: Pipeline, b: Pipeline) => a.duration - b.duration
   },
   {
-    title:
+    title: () => (
       <span>
         No. of Elections&nbsp;
         <Tooltip title='Number of elections in this pipeline. Only available if any metrics service providers like Prometheus is configured.'>
           <InfoCircleOutlined />
         </Tooltip>
-      </span>,
+      </span>
+    ),
     dataIndex: 'leaderElections',
     key: 'leaderElections',
     render: (leaderElections: number) => leaderElections > 0 ?
@@ -182,7 +224,9 @@ const COLUMNS: ColumnsType<Pipeline> = [
 ];
 
 const defaultColumns = COLUMNS.map(column => ({
-  label: column.title as string,
+  label: (typeof column.title === 'string')
+    ? column.title
+    : (column.title as Function)().props.children[0],
   value: column.key as string,
 }));
 
@@ -197,7 +241,7 @@ const Pipelines: React.FC<{}> = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  
+
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   const loadData = () => {
@@ -231,7 +275,7 @@ const Pipelines: React.FC<{}> = () => {
   useEffect(() => {
     autoReloadHelper.startPolling();
     loadData();
-    return(() => {
+    return (() => {
       autoReloadHelper.stopPolling();
       cancelRequests([cancelSignal.current!]);
     })
@@ -277,7 +321,7 @@ const Pipelines: React.FC<{}> = () => {
                 selected={selectedColumns}
                 placeholder='Columns'
                 onChange={handleColumnChange}
-                onTagClose={() => {}}
+                onTagClose={() => { }}
                 fixedColumn='pipelineId'
                 columnLength={COLUMNS.length} />
             </div>
@@ -292,7 +336,7 @@ const Pipelines: React.FC<{}> = () => {
               onSearchChange={
                 (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
               }
-              onChange={() => {}} />
+              onChange={() => { }} />
           </div>
           <div>
             <Table
