@@ -32,6 +32,7 @@ class ContainerBalancerConfigBuilder {
   ContainerBalancerConfigBuilder(OzoneConfiguration ozoneConfig, int nodeCount) {
     config = ozoneConfig.getObject(ContainerBalancerConfiguration.class);
     config.setIterations(1);
+    config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * TestContainerBalancerTask.STORAGE_UNIT);
     config.setMaxSizeEnteringTarget(50 * TestContainerBalancerTask.STORAGE_UNIT);
     if (nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
