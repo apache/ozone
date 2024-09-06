@@ -15,10 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.ratis;
+package org.apache.hadoop.ozone.admin.ratis;
 
-import org.apache.hadoop.hdds.scm.cli.ratis.local.RatisLocalRaftMetaConfSubCommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.admin.ratis.local.RatisLocalRaftMetaConfSubCommand;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +38,6 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 /**
  * Tests for RatisLocalRaftMetaConfSubCommand class.
@@ -52,15 +50,12 @@ public class TestRatisLocalRaftMetaConfSubCommand {
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
   private RatisLocalRaftMetaConfSubCommand raftCmd;
-  private ScmClient scmClient;
 
   @BeforeEach
   public void setup() throws IOException {
     raftCmd = new RatisLocalRaftMetaConfSubCommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
-
-    scmClient = mock(ScmClient.class);
   }
 
   @AfterEach
@@ -99,7 +94,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
     CommandLine cmd = new CommandLine(raftCmd);
     cmd.parseArgs("-peers", "peer1|localhost:8080", "-path", metadataDir.toString());
 
-    raftCmd.execute(scmClient);
+    raftCmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Index in the original file is: 1"));
@@ -126,7 +121,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
 
     Exception exception = assertThrows(CommandLine.MissingParameterException.class, () -> {
       cmd.parseArgs();
-      raftCmd.execute(scmClient);
+      raftCmd.call();
     });
 
     assertEquals("Missing required options: '-peers=<peers>', '-path=<path>'", exception.getMessage());
@@ -138,7 +133,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
 
     Exception exception = assertThrows(CommandLine.MissingParameterException.class, () -> {
       cmd.parseArgs("-path", "/dummy/path");
-      raftCmd.execute(scmClient);
+      raftCmd.call();
     });
 
     assertEquals("Missing required option: '-peers=<peers>'", exception.getMessage());
@@ -150,7 +145,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
 
     Exception exception = assertThrows(CommandLine.MissingParameterException.class, () -> {
       cmd.parseArgs("-peers", "peer1|localhost:8080");
-      raftCmd.execute(scmClient);
+      raftCmd.call();
     });
 
     assertEquals("Missing required option: '-path=<path>'", exception.getMessage());
@@ -163,7 +158,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
     IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
       //invalid peers format (missing ':' separator)
       cmd.parseArgs("-peers", "peer1|localhost8080", "-path", "/dummy/path");
-      raftCmd.execute(scmClient);
+      raftCmd.call();
     });
 
     assertTrue(thrown.getMessage().contains("Failed to parse the server address parameter"));
@@ -173,7 +168,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
   public void testDuplicatePeersAddress() throws IOException {
     CommandLine cmd = new CommandLine(raftCmd);
     cmd.parseArgs("-peers", "localhost:8080,localhost:8080", "-path", "/dummy/path");
-    raftCmd.execute(scmClient);
+    raftCmd.call();
 
     String errorOutput = errContent.toString(DEFAULT_ENCODING);
     assertTrue(errorOutput.contains("Found duplicated address"));
@@ -183,7 +178,7 @@ public class TestRatisLocalRaftMetaConfSubCommand {
   public void testDuplicatePeersId() throws IOException {
     CommandLine cmd = new CommandLine(raftCmd);
     cmd.parseArgs("-peers", "peer1|localhost:8080,peer1|localhost:8081", "-path", "/dummy/path");
-    raftCmd.execute(scmClient);
+    raftCmd.call();
 
     String errorOutput = errContent.toString(DEFAULT_ENCODING);
     assertTrue(errorOutput.contains("Found duplicated ID"));

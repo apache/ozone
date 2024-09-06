@@ -15,11 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.ratis.local;
+package org.apache.hadoop.ozone.admin.ratis.local;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -36,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 /**
  * Handler to generate a new raft-meta.conf.
@@ -47,7 +46,7 @@ import java.util.Set;
     versionProvider = HddsVersionProvider.class
 )
 
-public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
+public class RatisLocalRaftMetaConfSubCommand implements Callable<Void> {
 
   @CommandLine.Option(names = { "-peers" },
       description = "Provide list of peers in format" +
@@ -61,10 +60,10 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
   private String path;
 
   @Override
-  public void execute(ScmClient scmClient) throws IOException {
+  public Void call() throws IOException {
     if (peers == null || path == null || peers.isEmpty() || path.isEmpty()) {
       System.err.println("peers or path cannot be empty.");
-      return;
+      return null;
     }
     Set<String> addresses = new HashSet<>();
     Set<String> ids = new HashSet<>();
@@ -79,7 +78,7 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
             "Failed to parse peer's ID and address for: " + idWithAddress + ", from option: -peers " + peers +
             ". Please provide list of peers in format " +
             "<[P0_ID|]P0_HOST:P0_PORT,[P1_ID|]P1_HOST:P1_PORT,[P2_ID|]P2_HOST:P2_PORT>");
-        return;
+        return null;
       }
 
       InetSocketAddress inetSocketAddress = parseInetSocketAddress(
@@ -89,7 +88,7 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
       if (addresses.contains(addressString)) {
         System.err.println("Found duplicated address: " + addressString +
             ". Please ensure the address of peers have no duplicated value.");
-        return;
+        return null;
       }
       addresses.add(addressString);
 
@@ -100,7 +99,7 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
         if (ids.contains(peerId)) {
           System.err.println("Found duplicated ID: " + peerId +
               ". Please ensure the ID of peers have no duplicated value.");
-          return;
+          return null;
         }
         ids.add(peerId);
       } else {
@@ -129,6 +128,7 @@ public class RatisLocalRaftMetaConfSubCommand extends ScmSubcommand {
       System.out.println("Generated new LogEntryProto info:\n" + newLogEntryProto);
       newLogEntryProto.writeTo(out);
     }
+    return null;
   }
 
   public static InetSocketAddress parseInetSocketAddress(String address) {

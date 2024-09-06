@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.ratis.local;
+package org.apache.hadoop.ozone.admin.ratis.local;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.scm.cli.ratis.RatisCommands;
+import org.apache.hadoop.ozone.admin.ratis.RatisCommands;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -39,7 +39,7 @@ import java.util.concurrent.Callable;
     }
 )
 @MetaInfServices(SubcommandWithParent.class)
-public class RatisLocalSubCommand implements Callable<Void>, SubcommandWithParent {
+public class RatisLocalCommand implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
