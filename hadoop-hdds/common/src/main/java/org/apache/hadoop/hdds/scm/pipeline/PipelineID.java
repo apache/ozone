@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -52,8 +50,7 @@ public final class PipelineID {
     return new PipelineID(UUID.randomUUID());
   }
 
-  @JsonCreator
-  public static PipelineID valueOf(@JsonProperty("id") UUID id) {
+  public static PipelineID valueOf(UUID id) {
     return new PipelineID(id);
   }
 

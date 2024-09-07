@@ -35,8 +35,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
@@ -60,7 +58,6 @@ import com.google.common.base.Preconditions;
 /**
  * Represents a group of datanodes which store a container.
  */
-@JsonDeserialize(builder = Pipeline.Builder.class)
 public final class Pipeline {
   /**
    * This codec is inconsistent since
@@ -119,7 +116,7 @@ public final class Pipeline {
     nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
-    stateEnterTime = b.stateEnterTime != null ? b.stateEnterTime : Instant.now();
+    stateEnterTime = Instant.now();
   }
 
   /**
@@ -546,20 +543,17 @@ public final class Pipeline {
   /**
    * Builder class for Pipeline.
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder {
     private PipelineID id = null;
     private ReplicationConfig replicationConfig = null;
     private PipelineState state = null;
     private Map<DatanodeDetails, Long> nodeStatus = null;
-    @JsonIgnore
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
-    private Instant stateEnterTime;
 
     public Builder() { }
 
@@ -572,7 +566,6 @@ public final class Pipeline {
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
-      this.stateEnterTime = pipeline.stateEnterTime;
       if (nodeStatus != null) {
         final ImmutableMap.Builder<DatanodeDetails, Integer> b = ImmutableMap.builder();
         for (DatanodeDetails dn : nodeStatus.keySet()) {
@@ -597,11 +590,6 @@ public final class Pipeline {
 
     public Builder setState(PipelineState state1) {
       this.state = state1;
-      return this;
-    }
-
-    public Builder setNodeStatus(Map<DatanodeDetails, Long> nodeStatus) {
-      this.nodeStatus = nodeStatus;
       return this;
     }
 
@@ -637,10 +625,6 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setCreationTimestamp(long createTimestamp) {
-      return setCreateTimestamp(createTimestamp);
-    }
-
     public Builder setCreateTimestamp(long createTimestamp) {
       this.creationTimestamp = Instant.ofEpochMilli(createTimestamp);
       return this;
@@ -648,11 +632,6 @@ public final class Pipeline {
 
     public Builder setSuggestedLeaderId(UUID uuid) {
       this.suggestedLeaderId = uuid;
-      return this;
-    }
-
-    public Builder setStateEnterTime(long i) {
-      this.stateEnterTime = Instant.ofEpochMilli(i);
       return this;
     }
 

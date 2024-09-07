@@ -59,13 +59,6 @@ public final class ContainerID implements Comparable<ContainerID> {
   }
 
   /**
-   * Constructor to support Jackson utilities for converting to/from json string.
-   */
-  public ContainerID() {
-    this.id = 0;
-  }
-
-  /**
    * Factory method for creation of ContainerID.
    * @param containerID  long
    * @return ContainerID.

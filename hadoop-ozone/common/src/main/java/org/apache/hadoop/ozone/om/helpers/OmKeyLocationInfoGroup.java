@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.google.common.base.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
@@ -38,10 +40,6 @@ public class OmKeyLocationInfoGroup {
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
-  public OmKeyLocationInfoGroup() {
-    locationVersionMap = null;
-    version = 0;
-  }
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
     this(version, locations, false);
@@ -76,19 +74,22 @@ public class OmKeyLocationInfoGroup {
     this.isMultipartKey = isMultipartKey;
   }
 
+  /**
+   * Dummy constructor to support Jackson utilities for
+   * converting between json string and OmKeyLocationInfoGroup object.
+   */
+  public OmKeyLocationInfoGroup() {
+    locationVersionMap = null;
+    version = 0;
+  }
+
+  @JsonSetter("isMultipartKey")
   public void setMultipartKey(boolean isMpu) {
     this.isMultipartKey = isMpu;
   }
 
+  @JsonGetter("isMultipartKey")
   public boolean isMultipartKey() {
-    return isMultipartKey;
-  }
-
-  public void setIsMultipartKey(boolean isMpu) {
-    this.isMultipartKey = isMpu;
-  }
-
-  public boolean getIsMultipartKey() {
     return isMultipartKey;
   }
 

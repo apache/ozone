@@ -82,6 +82,9 @@ public class ECReplicationConfig implements ReplicationConfig {
     this.ecChunkSize = ecChunkSize;
   }
 
+  /**
+   * Dummy constructor to support Jackson utilities for converting between json string and ECReplicationConfig object.
+   */
   public ECReplicationConfig() {
     this(0, 0, EcCodec.RS, 0);
   }

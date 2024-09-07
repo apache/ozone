@@ -92,11 +92,6 @@ public final class OmVolumeArgs extends WithObjectID
     this.refCount = b.refCount;
   }
 
-  /*public OmVolumeArgs() {
-    this.adminName = "om";
-    this.volume = "vol";
-    this.acls = null;
-  }*/
   public long getRefCount() {
     Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
@@ -380,7 +375,7 @@ public final class OmVolumeArgs extends WithObjectID
 
     public Builder setAcls(List<OzoneAcl> acl) {
       for (OzoneAcl a:acl) {
-        OzoneAclUtil.addAcl(acls, a);
+        addOzoneAcls(a);
       }
       return this;
     }

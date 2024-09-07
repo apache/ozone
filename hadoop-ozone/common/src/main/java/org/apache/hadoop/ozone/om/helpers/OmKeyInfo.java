@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
@@ -510,17 +511,13 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("omKeyLocationInfoGroups")
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
       if (omKeyLocationInfoList != null) {
         this.omKeyLocationInfoGroups.addAll(omKeyLocationInfoList);
       }
       return this;
-    }
-
-    public Builder setKeyLocationVersions(
-        List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
-      return setOmKeyLocationInfos(omKeyLocationInfoList);
     }
 
     public Builder addOmKeyLocationInfoGroup(OmKeyLocationInfoGroup
@@ -610,13 +607,10 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("isFile")
     public Builder setFile(boolean isAFile) {
       this.isFile = isAFile;
       return this;
-    }
-
-    public Builder setIsFile(boolean isAFile) {
-      return setFile(isAFile);
     }
 
     public Builder addTag(String key, String value) {
@@ -624,13 +618,10 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("tags")
     public Builder addAllTags(Map<String, String> keyTags) {
       tags.putAll(keyTags);
       return this;
-    }
-
-    public Builder setTags(Map<String, String> keyTags) {
-      return addAllTags(keyTags);
     }
 
     public Builder setExpectedDataGeneration(Long existingGeneration) {

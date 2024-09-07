@@ -88,6 +88,10 @@ public class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
+
+  /**
+   * Constructor to support Jackson utilities for converting between json string and OzoneAcl object.
+   */
   public OzoneAcl() {
     this.name = "name";
     this.type = ACLIdentityType.USER;

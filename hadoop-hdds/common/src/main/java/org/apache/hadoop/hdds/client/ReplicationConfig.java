@@ -35,9 +35,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEF
  * parameters..
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME, // Use the name of the class to identify type
-    include = JsonTypeInfo.As.PROPERTY, // Include type info as a property in the JSON
-    property = "typeOfReplicationConfig" // Name of the property that will hold the type information
+    use = JsonTypeInfo.Id.NAME,
+    include = JsonTypeInfo.As.PROPERTY,
+    property = "typeOfReplicationConfig"
 )
 @JsonSubTypes({
     @JsonSubTypes.Type(value = ECReplicationConfig.class, name = "ec"),

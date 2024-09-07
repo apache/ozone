@@ -54,7 +54,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -101,38 +100,26 @@ public class RDBPut
   public Void call() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     String dbPath = parent.getDbPath();
-    System.out.println("1. enter call: " + dbPath);
-
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
-    System.out.println("2. desc list:  " + cfDescList);
-
     String errorMessage = tableName + " is not in a column family in DB for the given path.";
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
-      System.out.println("3. in try block");
       ColumnFamilyHandle columnFamilyHandle = RocksDBUtils.getColumnFamilyHandle(tableName, cfHandleList);
-      System.out.println("4. columnFamilyHandle:  " + columnFamilyHandle);
       if (columnFamilyHandle == null) {
         throw new IllegalArgumentException(errorMessage);
       }
-
       DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
       DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(Paths.get(dbPath), new OzoneConfiguration());
-      System.out.println("5. dbDefinition:  " + dbDefinition);
       if (dbDefinition == null) {
         throw new IllegalArgumentException(errorMessage);
       }
-
       final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition = dbDefinition.getColumnFamily(tableName);
-      System.out.println("6. columnFamilyDefinition:  " + columnFamilyDefinition);
       if (columnFamilyDefinition == null) {
         throw new IllegalArgumentException(errorMessage);
       }
-
       Class<?> valueClass = columnFamilyDefinition.getValueType();
       Class<?> keyClass = columnFamilyDefinition.getKeyType();
-      System.out.println("7. class of value type:  " + valueClass);
 
       Object newValue;
       ObjectMapper objectMapper = new ObjectMapper();
@@ -145,48 +132,31 @@ public class RDBPut
       objectMapper.registerModule(module);
       try {
         newValue = objectMapper.readValue(value, valueClass);
-        System.out.println("After objectMapper");
-        System.out.println(newValue);
       } catch (IOException e) {
-        System.err.println("IOEX in objectMapper");
         e.printStackTrace();
         throw e;
       }
 
-      System.out.println("8. Converting to byte[]");
       Class<?> valueCodecClass = columnFamilyDefinition.getValueCodec().getClass();
       Method valueCodecClassToPersistedFormat = Stream.of(valueCodecClass.getMethods())
           .filter((m) -> m.getName().equals("toPersistedFormat"))
           .findFirst()
           .get();
-      System.out.println(" valueCodecClassToPersistedFormat: " + valueCodecClassToPersistedFormat.getName() +
-          valueCodecClassToPersistedFormat.getReturnType());
-
       Class<?> keyCodecClass = columnFamilyDefinition.getKeyCodec().getClass();
       Method keyCodecClassToPersistedFormat = Stream.of(keyCodecClass.getMethods())
           .filter((m) -> m.getName().equals("toPersistedFormat"))
           .findFirst()
           .get();
-      System.out.println(" mm2: " + keyCodecClassToPersistedFormat.getName() +
-          keyCodecClassToPersistedFormat.getReturnType());
 
       byte[] valueBytes = (byte[]) valueCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getValueCodec(),
           valueClass.cast(newValue));
       byte[] keyBytes = (byte[]) keyCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getKeyCodec(),
           keyClass.cast(objectMapper.readValue(key, keyClass)));
 
-      System.out.println("Key Bytes: " + Arrays.toString(keyBytes));
-      System.out.println("Value Bytes: " + Arrays.toString(valueBytes));
-
       Object oldValue = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
       System.out.println("The original value was \n" + oldValue);
 
-
-      System.out.println("------------------------");
-      //db.get().put(columnFamilyHandle, keyBytes, valueBytes);
-      Object newValuee = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
-      System.out.println("The new value is \n" + newValuee);
-      System.out.println("------------------------");
+      db.get().put(columnFamilyHandle, keyBytes, valueBytes);
 
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
