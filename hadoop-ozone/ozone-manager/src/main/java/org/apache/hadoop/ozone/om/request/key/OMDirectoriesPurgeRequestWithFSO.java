@@ -82,31 +82,22 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-
+    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
+        OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
       fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot) : null;
-
-      Map<Pair<String, String>, Boolean> previousSnapshotValidatedMap = Maps.newHashMap();
-
+      // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
+      // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
+      // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
+      // file/directory would be present in the newly created snapshot.
+      // Validating previous snapshot can ensure the chain hasn't changed.
+      UUID expectedPreviousSnapshotId = purgeDirsRequest.hasExpectedPreviousSnapshotID()
+          ? fromProtobuf(purgeDirsRequest.getExpectedPreviousSnapshotID()) : null;
+      validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+          expectedPreviousSnapshotId);
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
-        // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
-        // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
-        // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
-        // file/directory would be present in the newly created snapshot.
-        // Validating previous snapshot can ensure the chain hasn't changed.
-        boolean isPreviousSnapshotValid = previousSnapshotValidatedMap.computeIfAbsent(Pair.of(path.getVolumeName(),
-            path.getBucketName()),
-            (volumeBucketPair) -> validatePreviousSnapshotId(fromSnapshotInfo, volumeBucketPair.getLeft(),
-                volumeBucketPair.getRight(), omMetadataManager.getSnapshotChainManager(),
-                path.hasExpectedPathPreviousSnapshotUUID()
-                    ? fromProtobuf(path.getExpectedPathPreviousSnapshotUUID()) : null));
-
-        if (!isPreviousSnapshotValid) {
-          continue;
-        }
-
         validPurgePathRequests.add(path);
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -184,10 +175,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
       }
     } catch (IOException ex) {
-      // Case of IOException for fromProtobuf will not happen
-      // as this is created and send within OM
-      // only case of upgrade where compatibility is broken can have
-      throw new IllegalStateException(ex);
+      // Handling IOException thrown when snapshot is not found or previous snapshot validation fails.
+      LOG.error("Error occured while performing OMDirectoriesPurge. ", ex);
+      return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, ex));
     } finally {
       lockSet.stream().forEach(e -> omMetadataManager.getLock()
           .releaseWriteLock(BUCKET_LOCK, e.getKey(),
@@ -197,8 +187,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         entry.setValue(entry.getValue().copyObject());
       }
     }
-    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
-        getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), validPurgePathRequests, ozoneManager.isRatisEnabled(),
             getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);

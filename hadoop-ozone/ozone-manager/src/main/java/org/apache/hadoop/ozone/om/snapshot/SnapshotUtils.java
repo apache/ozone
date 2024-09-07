@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -288,6 +290,13 @@ public final class SnapshotUtils {
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
+  public static SnapshotInfo getLatestGlobalSnapshotInfo(OzoneManager ozoneManager,
+                                                         SnapshotChainManager snapshotChainManager) throws IOException {
+    Optional<UUID> latestGlobalSnapshot  = Optional.ofNullable(snapshotChainManager.getLatestGlobalSnapshotId());
+    return latestGlobalSnapshot.isPresent() ? getSnapshotInfo(ozoneManager, snapshotChainManager,
+        latestGlobalSnapshot.get()) : null;
+  }
+
   public static SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
                                                    OzoneManager ozoneManager,
                                                    SnapshotChainManager snapshotChainManager) throws IOException {
@@ -304,24 +313,23 @@ public final class SnapshotUtils {
   }
 
   // Validates previous snapshotId given a snapshotInfo or volumeName & bucketName. Incase snapshotInfo is null, this
-  // would be considered as AOS and previous snapshot becomes the latest snapshot for the bucket in the snapshot chain.
-  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo, String volumeName, String bucketName,
-                                                   SnapshotChainManager snapshotChainManager,
-                                                   UUID expectedPreviousSnapshotId) {
+  // would be considered as AOS and previous snapshot becomes the latest snapshot in the global snapshot chain.
+  // Would throw OMException if validation fails otherwise function would pass.
+  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+                                                SnapshotChainManager snapshotChainManager,
+                                                UUID expectedPreviousSnapshotId) throws IOException {
     try {
-      if (snapshotInfo != null && (!snapshotInfo.getVolumeName().equals(volumeName) ||
-          !snapshotInfo.getBucketName().equals(bucketName))) {
-        LOG.error("Volume & Bucket mismatch expected volume: {}, expected bucket: {} for snapshot: {}",
-            volumeName, bucketName, snapshotInfo);
-        return false;
+      UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
+          SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
+      if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
+        throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+                expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+                OMException.ResultCodes.INVALID_REQUEST);
       }
-      UUID previousSnapshotId = snapshotInfo == null ? SnapshotUtils.getLatestSnapshotId(volumeName, bucketName,
-          snapshotChainManager) : SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
-      return Objects.equals(expectedPreviousSnapshotId, previousSnapshotId);
     } catch (IOException e) {
-      LOG.error("Error while validating previous snapshot for volume: {}, bucket: {}, snapshot: {}", volumeName,
-          bucketName, snapshotInfo == null ? null : snapshotInfo.getName(), e);
+      LOG.error("Error while validating previous snapshot for snapshot: {}",
+          snapshotInfo == null ? null : snapshotInfo.getName(), e);
+      throw e;
     }
-    return false;
   }
 }

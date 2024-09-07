@@ -122,7 +122,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
     }
     // Delete rename entries.
     for (String key : renamedList) {
-      metadataManager.getSnapshotInfoTable().deleteWithBatch(batchOp, key);
+      metadataManager.getSnapshotRenamedTable().deleteWithBatch(batchOp, key);
     }
   }
 

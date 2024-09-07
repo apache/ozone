@@ -296,7 +296,6 @@ message OMRequest {
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests     = 135;
-  optional SnapshotPurgeAndMoveRequest      SnapshotPurgeAndMoveRequest    = 136;
 }
 
 message OMResponse {
@@ -1374,8 +1373,6 @@ message DeletedKeys {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
-    optional hadoop.hdds.UUID  expectedPathPreviousSnapshotUUID = 4;
-    repeated string renamedKeys = 5;
 }
 
 message PurgeKeysRequest {
@@ -1383,6 +1380,9 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+    optional hadoop.hdds.UUID  expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
+
 }
 
 message PurgeKeysResponse {
@@ -1405,6 +1405,7 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
+  optional hadoop.hdds.UUID  expectedPreviousSnapshotID = 3;
 }
 
 message PurgeDirectoriesResponse {
@@ -1417,9 +1418,6 @@ message PurgePathRequest {
   optional string deletedDir = 3;
   repeated KeyInfo deletedSubFiles = 4;
   repeated KeyInfo markDeletedSubDirs = 5;
-  optional hadoop.hdds.UUID  expectedPathPreviousSnapshotUUID = 6;
-  optional string volumeName = 7;
-  optional string bucketName = 8;
 }
 
 message DeleteOpenKeysRequest {
@@ -1998,11 +1996,6 @@ message SnapshotMoveKeyInfos {
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
   repeated string updatedSnapshotDBKey = 2 [deprecated = true];
-}
-
-message SnapshotPurgeAndMoveRequest {
-  required hadoop.hdds.UUID snapshotID = 1;
-  optional hadoop.hdds.UUID expectedNextSnapshotID = 2;
 }
 
 message SetSnapshotPropertyRequest {

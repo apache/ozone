@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
@@ -150,6 +151,20 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
       CheckExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
+      throws IOException;
+
+  /**
+   * Returns a list rename entries from the snapshotRenamedTable.
+   *
+   * @param count max number of keys to return.
+   * @param filter filter to apply on the entries.
+   * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
+   * underlying metadataManager.
+   * @throws IOException
+   */
+  List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
+      String volume, String bucket, String startKey,
+      CheckExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter, int count)
       throws IOException;
 
   /**

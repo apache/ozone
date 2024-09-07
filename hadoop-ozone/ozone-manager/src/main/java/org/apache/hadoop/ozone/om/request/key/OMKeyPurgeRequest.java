@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
@@ -66,8 +67,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest.getDeletedKeysList();
     List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest.getKeysToUpdateList();
-    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
-        purgeKeysRequest.getSnapshotTableKey() : null;
+    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ? purgeKeysRequest.getSnapshotTableKey() : null;
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -75,30 +75,31 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     final SnapshotInfo fromSnapshotInfo;
 
     try {
-      fromSnapshotInfo = fromSnapshot != null ? null : SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
+      fromSnapshotInfo = fromSnapshot == null ? null : SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
     } catch (IOException ex) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, ex));
     }
 
     List<String> keysToBePurgedList = new ArrayList<>();
-    List<String> renamedKeysToBePurged = new ArrayList<>();
 
-    Map<Pair<String, String>, Boolean> previousSnapshotValidatedMap = Maps.newHashMap();
+    // Validating previous snapshot since while purging rename keys, a snapshot create request could make this purge
+    // rename entry invalid on AOS since the key could be now present on the newly created snapshot since a rename
+    // request could have come through after creation of a snapshot. The purged deletedKey would not be even
+    // present.
+    UUID expectedPreviousSnapshotId = purgeKeysRequest.hasExpectedPreviousSnapshotID()
+        ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID()) : null;
+    try {
+      validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+          expectedPreviousSnapshotId);
+    } catch (IOException e) {
+      LOG.error("Previous snapshot validation failed.", e);
+      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
+    }
+
+
+    List<String> renamedKeysToBePurged = new ArrayList<>(purgeKeysRequest.getRenamedKeysList());
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
-      // Validating previous snapshot since while purging rename keys, a snapshot create request could make this purge
-      // rename entry invalid on AOS since the key could be now present on the newly created snapshot since a rename
-      // request could have come through after creation of a snapshot. The purged deletedKey would not be even
-      // present
-      boolean isPreviousSnapshotValid = previousSnapshotValidatedMap.computeIfAbsent(
-          Pair.of(bucketWithDeleteKeys.getVolumeName(), bucketWithDeleteKeys.getBucketName()),
-          (volumeBucketPair) -> validatePreviousSnapshotId(fromSnapshotInfo, volumeBucketPair.getLeft(),
-              volumeBucketPair.getRight(), omMetadataManager.getSnapshotChainManager(),
-              bucketWithDeleteKeys.hasExpectedPathPreviousSnapshotUUID()
-                  ? fromProtobuf(bucketWithDeleteKeys.getExpectedPathPreviousSnapshotUUID()) : null));
-      if (isPreviousSnapshotValid) {
-        renamedKeysToBePurged.addAll(bucketWithDeleteKeys.getRenamedKeysList());
         keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
-      }
     }
 
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {

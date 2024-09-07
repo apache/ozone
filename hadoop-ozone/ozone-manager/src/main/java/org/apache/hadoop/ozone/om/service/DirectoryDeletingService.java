@@ -87,8 +87,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
 
-  private static ClientId clientId = ClientId.randomId();
-
   // Use only a single thread for DirDeletion. Multiple threads would read
   // or write to same tables and can send deletion requests for same key
   // multiple times.
@@ -219,78 +217,87 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager())
             .getSnapshotChainManager();
+        // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+        // snapshotId since AOS could process multiple buckets in one iteration. While using path previous snapshot
+        // Id for a snapshot since it would process only one bucket.
+        UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
+            snapshotChainManager.getLatestGlobalSnapshotId() :
+            SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
         IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
-        ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager, snapshotChainManager,
-            currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-        ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager,
-            snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-        long startTime = Time.monotonicNow();
-        while (remainNum > 0 && deletedDirsIterator.hasNext()) {
-          pendingDeletedDirInfo = deletedDirsIterator.next();
-          // Always perform listing on AOS.
-          Optional<PurgePathRequest> request = prepareDeleteDirRequest(
-              remainNum, pendingDeletedDirInfo.getValue(),
-              pendingDeletedDirInfo.getKey(), allSubDirList,
-              getOzoneManager().getKeyManager(), reclaimableDirFilter.apply(pendingDeletedDirInfo),
-              reclaimableSubFileFilter);
 
-          if (request.isPresent() && isBufferLimitCrossed(ratisByteLimit, consumedSize,
-              request.get().getSerializedSize())) {
-            if (purgePathRequestList.size() != 0) {
-              // if message buffer reaches max limit, avoid sending further
-              remainNum = 0;
-              break;
-            }
-            // if directory itself is having a lot of keys / files,
-            // reduce capacity to minimum level
-            remainNum = MIN_ERR_LIMIT_PER_TASK;
-            request = prepareDeleteDirRequest(
+        try(ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager, snapshotChainManager,
+            currentSnapshotInfo, keyManager.getMetadataManager(), lock);
+            ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager,
+                snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
+          long startTime = Time.monotonicNow();
+          while (remainNum > 0 && deletedDirsIterator.hasNext()) {
+            pendingDeletedDirInfo = deletedDirsIterator.next();
+            // Always perform listing on AOS.
+            Optional<PurgePathRequest> request = prepareDeleteDirRequest(
                 remainNum, pendingDeletedDirInfo.getValue(),
                 pendingDeletedDirInfo.getKey(), allSubDirList,
                 getOzoneManager().getKeyManager(), reclaimableDirFilter.apply(pendingDeletedDirInfo),
                 reclaimableSubFileFilter);
-          }
-          if (!request.isPresent()) {
-            continue;
-          }
-          PurgePathRequest purgePathRequest = request.get();
-          consumedSize += purgePathRequest.getSerializedSize();
-          purgePathRequestList.add(purgePathRequest);
-          remainNum = remainNum - purgePathRequest.getDeletedSubFilesCount();
-          remainNum = remainNum - purgePathRequest.getMarkDeletedSubDirsCount();
-          // Count up the purgeDeletedDir, subDirs and subFiles
-          if (purgePathRequest.getDeletedDir() != null
-              && !purgePathRequest.getDeletedDir().isEmpty()) {
-            dirNum++;
-          }
-          subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
-          subFileNum += purgePathRequest.getDeletedSubFilesCount();
-        }
 
-        Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> retVal = optimizeDirDeletesAndSubmitRequest(
-            remainNum, dirNum, subDirNum, subFileNum,
-            allSubDirList, purgePathRequestList, snapshotTableKey, startTime,
-            ratisByteLimit - consumedSize,
-            getOzoneManager().getKeyManager(), reclaimableDirFilter, reclaimableSubFileFilter);
-        remainNum = retVal.getKey();
-
-        if (remainNum == initialRemainNum &&
-            retVal.getValue().map(OzoneManagerProtocolProtos.OMResponse::getSuccess).orElse(true)) {
-          List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
-          Map<String, Long> exclusiveReplicatedSizeMap = reclaimableSubFileFilter.getExclusiveReplicatedSizeMap();
-          Map<String, Long> exclusiveSizeMap = reclaimableSubFileFilter.getExclusiveSizeMap();
-          for (String snapshot : Stream.of(exclusiveSizeMap.keySet(),
-              exclusiveReplicatedSizeMap.keySet()).flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
-            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
-                exclusiveReplicatedSizeMap, snapshot));
-          }
-          //Updating directory deep clean flag of snapshot.
-          if (currentSnapshotInfo != null) {
-            setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(
-                currentSnapshotInfo.getTableKey()));
+            if (request.isPresent() && isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                request.get().getSerializedSize())) {
+              if (purgePathRequestList.size() != 0) {
+                // if message buffer reaches max limit, avoid sending further
+                remainNum = 0;
+                break;
+              }
+              // if directory itself is having a lot of keys / files,
+              // reduce capacity to minimum level
+              remainNum = MIN_ERR_LIMIT_PER_TASK;
+              request = prepareDeleteDirRequest(
+                  remainNum, pendingDeletedDirInfo.getValue(),
+                  pendingDeletedDirInfo.getKey(), allSubDirList,
+                  getOzoneManager().getKeyManager(), reclaimableDirFilter.apply(pendingDeletedDirInfo),
+                  reclaimableSubFileFilter);
+            }
+            if (!request.isPresent()) {
+              continue;
+            }
+            PurgePathRequest purgePathRequest = request.get();
+            consumedSize += purgePathRequest.getSerializedSize();
+            purgePathRequestList.add(purgePathRequest);
+            remainNum = remainNum - purgePathRequest.getDeletedSubFilesCount();
+            remainNum = remainNum - purgePathRequest.getMarkDeletedSubDirsCount();
+            // Count up the purgeDeletedDir, subDirs and subFiles
+            if (purgePathRequest.getDeletedDir() != null
+                && !purgePathRequest.getDeletedDir().isEmpty()) {
+              dirNum++;
+            }
+            subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
+            subFileNum += purgePathRequest.getDeletedSubFilesCount();
           }
 
-          submitSetSnapshotRequest(setSnapshotPropertyRequests);
+          Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> retVal = optimizeDirDeletesAndSubmitRequest(
+              remainNum, dirNum, subDirNum, subFileNum,
+              allSubDirList, purgePathRequestList, snapshotTableKey, startTime,
+              ratisByteLimit - consumedSize,
+              getOzoneManager().getKeyManager(), reclaimableDirFilter, reclaimableSubFileFilter,
+              expectedPreviousSnapshotId);
+          remainNum = retVal.getKey();
+
+          if (remainNum == initialRemainNum &&
+              retVal.getValue().map(OzoneManagerProtocolProtos.OMResponse::getSuccess).orElse(true)) {
+            List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+            Map<String, Long> exclusiveReplicatedSizeMap = reclaimableSubFileFilter.getExclusiveReplicatedSizeMap();
+            Map<String, Long> exclusiveSizeMap = reclaimableSubFileFilter.getExclusiveSizeMap();
+            for (String snapshot : Stream.of(exclusiveSizeMap.keySet(),
+                exclusiveReplicatedSizeMap.keySet()).flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
+              setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
+                  exclusiveReplicatedSizeMap, snapshot));
+            }
+            //Updating directory deep clean flag of snapshot.
+            if (currentSnapshotInfo != null) {
+              setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(
+                  currentSnapshotInfo.getTableKey()));
+            }
+
+            submitSetSnapshotRequest(setSnapshotPropertyRequests);
+          }
         }
 
       } catch (IOException e) {

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -65,14 +68,12 @@ import org.apache.ratis.util.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
@@ -82,8 +83,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
@@ -94,7 +93,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
-  private static ClientId clientId = ClientId.randomId();
+  protected static ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -115,26 +114,65 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.runCount = new AtomicLong(0);
   }
 
-  //Removes deleted file from AOS and moves if it is not referenced in the previous snapshot.
-  // Returns True if it can be deleted and false if it cannot be deleted.
-  private boolean deleteKeyIfNotReferencedInPreviousSnapshot(long volumeId, OmBucketInfo bucketInfo,
-      OmKeyInfo deletedKeyInfo, SnapshotInfo prevSnapshotInfo, SnapshotInfo prevPrevSnapshotInfo,
-      Table<String, String> renamedTable, Table<String, String> prevRenamedTable,
-      Table<String, OmKeyInfo> previousKeyTable, Table<String, OmKeyInfo> previousPrevKeyTable,
-      Map<String, Long> exclusiveSizeMap, Map<String, Long> exclusiveReplicatedSizeMap) throws IOException {
-    if (isKeyReclaimable(previousKeyTable, renamedTable, deletedKeyInfo, bucketInfo, volumeId, null)) {
+  // TODO: Move this util class.
+  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
+                                                OmKeyInfo deletedKeyInfo) {
+
+    if (prevKeyInfo == null && deletedKeyInfo == null) {
+      LOG.debug("Both prevKeyInfo and deletedKeyInfo are null.");
       return true;
     }
-    calculateExclusiveSize(prevSnapshotInfo, prevPrevSnapshotInfo, deletedKeyInfo, bucketInfo, volumeId,
-        renamedTable, previousKeyTable, prevRenamedTable, previousPrevKeyTable, exclusiveSizeMap,
-        exclusiveReplicatedSizeMap);
-    return false;
+    if (prevKeyInfo == null || deletedKeyInfo == null) {
+      LOG.debug("prevKeyInfo: '{}' or deletedKeyInfo: '{}' is null.",
+          prevKeyInfo, deletedKeyInfo);
+      return false;
+    }
+    // For hsync, Though the blockLocationInfo of a key may not be same
+    // at the time of snapshot and key deletion as blocks can be appended.
+    // If the objectId is same then the key is same.
+    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
+      return true;
+    }
+
+    if (prevKeyInfo.getKeyLocationVersions().size() !=
+        deletedKeyInfo.getKeyLocationVersions().size()) {
+      return false;
+    }
+
+    OmKeyLocationInfoGroup deletedOmKeyLocation =
+        deletedKeyInfo.getLatestVersionLocations();
+    OmKeyLocationInfoGroup prevOmKeyLocation =
+        prevKeyInfo.getLatestVersionLocations();
+
+    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
+      return false;
+    }
+
+    List<OmKeyLocationInfo> deletedLocationList =
+        deletedOmKeyLocation.getLocationList();
+    List<OmKeyLocationInfo> prevLocationList =
+        prevOmKeyLocation.getLocationList();
+
+    if (deletedLocationList.size() != prevLocationList.size()) {
+      return false;
+    }
+
+    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
+      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
+      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
+      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       Map<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey) throws IOException {
+      List<String> renameEntries,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
     long startTime = Time.monotonicNow();
     Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
@@ -156,7 +194,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (blockDeletionResults != null) {
       startTime = Time.monotonicNow();
       if (isRatisEnabled()) {
-        purgeResult = submitPurgeKeysRequest(blockDeletionResults, keysToModify, snapTableKey);
+        purgeResult = submitPurgeKeysRequest(blockDeletionResults, keysToModify, renameEntries,
+            snapTableKey, expectedPreviousSnapshotId);
       } else {
         // TODO: Once HA and non-HA paths are merged, we should have
         //  only one code path here. Purge keys should go through an
@@ -211,9 +250,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
-      String snapTableKey) {
-    Map<Pair<String, String>, Pair<List<String>, List<String>>> purgeKeysMapPerBucket =
-        new HashMap<>();
+      String snapTableKey, UUID expectedPreviousSnapshotId) {
+    Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket = new HashMap<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
@@ -246,18 +284,25 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       purgeKeysRequest.setSnapshotTableKey(snapTableKey);
     }
 
+    if (expectedPreviousSnapshotId != null) {
+      purgeKeysRequest.setExpectedPreviousSnapshotID(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+
     // Add keys to PurgeKeysRequest bucket wise.
-    for (Map.Entry<Pair<String, String>, Pair<List<String>, List<String>>> entry :
-        purgeKeysMapPerBucket.entrySet()) {
+    for (Map.Entry<Pair<String, String>, List<String>> entry : purgeKeysMapPerBucket.entrySet()) {
       Pair<String, String> volumeBucketPair = entry.getKey();
       DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
           .setVolumeName(volumeBucketPair.getLeft())
           .setBucketName(volumeBucketPair.getRight())
-          .addAllKeys(entry.getValue().getKey())
-          .addAllRenamedKeys(entry.getValue().getValue())
+          .addAllKeys(entry.getValue())
           .build();
       purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
     }
+    // Adding rename entries to be purged.
+    if (renameEntriesToBeDeleted != null) {
+      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
+    }
+
 
     List<SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
@@ -348,7 +393,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Parse Volume and Bucket Name from ObjectKey and add it to given map of
    * keys to be purged per bucket.
    */
-  private void addToMap(Map<Pair<String, String>, Pair<List<String>, List<String>>> map, String objectKey) {
+  private void addToMap(Map<Pair<String, String>, List<String>> map, String objectKey) {
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
     Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
@@ -358,20 +403,24 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
     if (!map.containsKey(volumeBucketPair)) {
-      map.put(volumeBucketPair, Pair.of(new ArrayList<>(), new ArrayList<>()));
+      map.put(volumeBucketPair, new ArrayList<>());
     }
-    map.get(volumeBucketPair).getKey().add(objectKey);
-
+    map.get(volumeBucketPair).add(objectKey);
   }
 
   protected OzoneManagerProtocolProtos.OMResponse submitPurgePaths(
-      List<PurgePathRequest> requests, String snapTableKey) {
+      List<PurgePathRequest> requests, String snapTableKey, UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
     if (snapTableKey != null) {
       purgeDirRequest.setSnapshotTableKey(snapTableKey);
     }
+
+    if (expectedPreviousSnapshotId != null) {
+      purgeDirRequest.setExpectedPreviousSnapshotID(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+
     purgeDirRequest.addAllDeletedPath(requests);
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
@@ -396,20 +445,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
     return null;
-  }
-
-  protected OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
-      final long volumeId, final long bucketId, final List<OzoneManagerProtocolProtos.KeyInfo> purgeDeletedFiles) {
-    // Put all keys to be purged in a list
-    PurgePathRequest.Builder purgePathsRequest = PurgePathRequest.newBuilder();
-    purgePathsRequest.setVolumeId(volumeId);
-    purgePathsRequest.setBucketId(bucketId);
-
-    for (OzoneManagerProtocolProtos.KeyInfo purgeFile : purgeDeletedFiles) {
-      purgePathsRequest.addDeletedSubFiles(purgeFile);
-    }
-
-    return purgePathsRequest.build();
   }
 
   private OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
@@ -512,7 +547,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<PurgePathRequest> purgePathRequestList, String snapTableKey, long startTime, int remainingBufLimit,
       KeyManager keyManager,
       CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> subDirPurgeChecker,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker) {
+      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker,
+      UUID expectedPreviousSnapshotId) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -558,7 +594,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
     OzoneManagerProtocolProtos.OMResponse response = null;
     if (!purgePathRequestList.isEmpty()) {
-      response = submitPurgePaths(purgePathRequestList, snapTableKey);
+      response = submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -679,20 +715,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected boolean isBufferLimitCrossed(
       int maxLimit, int cLimit, int increment) {
     return cLimit + increment >= maxLimit;
-  }
-
-  protected SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo,
-                                             SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
-      throws IOException {
-    SnapshotInfo currSnapInfo = snapInfo;
-    if (chainManager.hasPreviousPathSnapshot(currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
-
-      UUID prevPathSnapshot = chainManager.previousPathSnapshot(
-          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
-      String tableKey = chainManager.getTableKey(prevPathSnapshot);
-      return omSnapshotManager.getSnapshotInfo(tableKey);
-    }
-    return null;
   }
 
   protected boolean isKeyReclaimable(
@@ -1003,8 +1025,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       return snapshotInfos;
     }
 
-    // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
-    private void initializePreviousSnapshotsFromChain(String volume, String bucket) throws IOException {
+    private boolean validateExistingLastNSnapshotsInChain(String volume, String bucket) throws IOException {
       List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
       List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
           .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
@@ -1012,16 +1033,24 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<UUID> existingSnapshotIds = previousOmSnapshots.stream()
           .map(omSnapshotReferenceCounted -> omSnapshotReferenceCounted == null ? null :
               omSnapshotReferenceCounted.get().getSnapshotID()).collect(Collectors.toList());
-      // If snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
-      if (!expectedSnapshotIds.equals(existingSnapshotIds)) {
+      return expectedSnapshotIds.equals(existingSnapshotIds);
+    }
+
+    // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
+    private void initializePreviousSnapshotsFromChain(String volume, String bucket) throws IOException {
+      // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
+      if (!validateExistingLastNSnapshotsInChain(volume, bucket)) {
         close();
         try {
           // Acquire lock only on last N-1 snapshot & current snapshot(AOS if it is null).
-          List<UUID> lockIds = new ArrayList<>(expectedSnapshotIds.subList(1, existingSnapshotIds.size()));
+          List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
+          List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
+              .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
+              .collect(Collectors.toList());
+          List<UUID> lockIds = new ArrayList<>(expectedSnapshotIds.subList(1, expectedSnapshotIds.size()));
           lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
           if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
-            expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
             for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
               if (snapshotInfo != null) {
                 // For AOS fail operation if any of the previous snapshots are not active. currentSnapshotInfo for
@@ -1056,8 +1085,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     @Override
     public Boolean apply(Table.KeyValue<String, V> keyValue) throws IOException {
-      initializePreviousSnapshotsFromChain(getVolumeName(keyValue), getBucketName(keyValue));
-      return isReclaimable(keyValue);
+      String volume = getVolumeName(keyValue);
+      String bucket = getBucketName(keyValue);
+      initializePreviousSnapshotsFromChain(volume, bucket);
+      boolean isReclaimable = isReclaimable(keyValue);
+      // This is to ensure the reclamation ran on the same previous snapshot and no change occurred in the chain
+      // while processing the entry.
+      return isReclaimable && validateExistingLastNSnapshotsInChain(volume, bucket);
     }
 
     protected abstract String getVolumeName(Table.KeyValue<String, V> keyValue) throws IOException;
@@ -1247,5 +1281,4 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       return getMetadataManager().splitRenameKey(keyValue.getKey())[1];
     }
   }
-
 }

@@ -186,7 +186,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // TODO: [SNAPSHOT] Assign actual data size once we have the
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
-      SnapshotUtils.setTransactionInfoInSnapshot(snapshotInfo, termIndex);
       addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager,
           termIndex.getIndex());
 
@@ -269,6 +268,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
       snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
+
       Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getLatestSnapshotInfo(
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), ozoneManager, snapshotChainManager));
       Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?

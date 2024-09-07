@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -104,7 +105,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Map<String, String> snapshotSeekMap;
-  private static ClientId clientId = ClientId.randomId();
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -230,6 +230,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       String volume = currentSnapshotInfo == null ? null : currentSnapshotInfo.getVolumeName();
       String bucket = currentSnapshotInfo == null ? null : currentSnapshotInfo.getBucketName();
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
+
       String startKey = "";
       int initialRemainNum = remainNum;
       boolean successStatus = true;
@@ -242,50 +243,71 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager())
             .getSnapshotChainManager();
+        // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+        // snapshotId since AOS could process multiple buckets in one iteration. While using path previous snapshot
+        // Id for a snapshot since it would process only one bucket.
+        UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
+            snapshotChainManager.getLatestGlobalSnapshotId() :
+            SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
+
         IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
 
-        ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(omSnapshotManager, snapshotChainManager,
+        // Purge deleted Keys in the deletedTable && rename entries in the snapshotRenamedTable which doesn't have a
+        // reference in the previous snapshot.
+        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(omSnapshotManager, snapshotChainManager,
             currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-        ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
-            omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-        List<Table.KeyValue<String, String>> renamedTableEntries = keyManager.getRenamesKeyEntries(volume, bucket,
-            startKey, renameEntryFilter, remainNum);
-        submitPurgeKeysRequest()
+             ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
+                 omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
+          List<String> renamedTableEntries =
+              keyManager.getRenamesKeyEntries(volume, bucket, startKey, renameEntryFilter, remainNum).stream()
+              .map(entry -> {
+                try {
+                  return entry.getKey();
+                } catch (IOException e) {
+                  throw new UncheckedIOException(e);
+                }
+              }).collect(Collectors.toList());
+          remainNum -= renamedTableEntries.size();
 
-        PendingKeysDeletion pendingKeysDeletion = keyManager.getPendingDeletionKeys(volume, bucket, startKey,
-            reclaimableKeyFilter, remainNum);
-        List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
-        if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
-           Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, getOzoneManager().getKeyManager(),
-              pendingKeysDeletion.getKeysToModify(), snapshotTableKey);
-          remainNum -= purgeResult.getKey();
-          successStatus = purgeResult.getValue();
-        }
-
-        // Checking remainNum is greater than zero and not equal to the initial value if there were some keys to
-        // reclaim. This is to check if
-        if (remainNum > 0 && successStatus) {
-          List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
-          Map<String, Long> exclusiveReplicatedSizeMap = reclaimableKeyFilter.getExclusiveReplicatedSizeMap();
-          Map<String, Long> exclusiveSizeMap = reclaimableKeyFilter.getExclusiveSizeMap();
-          for (String snapshot : Stream.of(exclusiveSizeMap.keySet(),
-              exclusiveReplicatedSizeMap.keySet()).flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
-            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
-                exclusiveReplicatedSizeMap, snapshot));
+          // Get pending keys that can be deleted
+          PendingKeysDeletion pendingKeysDeletion = keyManager.getPendingDeletionKeys(volume, bucket, startKey,
+              reclaimableKeyFilter, remainNum);
+          List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
+          //submit purge requests if there are renamed entries to be purged or keys to be purged.
+          if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
+             Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, getOzoneManager().getKeyManager(),
+                pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
+            remainNum -= purgeResult.getKey();
+            successStatus = purgeResult.getValue();
           }
 
-          //Updating directory deep clean flag of snapshot.
-          if (currentSnapshotInfo != null) {
-            setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(
-                snapshotTableKey));
+          // Checking remainNum is greater than zero and not equal to the initial value if there were some keys to
+          // reclaim. This is to check if
+          if (remainNum > 0 && successStatus) {
+            List<SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+            Map<String, Long> exclusiveReplicatedSizeMap = reclaimableKeyFilter.getExclusiveReplicatedSizeMap();
+            Map<String, Long> exclusiveSizeMap = reclaimableKeyFilter.getExclusiveSizeMap();
+            List<String> previousPathSnapshotsInChain =
+                Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
+                .flatMap(Collection::stream).distinct().collect(Collectors.toList());
+            for (String snapshot : previousPathSnapshotsInChain) {
+              setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
+                  exclusiveReplicatedSizeMap, snapshot));
+            }
+
+            //Updating directory deep clean flag of snapshot.
+            if (currentSnapshotInfo != null) {
+              setSnapshotPropertyRequests.add(getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(
+                  snapshotTableKey));
+            }
+            submitSetSnapshotRequest(setSnapshotPropertyRequests);
           }
-
-
-          submitSetSnapshotRequest(setSnapshotPropertyRequests);
         }
 
       } catch (IOException e) {
         throw e;
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
       }
       return remainNum;
     }
