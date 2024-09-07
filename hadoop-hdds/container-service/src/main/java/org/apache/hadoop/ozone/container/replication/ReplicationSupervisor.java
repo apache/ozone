@@ -472,9 +472,7 @@ public final class ReplicationSupervisor {
       return 0;
     }
     AtomicLong total = new AtomicLong(0);
-    counter.forEach((key, value) -> {
-      total.set(total.get() + value.get());
-    });
+    counter.forEach((key, value) -> total.addAndGet(value.get()));
     return total.get();
   }
 
