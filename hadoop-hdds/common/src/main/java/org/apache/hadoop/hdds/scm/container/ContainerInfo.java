@@ -98,7 +98,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     pipelineID = b.pipelineID;
     usedBytes = b.used;
     numberOfKeys = b.keys;
-    lastUsed = b.clock.instant();
+    lastUsed = b.lastUsed != null ? b.lastUsed : b.clock.instant();
     state = b.state;
     stateEnterTime = Instant.ofEpochMilli(b.stateEnterTime);
     owner = b.owner;
