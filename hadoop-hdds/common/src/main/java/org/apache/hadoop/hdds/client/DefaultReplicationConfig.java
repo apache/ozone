@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.client;
 
-import com.fasterxml.jackson.annotation.JsonGetter;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -71,9 +70,12 @@ public class DefaultReplicationConfig {
     return new DefaultReplicationConfig(replicationConfig);
   }
 
-  @JsonGetter("ecReplicationConfig")
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
+  }
+
+  public ECReplicationConfig getEcReplicationConfig() {
+    return ecReplicationConfig;
   }
 
   public HddsProtos.DefaultReplicationConfig toProto() {

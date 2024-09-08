@@ -153,10 +153,8 @@ public class RDBPut
       byte[] keyBytes = (byte[]) keyCodecClassToPersistedFormat.invoke(columnFamilyDefinition.getKeyCodec(),
           keyClass.cast(objectMapper.readValue(key, keyClass)));
 
-      Object oldValue = RocksDBUtils.getValue(db, columnFamilyHandle, key, columnFamilyDefinition.getValueCodec());
-      System.out.println("The original value was \n" + oldValue);
-
       db.get().put(columnFamilyHandle, keyBytes, valueBytes);
+      System.out.println("Record put in db successfully.");
 
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + dbPath);

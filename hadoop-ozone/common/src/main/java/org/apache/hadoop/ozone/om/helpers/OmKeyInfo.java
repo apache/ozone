@@ -511,7 +511,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    @JsonSetter("omKeyLocationInfoGroups")
+    @JsonSetter("keyLocationVersions")
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
       if (omKeyLocationInfoList != null) {
