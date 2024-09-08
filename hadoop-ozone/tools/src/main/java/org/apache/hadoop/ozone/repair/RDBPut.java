@@ -64,7 +64,9 @@ import java.util.stream.Stream;
  */
 @CommandLine.Command(
     name = "put",
-    description = "CLI to put a record to a table.",
+    description = "CLI to put a record to a table. Only the following om.db tables are currently supported: " +
+        "volumeTable, bucketTable, keyTable, openKeyTable, fileTable, openFileTable, " +
+        "directoryTable, deletedDirectoryTable, s3SecretTable.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
