@@ -90,7 +90,7 @@ public class OzoneAcl {
   }
 
   /**
-   * Constructor to support Jackson utilities for converting between json string and OzoneAcl object.
+   * Dummy constructor to support Jackson utilities for converting between json string and OzoneAcl object.
    */
   public OzoneAcl() {
     this.name = "name";

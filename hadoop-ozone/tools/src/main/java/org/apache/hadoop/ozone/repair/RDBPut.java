@@ -60,7 +60,7 @@ import java.util.stream.Stream;
 
 
 /**
- * Tool to update the highest term-index in transactionInfoTable.
+ * Tool to add or update a record in any table in a DB.
  */
 @CommandLine.Command(
     name = "put",

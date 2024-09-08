@@ -635,6 +635,7 @@ public final class Pipeline {
       return this;
     }
 
+
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);
       return this;
