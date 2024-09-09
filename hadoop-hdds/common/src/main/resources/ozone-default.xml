@@ -1582,8 +1582,8 @@
     <value>false</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
     <description>
-      Whether to enable Datanode to send lifeline to SCM and Recon.
-      The default value is false.
+      It specifies whether Datanode will send lifeline
+      to SCM and Recon. The default value is false.
     </description>
   </property>
   <property>

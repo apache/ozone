@@ -182,11 +182,6 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
         .getRegisterResponse();
   }
 
-  /**
-   * Send by datanode to SCM.
-   * @param lifelineRequest Lifeline request containing the message body.
-   * @return Lifeline Response.
-   */
   @Override
   public SCMLifelineResponseProto sendLifeline(SCMLifelineRequestProto lifelineRequest)
       throws IOException {
