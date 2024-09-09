@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -2613,33 +2612,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   public void testSetReplication() throws IOException {
-    String testKeyName = "testKey" + RandomStringUtils.randomNumeric(4);
-    Path testKeyPath = new Path(bucketPath, testKeyName);
-    OzoneBucket ozoneBucket =
-        objectStore.getVolume(volumeName).getBucket(bucketName);
-    try (OzoneOutputStream outputStream = ozoneBucket.createKey(testKeyName, 1,
-        RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.ONE),
-        new HashMap<>())) {
-      outputStream.write(RandomUtils.nextBytes(1));
-    }
-    OzoneKeyDetails key = getKey(testKeyPath, false);
-    assertEquals(HddsProtos.ReplicationType.RATIS,
-        key.getReplicationConfig().getReplicationType());
-    assertEquals(ReplicationFactor.ONE.toString(),
-        key.getReplicationConfig().getReplication());
-    ofs.setReplication(testKeyPath, (short) 3);
-    key = getKey(testKeyPath, false);
-    assertEquals(ReplicationFactor.THREE.toString(),
-        key.getReplicationConfig().getReplication());
-    IOException exception = assertThrows(IOException.class,
-        () -> ofs.setReplication(testKeyPath, (short) 5),
-        "Does not throw IOException");
-    assertTrue(exception.getMessage().contains("not supported"));
-    exception = assertThrows(IOException.class,
-        () -> ofs.setReplication(testKeyPath, (short) 2),
-        "Does not throw IOException");
-    assertTrue(exception.getMessage().contains("not supported"));
+    OzoneBucket ozoneBucket = objectStore.getVolume(volumeName)
+        .getBucket(bucketName);
+    OzoneFileSystemTests.testSetReplication(ofs, ozoneBucket, bucketPath);
   }
 
 }

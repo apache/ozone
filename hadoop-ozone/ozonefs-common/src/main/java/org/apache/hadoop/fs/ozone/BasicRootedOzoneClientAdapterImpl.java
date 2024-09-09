@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -61,7 +60,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
@@ -72,7 +70,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
@@ -101,8 +98,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
@@ -375,22 +370,10 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public InputStream readFile(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ, 1);
-    OFSPath ofsPath = new OFSPath(pathStr,
-        config);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     String key = ofsPath.getKeyName();
-    try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-      return bucket.readFile(key).getInputStream();
-    } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
-        throw new FileNotFoundException(
-            ex.getResult().name() + ": " + ex.getMessage());
-      } else {
-        throw ex;
-      }
-    }
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return OzoneClientUtils.readFile(bucket, key);
   }
 
   protected void incrementCounter(Statistic objectsRead, long count) {
@@ -401,35 +384,8 @@ public class BasicRootedOzoneClientAdapterImpl
   public void setReplication(String key, short replication) throws IOException {
     OFSPath ofsPath = new OFSPath(key, config);
     OzoneBucket bucket = getBucket(ofsPath, false);
-    OzoneKeyDetails keyDetails = null;
-    try {
-      keyDetails = bucket.getKey(ofsPath.getKeyName());
-    } catch (OMException ome) {
-      // if key does not exist, do nothing
-      if (ome.getResult() == KEY_NOT_FOUND) {
-        return;
-      }
-      throw ome;
-    }
-    ReplicationConfig newReplication = OzoneClientUtils
-        .resolveClientSideReplicationConfig(replication, null,
-            null, config);
-    if (newReplication == null) {
-      throw new IOException(
-          "Replication factor of " + replication + " not supported");
-    }
-    if (newReplication.getReplication()
-        .equals(keyDetails.getReplicationConfig().getReplication())) {
-      return;
-    }
-    try (InputStream inputStream = readFile(key);
-        OzoneOutputStream outputStream = bucket.rewriteKey(ofsPath.getKeyName(),
-            keyDetails.getDataSize(), keyDetails.getGeneration(),
-            newReplication, keyDetails.getMetadata())) {
-      int chunkSize = (int) config.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-      IOUtils.copyBytes(inputStream, outputStream, chunkSize);
-    }
+    String keyName = ofsPath.getKeyName();
+    OzoneClientUtils.setReplication(config, bucket, keyName, replication);
   }
 
   @Override
