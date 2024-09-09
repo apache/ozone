@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -41,6 +40,8 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -58,8 +59,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -94,6 +97,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final int keyLimitPerTask;
   private final int snapshotDeletionPerTask;
   private final int ratisByteLimit;
+  private MultiLocks<UUID> snapshotIdLocks;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
@@ -120,6 +124,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+    IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+    this.snapshotIdLocks = new MultiLocks<>(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, true);
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -158,6 +164,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // since purge transaction will add entries and it could be processed by mistake.
           if ((nextSnapshot != null && isSnapshotDeepCleaned(nextSnapshot)) ||
               (nextToNextSnapshot != null && isSnapshotDeepCleaned(nextToNextSnapshot))) {
+            continue;
+          }
+          // Acquire write lock on current snapshot and next snapshot in chain.
+          if (!snapshotIdLocks.acquireLock(Arrays.asList(snapInfo.getSnapshotId(),
+              Optional.ofNullable(nextSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null)))
+              .isLockAcquired()) {
             continue;
           }
           try(ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
@@ -211,6 +223,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             } else {
               snapshotsToBePurged.add(snapInfo);
             }
+          } finally {
+            snapshotIdLocks.releaseLock();
           }
           successRunCount.incrementAndGet();
           snapshotLimit--;
