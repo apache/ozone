@@ -468,12 +468,11 @@ public final class ReplicationSupervisor {
   }
 
   private long getCount(Map<String, AtomicLong> counter) {
-    if (counter.isEmpty()) {
-      return 0;
+    long total = 0;
+    for (Map.Entry<String, AtomicLong> entry : counter.entrySet()) {
+      total += entry.getValue().get();
     }
-    AtomicLong total = new AtomicLong(0);
-    counter.forEach((key, value) -> total.addAndGet(value.get()));
-    return total.get();
+    return total;
   }
 
   public long getReplicationSuccessCount() {
