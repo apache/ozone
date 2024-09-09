@@ -449,7 +449,7 @@ public final class OzoneManagerDoubleBuffer {
   private List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
     final List<Queue<Entry>> response = new ArrayList<>();
     final Set<OzoneManagerProtocolProtos.Type> standaloneBatchCmdTypes = ImmutableSet.of(
-        OzoneManagerProtocolProtos.Type.SnapshotPurge, OzoneManagerProtocolProtos.Type.SnapshotPurgeAndMove);
+        OzoneManagerProtocolProtos.Type.SnapshotPurge, OzoneManagerProtocolProtos.Type.CreateSnapshot);
     final List<Function<OMResponse, Boolean>> standaloneBatchConditions =
         ImmutableList.of(OMResponse::hasCreateSnapshotResponse,
         (omResponse) -> standaloneBatchCmdTypes.contains(omResponse.getCmdType()));

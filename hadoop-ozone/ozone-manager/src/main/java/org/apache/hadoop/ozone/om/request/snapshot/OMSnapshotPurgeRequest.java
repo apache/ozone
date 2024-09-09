@@ -110,17 +110,17 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
         SnapshotInfo nextSnapshot =
             SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
-        Optional<SnapshotInfo> previousSnapshot = Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(ozoneManager,
-            snapshotChainManager, fromSnapshot));
-        Optional<SnapshotInfo> previousPrevSnapshot = previousSnapshot.isPresent() ?
-            Optional.ofNullable(SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager,
-                previousSnapshot.get())) : Optional.empty();
+        SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null
+            : SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, nextSnapshot);
+        SnapshotInfo previousSnapshot = SnapshotUtils.getPreviousSnapshot(ozoneManager,
+            snapshotChainManager, fromSnapshot);
+        SnapshotInfo previousPrevSnapshot = previousSnapshot == null ? null
+            : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, previousSnapshot);
         // Step 1: Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
         // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't
         // get purged.
-        updateNextSnapshotInfoFields(nextSnapshot, omMetadataManager, trxnLogIndex,
-            !(previousSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE &&
-            previousPrevSnapshot.map(SnapshotInfo::getSnapshotStatus).orElse(SNAPSHOT_ACTIVE) == SNAPSHOT_ACTIVE));
+        updateNextSnapshotInfoFields(nextSnapshot, nextToNextSnapshot, previousSnapshot, previousPrevSnapshot,
+            omMetadataManager, trxnLogIndex);
 
 
         // Step 2: Update the snapshot chain.
@@ -151,12 +151,18 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  private void updateNextSnapshotInfoFields(SnapshotInfo nextSnapshot, OmMetadataManagerImpl omMetadataManager,
-                                            long trxnLogIndex, boolean deepCleanFlagValue) throws IOException {
+  private void updateNextSnapshotInfoFields(SnapshotInfo nextSnapshot,
+                                            SnapshotInfo nextToNextSnapshot,
+                                            SnapshotInfo previousSnapshot,
+                                            SnapshotInfo previousToPreviousSnapshot,
+                                            OmMetadataManagerImpl omMetadataManager,
+                                            long trxnLogIndex) throws IOException {
     if (nextSnapshot != null) {
-      // Setting next snapshot deep clean to false, Since the
-      // current snapshot is deleted. We can potentially
-      // reclaim more keys in the next snapshot.
+      // Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
+      // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't
+      // get purged. There could be potentially more keys to be reclaimed.
+      boolean deepCleanFlagValue = (previousSnapshot == null || previousSnapshot.getSnapshotStatus() == SNAPSHOT_ACTIVE)
+          && (previousToPreviousSnapshot == null || previousToPreviousSnapshot.getSnapshotStatus() == SNAPSHOT_ACTIVE);
       nextSnapshot.setDeepClean(deepCleanFlagValue);
       nextSnapshot.setDeepCleanedDeletedDir(deepCleanFlagValue);
 
@@ -164,6 +170,21 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
           CacheValue.get(trxnLogIndex, nextSnapshot));
       updatedSnapshotInfos.put(nextSnapshot.getTableKey(), nextSnapshot);
+    }
+
+    if (nextToNextSnapshot != null) {
+      // Reset the deep clean flag for the next active snapshot if and only if the last 2 snapshots in the
+      // chain are active, otherwise set it to prevent deep cleaning from running till the deleted snapshots don't
+      // get purged.
+      boolean deepCleanFlagValue = (previousSnapshot == null || previousSnapshot.getSnapshotStatus() == SNAPSHOT_ACTIVE)
+          && (nextSnapshot == null || nextSnapshot.getSnapshotStatus() == SNAPSHOT_ACTIVE);
+      nextToNextSnapshot.setDeepClean(deepCleanFlagValue);
+      nextToNextSnapshot.setDeepCleanedDeletedDir(deepCleanFlagValue);
+
+      // Update table cache first
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextToNextSnapshot.getTableKey()),
+          CacheValue.get(trxnLogIndex, nextSnapshot));
+      updatedSnapshotInfos.put(nextToNextSnapshot.getTableKey(), nextSnapshot);
     }
 
   }

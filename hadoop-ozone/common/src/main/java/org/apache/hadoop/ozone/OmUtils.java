@@ -334,7 +334,6 @@ public final class OmUtils {
     case RenameSnapshot:
     case SnapshotMoveDeletedKeys:
     case SnapshotPurge:
-    case SnapshotPurgeAndMove:
     case RecoverLease:
     case SetTimes:
     case AbortExpiredMultiPartUploads:

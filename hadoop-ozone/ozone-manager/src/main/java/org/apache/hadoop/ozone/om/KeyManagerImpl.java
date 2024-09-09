@@ -755,36 +755,10 @@ public class KeyManagerImpl implements KeyManager {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null && filter.apply(kv)) {
           deletedKeyEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue().cloneOmKeyInfoList()));
-
-          for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
-
-            // Skip the key if the filter doesn't allow the file to be deleted.
-            if (filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
-                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
-                  .addAllBlockIDs(blockIDS).build();
-              blockGroupList.add(keyBlocks);
-              currentCount++;
-            } else {
-              notReclaimableKeyInfo.addOmKeyInfo(info);
-            }
-          }
-
-          List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
-
-          // If all the versions are not reclaimable, then modify key by just purging the key that can be purged.
-          if (notReclaimableKeyInfoList.size() > 0 &&
-              notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
-            keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
-          }
-          keyBlocksList.addAll(blockGroupList);
         }
       }
-      nextPageStartKey = delKeyIter.hasNext() ? delKeyIter.next().getKey() : null;
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify, nextPageStartKey);
+    return deletedKeyEntries;
   }
 
   @Override

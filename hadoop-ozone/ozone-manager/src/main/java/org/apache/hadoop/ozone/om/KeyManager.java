@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.util.CheckExceptionOperation;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -272,6 +273,19 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(String volume, String bucket)
       throws IOException;
+
+  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int count)
+      throws IOException {
+    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(count);
+    try (TableIterator<String, ? extends  Table.KeyValue<String, OmKeyInfo>> iterator =
+             getPendingDeletionDirs(volume, bucket)) {
+      while (deletedDirEntries.size() < count && iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        deletedDirEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
+      }
+      return deletedDirEntries;
+    }
+  }
 
   /**
    * Returns all sub directories under the given parent directory.

@@ -28,18 +28,25 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
@@ -49,12 +56,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -124,7 +134,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       getRunCount().incrementAndGet();
 
       try {
+        int remaining = keyLimitPerTask;
         Iterator<UUID> iterator = snapshotChainManager.iterator(true);
+        List<SnapshotInfo> snapshotsToBePurged = new ArrayList<>();
         long snapshotLimit = snapshotDeletionPerTask;
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotChainManager, iterator.next());
@@ -148,9 +160,64 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               (nextToNextSnapshot != null && isSnapshotDeepCleaned(nextToNextSnapshot))) {
             continue;
           }
+          try(ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
+              snapInfo.getBucketName(),
+              snapInfo.getName())) {
+            KeyManager snapshotKeyManager = snapshot.get().getKeyManager();
+            int moveCount = 0;
+            // Get all entries from deletedKeyTable.
+            List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries =
+                snapshotKeyManager.getDeletedKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(),
+                    null, (kv) -> true, remaining);
+            moveCount += deletedKeyEntries.size();
+            // Get all entries from deletedDirTable.
+            List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = snapshotKeyManager.getDeletedDirEntries(
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), remaining - moveCount);
+            moveCount += deletedDirEntries.size();
+            // Get all entries from snapshotRenamedTable.
+            List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null , (kv) -> true, remaining - moveCount);
+            moveCount += renameEntries.size();
+            if (moveCount > 0) {
+              try {
+                submitSnapshotMoveDeletedKeys(snapInfo, deletedKeyEntries.stream().map(kv -> {
+                      try {
+                        return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey()).addAllKeyInfos(kv.getValue()
+                            .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT_VERSION))
+                            .collect(Collectors.toList())).build();
+                      } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                      }
+                    }).collect(Collectors.toList()),
+                    renameEntries.stream().map(kv -> {
+                      try {
+                        return HddsProtos.KeyValue.newBuilder().setKey(kv.getKey()).setValue(kv.getValue()).build();
+                      } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                      }
+                    }).collect(Collectors.toList()),
+                    deletedDirEntries.stream()
+                    .map(kv -> {
+                      try {
+                        return kv.getKey();
+                      } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                      }
+                    }).collect(Collectors.toList()));
+                remaining -= moveCount;
+              } catch (UncheckedIOException e) {
+                throw e.getCause();
+              }
+            } else {
+              snapshotsToBePurged.add(snapInfo);
+            }
+          }
           successRunCount.incrementAndGet();
-          submitSnapshotMoveDeletedKeys(snapInfo, nextSnapshot);
           snapshotLimit--;
+        }
+        if (!snapshotsToBePurged.isEmpty()) {
+          submitSnapshotPurgeRequest(snapshotsToBePurged.stream().map(SnapshotInfo::getTableKey)
+              .collect(Collectors.toList()));
         }
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
@@ -176,21 +243,34 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
 
     public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        List<SnapshotMoveKeyInfos> toReclaimList,
-        List<SnapshotMoveKeyInfos> toNextDBList,
-        List<HddsProtos.KeyValue> renamedList,
-        List<String> dirsToMove) throws InterruptedException {
+        List<SnapshotMoveKeyInfos> keysToMove, List<HddsProtos.KeyValue> renamedList,
+        List<String> dirsToMove) {
 
       OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
           OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest.newBuilder()
               .setFromSnapshot(snapInfo.getProtobuf());
 
       OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-          .addAllReclaimKeys(toReclaimList)
-          .addAllNextDBKeys(toNextDBList)
+          .addAllNextDBKeys(keysToMove)
           .addAllRenamedKeys(renamedList)
           .addAllDeletedDirsToMove(dirsToMove)
+          .setPurgeMovedKeys(true)
           .build();
+      if (isBufferLimitCrossed(ratisByteLimit, 0, moveDeletedKeys.getSerializedSize())) {
+        int remaining = MIN_ERR_LIMIT_PER_TASK;
+        keysToMove = keysToMove.subList(0, Math.min(remaining, keysToMove.size()));
+        remaining -= keysToMove.size();
+        renamedList = renamedList.subList(0, Math.min(remaining, renamedList.size()));
+        remaining -= renamedList.size();
+        dirsToMove = dirsToMove.subList(0, Math.min(remaining, dirsToMove.size()));
+        remaining -= dirsToMove.size();
+        moveDeletedKeys = moveDeletedKeysBuilder
+            .addAllNextDBKeys(keysToMove)
+            .addAllRenamedKeys(renamedList)
+            .addAllDeletedDirsToMove(dirsToMove)
+            .setPurgeMovedKeys(true)
+            .build();
+      }
 
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(Type.SnapshotMoveDeletedKeys)
