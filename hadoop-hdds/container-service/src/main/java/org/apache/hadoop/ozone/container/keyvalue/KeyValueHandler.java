@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
@@ -976,19 +977,43 @@ public class KeyValueHandler extends Handler {
    *
    */
   private void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
-                                            ChunkBuffer data, KeyValueContainer kvContainer) {
+                                            ChunkBuffer data, KeyValueContainer kvContainer,
+                                            BlockData blockData) {
 
-    // TODO: Set OzoneConsts.CHUNK_OVERWRITE in ChunkInfo to overwrite chunks.
     try {
       Preconditions.checkNotNull(chunkInfo);
-      Preconditions.checkNotNull(blockID);
       Preconditions.checkNotNull(data);
+      long writeChunkStartTime = Time.monotonicNowNanos();
       checkContainerClose(kvContainer);
 
       DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
 
+      // Set CHUNK_OVERWRITE to overwrite existing chunk.
+      chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
       chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
           dispatcherContext);
+
+      // Increment write stats for WriteChunk after write.
+      metrics.incContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
+      metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
+
+      if (blockData != null) {
+        long putBlockStartTime = Time.monotonicNowNanos();
+        // Add ChunkInfo to BlockData to be persisted in RocksDb
+        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+        chunks.add(chunkInfo.getProtoBufMessage());
+        blockData.setChunks(chunks);
+
+        // To be set from the Replica's BCSId
+        blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
+
+        blockManager.putBlock(kvContainer, blockData);
+        ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+        final long numBytes = blockDataProto.getSerializedSize();
+        // Increment write stats for PutBlock after write.
+        metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+        metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - putBlockStartTime);
+      }
     } catch (IOException ex) {
       LOG.error("Write Chunk failed for closed container", ex);
     }
