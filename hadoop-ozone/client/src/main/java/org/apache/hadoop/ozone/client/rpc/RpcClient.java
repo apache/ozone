@@ -2162,9 +2162,11 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
     OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
-    return ozoneManagerClient
-        .listStatusLight(keyArgs, recursive, startKey, numEntries,
-            allowPartialPrefixes);
+    // Disable listStatusLight in Ozone-1.4.x due to compatibility issues with Ozone-1.4.x listStatusLight.
+    return ozoneManagerClient.listStatus(keyArgs, recursive, startKey, numEntries, allowPartialPrefixes)
+        .stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
   }
 
   /**
