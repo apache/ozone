@@ -669,7 +669,7 @@ public class KeyManagerImpl implements KeyManager {
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
-            if (filter.apply(Table.newKeyValue(kv.getKey(), info))) {
+            if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());

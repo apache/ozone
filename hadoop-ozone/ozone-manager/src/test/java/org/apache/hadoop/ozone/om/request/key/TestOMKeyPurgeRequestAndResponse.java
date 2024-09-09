@@ -103,10 +103,9 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .addAllKeys(deletedKeys)
-        .addAllRenamedKeys(renamedEntries)
         .build();
     PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder()
-        .addDeletedKeys(deletedKeysInBucket);
+        .addDeletedKeys(deletedKeysInBucket).addAllRenamedKeys(renamedEntries);
 
     if (snapshotDbKey != null) {
       purgeKeysRequest.setSnapshotTableKey(snapshotDbKey);
@@ -261,7 +260,8 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
 
-      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deletedKeyNames, snapInfo, null);
+      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deleteKeysAndRenamedEntry.getKey(),
+          deleteKeysAndRenamedEntry.getValue(), snapInfo, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.
