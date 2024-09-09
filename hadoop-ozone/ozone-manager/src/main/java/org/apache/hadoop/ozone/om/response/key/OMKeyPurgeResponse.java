@@ -93,6 +93,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
+      omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
     } else {
       processKeys(batchOperation, omMetadataManager);
       processKeysToUpdate(batchOperation, omMetadataManager);
