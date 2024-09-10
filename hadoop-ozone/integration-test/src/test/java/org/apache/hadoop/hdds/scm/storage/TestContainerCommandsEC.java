@@ -834,8 +834,8 @@ public class TestContainerCommandsEC {
       BlockOutputStreamEntry blockOutputStreamEntry = out.getKeyOutputStream().getStreamEntries().get(0);
       BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
       long entryContainerID = entryBlockID.getContainerID();
-      Pipeline pipeline = blockOutputStreamEntry.getPipeline();
-      Map<DatanodeDetails, Integer> replicaIndexes = pipeline.getReplicaIndexes();
+      Pipeline entryPipeline = blockOutputStreamEntry.getPipeline();
+      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexes();
       try {
         for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
           DatanodeDetails key = entry.getKey();
@@ -844,13 +844,9 @@ public class TestContainerCommandsEC {
           Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
               .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
           XceiverClientSpi client = xceiverClientManager.acquireClient(
-              createSingleNodePipeline(pipeline, key, value));
+              createSingleNodePipeline(entryPipeline, key, value));
           try {
-            ListBlockResponseProto listResponse = ContainerProtocolCalls
-                .listBlock(client, entryContainerID, null, Integer.MAX_VALUE, cToken);
-            if (listResponse != null && listResponse.getBlockDataCount() > 0) {
-              ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
-            }
+            ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
           } finally {
             xceiverClientManager.releaseClient(client, false);
           }
