@@ -185,17 +185,16 @@ public class TestReconTasks {
   }
 
   /**
-   * This test verifies the count of MISSING and EMPTY_MISSING containers.
+   * This test verifies the count of MISSING containers.
    * Following steps being followed in a single DN cluster.
    *    --- Allocate a container in SCM.
    *    --- Client writes the chunk and put block to only DN successfully.
    *    --- Shuts down the only DN.
    *    --- Since container to key mapping doesn't have any key mapped to
-   *        container, missing container will be marked EMPTY_MISSING.
+   *        container, missing container will be marked MISSING.
    *    --- Add a key mapping entry to key container mapping table for the
    *        container added.
-   *    --- Now container will no longer be marked as EMPTY_MISSING and just
-   *        as MISSING.
+   *    --- Now container will no longer be marked as MISSING.
    *    --- Restart the only DN in cluster.
    *    --- Now container no longer will be marked as MISSING.
    *
@@ -236,14 +235,14 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
+    // Verify that the container is marked as MISSING
     LambdaTestUtils.await(25000, 1000, () -> {
-      List<UnhealthyContainers> allEmptyMissingContainers =
+      List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.
-                      EMPTY_MISSING,
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.size() == 1);
+      return (allMissingContainers.size() == 1);
     });
 
 
@@ -255,7 +254,7 @@ public class TestReconTasks {
       reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
     }
 
-    // Verify again and now container is not empty missing but just missing.
+    // Verify again and now container is still marked as MISSING, not EMPTY_MISSING.
     LambdaTestUtils.await(25000, 1000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
@@ -263,36 +262,6 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
       return (allMissingContainers.size() == 1);
-    });
-
-    LambdaTestUtils.await(25000, 1000, () -> {
-      List<UnhealthyContainers> allEmptyMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.
-                      EMPTY_MISSING,
-                  0, 1000);
-      return (allEmptyMissingContainers.isEmpty());
-    });
-
-    // Now remove keys from container. This data is used to
-    // identify if container is empty in terms of keys mapped to container.
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      reconContainerMetadataManager
-          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 0L);
-      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
-    }
-
-    // Check existing container state in UNHEALTHY_CONTAINER table
-    // will be updated as EMPTY_MISSING
-    LambdaTestUtils.await(25000, 1000, () -> {
-      List<UnhealthyContainers> allEmptyMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.
-                      EMPTY_MISSING,
-                  0, 1000);
-      return (allEmptyMissingContainers.size() == 1);
     });
 
     // Now restart the cluster and verify the container is no longer missing.

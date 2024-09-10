@@ -396,13 +396,9 @@ public class TestContainerHealthTaskRecordGenerator {
     status =
         new ContainerHealthStatus(emptyContainer, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    records = ContainerHealthTask.ContainerHealthRecords
+    ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, (long) 345678,
             unhealthyContainerStateStatsMap);
-    assertEquals(1, records.size());
-    rec = records.get(0);
-    assertEquals(UnHealthyContainerStates.EMPTY_MISSING.toString(),
-        rec.getContainerState());
 
     assertEquals(3, rec.getExpectedReplicaCount().intValue());
     assertEquals(0, rec.getActualReplicaCount().intValue());
@@ -590,7 +586,7 @@ public class TestContainerHealthTaskRecordGenerator {
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
-    // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
+    // EMPTY_MISSING containers, but dont add it to the unhealthy container table.
     unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
       UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();

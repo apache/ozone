@@ -21,13 +21,9 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -73,6 +69,8 @@ import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to test a single run of the Container Health Task.
@@ -193,7 +191,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 6));
+        (unHealthyContainersTableHandle.count() == 5));
     UnhealthyContainers rec =
         unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
@@ -211,10 +209,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         unhealthyContainers.get(0).getContainerId().longValue());
     assertEquals(0,
         unhealthyContainers.get(0).getActualReplicaCount().intValue());
-
-    rec = unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
-    assertEquals("EMPTY_MISSING", rec.getContainerState());
-    assertEquals(3, rec.getReplicaDelta().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(7L).get(0);
     assertEquals("MISSING", rec.getContainerState());
@@ -260,7 +254,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     placementMock.setMisRepWhenDnPresent(null);
 
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 4));
+        (unHealthyContainersTableHandle.count() == 3));
     rec = unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
     assertEquals(1, rec.getReplicaDelta().intValue());
@@ -268,10 +262,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // This container is now healthy, it should not be in the table any more
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(2L).size());
-
-    rec = unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
-    assertEquals("EMPTY_MISSING", rec.getContainerState());
-    assertEquals(3, rec.getReplicaDelta().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(7L).get(0);
     assertEquals("MISSING", rec.getContainerState());
@@ -285,20 +275,10 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(5L).size());
 
-    // Again make container Id 7 as empty which was missing as well, so in next
-    // container health task run, this container also should be deleted from
-    // UNHEALTHY_CONTAINERS table because we want to cleanup any existing
-    // EMPTY and MISSING containers from UNHEALTHY_CONTAINERS table.
-    when(reconContainerMetadataManager.getKeyCountForContainer(7L)).thenReturn(0L);
-    LambdaTestUtils.await(6000, 1000, () -> {
-      UnhealthyContainers emptyMissingContainer = unHealthyContainersTableHandle.fetchByContainerId(7L).get(0);
-      return ("EMPTY_MISSING".equals(emptyMissingContainer.getContainerState()));
-    });
-
     // Just check once again that count doesn't change, only state of
     // container 7 changes from MISSING to EMPTY_MISSING
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 4));
+        (unHealthyContainersTableHandle.count() == 3));
   }
 
   @Test
@@ -373,15 +353,10 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
     LambdaTestUtils.await(6000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 2));
+        (unHealthyContainersTableHandle.count() == 1));
     UnhealthyContainers rec =
         unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("MISSING", rec.getContainerState());
-    assertEquals(3, rec.getReplicaDelta().intValue());
-
-    rec =
-        unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
-    assertEquals("EMPTY_MISSING", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
 
     ReconTaskStatus taskStatus =
@@ -473,64 +448,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           "The inserted container state does not match for state " +
               state.name() + ".");
     }
-  }
-
-  @Test
-  public void testNegativeSizeContainers() throws Exception {
-    // Setup mock objects and test environment
-    UnhealthyContainersDao unhealthyContainersDao =
-        getDao(UnhealthyContainersDao.class);
-    ContainerHealthSchemaManager containerHealthSchemaManager =
-        new ContainerHealthSchemaManager(
-            getSchemaDefinition(ContainerSchemaDefinition.class),
-            unhealthyContainersDao);
-    ReconStorageContainerManagerFacade scmMock =
-        mock(ReconStorageContainerManagerFacade.class);
-    ContainerManager containerManagerMock = mock(ContainerManager.class);
-    StorageContainerServiceProvider scmClientMock =
-        mock(StorageContainerServiceProvider.class);
-    ReconContainerMetadataManager reconContainerMetadataManager =
-        mock(ReconContainerMetadataManager.class);
-    MockPlacementPolicy placementMock = new MockPlacementPolicy();
-
-    // Mock container info setup
-    List<ContainerInfo> mockContainers = getMockContainers(3);
-    when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
-    when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
-    when(containerManagerMock.getContainers(any(ContainerID.class),
-        anyInt())).thenReturn(mockContainers);
-    for (ContainerInfo c : mockContainers) {
-      when(containerManagerMock.getContainer(
-          c.containerID())).thenReturn(c);
-      when(scmClientMock.getContainerWithPipeline(
-          c.getContainerID())).thenReturn(new ContainerWithPipeline(c, null));
-      when(containerManagerMock.getContainer(c.containerID())
-          .getUsedBytes()).thenReturn(Long.valueOf(-10));
-    }
-
-    // Verify the table is initially empty
-    assertThat(unhealthyContainersDao.findAll()).isEmpty();
-
-    // Setup and start the container health task
-    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
-    ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
-    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
-    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
-        scmMock.getContainerManager(), scmMock.getScmServiceProvider(),
-        reconTaskStatusDao,
-        containerHealthSchemaManager, placementMock, reconTaskConfig,
-        reconContainerMetadataManager,
-        new OzoneConfiguration());
-    containerHealthTask.start();
-
-    // Wait for the task to identify unhealthy containers
-    LambdaTestUtils.await(6000, 1000,
-        () -> unhealthyContainersDao.count() == 3);
-
-    // Assert that all unhealthy containers have been identified as NEGATIVE_SIZE states
-    List<UnhealthyContainers> negativeSizeContainers =
-        unhealthyContainersDao.fetchByContainerState("NEGATIVE_SIZE");
-    assertThat(negativeSizeContainers).hasSize(3);
   }
 
   @Test

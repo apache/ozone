@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -188,7 +189,7 @@ public class ContainerHealthTask extends ReconScmTask {
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
-    // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
+    // EMPTY_MISSING in unhealthy container statistics but do not add it to the table.
     unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
       UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();
@@ -297,7 +298,6 @@ public class ContainerHealthTask extends ReconScmTask {
             LOG.info("DELETED existing unhealthy container record...for Container: {}",
                 currentContainer.getContainerID());
             rec.delete();
-            continue;
           }
 
           // If the container is marked as MISSING and it's deleted in SCM, remove the record
@@ -305,10 +305,6 @@ public class ContainerHealthTask extends ReconScmTask {
             rec.delete();
           }
 
-          // If the container is in the EMPTY_MISSING state, delete the record
-          if (currentContainer.isEmptyMissing()) {
-            rec.delete();
-          }
           existingRecords.add(rec.getContainerState());
           // If the record was changed, update it
           if (rec.changed()) {
@@ -431,7 +427,6 @@ public class ContainerHealthTask extends ReconScmTask {
     populateContainerStats(containerHealthStatus,
         UnHealthyContainerStates.NEGATIVE_SIZE,
         unhealthyContainerStateStatsMap);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
   }
 
   /**
@@ -464,9 +459,6 @@ public class ContainerHealthTask extends ReconScmTask {
       switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing() && !container.isEmpty();
-        break;
-      case EMPTY_MISSING:
-        returnValue = container.isMissing() && container.isEmpty();
         break;
       case MIS_REPLICATED:
         returnValue = keepMisReplicatedRecord(container, rec);
@@ -526,18 +518,25 @@ public class ContainerHealthTask extends ReconScmTask {
               unhealthyContainerStateStatsMap);
         } else {
 
-          LOG.debug("Empty container {} is missing. Kindly check the " +
-              "consolidated container stats per UNHEALTHY state logged as " +
-              "starting with **Container State Stats:**", container.getContainerID());
+          LOG.debug("Empty container {} is missing. It will be logged in the " +
+              "unhealthy container statistics, but no record will be created in the " +
+              "UNHEALTHY_CONTAINERS table.", container.getContainerID());
 
-          records.add(
-              recordForState(container, EMPTY_MISSING,
-                  time));
           populateContainerStats(container,
               EMPTY_MISSING,
               unhealthyContainerStateStatsMap);
         }
         // A container cannot have any other records if it is missing so return
+        return records;
+      }
+
+      // For Negative sized containers we only log but not insert into DB
+      if (container.getContainer().getUsedBytes() < 0
+          && !recordForStateExists.contains(
+          UnHealthyContainerStates.NEGATIVE_SIZE.toString())) {
+        populateContainerStats(container,
+            UnHealthyContainerStates.NEGATIVE_SIZE,
+            unhealthyContainerStateStatsMap);
         return records;
       }
 
@@ -683,4 +682,15 @@ public class ContainerHealthTask extends ReconScmTask {
               (value + container.getContainer().getUsedBytes()));
     }
   }
+
+  /**
+   * Expose the logger for testing purposes.
+   *
+   * @return the logger instance
+   */
+  @VisibleForTesting
+  public Logger getLogger() {
+    return LOG;
+  }
+
 }
