@@ -295,7 +295,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
         throw ce;
       });
     } catch (IOException | ExecutionException e) {
-      throw new IOException(EXCEPTION_MSG + e.toString(), e);
+      throw new IOException(EXCEPTION_MSG + e, e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
