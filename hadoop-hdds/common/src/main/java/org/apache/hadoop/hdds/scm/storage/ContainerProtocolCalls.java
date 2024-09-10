@@ -768,15 +768,21 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
-   * Gets the Container merkle tree for a container from a datanode.
+   * Gets the container checksum info for a container from a datanode. This method does not deserialize the checksum
+   * info.
+   *
    * @param client - client that communicates with the container
    * @param containerID - Container Id of the container
    * @param encodedContainerID - Encoded token if security is enabled
+   *
+   * @throws IOException For errors communicating with the datanode.
+   * @throws StorageContainerException For errors obtaining the checksum info, including the file being missing or
+   * empty on the datanode, or the datanode not having a replica of the container.
    */
-  public static ContainerProtos.GetContainerMerkleTreeResponseProto getContainerMerkleTree(
+  public static ContainerProtos.GetContainerChecksumInfoResponseProto getContainerChecksumInfo(
       XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
-    ContainerProtos.GetContainerMerkleTreeRequestProto containerMerkleTreeRequestProto =
-        ContainerProtos.GetContainerMerkleTreeRequestProto
+    ContainerProtos.GetContainerChecksumInfoRequestProto containerChecksumRequestProto =
+        ContainerProtos.GetContainerChecksumInfoRequestProto
             .newBuilder()
             .setContainerID(containerID)
             .build();
@@ -784,10 +790,10 @@ public final class ContainerProtocolCalls  {
 
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(Type.GetContainerMerkleTree)
+        .setCmdType(Type.GetContainerChecksumInfo)
         .setContainerID(containerID)
         .setDatanodeUuid(id)
-        .setGetContainerMerkleTree(containerMerkleTreeRequestProto);
+        .setGetContainerChecksumInfo(containerChecksumRequestProto);
     if (encodedContainerID != null) {
       builder.setEncodedToken(encodedContainerID);
     }
@@ -796,9 +802,8 @@ public final class ContainerProtocolCalls  {
       builder.setTraceID(traceId);
     }
     ContainerCommandRequestProto request = builder.build();
-    ContainerCommandResponseProto response =
-        client.sendCommand(request, getValidatorList());
-    return response.getGetContainerMerkleTree();
+    ContainerCommandResponseProto response = client.sendCommand(request, getValidatorList());
+    return response.getGetContainerChecksumInfo();
   }
 
   /**

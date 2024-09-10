@@ -124,6 +124,29 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
+   * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
+   * structure is preserved throughout serialization, deserialization, and API calls.
+   */
+  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
+    final long blockID1 = 1;
+    final long blockID2 = 2;
+    final long blockID3 = 3;
+    ContainerProtos.ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    ContainerProtos.ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
+    ContainerProtos.ChunkInfo b2c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{12, 11, 10}));
+    ContainerProtos.ChunkInfo b3c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
+    ContainerProtos.ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
+
+    ContainerMerkleTree tree = new ContainerMerkleTree();
+    tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
+    tree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
+    tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
+
+    return tree;
+  }
+
+  /**
    * This function checks whether the container checksum file exists.
    */
   public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,

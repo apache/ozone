@@ -22,9 +22,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
@@ -62,6 +65,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -483,6 +489,34 @@ public class TestKeyValueHandler {
     // This should trigger container report validation in the ICR handler above.
     keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptySet());
     Assertions.assertEquals(1, icrCount.get());
+  }
+
+  @Test
+  public void testGetContainerChecksumInfoOnInvalidContainerStates() {
+    when(handler.handleGetContainerChecksumInfo(any(), any())).thenCallRealMethod();
+
+    // Only mock what is necessary for the request to fail. This test does not cover allowed states.
+    KeyValueContainer container = mock(KeyValueContainer.class);
+    KeyValueContainerData containerData = mock(KeyValueContainerData.class);
+    when(container.getContainerData()).thenReturn(containerData);
+
+    ContainerCommandRequestProto request = mock(ContainerCommandRequestProto.class);
+    when(request.hasGetContainerChecksumInfo()).thenReturn(true);
+    when(request.getCmdType()).thenReturn(ContainerProtos.Type.GetContainerChecksumInfo);
+    when(request.getTraceID()).thenReturn("123");
+
+    Set<State> disallowedStates = EnumSet.allOf(State.class);
+    disallowedStates.removeAll(EnumSet.of(CLOSED, QUASI_CLOSED, UNHEALTHY));
+
+    for (State state: disallowedStates) {
+      when(containerData.getState()).thenReturn(state);
+      ContainerProtos.ContainerCommandResponseProto response = handler.handleGetContainerChecksumInfo(request,
+          container);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.UNCLOSED_CONTAINER_IO, response.getResult());
+      assertTrue(response.getMessage().contains(state.toString()), "Response message did not contain the container " +
+          "state " + state);
+    }
   }
 
   private static ContainerCommandRequestProto createContainerRequest(

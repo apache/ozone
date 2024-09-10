@@ -29,18 +29,22 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Optional;
 import java.util.Collection;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
@@ -50,17 +54,18 @@ public class ContainerChecksumTreeManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerChecksumTreeManager.class);
 
-  // Used to coordinate reads and writes to each container's checksum file.
+  // Used to coordinate writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
-  private final Striped<ReadWriteLock> fileLock;
+  // The file is atomically renamed into place, so readers do not need coordination.
+  private final Striped<Lock> fileLock;
   private final ContainerMerkleTreeMetrics metrics;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
-    fileLock = SimpleStriped.readWriteLock(
-        conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(), true);
+    fileLock = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
+        () -> new ReentrantLock(true));
     metrics = ContainerMerkleTreeMetrics.create();
   }
 
@@ -75,14 +80,26 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    */
   public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
-    Lock writeLock = getWriteLock(data.getContainerID());
+    long containerID = data.getContainerID();
+    Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
-          .build();
-      write(data, newChecksumInfo);
-      LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
+      try {
+        // If the file is not present, we will create the data for the first time. This happens under a write lock.
+        checksumInfoBuilder = read(data)
+            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      } catch (IOException ex) {
+        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+            containerID, ex);
+        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
+      }
+
+      checksumInfoBuilder
+          .setContainerID(containerID)
+          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
+      write(data, checksumInfoBuilder.build());
+      LOG.debug("Data merkle tree for container {} updated", containerID);
     } finally {
       writeLock.unlock();
     }
@@ -94,21 +111,33 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    */
   public void markBlocksAsDeleted(KeyValueContainerData data, Collection<Long> deletedBlockIDs) throws IOException {
-    Lock writeLock = getWriteLock(data.getContainerID());
+    long containerID = data.getContainerID();
+    Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data).toBuilder();
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
+      try {
+        // If the file is not present, we will create the data for the first time. This happens under a write lock.
+        checksumInfoBuilder = read(data)
+            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+      } catch (IOException ex) {
+        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+            data.getContainerID(), ex);
+        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
+      }
+
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
       checksumInfoBuilder
+          .setContainerID(containerID)
           .clearDeletedBlocks()
-          .addAllDeletedBlocks(sortedDeletedBlockIDs)
-          .build();
+          .addAllDeletedBlocks(sortedDeletedBlockIDs);
       write(data, checksumInfoBuilder.build());
-      LOG.debug("Deleted block list for container {} updated", data.getContainerID());
+      LOG.debug("Deleted block list for container {} updated with {} new blocks", data.getContainerID(),
+          sortedDeletedBlockIDs.size());
     } finally {
       writeLock.unlock();
     }
@@ -125,83 +154,80 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
+  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
-  private Lock getReadLock(long containerID) {
-    return fileLock.get(containerID).readLock();
+  @VisibleForTesting
+  public static File getTmpContainerChecksumFile(ContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
   }
 
-  private Lock getWriteLock(long containerID) {
-    return fileLock.get(containerID).writeLock();
+  private Lock getLock(long containerID) {
+    return fileLock.get(containerID);
   }
 
-  private ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
+  /**
+   * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
+   * swapped into place.
+   */
+  private Optional<ContainerProtos.ContainerChecksumInfo.Builder> read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
-    Lock readLock = getReadLock(containerID);
-    readLock.lock();
+    File checksumFile = getContainerChecksumFile(data);
     try {
-      File checksumFile = getContainerChecksumFile(data);
-      // If the checksum file has not been created yet, return an empty instance.
-      // Since all writes happen as part of an atomic read-modify-write cycle that requires a write lock, two empty
-      // instances for the same container obtained only under the read lock will not conflict.
       if (!checksumFile.exists()) {
-        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
-            containerID, checksumFile);
-        return ContainerProtos.ContainerChecksumInfo.newBuilder()
-            .setContainerID(containerID)
-            .build();
+        LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
+        return Optional.empty();
       }
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
         return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(),
-            () -> ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+            () -> Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream).toBuilder()));
       }
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
       throw new IOException("Error occurred when reading container merkle tree for containerID "
-              + data.getContainerID(), ex);
-    } finally {
-      readLock.unlock();
+              + data.getContainerID() + " at path " + checksumFile, ex);
     }
   }
 
+  /**
+   * Callers should have acquired the write lock before calling this method.
+   */
   private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
-    Lock writeLock = getWriteLock(data.getContainerID());
-    writeLock.lock();
-    try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {
-      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
-          () -> checksumInfo.writeTo(outStream));
+    // Make sure callers filled in required fields before writing.
+    Preconditions.assertTrue(checksumInfo.hasContainerID());
+
+    File checksumFile = getContainerChecksumFile(data);
+    File tmpChecksumFile = getTmpContainerChecksumFile(data);
+
+    try (FileOutputStream tmpOutputStream = new FileOutputStream(tmpChecksumFile)) {
+      // Write to a tmp file and rename it into place.
+      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
+        checksumInfo.writeTo(tmpOutputStream);
+        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), ATOMIC_MOVE);
+      });
     } catch (IOException ex) {
+      // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
+      // Nothing reads directly from the tmp file.
       metrics.incrementMerkleTreeWriteFailures();
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
-    } finally {
-      writeLock.unlock();
     }
   }
 
-  public ByteString getContainerChecksumInfo(KeyValueContainerData data)
-      throws IOException {
-    long containerID = data.getContainerID();
-    Lock readLock = getReadLock(containerID);
-    readLock.lock();
-    try {
-      File checksumFile = getContainerChecksumFile(data);
-
-      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return ByteString.readFrom(inStream);
-      } catch (FileNotFoundException ex) {
-        // TODO: Build the container checksum tree when it doesn't exist.
-        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
-            containerID, checksumFile, ex);
-      } catch (IOException ex) {
-        throw new IOException("Error occured when reading checksum file for container " + containerID +
-            " at the path " + checksumFile, ex);
-      }
-      return ByteString.EMPTY;
-    } finally {
-      readLock.unlock();
+  /**
+   * Reads the container checksum info file from the disk as bytes.
+   * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
+   * swapped into place.
+   *
+   * @throws FileNotFoundException When the file does not exist. It may not have been generated yet for this container.
+   * @throws IOException On error reading the file.
+   */
+  public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
+    File checksumFile = getContainerChecksumFile(data);
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      return ByteString.readFrom(inStream);
     }
   }
 

@@ -249,7 +249,7 @@ public class TestOzoneContainerWithTLS {
              new DNContainerOperationClient(conf, caClient, keyClient)) {
       client = clientManager.acquireClient(pipeline);
       long containerId = createAndCloseContainer(client, containerTokenEnabled);
-      dnClient.getContainerMerkleTree(containerId, dn);
+      dnClient.getContainerChecksumInfo(containerId, dn);
     } finally {
       if (container != null) {
         container.stop();
@@ -275,16 +275,16 @@ public class TestOzoneContainerWithTLS {
       TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), keyClient);
       String containerToken = encode(tokenHelper.getContainerToken(
           ContainerID.valueOf(containerId)));
-      ContainerProtos.GetContainerMerkleTreeResponseProto response =
-          ContainerProtocolCalls.getContainerMerkleTree(client,
+      ContainerProtos.GetContainerChecksumInfoResponseProto response =
+          ContainerProtocolCalls.getContainerChecksumInfo(client,
               containerId, containerToken);
       // Getting container merkle tree with valid container token
-      assertFalse(response.getContainerMerkleTree().isEmpty());
+      assertFalse(response.getContainerChecksumInfo().isEmpty());
 
       // Getting container merkle tree with invalid container token
       XceiverClientSpi finalClient = client;
       StorageContainerException exception = assertThrows(StorageContainerException.class,
-          () -> ContainerProtocolCalls.getContainerMerkleTree(
+          () -> ContainerProtocolCalls.getContainerChecksumInfo(
           finalClient, containerId, "invalidContainerToken"));
       assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, exception.getResult());
     } finally {

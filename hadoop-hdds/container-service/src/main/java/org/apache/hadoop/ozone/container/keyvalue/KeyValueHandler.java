@@ -99,6 +99,10 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -109,6 +113,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNCLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
@@ -298,8 +303,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleFinalizeBlock(request, kvContainer);
     case Echo:
       return handler.handleEcho(request, kvContainer);
-    case GetContainerMerkleTree:
-      return handler.handleGetContainerMerkleTree(request, kvContainer);
+    case GetContainerChecksumInfo:
+      return handler.handleGetContainerChecksumInfo(request, kvContainer);
     default:
       return null;
     }
@@ -671,10 +676,10 @@ public class KeyValueHandler extends Handler {
     return getEchoResponse(request);
   }
 
-  ContainerCommandResponseProto handleGetContainerMerkleTree(
+  ContainerCommandResponseProto handleGetContainerChecksumInfo(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
 
-    if (!request.hasGetContainerMerkleTree()) {
+    if (!request.hasGetContainerChecksumInfo()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Read Container Merkle tree request. trace ID: {}",
             request.getTraceID());
@@ -682,11 +687,25 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
+    // A container must have moved past the CLOSING
     KeyValueContainerData containerData = kvContainer.getContainerData();
+    State state = containerData.getState();
+    boolean stateSupportsChecksumInfo = (state == CLOSED || state == QUASI_CLOSED || state == UNHEALTHY);
+    if (!stateSupportsChecksumInfo) {
+      return ContainerCommandResponseProto.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setTraceID(request.getTraceID())
+          .setResult(UNCLOSED_CONTAINER_IO)
+          .setMessage("Checksum information is not available for containers in state " + state)
+          .build();
+    }
+
     ByteString checksumTree = null;
     try {
       checksumTree = checksumManager.getContainerChecksumInfo(containerData);
     } catch (IOException ex) {
+      // For file not found or other inability to read the file, return an error to the client.
+      LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
       return ContainerCommandResponseProto.newBuilder()
           .setCmdType(request.getCmdType())
           .setTraceID(request.getTraceID())
