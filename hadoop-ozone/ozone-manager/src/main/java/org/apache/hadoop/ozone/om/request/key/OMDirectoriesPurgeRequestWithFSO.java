@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -71,7 +70,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-
+    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
+        OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
       if (fromSnapshot != null) {
@@ -149,6 +149,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
       }
+      if (fromSnapshotInfo != null) {
+        SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshotInfo, termIndex);
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+      }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
@@ -164,8 +169,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
     }
 
-    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
-        getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
             getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);

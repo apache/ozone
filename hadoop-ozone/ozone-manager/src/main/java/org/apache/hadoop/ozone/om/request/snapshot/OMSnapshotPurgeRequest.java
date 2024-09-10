@@ -110,9 +110,16 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
         // Step 2: Update the snapshot chain.
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
-        // Step 3: Purge the snapshot from SnapshotInfoTable cache.
+        // Step 3: Purge the snapshot from SnapshotInfoTable cache and also remove from the map.
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
+        updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
+      }
+
+      for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
+        SnapshotUtils.setTransactionInfoInSnapshot(snapshotInfo, termIndex);
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), snapshotInfo));
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos);
