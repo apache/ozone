@@ -982,6 +982,7 @@ public class SCMNodeManager implements NodeManager {
     DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
+      usageInfo.setPipelineCount(getPipeLineCount(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1608,6 +1609,11 @@ public class SCMNodeManager implements NodeManager {
   public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
+  }
+
+  public int getPipeLineCount(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getPipelinesCount(datanodeDetails);
   }
 
   @Override
