@@ -253,8 +253,8 @@ public final class OMPBHelper {
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
-        assert buffer != null;
-        buffer.close();
+      assert buffer != null;
+      buffer.close();
     }
 
     int offset = Integer.BYTES + Long.BYTES;
