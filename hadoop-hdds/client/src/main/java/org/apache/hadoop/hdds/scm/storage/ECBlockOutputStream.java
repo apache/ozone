@@ -38,9 +38,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -143,9 +141,27 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
     if (checksumBlockData != null) {
 
-      // We need to determine the size of the chunklist
-      // for verification based on the size of the blockgrouplength.
-      int chunkSize = calcEffectiveChunkSize(blockData, totalNodes, blockGroupLength);
+      // For the same BlockGroupLength, we need to find the larger value of Block DataSize.
+      // This is because we do not send empty chunks to the DataNode, so the larger value is more accurate.
+      Map<Long, Optional<BlockData>> maxDataSizeByGroup = Arrays.stream(blockData)
+          .filter(Objects::nonNull)
+          .collect(Collectors.groupingBy(BlockData::getBlockGroupLength,
+          Collectors.maxBy(Comparator.comparingLong(BlockData::getSize))));
+      BlockData maxBlockData = maxDataSizeByGroup.get(blockGroupLength).get();
+
+      // When calculating the checksum size,
+      // We need to consider both blockGroupLength and the actual size of blockData.
+      //
+      // We use the smaller value to determine the size of the ChunkList.
+      //
+      // 1. In most cases, blockGroupLength is equal to the size of blockData.
+      // 2. Occasionally, blockData is not fully filled; if a chunk is empty,
+      // it is not sent to the DN, resulting in blockData size being smaller than blockGroupLength.
+      // 3. In cases with 'dirty data',
+      // if an error occurs when writing to the EC-Stripe (e.g., DN reports Container Closed),
+      // and the length confirmed with OM is smaller, blockGroupLength may be smaller than blockData size.
+      long blockDataSize = Math.min(maxBlockData.getSize(), blockGroupLength);
+      int chunkSize = (int) Math.ceil(((double) blockDataSize / repConfig.getEcChunkSize()));
       List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
       if (chunkSize > 0) {
         checksumBlockDataChunks = checksumBlockData.getChunks().subList(0, chunkSize);
@@ -183,24 +199,6 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     return executePutBlock(close, force, blockGroupLength);
-  }
-
-  private int calcEffectiveChunkSize(BlockData[] blockGroup,
-      int replicaCount, long blockGroupLength) {
-    Preconditions.checkState(blockGroup.length == replicaCount);
-    int effectiveChunkSize = 0;
-    for (int i = 0; i < replicaCount; i++) {
-      if (blockGroup[i] == null) {
-        continue;
-      }
-      String lenStr = blockGroup[i].getMetadata().
-          get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
-      long calcBlockGroupLength = Long.parseLong(lenStr);
-      if (blockGroupLength == calcBlockGroupLength) {
-        effectiveChunkSize = Math.max(effectiveChunkSize, blockGroup[i].getChunks().size());
-      }
-    }
-    return effectiveChunkSize;
   }
 
   public CompletableFuture<ContainerProtos.

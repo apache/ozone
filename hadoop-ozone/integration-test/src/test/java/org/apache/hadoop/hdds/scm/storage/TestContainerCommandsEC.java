@@ -832,8 +832,8 @@ public class TestContainerCommandsEC {
   private void triggerRetryByCloseContainer(OzoneOutputStream out) {
     CompletableFuture.runAsync(() -> {
       BlockOutputStreamEntry blockOutputStreamEntry = out.getKeyOutputStream().getStreamEntries().get(0);
-      BlockID blockID = blockOutputStreamEntry.getBlockID();
-      long containerID = blockID.getContainerID();
+      BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
+      long entryContainerID = entryBlockID.getContainerID();
       Pipeline pipeline = blockOutputStreamEntry.getPipeline();
       Map<DatanodeDetails, Integer> replicaIndexes = pipeline.getReplicaIndexes();
       try {
@@ -842,18 +842,22 @@ public class TestContainerCommandsEC {
           Integer value = entry.getValue();
           XceiverClientManager xceiverClientManager = new XceiverClientManager(config);
           Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-              .generateToken(ANY_USER, ContainerID.valueOf(containerID));
+              .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
           XceiverClientSpi client = xceiverClientManager.acquireClient(
               createSingleNodePipeline(pipeline, key, value));
           try {
-            ContainerProtocolCalls.closeContainer(client, containerID, cToken.encodeToUrlString());
+            ListBlockResponseProto listResponse = ContainerProtocolCalls
+                .listBlock(client, entryContainerID, null, Integer.MAX_VALUE, cToken);
+            if (listResponse != null && listResponse.getBlockDataCount() > 0) {
+              ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
+            }
           } finally {
             xceiverClientManager.releaseClient(client, false);
           }
           break;
         }
       } catch (Exception e) {
-        // do nothing.
+        throw new RuntimeException(e);
       }
     });
   }
