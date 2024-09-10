@@ -426,6 +426,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
   }
 
+  @Override
+  public OMClientResponse handleLeaderWriteRequest(OMClientRequest omClientRequest, TermIndex termIndex)
+      throws IOException {
+    injectPause();
+    OMClientResponse omClientResponse = captureLatencyNs(
+        impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
+        () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
+            "omClientResponse returned by validateAndUpdateCache cannot be null"));
+    return omClientResponse;
+  }
+
   @VisibleForTesting
   public void setInjector(FaultInjector injector) {
     this.injector = injector;

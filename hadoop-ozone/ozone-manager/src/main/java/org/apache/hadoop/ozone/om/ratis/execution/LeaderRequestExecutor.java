@@ -35,8 +35,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -164,14 +166,7 @@ public class LeaderRequestExecutor {
     ctx.setCacheIndex(termIndex);
     try {
       validate(request);
-      final OMClientResponse omClientResponse = handler.handleWriteRequestImpl(request, termIndex);
-      ctx.setResponse(omClientResponse.getOMResponse());
-      if (ctx.getResponse().getSuccess()) {
-        OMRequest.Builder nextRequest = retrieveDbChanges(request, termIndex, omClientResponse);
-        if (nextRequest != null) {
-          ctx.setNextRequest(nextRequest);
-        }
-      }
+      handleRequest(ctx, termIndex);
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       ctx.setResponse(createErrorResponse(request, e));
@@ -191,8 +186,33 @@ public class LeaderRequestExecutor {
     }
   }
 
-  private OMRequest.Builder retrieveDbChanges(
-      OMRequest request, TermIndex termIndex, OMClientResponse omClientResponse) throws IOException {
+  private void handleRequest(RequestContext ctx, TermIndex termIndex) throws IOException {
+    OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(ctx.getRequest(), ozoneManager);
+    try {
+      OMClientResponse omClientResponse = handler.handleLeaderWriteRequest(omClientRequest, termIndex);
+      ctx.setClientRequest(omClientRequest);
+      ctx.setResponse(omClientResponse.getOMResponse());
+      if (!omClientResponse.getOMResponse().getSuccess()) {
+        OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+      } else {
+        OzoneManagerProtocolProtos.PersistDbRequest.Builder nxtRequest = retrieveDbChanges(termIndex, omClientResponse);
+        if (nxtRequest != null) {
+          OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(nxtRequest.build())
+              .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb);
+          omReqBuilder.setClientId(ctx.getRequest().getClientId());
+          ctx.setNextRequest(nxtRequest);
+        } else {
+          OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+        }
+      }
+    } catch (Throwable th) {
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, termIndex, th);
+      throw th;
+    }
+  }
+
+  private OzoneManagerProtocolProtos.PersistDbRequest.Builder retrieveDbChanges(
+      TermIndex termIndex, OMClientResponse omClientResponse) throws IOException {
     try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore()
         .initBatchOperation()) {
       omClientResponse.checkAndUpdateDB(ozoneManager.getMetadataManager(), batchOperation);
@@ -216,10 +236,11 @@ public class LeaderRequestExecutor {
         }
         reqBuilder.addTableUpdates(tblBuilder.build());
       }
+      if (reqBuilder.getTableUpdatesCount() == 0) {
+        return null;
+      }
       reqBuilder.addIndex(termIndex.getIndex());
-      OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(reqBuilder.build())
-          .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb).setClientId(request.getClientId());
-      return omReqBuilder;
+      return reqBuilder;
     }
   }
 
@@ -233,8 +254,7 @@ public class LeaderRequestExecutor {
         = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
     long size = 0;
     for (RequestContext ctx : ctxs) {
-      List<OzoneManagerProtocolProtos.DBTableUpdate> tblList = ctx.getNextRequest().getPersistDbRequest()
-          .getTableUpdatesList();
+      List<OzoneManagerProtocolProtos.DBTableUpdate> tblList = ctx.getNextRequest().getTableUpdatesList();
       int tmpSize = 0;
       for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdates : tblList) {
         tmpSize += tblUpdates.getSerializedSize();
@@ -244,7 +264,7 @@ public class LeaderRequestExecutor {
         RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
         OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(reqBuilder.build())
             .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb)
-            .setClientId(lastReqCtx.getNextRequest().getClientId());
+            .setClientId(lastReqCtx.getRequest().getClientId());
         try {
           OMRequest reqBatch = omReqBuilder.build();
           OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, ctx.getCacheIndex());
@@ -306,23 +326,24 @@ public class LeaderRequestExecutor {
     Map<String, List<Long>> cleanupMap = new HashMap<>();
     for (RequestContext ctx : ctxs) {
       if (th != null) {
+        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getClientRequest(), ozoneManager,
+            ctx.getCacheIndex(), th);
         if (th instanceof IOException) {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
         } else {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
         }
 
-        // TODO: audit log for failure or more audit log only after completion for failure / success
         // TODO: no-cache, remove disable processing, let every request deal with ratis failure
         disableProcessing();
       } else {
+        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getCacheIndex());
         ctx.getFuture().complete(ctx.getResponse());
       }
 
       // cache cleanup
       if (null != ctx.getNextRequest()) {
-        List<OzoneManagerProtocolProtos.DBTableUpdate> tblList
-            = ctx.getNextRequest().getPersistDbRequest().getTableUpdatesList();
+        List<OzoneManagerProtocolProtos.DBTableUpdate> tblList = ctx.getNextRequest().getTableUpdatesList();
         for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdate : tblList) {
           List<Long> epochs = cleanupMap.computeIfAbsent(tblUpdate.getTableName(), k -> new ArrayList<>());
           epochs.add(ctx.getCacheIndex().getIndex());
