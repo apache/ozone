@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
 import org.apache.hadoop.ozone.recon.api.TriggerDBSyncEndpoint;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
+import org.apache.hadoop.ozone.recon.api.ReconContextEndpoint;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.reflections.Reflections;
@@ -80,6 +81,7 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
     nonAdminEndpoints.add(TriggerDBSyncEndpoint.class);
+    nonAdminEndpoints.add(ReconContextEndpoint.class);
 
     assertThat(allEndpoints).containsAll(nonAdminEndpoints);
 
