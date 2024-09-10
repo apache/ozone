@@ -493,7 +493,6 @@ const Datanodes: React.FC<{}> = () => {
     ),
     showSizeChanger: true
   };
-  console.log(selectedRows);
 
   return (
     <>
