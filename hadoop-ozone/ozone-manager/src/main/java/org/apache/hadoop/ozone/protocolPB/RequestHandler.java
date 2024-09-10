@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -75,4 +76,13 @@ public interface RequestHandler {
    * @return OMClientResponse
    */
   OMClientResponse handleWriteRequestImpl(OMRequest omRequest, TermIndex termIndex) throws IOException;
+
+  /**
+   * Handle write request at leader execution
+   *
+   * @param omClientRequest the write cleitn request
+   * @param termIndex - ratis transaction term and index
+   * @return OMClientResponse
+   */
+  OMClientResponse handleLeaderWriteRequest(OMClientRequest omClientRequest, TermIndex termIndex) throws IOException;
 }

@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -43,18 +44,18 @@ import org.slf4j.LoggerFactory;
 /**
  * entry for request execution.
  */
-public class Gateway {
-  private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
+public class OMGateway {
+  private static final Logger LOG = LoggerFactory.getLogger(OMGateway.class);
   private final LeaderRequestExecutor leaderExecutor;
   private final OzoneManagerRatisServer ratisServer;
   private final AtomicLong requestInProgress = new AtomicLong(0);
 
-  public Gateway(OzoneManagerRatisServer ratisServer) {
+  public OMGateway(OzoneManagerRatisServer ratisServer) {
     this.leaderExecutor = new LeaderRequestExecutor(ratisServer);
     this.ratisServer = ratisServer;
-    // ratisServer.getOmStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
+    ratisServer.getOmBasicStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
   }
-  public CompletableFuture<OMResponse> submit(OMRequest omRequest) throws ServiceException {
+  public OMResponse submit(OMRequest omRequest) throws ServiceException {
     if (!ratisServer.getOzoneManager().isLeaderReady()) {
       OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(
           ratisServer.getRaftPeerId().toString() + " is not ready to process request yet.");
@@ -76,7 +77,14 @@ public class Gateway {
     } catch (Throwable e) {
       requestContext.getFuture().completeExceptionally(e);
     }
-    return requestContext.getFuture();
+    try {
+      return requestContext.getFuture().get();
+    } catch (ExecutionException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new ServiceException(ex.getMessage(), ex);
+    }
   }
 
   private OMResponse handleAfterExecution(RequestContext ctx) {
@@ -134,6 +142,7 @@ public class Gateway {
 
   public void cleanupCache(long lastIndex) {
     // TODO no-cache case, no need re-build bucket/volume cache and cleanup of cache
+    LOG.debug("clean all table cache and update bucket/volume with db");
     for (String tbl : ratisServer.getOzoneManager().getMetadataManager().listTableNames()) {
       ratisServer.getOzoneManager().getMetadataManager().getTable(tbl).cleanupCache(
           Collections.singletonList(lastIndex));
@@ -158,6 +167,7 @@ public class Gateway {
       cleanupCache(Long.MAX_VALUE);
       leaderExecutor.enableProcessing();
     } else {
+      LOG.warn("Executor is not enabled, previous request {} is still not cleaned", requestInProgress.get());
       String msg = "Request processing is disabled due to error";
       throw new ServiceException(msg, new OMException(msg, OMException.ResultCodes.INTERNAL_ERROR));
     }

@@ -4545,4 +4545,12 @@
       maximum number of buckets across all volumes.
     </description>
   </property>
+  <property>
+    <name>ozone.om.leader.executor.enable</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      flag to enable / disable experimental feature for leader size execution for performance.
+    </description>
+  </property>
 </configuration>

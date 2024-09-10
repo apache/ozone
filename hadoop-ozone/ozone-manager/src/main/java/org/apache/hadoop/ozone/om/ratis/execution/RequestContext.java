@@ -17,6 +17,8 @@
 package org.apache.hadoop.ozone.om.ratis.execution;
 
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -26,10 +28,11 @@ import org.apache.ratis.server.protocol.TermIndex;
  */
 public final class RequestContext {
   private OMRequest request;
+  private OMClientRequest clientRequest;
   private OMResponse response;
   private TermIndex cacheIndex;
   private CompletableFuture<OMResponse> future;
-  private OMRequest.Builder nextRequest;
+  private OzoneManagerProtocolProtos.PersistDbRequest.Builder nextRequest;
 
   public RequestContext() {
   }
@@ -66,11 +69,19 @@ public final class RequestContext {
     this.future = future;
   }
 
-  public OMRequest.Builder getNextRequest() {
+  public OzoneManagerProtocolProtos.PersistDbRequest.Builder getNextRequest() {
     return nextRequest;
   }
 
-  public void setNextRequest(OMRequest.Builder nextRequest) {
+  public void setNextRequest(OzoneManagerProtocolProtos.PersistDbRequest.Builder nextRequest) {
     this.nextRequest = nextRequest;
+  }
+
+  public OMClientRequest getClientRequest() {
+    return clientRequest;
+  }
+
+  public void setClientRequest(OMClientRequest clientRequest) {
+    this.clientRequest = clientRequest;
   }
 }
