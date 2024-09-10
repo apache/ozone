@@ -684,10 +684,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           }
         } catch (NoSuchFieldException ex) {
           err().println("ERROR: no such field: " + field);
+          exception = true;
+          return false;
         } catch (IllegalAccessException e) {
           err().println("ERROR: Cannot get field from object: " + field);
+          exception = true;
+          return false;
         } catch (Exception ex) {
           err().println("ERROR: field: " + field + ", ex: " + ex);
+          exception = true;
+          return false;
         }
       }
       return true;
