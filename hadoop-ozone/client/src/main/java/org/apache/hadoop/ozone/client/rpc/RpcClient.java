@@ -2580,15 +2580,18 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneFsServerDefaults getServerDefaults() throws IOException {
-    if (omVersion.compareTo(OzoneManagerVersion.SERVER_DEFAULTS) < 0) {
-      return null;
-    }
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
         (now - serverDefaultsLastUpdate > serverDefaultsValidityPeriod)) {
       try {
-        serverDefaults = ozoneManagerClient.getServerDefaults();
-        serverDefaultsLastUpdate = now;
+        for (ServiceInfo si : ozoneManagerClient.getServiceInfo()
+            .getServiceInfoList()) {
+          if (si.getServerDefaults() == null) {
+            continue;
+          }
+          serverDefaults = si.getServerDefaults();
+          serverDefaultsLastUpdate = now;
+        }
       } catch (Exception e) {
         LOG.warn("Could not get server defaults from OM.", e);
       }
