@@ -435,7 +435,7 @@ public class NodeDecommissionManager {
             int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
-                " UNHEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
+                " not IN-SERVICE or not HEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
                 " IN-SERVICE HEALTHY nodes are required to maintain replication after decommission. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
@@ -603,7 +603,7 @@ public class NodeDecommissionManager {
             int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
-                " UNHEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +
+                " not IN-SERVICE or not HEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +
                 " IN-SERVICE HEALTHY nodes are required to maintain replication after maintenance. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
