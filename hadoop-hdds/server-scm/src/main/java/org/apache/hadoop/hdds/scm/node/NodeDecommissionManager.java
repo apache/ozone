@@ -391,8 +391,6 @@ public class NodeDecommissionManager {
     int numDecom = dns.size();
     List<DatanodeDetails> validDns = new ArrayList<>(dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
-    int unHealthyTotal = nodeManager.getNodeCount(NodeStatus.inServiceStale()) +
-        nodeManager.getNodeCount(NodeStatus.inServiceDead());
     for (DatanodeDetails dn : dns) {
       try {
         NodeStatus nodeStatus = getNodeStatus(dn);
@@ -400,12 +398,12 @@ public class NodeDecommissionManager {
         if (opState != NodeOperationalState.IN_SERVICE) {
           numDecom--;
           validDns.remove(dn);
-          LOG.warn("Cannot decommission " + dn.getHostName() + " because it is not IN-SERVICE");
+          LOG.warn("Cannot decommission {} because it is not IN-SERVICE", dn.getHostName());
         }
       } catch (NodeNotFoundException ex) {
         numDecom--;
         validDns.remove(dn);
-        LOG.warn("Cannot decommission " + dn.getHostName() + " because it is not found in SCM");
+        LOG.warn("Cannot decommission {} because it is not found in SCM", dn.getHostName());
       }
     }
 
@@ -434,6 +432,7 @@ public class NodeDecommissionManager {
           }
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
           if ((inServiceTotal - numDecom) < reqNodes) {
+            int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " UNHEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
@@ -550,8 +549,6 @@ public class NodeDecommissionManager {
     List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
     Collections.copy(validDns, dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
-    int unHealthyTotal = nodeManager.getNodeCount(NodeStatus.inServiceStale()) +
-        nodeManager.getNodeCount(NodeStatus.inServiceDead());
     for (DatanodeDetails dn : dns) {
       try {
         NodeStatus nodeStatus = getNodeStatus(dn);
@@ -559,12 +556,12 @@ public class NodeDecommissionManager {
         if (opState != NodeOperationalState.IN_SERVICE) {
           numMaintenance--;
           validDns.remove(dn);
-          LOG.warn(dn.getHostName() + " cannot enter maintenance because it is not IN-SERVICE");
+          LOG.warn("{} cannot enter maintenance because it is not IN-SERVICE", dn.getHostName());
         }
       } catch (NodeNotFoundException ex) {
         numMaintenance--;
         validDns.remove(dn);
-        LOG.warn(dn.getHostName() + " cannot enter maintenance because it is not found in SCM");
+        LOG.warn("{} cannot enter maintenance because it is not found in SCM", dn.getHostName());
       }
     }
 
@@ -603,6 +600,7 @@ public class NodeDecommissionManager {
             minInService = maintenanceReplicaMinimum;
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
+            int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " UNHEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +
