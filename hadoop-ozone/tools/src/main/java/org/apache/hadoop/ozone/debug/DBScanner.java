@@ -633,6 +633,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           Object valueObject = valueClassField.get(obj);
           Object fieldValue = field.getValue();
 
+          if (valueObject == null) {
+            // there is no such field in the record. This filter will be ignored for the current record.
+            continue;
+          }
           if (fieldValue == null) {
             throw new IOException("Malformed filter. Check input");
           } else if (fieldValue instanceof Filter) {
@@ -653,18 +657,25 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               }
             } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
               Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
+              boolean flag = false;
               for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
-                boolean flag;
+                boolean subflag;
                 if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
-                  flag = checkFilteredObjectCollection((Collection)ob.getValue(), subfields);
+                  subflag = checkFilteredObjectCollection((Collection)ob.getValue(), subfields);
                 } else {
-                  flag = checkFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
+                  subflag = checkFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
                 }
-                if (flag) {
-                  return true;
+                if (subflag) {
+                  // atleast one item in the map/list of the record has matched the filter,
+                  // so record passes the filter.
+                  flag = true;
+                  break;
                 }
               }
-              return false;
+              if (!flag) {
+                // none of the items in the map/list passed the filter => record doesn't pass the filter
+                return false;
+              }
             } else {
               if (!checkFilteredObject(valueObject, valueClassField.getType(), subfields)) {
                 return false;
