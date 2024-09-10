@@ -553,6 +553,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache;
   }
 
+  @Override
+  public Table getRawTable() {
+    return rawTable;
+  }
+
   /**
    * Key value implementation for strongly typed tables.
    */

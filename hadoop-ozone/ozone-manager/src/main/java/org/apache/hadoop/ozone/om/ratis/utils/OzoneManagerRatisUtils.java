@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
+import org.apache.hadoop.ozone.om.request.OMPersistDbRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetOwnerRequest;
@@ -337,6 +338,8 @@ public final class OzoneManagerRatisUtils {
       return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     case QuotaRepair:
       return new OMQuotaRepairRequest(omRequest);
+    case PersistDb:
+      return new OMPersistDbRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);

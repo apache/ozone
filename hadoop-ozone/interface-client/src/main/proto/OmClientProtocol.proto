@@ -153,6 +153,7 @@ enum Type {
   GetServerDefaults = 134;
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
+  PersistDb = 137;
 }
 
 enum SafeMode {
@@ -295,6 +296,7 @@ message OMRequest {
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  optional PersistDbRequest          PersistDbRequest        = 135;
 }
 
 message OMResponse {
@@ -425,6 +427,7 @@ message OMResponse {
   optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
   optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
   optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
+  optional PersistDbResponse          PersistDbResponse       = 138;
 }
 
 enum Status {
@@ -2250,7 +2253,20 @@ message OMLockDetailsProto {
   optional uint64 readLockNanos    = 3;
   optional uint64 writeLockNanos   = 4;
 }
-
+message PersistDbRequest {
+    repeated DBTableUpdate tableUpdates = 1;
+    repeated int64 index = 2;
+}
+message DBTableUpdate {
+    required string tableName = 1;
+    repeated DBTableRecord records = 2;
+}
+message DBTableRecord {
+    required bytes key = 1;
+    optional bytes value = 2;
+}
+message PersistDbResponse {
+}
 /**
  The OM service that takes care of Ozone namespace.
 */
