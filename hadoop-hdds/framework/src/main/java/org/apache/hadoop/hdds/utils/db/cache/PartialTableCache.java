@@ -137,23 +137,22 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
       }
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
-      if (epochs.contains(currentEpoch)) {
-        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
-             iterator.hasNext();) {
-          cachekey = iterator.next();
-          cache.computeIfPresent(cachekey, ((k, v) -> {
-            // If cache epoch entry matches with current Epoch, remove entry
-            // from cache.
-            if (v.getEpoch() == currentEpoch) {
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                        k.getCacheKey(), currentEpoch);
-              }
-              return null;
+      // Also, if higher epoch is present indicates all previous epoch is received
+      for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
+           iterator.hasNext();) {
+        cachekey = iterator.next();
+        cache.computeIfPresent(cachekey, ((k, v) -> {
+          // If cache epoch entry matches with current Epoch, remove entry
+          // from cache.
+          if (v.getEpoch() == currentEpoch) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                      k.getCacheKey(), currentEpoch);
             }
-            return v;
-          }));
-        }
+            return null;
+          }
+          return v;
+        }));
         // Remove epoch entry, as the entry is there in epoch list.
         epochEntries.remove(currentEpoch);
       }

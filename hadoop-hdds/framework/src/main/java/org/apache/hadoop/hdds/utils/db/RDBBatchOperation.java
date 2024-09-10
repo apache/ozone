@@ -258,6 +258,25 @@ public class RDBBatchOperation implements BatchOperation {
             countSize2String(discardedCount, discardedSize));
       }
 
+      public void retrieveCache(Map<ByteBuffer, ByteBuffer> dataMap) {
+        for (Map.Entry<Bytes, Object> d : ops.entrySet()) {
+          Bytes key = d.getKey();
+          Object value = d.getValue();
+          if (value instanceof byte[]) {
+            dataMap.put(ByteBuffer.wrap(key.array()), ByteBuffer.wrap((byte[]) value));
+          } else if (value instanceof CodecBuffer) {
+            dataMap.put(key.asReadOnlyByteBuffer(), ((CodecBuffer) value).asReadOnlyByteBuffer());
+          } else if (value == Op.DELETE) {
+            dataMap.put(ByteBuffer.wrap(key.array()), null);
+          } else {
+            throw new IllegalStateException("Unexpected value: " + value
+                + ", class=" + value.getClass().getSimpleName());
+          }
+        }
+        isCommit = true;
+        clear();
+      }
+
       @Override
       public String toString() {
         return name + ": " + family.getName();
@@ -320,6 +339,15 @@ public class RDBBatchOperation implements BatchOperation {
           countSize2String(discardedCount, discardedSize),
           countSize2String(opCount - discardedCount, opSize - discardedSize));
     }
+
+    public Map<String, Map<ByteBuffer, ByteBuffer>> getCachedTransaction() {
+      Map<String, Map<ByteBuffer, ByteBuffer>> tableMap = new HashMap<>();
+      for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
+        Map<ByteBuffer, ByteBuffer> dataMap = tableMap.computeIfAbsent(e.getKey(), (p) -> new HashMap<>());
+        e.getValue().retrieveCache(dataMap);
+      }
+      return tableMap;
+    }
   }
 
   private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
@@ -377,5 +405,9 @@ public class RDBBatchOperation implements BatchOperation {
   public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
     opCache.put(family, key, value);
+  }
+
+  public Map<String, Map<ByteBuffer, ByteBuffer>> getCachedTransaction() {
+    return opCache.getCachedTransaction();
   }
 }
