@@ -33,6 +33,8 @@ import com.google.common.primitives.Ints;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to compute and verify checksums for chunks.
@@ -40,6 +42,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * This class is not thread safe.
  */
 public class Checksum {
+  public static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
+
   private static Function<ByteBuffer, ByteString> newMessageDigestFunction(
       String algorithm) {
     final MessageDigest md;
@@ -63,7 +67,7 @@ public class Checksum {
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(
       Supplier<ChecksumByteBuffer> constructor) {
     final ChecksumByteBuffer algorithm = constructor.get();
-    return  data -> {
+    return data -> {
       algorithm.reset();
       algorithm.update(data);
       return int2ByteString((int)algorithm.getValue());
@@ -97,6 +101,22 @@ public class Checksum {
 
   private final ChecksumType checksumType;
   private final int bytesPerChecksum;
+  /**
+   * TODO: Make sure to clear this cache when a new block chunk is started.
+   */
+  private final ChecksumCache checksumCache;
+
+  /**
+   * BlockOutputStream needs to call this method to clear the checksum cache
+   * whenever a block chunk has been established.
+   */
+  public boolean clearChecksumCache() {
+    if (checksumCache != null) {
+      checksumCache.clear();
+      return true;
+    }
+    return false;
+  }
 
   /**
    * Constructs a Checksum object.
@@ -106,6 +126,24 @@ public class Checksum {
   public Checksum(ChecksumType type, int bytesPerChecksum) {
     this.checksumType = type;
     this.bytesPerChecksum = bytesPerChecksum;
+    this.checksumCache = null;
+  }
+
+  /**
+   * Constructs a Checksum object.
+   * @param type type of Checksum
+   * @param bytesPerChecksum number of bytes of data per checksum
+   * @param useChecksumCache true to enable checksum cache
+   */
+  public Checksum(ChecksumType type, int bytesPerChecksum, boolean useChecksumCache) {
+    this.checksumType = type;
+    this.bytesPerChecksum = bytesPerChecksum;
+    LOG.debug("useChecksumCache = {}", useChecksumCache);
+    if (useChecksumCache) {
+      this.checksumCache = new ChecksumCache(bytesPerChecksum);
+    } else {
+      this.checksumCache = null;
+    }
   }
 
   /**
@@ -168,12 +206,20 @@ public class Checksum {
       throw new OzoneChecksumException(checksumType);
     }
 
-    // Checksum is computed for each bytesPerChecksum number of bytes of data
-    // starting at offset 0. The last checksum might be computed for the
-    // remaining data with length less than bytesPerChecksum.
-    final List<ByteString> checksumList = new ArrayList<>();
-    for (ByteBuffer b : data.iterate(bytesPerChecksum)) {
-      checksumList.add(computeChecksum(b, function, bytesPerChecksum));
+    final List<ByteString> checksumList;
+    if (checksumCache == null) {
+      // When checksumCache is not enabled:
+      // Checksum is computed for each bytesPerChecksum number of bytes of data
+      // starting at offset 0. The last checksum might be computed for the
+      // remaining data with length less than bytesPerChecksum.
+      checksumList = new ArrayList<>();
+      for (ByteBuffer b : data.iterate(bytesPerChecksum)) {
+        checksumList.add(computeChecksum(b, function, bytesPerChecksum));  // merge this?
+      }
+    } else {
+      // When checksumCache is enabled:
+      // We only need to update the last checksum in the cache, then pass it along.
+      checksumList = checksumCache.computeChecksum(data, function);
     }
     return new ChecksumData(checksumType, bytesPerChecksum, checksumList);
   }
@@ -185,7 +231,7 @@ public class Checksum {
    * @param maxLength the max length of data
    * @return computed checksum ByteString
    */
-  private static ByteString computeChecksum(ByteBuffer data,
+  protected static ByteString computeChecksum(ByteBuffer data,
       Function<ByteBuffer, ByteString> function, int maxLength) {
     final int limit = data.limit();
     try {
