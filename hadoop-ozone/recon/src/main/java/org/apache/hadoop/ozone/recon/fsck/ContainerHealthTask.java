@@ -79,6 +79,8 @@ public class ContainerHealthTask extends ReconScmTask {
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final PlacementPolicy placementPolicy;
   private final long interval;
+  private Map<UnHealthyContainerStates, Map<String, Long>>
+      unhealthyContainerStateStatsMap;
 
   private final Set<ContainerInfo> processedContainers = new HashSet<>();
 
@@ -128,8 +130,7 @@ public class ContainerHealthTask extends ReconScmTask {
     // <MISSING, <TOTAL_USED_BYTES, 2048>>,
     // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
-    Map<UnHealthyContainerStates, Map<String, Long>>
-        unhealthyContainerStateStatsMap;
+    unhealthyContainerStateStatsMap.clear();
     try {
       unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
       initializeUnhealthyContainerStateStatsMap(
@@ -701,6 +702,15 @@ public class ContainerHealthTask extends ReconScmTask {
   @VisibleForTesting
   public Logger getLogger() {
     return LOG;
+  }
+
+  /**
+   * Expose the unhealthyContainerStateStatsMap for testing purposes.
+   */
+  @VisibleForTesting
+  public Map<UnHealthyContainerStates, Map<String, Long>>
+  getUnhealthyContainerStateStatsMap() {
+    return unhealthyContainerStateStatsMap;
   }
 
 }
