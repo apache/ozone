@@ -380,9 +380,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .isGreaterThan(currentTime);
   }
 
-  // Write a test where we insert a new container which is missing and is empty.
-
-
   @Test
   public void testAllContainerStateInsertions() {
     UnhealthyContainersDao unHealthyContainersTableHandle =
