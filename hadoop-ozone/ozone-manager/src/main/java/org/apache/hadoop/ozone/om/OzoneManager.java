@@ -4005,8 +4005,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcServer = getRpcServer(configuration);
         omRpcServer.start();
         isOmRpcServerRunning = true;
-        LOG.info("RPC server is re-started. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("RPC server is re-started. Spend " + (Time.monotonicNow() - time) + " ms.");
       } catch (Exception e) {
         String errorMsg = "Failed to start RPC Server.";
         exitManager.exitSystem(1, errorMsg, e, LOG);

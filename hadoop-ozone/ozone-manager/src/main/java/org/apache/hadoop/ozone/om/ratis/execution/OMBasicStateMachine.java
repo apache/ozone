@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
@@ -368,6 +367,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
     try {
       try {
         omClientResponse = handler.handleWriteRequestImpl(request, termIndex);
+        validateResponseError(omClientResponse.getOMResponse());
       } catch (IOException e) {
         LOG.warn("Failed to apply command, Exception occurred ", e);
         omClientResponse = new DummyOMClientResponse(createErrorResponse(request, e, termIndex));
@@ -385,18 +385,15 @@ public class OMBasicStateMachine extends BaseStateMachine {
           ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
         }
       }
+      return omClientResponse.getOMResponse();
     } catch (Throwable e) {
       // For any further exceptions, terminate OM as db update fails
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     } finally {
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (null != omResponse) {
-        validateResponseError(omResponse);
-      }
       updateLastAppliedTermIndex(termIndex);
-      return omResponse;
     }
+    return null;
   }
 
   private static void validateResponseError(OMResponse omResponse) {
