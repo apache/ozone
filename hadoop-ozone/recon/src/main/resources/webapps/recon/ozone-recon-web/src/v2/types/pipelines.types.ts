@@ -53,3 +53,10 @@ export type PipelinesState = {
   columnOptions: Option[];
   lastUpdated: number;
 }
+
+export type PipelinesTableProps = {
+  loading: boolean;
+  data: Pipeline[];
+  selectedColumns: Option[];
+  searchTerm: string;
+}

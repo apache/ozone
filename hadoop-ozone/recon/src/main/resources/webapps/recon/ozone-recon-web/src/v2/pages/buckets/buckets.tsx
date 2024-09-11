@@ -18,25 +18,9 @@
 
 import React, { useEffect, useState } from 'react';
 import moment from 'moment';
-import { Table, Tag } from 'antd';
-import {
-  ColumnProps,
-  ColumnsType,
-  TablePaginationConfig
-} from 'antd/es/table';
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  CloudServerOutlined,
-  FileUnknownOutlined,
-  HddOutlined,
-  LaptopOutlined,
-  SaveOutlined
-} from '@ant-design/icons';
 import { ValueType } from 'react-select';
 import { useLocation } from 'react-router-dom';
 
-import QuotaBar from '@/components/quotaBar/quotaBar';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
 import Search from '@/v2/components/search/search';
@@ -45,20 +29,17 @@ import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
-import { nullAwareLocaleCompare, showDataFetchError } from '@/utils/common';
+import { showDataFetchError } from '@/utils/common';
 import { useDebounce } from '@/v2/hooks/debounce.hook';
 
 import {
   Bucket,
-  BucketLayout,
-  BucketLayoutTypeList,
   BucketResponse,
   BucketsState,
-  BucketStorage,
-  BucketStorageTypeList
 } from '@/v2/types/bucket.types';
 
 import './buckets.less';
+import BucketsTable, { COLUMNS } from '@/v2/components/tables/bucketsTable';
 
 
 const LIMIT_OPTIONS: Option[] = [
@@ -80,38 +61,6 @@ const LIMIT_OPTIONS: Option[] = [
   }
 ]
 
-const renderIsVersionEnabled = (isVersionEnabled: boolean) => {
-  return isVersionEnabled
-    ? <CheckCircleOutlined
-      style={{ color: '#1da57a' }}
-      className='icon-success' />
-    : <CloseCircleOutlined className='icon-neutral' />
-};
-
-const renderStorageType = (bucketStorage: BucketStorage) => {
-  const bucketStorageIconMap: Record<BucketStorage, React.ReactElement> = {
-    RAM_DISK: <LaptopOutlined />,
-    SSD: <SaveOutlined />,
-    DISK: <HddOutlined />,
-    ARCHIVE: <CloudServerOutlined />
-  };
-  const icon = bucketStorage in bucketStorageIconMap
-    ? bucketStorageIconMap[bucketStorage]
-    : <FileUnknownOutlined />;
-  return <span>{icon} {bucketStorage}</span>;
-};
-
-const renderBucketLayout = (bucketLayout: BucketLayout) => {
-  const bucketLayoutColorMap = {
-    FILE_SYSTEM_OPTIMIZED: 'green',
-    OBJECT_STORE: 'orange',
-    LEGACY: 'blue'
-  };
-  const color = bucketLayout in bucketLayoutColorMap ?
-    bucketLayoutColorMap[bucketLayout] : '';
-  return <Tag color={color}>{bucketLayout}</Tag>;
-};
-
 const SearchableColumnOpts = [{
   label: 'Bucket',
   value: 'name'
@@ -119,113 +68,6 @@ const SearchableColumnOpts = [{
   label: 'Volume',
   value: 'volumeName'
 }]
-
-const COLUMNS: ColumnsType<Bucket> = [
-  {
-    title: 'Bucket',
-    dataIndex: 'name',
-    key: 'name',
-    sorter: (a: Bucket, b: Bucket) => a.name.localeCompare(b.name),
-    defaultSortOrder: 'ascend' as const
-  },
-  {
-    title: 'Volume',
-    dataIndex: 'volumeName',
-    key: 'volumeName',
-    sorter: (a: Bucket, b: Bucket) => a.volumeName.localeCompare(b.volumeName),
-    defaultSortOrder: 'ascend' as const
-  },
-  {
-    title: 'Owner',
-    dataIndex: 'owner',
-    key: 'owner',
-    sorter: (a: Bucket, b: Bucket) => nullAwareLocaleCompare(a.owner, b.owner)
-  },
-  {
-    title: 'Versioning',
-    dataIndex: 'versioning',
-    key: 'isVersionEnabled',
-    render: (isVersionEnabled: boolean) => renderIsVersionEnabled(isVersionEnabled)
-  },
-  {
-    title: 'Storage Type',
-    dataIndex: 'storageType',
-    key: 'storageType',
-    filterMultiple: true,
-    filters: BucketStorageTypeList.map(state => ({ text: state, value: state })),
-    onFilter: (value, record: Bucket) => record.storageType === value,
-    sorter: (a: Bucket, b: Bucket) => a.storageType.localeCompare(b.storageType),
-    render: (storageType: BucketStorage) => renderStorageType(storageType)
-  },
-  {
-    title: 'Bucket Layout',
-    dataIndex: 'bucketLayout',
-    key: 'bucketLayout',
-    filterMultiple: true,
-    filters: BucketLayoutTypeList.map(state => ({ text: state, value: state })),
-    onFilter: (value, record: Bucket) => record.bucketLayout === value,
-    sorter: (a: Bucket, b: Bucket) => a.bucketLayout.localeCompare(b.bucketLayout),
-    render: (bucketLayout: BucketLayout) => renderBucketLayout(bucketLayout)
-  },
-  {
-    title: 'Creation Time',
-    dataIndex: 'creationTime',
-    key: 'creationTime',
-    sorter: (a: Bucket, b: Bucket) => a.creationTime - b.creationTime,
-    render: (creationTime: number) => {
-      return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
-    }
-  },
-  {
-    title: 'Modification Time',
-    dataIndex: 'modificationTime',
-    key: 'modificationTime',
-    sorter: (a: Bucket, b: Bucket) => a.modificationTime - b.modificationTime,
-    render: (modificationTime: number) => {
-      return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
-    }
-  },
-  {
-    title: 'Storage Capacity',
-    key: 'quotaCapacityBytes',
-    sorter: (a: Bucket, b: Bucket) => a.usedBytes - b.usedBytes,
-    render: (text: string, record: Bucket) => (
-      <QuotaBar
-        quota={record.quotaInBytes}
-        used={record.usedBytes}
-        quotaType='size'
-      />
-    )
-  },
-  {
-    title: 'Namespace Capacity',
-    key: 'namespaceCapacity',
-    sorter: (a: Bucket, b: Bucket) => a.usedNamespace - b.usedNamespace,
-    render: (text: string, record: Bucket) => (
-      <QuotaBar
-        quota={record.quotaInNamespace}
-        used={record.usedNamespace}
-        quotaType='namespace'
-      />
-    )
-  },
-  {
-    title: 'Source Volume',
-    dataIndex: 'sourceVolume',
-    key: 'sourceVolume',
-    render: (sourceVolume: string) => {
-      return sourceVolume ? sourceVolume : 'NA';
-    }
-  },
-  {
-    title: 'Source Bucket',
-    dataIndex: 'sourceBucket',
-    key: 'sourceBucket',
-    render: (sourceBucket: string) => {
-      return sourceBucket ? sourceBucket : 'NA';
-    }
-  }
-];
 
 const defaultColumns = COLUMNS.map(column => ({
   label: column.title as string,
@@ -291,20 +133,9 @@ const Buckets: React.FC<{}> = () => {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const { search } = useLocation();
 
-  const paginationConfig: TablePaginationConfig = {
-    showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} buckets`,
-    showSizeChanger: true
-  };
-
   function getVolumeSearchParam() {
     return new URLSearchParams(search).get('volume');
   };
-
-  function getFilteredData(data: Bucket[]) {
-    return data.filter(
-      (bucket: Bucket) => bucket[searchColumn].includes(debouncedSearch)
-    );
-  }
 
   function handleVolumeChange(selected: ValueType<Option, true>) {
     const { volumeBucketMap } = state;
@@ -326,50 +157,6 @@ const Buckets: React.FC<{}> = () => {
     setCurrentRow(bucket);
     setShowPanel(true);
   }
-
-  function filterSelectedColumns() {
-    const columnKeys = selectedColumns.map((column) => column.value);
-    return COLUMNS.filter(
-      (column) => columnKeys.indexOf(column.key as string) >= 0
-    )
-  }
-
-  function addAclColumn() {
-    // Inside the class component to access the React internal state
-    const aclLinkColumn: ColumnProps<Bucket> = {
-      title: 'ACLs',
-      dataIndex: 'acls',
-      key: 'acls',
-      render: (_: any, record: Bucket) => {
-        return (
-          <a
-            key='acl'
-            onClick={() => {
-              handleAclLinkClick(record);
-            }}
-          >
-            Show ACL
-          </a>
-        );
-      }
-    };
-
-    if (COLUMNS.length > 0 && COLUMNS[COLUMNS.length - 1].key !== 'acls') {
-      // Push the ACL column for initial
-      COLUMNS.push(aclLinkColumn);
-    } else {
-      // Replace old ACL column with new ACL column with correct reference
-      // e.g. After page is reloaded / redirect from other page
-      COLUMNS[COLUMNS.length - 1] = aclLinkColumn;
-    }
-
-    if (defaultColumns.length > 0 && defaultColumns[defaultColumns.length - 1].label !== 'acls') {
-      defaultColumns.push({
-        label: aclLinkColumn.title as string,
-        value: aclLinkColumn.key as string
-      });
-    }
-  };
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
@@ -447,7 +234,6 @@ const Buckets: React.FC<{}> = () => {
 
   useEffect(() => {
     autoReloadHelper.startPolling();
-    addAclColumn();
     const initialVolume = getVolumeSearchParam();
     if (initialVolume) {
       setSelectedVolumes([{
@@ -537,17 +323,13 @@ const Buckets: React.FC<{}> = () => {
                 setSearchColumn(value as 'name' | 'volumeName');
               }} />
           </div>
-          <div>
-            <Table
-              dataSource={getFilteredData(bucketsUnderVolume)}
-              columns={filterSelectedColumns()}
-              loading={loading}
-              rowKey='volume'
-              pagination={paginationConfig}
-              scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
-              locale={{ filterTitle: '' }}
-            />
-          </div>
+          <BucketsTable
+            loading={loading}
+            data={bucketsUnderVolume}
+            handleAclClick={handleAclLinkClick}
+            selectedColumns={selectedColumns}
+            searchColumn={searchColumn}
+            searchTerm={debouncedSearch} />
         </div>
         <AclPanel
           visible={showPanel}
