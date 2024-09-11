@@ -148,7 +148,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         long snapshotLimit = snapshotDeletionPerTask;
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotChainManager, iterator.next());
-          // Only Iterate in deleted snapshot & only if all the changes have been flushed into disk.
+          // Only Iterate in deleted snapshot & only if all the changes have been flushed into disk & snapshots have
+          // been deep cleaned.
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }

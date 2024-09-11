@@ -340,8 +340,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             try {
               SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(getOzoneManager(), chainManager, snapshotId);
               // Wait for snapshot changes to be flushed to disk.
-              if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(
-                  getOzoneManager().getMetadataManager(), snapInfo)) {
+              if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
                 LOG.info("Skipping snapshot processing since changes to snapshot {} have not been flushed to disk",
                     snapInfo);
                 continue;

@@ -1014,8 +1014,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         snapshotInfos.add(snapshotInfo);
         // If changes made to the snapshot have not been flushed to disk, throw exception immediately, next run of
         // garbage collection would process the snapshot.
-        if (snapshotInfo != null &&
-            !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapshotInfo)) {
+        if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapshotInfo)) {
           throw new IOException("Changes made to the snapshot " + snapshotInfo + " have not been flushed to the disk ");
         }
       }
