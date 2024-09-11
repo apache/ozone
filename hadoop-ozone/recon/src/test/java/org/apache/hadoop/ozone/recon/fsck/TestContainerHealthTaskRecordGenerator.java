@@ -128,6 +128,58 @@ public class TestContainerHealthTaskRecordGenerator {
   }
 
   @Test
+  public void testEmptyMissingRecordNotInsertedButLogged() {
+    // Create a container that is in EMPTY_MISSING state
+    Set<ContainerReplica> replicas = new HashSet<>();
+    ContainerHealthStatus status = new ContainerHealthStatus(emptyContainer, replicas, placementPolicy,
+            reconContainerMetadataManager, CONF);
+
+    // Initialize stats map
+    Map<UnHealthyContainerStates, Map<String, Long>> unhealthyContainerStateStatsMap = new HashMap<>();
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
+
+    // Generate records for EMPTY_MISSING container
+    List<UnhealthyContainers> records = ContainerHealthTask.ContainerHealthRecords.generateUnhealthyRecords(
+            status, (long) 345678, unhealthyContainerStateStatsMap);
+
+    // Assert that no records are created for EMPTY_MISSING state
+    assertEquals(0, records.size());
+
+    // Assert that the EMPTY_MISSING state is logged
+    assertEquals(1, unhealthyContainerStateStatsMap.get(UnHealthyContainerStates.EMPTY_MISSING)
+        .getOrDefault(CONTAINER_COUNT, 0L));
+  }
+
+  @Test
+  public void testNegativeSizeRecordNotInsertedButLogged() {
+    // Simulate a container with NEGATIVE_SIZE state
+    when(container.getUsedBytes()).thenReturn(-10L); // Negative size
+    Set<ContainerReplica> replicas = generateReplicas(container, CLOSED, CLOSED);
+    ContainerHealthStatus status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, reconContainerMetadataManager, CONF);
+
+    // Initialize stats map
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap = new HashMap<>();
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
+
+    // Generate records for NEGATIVE_SIZE container
+    List<UnhealthyContainers> records =
+        ContainerHealthTask.ContainerHealthRecords.generateUnhealthyRecords(
+            status, (long) 123456, unhealthyContainerStateStatsMap);
+
+    // Assert that none of the records are for negative.
+    records.forEach(record -> assertFalse(record.getContainerState()
+        .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString())));
+
+
+    // Assert that the NEGATIVE_SIZE state is logged
+    assertEquals(1, unhealthyContainerStateStatsMap.get(
+            UnHealthyContainerStates.NEGATIVE_SIZE).getOrDefault(CONTAINER_COUNT, 0L));
+  }
+
+
+  @Test
   public void testUnderReplicatedRecordRetainedAndUpdated() {
     // under replicated container
     Set<ContainerReplica> replicas =
@@ -578,6 +630,8 @@ public class TestContainerHealthTaskRecordGenerator {
         UnHealthyContainerStates.OVER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+        UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
   }
 
   private void logUnhealthyContainerStats(
