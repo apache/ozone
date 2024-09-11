@@ -873,7 +873,7 @@ public final class OzoneManagerRatisServer {
 
   public TermIndex getLastAppliedTermIndex() {
     if (ozoneManager.isLeaderExecutorEnabled()) {
-      omBasicStateMachine.getLastAppliedTermIndex();
+      return omBasicStateMachine.getLastAppliedTermIndex();
     }
     return omStateMachine.getLastAppliedTermIndex();
   }
