@@ -67,7 +67,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
   @Override
   protected void execute(ScmClient scmClient) throws IOException {
     List<String> ratisRoles = scmClient.getScmRatisRoles();
-    boolean isRatisEnabled = scmClient.isSCMRatisEnable();
+    boolean isRatisEnabled = scmClient.isScmRatisEnable();
     if (json) {
       Map<String, Map<String, String>> scmRoles = parseScmRoles(ratisRoles);
       System.out.print(

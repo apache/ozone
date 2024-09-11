@@ -520,7 +520,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean isSCMRatisEnable() throws IOException {
+  public boolean isScmRatisEnable() throws IOException {
     return storageContainerLocationClient.getScmInfo().getScmRatisEnabled();
   }
 

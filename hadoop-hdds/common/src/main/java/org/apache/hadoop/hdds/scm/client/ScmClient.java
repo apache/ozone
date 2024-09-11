@@ -399,7 +399,7 @@ public interface ScmClient extends Closeable {
    * while `false` indicates that it is in STANDALONE mode.
    * @throws IOException  an I/O exception of some sort has occurred.
    */
-  boolean isSCMRatisEnable() throws IOException;
+  boolean isScmRatisEnable() throws IOException;
 
   /**
    * Force generates new secret keys (rotate).

@@ -128,13 +128,8 @@ import org.apache.hadoop.ozone.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
@@ -156,6 +151,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+
+  /**
+   * This is used to check if 'leader' or 'follower' exists,
+   * in order to confirm whether we have enabled Ratis.
+   */
+  private final List<String> scmRatisRolesToCheck = Arrays.asList("leader", "follower");
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -758,11 +759,28 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setScmRatisEnabled(resp.getScmRatisEnabled())
         .setRatisPeerRoles(resp.getPeerRolesList());
 
-    return builder.build();
+    // By default, we assume that SCM Ratis is not enabled.
+    builder.setScmRatisEnabled(Boolean.FALSE);
 
+    // If the response contains the `ScmRatisEnabled` field,
+    // we will set it directly; otherwise,
+    // we will determine if Ratis is enabled based on
+    // whether the `peerRolesList` contains the keywords 'leader' or 'follower'.
+    if (resp.hasScmRatisEnabled()) {
+      builder.setScmRatisEnabled(resp.getScmRatisEnabled());
+    } else {
+      List<String> peerRolesList = resp.getPeerRolesList();
+      if (!peerRolesList.isEmpty()) {
+        boolean containsScmRoles = peerRolesList.stream().map(String::toLowerCase)
+            .anyMatch(scmRatisRolesToCheck::contains);
+        if(containsScmRoles) {
+          builder.setScmRatisEnabled(Boolean.TRUE);
+        }
+      }
+    }
+    return builder.build();
   }
 
   @Override
