@@ -853,10 +853,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if (factor != null) {
       // Call from a legacy client
       containerListAndTotalCount =
-          impl.listContainer(startContainerID, count, state, factor);
+          impl.listContainerWithCount(startContainerID, count, state, factor);
     } else {
       containerListAndTotalCount =
-          impl.listContainer(startContainerID, count, state, replicationType,
+          impl.listContainerWithCount(startContainerID, count, state, replicationType,
               repConfig);
     }
     SCMListContainerResponseProto.Builder builder =

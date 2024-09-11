@@ -342,7 +342,14 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count) throws IOException {
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count);
+  }
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count) throws IOException {
     if (count > maxCountOfContainerList) {
       LOG.error("Attempting to list {} containers. However, this exceeds" +
@@ -350,12 +357,22 @@ public class ContainerOperationClient implements ScmClient {
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;
     }
-    return storageContainerLocationClient.listContainer(
+    return storageContainerLocationClient.listContainerWithCount(
         startContainerID, count);
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType repType,
+      ReplicationConfig replicationConfig) throws IOException {
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state, repType, replicationConfig);
+  }
+
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType repType,
       ReplicationConfig replicationConfig) throws IOException {
@@ -365,7 +382,7 @@ public class ContainerOperationClient implements ScmClient {
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;
     }
-    return storageContainerLocationClient.listContainer(
+    return storageContainerLocationClient.listContainerWithCount(
         startContainerID, count, state, repType, replicationConfig);
   }
 

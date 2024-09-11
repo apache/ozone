@@ -149,7 +149,10 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count) throws IOException;
+
+  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -169,7 +172,10 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException;
+
+  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
@@ -189,7 +195,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException;
+
+  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
 
@@ -211,7 +221,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig) throws IOException;
+
+  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig) throws IOException;

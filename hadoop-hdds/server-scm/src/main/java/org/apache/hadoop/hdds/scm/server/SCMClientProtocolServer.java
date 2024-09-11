@@ -414,9 +414,15 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  public List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException {
     return listContainer(startContainerID, count, null, null, null);
+  }
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+      int count) throws IOException {
+    return listContainerWithCount(startContainerID, count, null, null, null);
   }
 
   /**
@@ -431,9 +437,15 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
     return listContainer(startContainerID, count, state, null, null);
+  }
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException {
+    return listContainerWithCount(startContainerID, count, state, null, null);
   }
 
   /**
@@ -449,17 +461,74 @@ public class SCMClientProtocolServer implements
    */
   @Override
   @Deprecated
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException {
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("startContainerID", String.valueOf(startContainerID));
+    auditMap.put("count", String.valueOf(count));
+    if (state != null) {
+      auditMap.put("state", state.name());
+    }
+    if (factor != null) {
+      auditMap.put("factor", factor.name());
+    }
+    try {
+      final ContainerID containerId = ContainerID.valueOf(startContainerID);
+      if (state != null) {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              //Filtering EC replication type as EC will not have factor.
+              .filter(info -> info
+                  .getReplicationType() != HddsProtos.ReplicationType.EC)
+              .filter(info -> (info.getReplicationFactor() == factor))
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .sorted().limit(count).collect(Collectors.toList());
+        }
+      } else {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers().stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              //Filtering EC replication type as EC will not have factor.
+              .filter(info -> info
+                  .getReplicationType() != HddsProtos.ReplicationType.EC)
+              .filter(info -> info.getReplicationFactor() == factor)
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(containerId, count);
+        }
+      }
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
+      }
+    }
+  }
+
+  @Override
+  @Deprecated
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
     return listContainerInternal(startContainerID, count, state, factor, null, null);
   }
 
   private Pair<List<ContainerInfo>, Long> listContainerInternal(long startContainerID, int count,
-                                                                HddsProtos.LifeCycleState state,
-                                                                HddsProtos.ReplicationFactor factor,
-                                                                HddsProtos.ReplicationType replicationType,
-                                                                ReplicationConfig repConfig) throws IOException {
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, replicationType, repConfig);
 
@@ -484,9 +553,9 @@ public class SCMClientProtocolServer implements
   }
 
   private Stream<ContainerInfo> buildContainerStream(HddsProtos.ReplicationFactor factor,
-                                                     HddsProtos.ReplicationType replicationType,
-                                                     ReplicationConfig repConfig,
-                                                     Stream<ContainerInfo> containerStream) {
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig,
+      Stream<ContainerInfo> containerStream) {
     if (factor != null) {
       containerStream = containerStream.filter(info -> info.getReplicationType() != HddsProtos.ReplicationType.EC)
           .filter(info -> info.getReplicationFactor() == factor);
@@ -511,10 +580,10 @@ public class SCMClientProtocolServer implements
   }
 
   private Map<String, String> buildAuditMap(long startContainerID, int count,
-                                            HddsProtos.LifeCycleState state,
-                                            HddsProtos.ReplicationFactor factor,
-                                            HddsProtos.ReplicationType replicationType,
-                                            ReplicationConfig repConfig) {
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig) {
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
@@ -546,10 +615,70 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
-                                                       int count, HddsProtos.LifeCycleState state,
-                                                       HddsProtos.ReplicationType replicationType,
-                                                       ReplicationConfig repConfig) throws IOException {
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig) throws IOException {
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("startContainerID", String.valueOf(startContainerID));
+    auditMap.put("count", String.valueOf(count));
+    if (state != null) {
+      auditMap.put("state", state.name());
+    }
+    if (replicationType != null) {
+      auditMap.put("replicationType", replicationType.toString());
+    }
+    if (repConfig != null) {
+      auditMap.put("replicationConfig", repConfig.toString());
+    }
+    try {
+      final ContainerID containerId = ContainerID.valueOf(startContainerID);
+      if (state == null && replicationType == null && repConfig == null) {
+        // Not filters, so just return everything
+        return scm.getContainerManager().getContainers(containerId, count);
+      }
+
+      List<ContainerInfo> containerList;
+      if (state != null) {
+        containerList = scm.getContainerManager().getContainers(state);
+      } else {
+        containerList = scm.getContainerManager().getContainers();
+      }
+
+      Stream<ContainerInfo> containerStream = containerList.stream()
+              .filter(info -> info.containerID().getId() >= startContainerID);
+      // If we have repConfig filter by it, as it includes repType too.
+      // Otherwise, we may have a filter just for repType, eg all EC containers
+      // without filtering on their replication scheme
+      if (repConfig != null) {
+        containerStream = containerStream
+                .filter(info -> info.getReplicationConfig().equals(repConfig));
+      } else if (replicationType != null) {
+        containerStream = containerStream
+                .filter(info -> info.getReplicationType() == replicationType);
+      }
+      return containerStream.sorted()
+              .limit(count)
+              .collect(Collectors.toList());
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+              buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(
+                buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
+      }
+    }
+  }
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig) throws IOException {
     return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig);
   }
 

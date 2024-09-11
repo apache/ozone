@@ -139,7 +139,7 @@ public class ListSubcommand extends ScmSubcommand {
     }
 
     Pair<List<ContainerInfo>, Long> containerListAndTotalCount =
-        scmClient.listContainer(startId, count, state, type, repConfig);
+        scmClient.listContainerWithCount(startId, count, state, type, repConfig);
 
     // Output data list
     for (ContainerInfo container : containerListAndTotalCount.getLeft()) {

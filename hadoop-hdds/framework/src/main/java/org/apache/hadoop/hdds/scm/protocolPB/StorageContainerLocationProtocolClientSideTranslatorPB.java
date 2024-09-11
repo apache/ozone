@@ -380,19 +380,77 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count)
+  public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
     return listContainer(startContainerID, count, null, null, null);
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count)
+      throws IOException {
+    return listContainerWithCount(startContainerID, count, null, null, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
     return listContainer(startContainerID, count, state, null, null);
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
+      HddsProtos.LifeCycleState state) throws IOException {
+    return listContainerWithCount(startContainerID, count, state, null, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
+      throws IOException {
+    Preconditions.checkState(startContainerID >= 0,
+        "Container ID cannot be negative.");
+    Preconditions.checkState(count > 0,
+        "Container count must be greater than 0.");
+    SCMListContainerRequestProto.Builder builder = SCMListContainerRequestProto
+        .newBuilder();
+    builder.setStartContainerID(startContainerID);
+    builder.setCount(count);
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (state != null) {
+      builder.setState(state);
+    }
+    if (replicationConfig != null) {
+      if (replicationConfig.getReplicationType() == EC) {
+        builder.setType(EC);
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig)replicationConfig).toProto());
+      } else {
+        builder.setType(replicationConfig.getReplicationType());
+        builder.setFactor(((ReplicatedReplicationConfig)replicationConfig)
+            .getReplicationFactor());
+      }
+    } else if (replicationType != null) {
+      builder.setType(replicationType);
+    }
+
+    SCMListContainerRequestProto request = builder.build();
+
+    SCMListContainerResponseProto response =
+        submitRequest(Type.ListContainer,
+            builder1 -> builder1.setScmListContainerRequest(request))
+            .getScmListContainerResponse();
+    List<ContainerInfo> containerList = new ArrayList<>();
+    for (HddsProtos.ContainerInfoProto containerInfoProto : response
+        .getContainersList()) {
+      containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
+    }
+    return containerList;
+  }
+
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -439,7 +497,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Deprecated
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException {
+    throw new UnsupportedOperationException("Should no longer be called from " +
+        "the client side");
+  }
+
+  @Deprecated
+  @Override
+  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
       throws IOException {
     throw new UnsupportedOperationException("Should no longer be called from " +
@@ -1171,7 +1238,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainer(startContainerID, count, state).getLeft();
+    return listContainerWithCount(startContainerID, count, state).getLeft();
   }
 
   @Override

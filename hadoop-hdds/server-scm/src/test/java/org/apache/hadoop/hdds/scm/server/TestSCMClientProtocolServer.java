@@ -133,10 +133,10 @@ public class TestSCMClientProtocolServer {
         new SCMClientProtocolServer(new OzoneConfiguration(),
             mockStorageContainerManager(), mock(ReconfigurationHandler.class));
 
-    assertEquals(10, scmServer.listContainer(1, 10,
+    assertEquals(10, scmServer.listContainerWithCount(1, 10,
         null, HddsProtos.ReplicationType.RATIS, null).getLeft().size());
     // Test call from a legacy client, which uses a different method of listContainer
-    assertEquals(10, scmServer.listContainer(1, 10, null,
+    assertEquals(10, scmServer.listContainerWithCount(1, 10, null,
         HddsProtos.ReplicationFactor.THREE).getLeft().size());
   }
 
