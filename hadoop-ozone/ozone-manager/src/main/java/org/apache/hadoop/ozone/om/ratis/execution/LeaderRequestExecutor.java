@@ -261,22 +261,7 @@ public class LeaderRequestExecutor {
       }
       if ((tmpSize + size) > ratisByteLimit) {
         // send current batched request
-        RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
-        OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(reqBuilder.build())
-            .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb)
-            .setClientId(lastReqCtx.getRequest().getClientId());
-        try {
-          OMRequest reqBatch = omReqBuilder.build();
-          OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, ctx.getCacheIndex());
-          if (dbUpdateRsp != null) {
-            throw new OMException(dbUpdateRsp.getMessage(),
-                OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
-          }
-          handleBatchUpdateComplete(sendList, null);
-        } catch (Throwable e) {
-          LOG.warn("Failed to write, Exception occurred ", e);
-          handleBatchUpdateComplete(sendList, e);
-        }
+        prepareAndSendRequest(sendList, reqBuilder);
 
         // reinit and continue
         reqBuilder = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
@@ -295,6 +280,29 @@ public class LeaderRequestExecutor {
       }
       reqBuilder.addIndex(ctx.getCacheIndex().getIndex());
       sendList.add(ctx);
+    }
+    if (sendList.size() > 0) {
+      prepareAndSendRequest(sendList, reqBuilder);
+    }
+  }
+
+  private void prepareAndSendRequest(
+      List<RequestContext> sendList, OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder) {
+    RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
+    OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(reqBuilder.build())
+        .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb)
+        .setClientId(lastReqCtx.getRequest().getClientId());
+    try {
+      OMRequest reqBatch = omReqBuilder.build();
+      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getCacheIndex());
+      if (dbUpdateRsp != null) {
+        throw new OMException(dbUpdateRsp.getMessage(),
+            OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
+      }
+      handleBatchUpdateComplete(sendList, null);
+    } catch (Throwable e) {
+      LOG.warn("Failed to write, Exception occurred ", e);
+      handleBatchUpdateComplete(sendList, e);
     }
   }
 

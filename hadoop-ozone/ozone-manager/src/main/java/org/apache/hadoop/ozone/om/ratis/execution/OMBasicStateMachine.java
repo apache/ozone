@@ -82,7 +82,6 @@ public class OMBasicStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
-  private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
@@ -97,10 +96,6 @@ public class OMBasicStateMachine extends BaseStateMachine {
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
-
-    ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat(threadPrefix + "OMStateMachineApplyTransactionThread - %d").build();
-    this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
 
     ThreadFactory installSnapshotThreadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
@@ -242,8 +237,10 @@ public class OMBasicStateMachine extends BaseStateMachine {
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
-      return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
-          .thenApply(r -> OMRatisHelper.convertResponseToMessage(r));
+      OMResponse response = runCommand(request, termIndex);
+      CompletableFuture<Message> future = new CompletableFuture<>();
+      future.complete(OMRatisHelper.convertResponseToMessage(response));
+      return future;
     } catch (Exception e) {
       return completeExceptionally(e);
     }
@@ -449,7 +446,6 @@ public class OMBasicStateMachine extends BaseStateMachine {
   }
 
   public void stop() {
-    HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
     if (this.nettyMetrics != null) {
       this.nettyMetrics.unregister();
