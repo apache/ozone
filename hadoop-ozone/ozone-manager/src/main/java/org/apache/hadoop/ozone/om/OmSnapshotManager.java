@@ -694,7 +694,8 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param metadataManager Metadatamanager of Active OM.
    * @param snapshotInfo table key corresponding to snapshot in snapshotInfoTable, this should be a value from cache
    *                     and not from disk.
-   * @return True if the changes have been flushed to DB otherwise false
+   * @return True if the changes have been flushed to DB otherwise false. It would return true if the snapshot
+   * provided is null meaning the snapshot doesn't exist.
    * @throws IOException
    */
   public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, SnapshotInfo snapshotInfo)
@@ -703,9 +704,10 @@ public final class OmSnapshotManager implements AutoCloseable {
       TransactionInfo snapshotTransactionInfo = snapshotInfo.getLastTransactionInfo() != null ?
           TransactionInfo.fromByteString(snapshotInfo.getLastTransactionInfo()) : null;
       TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
+      // If transactionInfo field is null then return true to keep things backward compatible.
       return snapshotTransactionInfo == null || omTransactionInfo.compareTo(snapshotTransactionInfo) >= 0;
     }
-    return false;
+    return true;
   }
 
 
