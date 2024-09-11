@@ -170,6 +170,10 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
     return ByteString.copyFrom(getCodec().toPersistedFormat(this));
   }
 
+  public static TransactionInfo fromByteString(ByteString byteString) throws IOException {
+    return byteString == null ? null : getCodec().fromPersistedFormat(byteString.toByteArray());
+  }
+
   public SnapshotInfo toSnapshotInfo() {
     return snapshotInfo;
   }
