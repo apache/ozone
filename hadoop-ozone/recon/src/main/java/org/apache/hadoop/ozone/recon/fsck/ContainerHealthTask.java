@@ -425,7 +425,6 @@ public class ContainerHealthTask extends ReconScmTask {
     UnhealthyContainers record =
         ContainerHealthRecords.recordForState(containerHealthStatus,
             UnHealthyContainerStates.NEGATIVE_SIZE, currentTime);
-    List<UnhealthyContainers> records = Collections.singletonList(record);
     populateContainerStats(containerHealthStatus,
         UnHealthyContainerStates.NEGATIVE_SIZE,
         unhealthyContainerStateStatsMap);
