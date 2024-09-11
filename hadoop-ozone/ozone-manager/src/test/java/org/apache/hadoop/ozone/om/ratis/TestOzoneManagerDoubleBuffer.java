@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
@@ -82,8 +81,6 @@ class TestOzoneManagerDoubleBuffer {
   private OzoneManagerDoubleBuffer doubleBuffer;
   private OzoneManager ozoneManager;
   private S3SecretLockedManager secretManager;
-  private final CreateSnapshotResponse snapshotResponse1 = mock(CreateSnapshotResponse.class);
-  private final CreateSnapshotResponse snapshotResponse2 = mock(CreateSnapshotResponse.class);
   private final OMResponse omKeyResponse = mock(OMResponse.class);
   private final OMResponse omBucketResponse = mock(OMResponse.class);
   private final OMResponse omSnapshotResponse1 = mock(OMResponse.class);
@@ -158,19 +155,13 @@ class TestOzoneManagerDoubleBuffer {
     when(omSnapshotResponse2.getTraceID()).thenReturn("snapshotTraceId-2");
     when(omSnapshotPurgeResponseProto1.getTraceID()).thenReturn("snapshotPurgeTraceId-1");
     when(omSnapshotPurgeResponseProto2.getTraceID()).thenReturn("snapshotPurgeTraceId-2");
-    when(omSnapshotResponse1.hasCreateSnapshotResponse())
-        .thenReturn(true);
-    when(omSnapshotResponse2.hasCreateSnapshotResponse())
-        .thenReturn(true);
-    when(omSnapshotResponse1.getCreateSnapshotResponse())
-        .thenReturn(snapshotResponse1);
-    when(omSnapshotResponse2.getCreateSnapshotResponse())
-        .thenReturn(snapshotResponse2);
 
     when(omKeyResponse.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.CreateKey);
     when(omBucketResponse.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.CreateBucket);
     when(omSnapshotPurgeResponseProto1.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
     when(omSnapshotPurgeResponseProto2.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
+    when(omSnapshotResponse1.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
+    when(omSnapshotResponse2.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
 
     when(omKeyCreateResponse.getOMResponse()).thenReturn(omKeyResponse);
     when(omBucketCreateResponse.getOMResponse()).thenReturn(omBucketResponse);

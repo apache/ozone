@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
@@ -451,16 +450,15 @@ public final class OzoneManagerDoubleBuffer {
     final Set<OzoneManagerProtocolProtos.Type> standaloneBatchCmdTypes = ImmutableSet.of(
         OzoneManagerProtocolProtos.Type.SnapshotPurge, OzoneManagerProtocolProtos.Type.CreateSnapshot);
     final List<Function<OMResponse, Boolean>> standaloneBatchConditions =
-        ImmutableList.of(OMResponse::hasCreateSnapshotResponse,
-        (omResponse) -> standaloneBatchCmdTypes.contains(omResponse.getCmdType()));
+        ImmutableList.of((omResponse) -> standaloneBatchCmdTypes.contains(omResponse.getCmdType()));
     OMResponse previousOmResponse = null;
     for (final Entry entry : readyBuffer) {
       OMResponse prevResponse = previousOmResponse;
       OMResponse omResponse = entry.getResponse().getOMResponse();
       // New queue gets created in three conditions:
       // 1. It is first element in the response,
-      // 2. Current request is createSnapshot request.
-      // 3. Previous request was createSnapshot request.
+      // 2. Current request is createSnapshot/purgeSnapshot request.
+      // 3. Previous request was createSnapshot/purgeSnapshot request.
       if (response.isEmpty() || standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(omResponse))
           || (previousOmResponse != null &&
           standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(prevResponse)))) {
