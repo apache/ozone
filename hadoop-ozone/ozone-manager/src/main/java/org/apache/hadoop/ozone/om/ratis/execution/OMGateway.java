@@ -53,7 +53,9 @@ public class OMGateway {
   public OMGateway(OzoneManagerRatisServer ratisServer) {
     this.leaderExecutor = new LeaderRequestExecutor(ratisServer);
     this.ratisServer = ratisServer;
-    ratisServer.getOmBasicStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
+    if (ratisServer.getOzoneManager().isLeaderExecutorEnabled()) {
+      ratisServer.getOmBasicStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
+    }
   }
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
     if (!ratisServer.getOzoneManager().isLeaderReady()) {
@@ -65,7 +67,9 @@ public class OMGateway {
     RequestContext requestContext = new RequestContext();
     requestContext.setRequest(omRequest);
     requestInProgress.incrementAndGet();
-    requestContext.setFuture(new CompletableFuture<>().thenApply(resp -> handleAfterExecution(requestContext)));
+    requestContext.setFuture(new CompletableFuture<>());
+    CompletableFuture<OMResponse> f = requestContext.getFuture()
+        .whenComplete((r, th) -> handleAfterExecution(requestContext, th));
     try {
       // TODO gateway locking: take lock with OMLockDetails
       // TODO scheduling of request to pool
@@ -78,7 +82,7 @@ public class OMGateway {
       requestContext.getFuture().completeExceptionally(e);
     }
     try {
-      return requestContext.getFuture().get();
+      return f.get();
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
@@ -87,10 +91,9 @@ public class OMGateway {
     }
   }
 
-  private OMResponse handleAfterExecution(RequestContext ctx) {
+  private void handleAfterExecution(RequestContext ctx, Throwable th) {
     // TODO: gateway locking: release lock and OMLockDetails update
     requestInProgress.decrementAndGet();
-    return ctx.getResponse();
   }
   
   public void leaderChangeNotifier(String newLeaderId) {
@@ -103,6 +106,7 @@ public class OMGateway {
   }
 
   private void rebuildBucketVolumeCache() throws IOException {
+    LOG.info("Rebuild of bucket and volume cache");
     Table<String, OmBucketInfo> bucketTable = ratisServer.getOzoneManager().getMetadataManager().getBucketTable();
     Set<String> cachedBucketKeySet = new HashSet<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> cacheItr = bucketTable.cacheIterator();
