@@ -417,11 +417,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    public Builder setLastTransactionInfo(byte[] lastTransactionInfo) {
-      this.lastTransactionInfo = lastTransactionInfo == null ? null : ByteString.copyFrom(lastTransactionInfo);
-      return this;
-    }
-
     public Builder setLastTransactionInfo(ByteString lastTransactionInfo) {
       this.lastTransactionInfo = lastTransactionInfo;
       return this;
@@ -534,7 +529,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     }
 
     if (snapshotInfoProto.hasLastTransactionInfo()) {
-      osib.setLastTransactionInfo(snapshotInfoProto.getLastTransactionInfo().toByteArray());
+      osib.setLastTransactionInfo(snapshotInfoProto.getLastTransactionInfo());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -633,8 +628,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return lastTransactionInfo;
   }
 
-  public void setLastTransactionInfo(byte[] lastTransactionInfo) {
-    this.lastTransactionInfo = lastTransactionInfo == null ? null : ByteString.copyFrom(lastTransactionInfo);
+  public void setLastTransactionInfo(ByteString lastTransactionInfo) {
+    this.lastTransactionInfo = lastTransactionInfo;
   }
 
   /**

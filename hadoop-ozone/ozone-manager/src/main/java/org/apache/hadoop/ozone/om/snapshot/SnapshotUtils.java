@@ -145,7 +145,7 @@ public final class SnapshotUtils {
    */
   public static void setTransactionInfoInSnapshot(SnapshotInfo snapshot, TermIndex termIndex) throws IOException {
     TransactionInfo transactionInfo = TransactionInfo.valueOf(termIndex);
-    snapshot.setLastTransactionInfo(TransactionInfo.getCodec().toPersistedFormat(transactionInfo));
+    snapshot.setLastTransactionInfo(transactionInfo.toByteString());
   }
 
   /**

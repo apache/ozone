@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -162,16 +163,11 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
    */
   public static TransactionInfo readTransactionInfo(
       DBStoreHAManager metadataManager) throws IOException {
-    return readTransactionInfo(metadataManager, false);
+    return metadataManager.getTransactionInfoTable().getSkipCache(TRANSACTION_INFO_KEY);
   }
 
-  /**
-   * Return transaction info persisted in OM DB skipping cache.
-   */
-  public static TransactionInfo readTransactionInfo(
-      DBStoreHAManager metadataManager, boolean skipCache) throws IOException {
-    return skipCache ? metadataManager.getTransactionInfoTable().getSkipCache(TRANSACTION_INFO_KEY) :
-        metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+  public ByteString toByteString() throws IOException {
+    return ByteString.copyFrom(getCodec().toPersistedFormat(this));
   }
 
   public SnapshotInfo toSnapshotInfo() {

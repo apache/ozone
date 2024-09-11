@@ -702,7 +702,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (snapshotInfo != null) {
       TransactionInfo snapshotTransactionInfo = snapshotInfo.getLastTransactionInfo() != null ?
           TransactionInfo.getCodec().fromPersistedFormat(snapshotInfo.getLastTransactionInfo().toByteArray()) : null;
-      TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager, true);
+      TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
       return snapshotTransactionInfo == null || omTransactionInfo.compareTo(snapshotTransactionInfo) >= 0;
     }
     return false;
