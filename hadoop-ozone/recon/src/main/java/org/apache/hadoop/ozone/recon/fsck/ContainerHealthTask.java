@@ -295,13 +295,15 @@ public class ContainerHealthTask extends ReconScmTask {
           //  Unhealthy Containers such as MISSING, EMPTY_MISSING, UNDER_REPLICATED,
           // OVER_REPLICATED, MIS_REPLICATED can have their unhealthy states changed or retained.
           if (!ContainerHealthRecords.retainOrUpdateRecord(currentContainer, rec)) {
+            rec.delete();
             LOG.info("DELETED existing unhealthy container record...for Container: {}",
                 currentContainer.getContainerID());
-            rec.delete();
           }
 
           // If the container is marked as MISSING and it's deleted in SCM, remove the record
           if (currentContainer.isMissing() && containerDeletedInSCM(currentContainer.getContainer())) {
+            LOG.info("DELETED existing unhealthy container record...for Container: {}",
+                currentContainer.getContainerID());
             rec.delete();
           }
 
