@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -47,7 +46,6 @@ import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -55,6 +53,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -73,12 +72,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
@@ -86,11 +82,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -115,7 +108,6 @@ public class TestContainerBalancerTask {
   private ContainerBalancerConfiguration balancerConfiguration;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
-  private double averageUtilization;
   private int numberOfNodes;
   private Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap =
       new HashMap<>();
@@ -132,7 +124,7 @@ public class TestContainerBalancerTask {
    * Sets up configuration values and creates a mock cluster.
    */
   @BeforeEach
-  public void setup() throws IOException, NodeNotFoundException,
+  public void setup(TestInfo testInfo) throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
     rmConf = new ReplicationManagerConfiguration();
@@ -164,7 +156,11 @@ public class TestContainerBalancerTask {
     conf.setFromObject(balancerConfiguration);
     GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
 
-    averageUtilization = createCluster();
+    int[] sizeArray = testInfo.getTestMethod()
+            .filter(method -> method.getName().equals("balancerShouldMoveOnlyPositiveSizeContainers"))
+            .map(method -> new int[]{0, 0, 0, 0, 0, 1, 2, 3, 4, 5})
+            .orElse(null);
+    createCluster(sizeArray);
     mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
     NetworkTopology clusterMap = mockNodeManager.getClusterNetworkTopologyMap();
@@ -244,489 +240,6 @@ public class TestContainerBalancerTask {
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
         sb.getMetrics(), balancerConfiguration, false);
-  }
-
-  @Test
-  public void testCalculationOfUtilization() {
-    assertEquals(nodesInCluster.size(), nodeUtilizations.size());
-    for (int i = 0; i < nodesInCluster.size(); i++) {
-      assertEquals(nodeUtilizations.get(i),
-          nodesInCluster.get(i).calculateUtilization(), 0.0001);
-    }
-
-    // should be equal to average utilization of the cluster
-    assertEquals(averageUtilization, containerBalancerTask.calculateAvgUtilization(nodesInCluster), 0.0001);
-  }
-
-  /**
-   * Checks whether ContainerBalancer is correctly updating the list of
-   * unBalanced nodes with varying values of Threshold.
-   */
-  @Test
-  public void
-      initializeIterationShouldUpdateUnBalancedNodesWhenThresholdChanges() {
-    List<DatanodeUsageInfo> expectedUnBalancedNodes;
-    List<DatanodeUsageInfo> unBalancedNodesAccordingToBalancer;
-
-    // check for random threshold values
-    ContainerBalancer sb = new ContainerBalancer(scm);
-    for (int i = 0; i < 50; i++) {
-      double randomThreshold = RANDOM.nextDouble() * 100;
-
-      expectedUnBalancedNodes =
-          determineExpectedUnBalancedNodes(randomThreshold);
-
-      balancerConfiguration.setThreshold(randomThreshold);
-      containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-          sb.getMetrics(), balancerConfiguration, false);
-      containerBalancerTask.run();
-
-      unBalancedNodesAccordingToBalancer =
-          containerBalancerTask.getUnBalancedNodes();
-
-      assertEquals(expectedUnBalancedNodes.size(), unBalancedNodesAccordingToBalancer.size());
-
-      for (int j = 0; j < expectedUnBalancedNodes.size(); j++) {
-        assertEquals(expectedUnBalancedNodes.get(j).getDatanodeDetails(),
-            unBalancedNodesAccordingToBalancer.get(j).getDatanodeDetails());
-      }
-    }
-  }
-
-  @Test
-  public void testBalancerWithMoveManager()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException,
-      NodeNotFoundException {
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    verify(moveManager, atLeastOnce())
-        .move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
-
-    verify(replicationManager, times(0))
-        .move(any(ContainerID.class), any(
-            DatanodeDetails.class), any(DatanodeDetails.class));
-  }
-
-  /**
-   * Checks whether the list of unBalanced nodes is empty when the cluster is
-   * balanced.
-   */
-  @Test
-  public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(99.99);
-    startBalancer(balancerConfiguration);
-
-
-    stopBalancer();
-    ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    assertEquals(0, containerBalancerTask.getUnBalancedNodes().size());
-    assertEquals(0, metrics.getNumDatanodesUnbalanced());
-  }
-
-  /**
-   * ContainerBalancer should not involve more datanodes than the
-   * maxDatanodesRatioToInvolvePerIteration limit.
-   */
-  @Test
-  public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    int percent = 40;
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(
-        percent);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setThreshold(1);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    int number = percent * numberOfNodes / 100;
-    ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    assertThat(containerBalancerTask.getCountDatanodesInvolvedPerIteration())
-        .isLessThanOrEqualTo(number);
-    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration()).isGreaterThan(0);
-    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration())
-        .isLessThanOrEqualTo(number);
-    stopBalancer();
-  }
-
-  @Test
-  public void containerBalancerShouldSelectOnlyClosedContainers()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    // make all containers open, balancer should not select any of them
-    for (ContainerInfo containerInfo : cidToInfoMap.values()) {
-      containerInfo.setState(HddsProtos.LifeCycleState.OPEN);
-    }
-    balancerConfiguration.setThreshold(10);
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    // no container should have been selected
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    /*
-    Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
-    move is generated
-     */
-    assertEquals(
-        ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE,
-        containerBalancerTask.getIterationResult());
-
-    // now, close all containers
-    for (ContainerInfo containerInfo : cidToInfoMap.values()) {
-      containerInfo.setState(HddsProtos.LifeCycleState.CLOSED);
-    }
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // check whether all selected containers are closed
-    for (ContainerID cid:
-         containerBalancerTask.getContainerToSourceMap().keySet()) {
-      assertSame(
-          cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
-    }
-  }
-
-  /**
-   * Container Balancer should not select a non-CLOSED replica for moving.
-   */
-  @Test
-  public void balancerShouldNotSelectNonClosedContainerReplicas()
-      throws IOException, IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-
-    // let's mock such that all replicas have CLOSING state
-    when(containerManager.getContainerReplicas(any(ContainerID.class)))
-        .thenAnswer(invocationOnMock -> {
-          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
-          Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
-          Set<ContainerReplica> replicasToReturn =
-              new HashSet<>(replicas.size());
-          for (ContainerReplica replica : replicas) {
-            ContainerReplica newReplica =
-                replica.toBuilder().setContainerState(
-                    ContainerReplicaProto.State.CLOSING).build();
-            replicasToReturn.add(newReplica);
-          }
-
-          return replicasToReturn;
-        });
-
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    // no container should have moved because all replicas are CLOSING
-    assertTrue(
-        containerBalancerTask.getContainerToSourceMap().isEmpty());
-  }
-
-  @Test
-  public void containerBalancerShouldObeyMaxSizeToMoveLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(1);
-    balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    // balancer should not have moved more size than the limit
-    assertThat(containerBalancerTask.getSizeScheduledForMoveInLatestIteration())
-        .isLessThanOrEqualTo(10 * STORAGE_UNIT);
-
-    long size = containerBalancerTask.getMetrics()
-        .getDataSizeMovedGBInLatestIteration();
-    assertThat(size).isGreaterThan(0);
-    assertThat(size).isLessThanOrEqualTo(10);
-    stopBalancer();
-  }
-
-  @Test
-  public void targetDatanodeShouldNotAlreadyContainSelectedContainer()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Map<ContainerID, DatanodeDetails> map =
-        containerBalancerTask.getContainerToTargetMap();
-    for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
-      ContainerID container = entry.getKey();
-      DatanodeDetails target = entry.getValue();
-      assertTrue(cidToReplicasMap.get(container)
-          .stream()
-          .map(ContainerReplica::getDatanodeDetails)
-          .noneMatch(target::equals));
-    }
-  }
-
-  @Test
-  public void containerMoveSelectionShouldFollowPlacementPolicy()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
-        containerBalancerTask.getContainerToSourceMap();
-    Map<ContainerID, DatanodeDetails> containerToTargetMap =
-        containerBalancerTask.getContainerToTargetMap();
-
-    // for each move selection, check if {replicas - source + target}
-    // satisfies placement policy
-    for (Map.Entry<ContainerID, DatanodeDetails> entry :
-        containerFromSourceMap.entrySet()) {
-      ContainerID container = entry.getKey();
-      DatanodeDetails source = entry.getValue();
-
-      List<DatanodeDetails> replicas = cidToReplicasMap.get(container)
-          .stream()
-          .map(ContainerReplica::getDatanodeDetails)
-          .collect(Collectors.toList());
-      // remove source and add target
-      replicas.remove(source);
-      replicas.add(containerToTargetMap.get(container));
-
-      ContainerInfo containerInfo = cidToInfoMap.get(container);
-      ContainerPlacementStatus placementStatus;
-      if (containerInfo.getReplicationType() ==
-          HddsProtos.ReplicationType.RATIS) {
-        placementStatus = placementPolicy.validateContainerPlacement(replicas,
-            containerInfo.getReplicationConfig().getRequiredNodes());
-      } else {
-        placementStatus =
-            ecPlacementPolicy.validateContainerPlacement(replicas,
-                containerInfo.getReplicationConfig().getRequiredNodes());
-      }
-      assertTrue(placementStatus.isPolicySatisfied());
-    }
-  }
-
-  @Test
-  public void targetDatanodeShouldBeInServiceHealthy()
-      throws NodeNotFoundException, IllegalContainerBalancerStateException,
-      IOException, InvalidContainerBalancerConfigurationException,
-      TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    for (DatanodeDetails target : containerBalancerTask.getSelectedTargets()) {
-      NodeStatus status = mockNodeManager.getNodeStatus(target);
-      assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
-          status.getOperationalState());
-      assertTrue(status.isHealthy());
-    }
-  }
-
-  @Test
-  public void selectedContainerShouldNotAlreadyHaveBeenSelected()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, NodeNotFoundException,
-      TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    rmConf.setEnableLegacy(true);
-
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-
-    int numContainers = containerBalancerTask.getContainerToTargetMap().size();
-
-    /*
-    Assuming move is called exactly once for each unique container, number of
-     calls to move should equal number of unique containers. If number of
-     calls to move is more than number of unique containers, at least one
-     container has been re-selected. It's expected that number of calls to
-     move should equal number of unique, selected containers (from
-     containerToTargetMap).
-     */
-    verify(replicationManager, times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
-
-    /*
-     Try the same test by disabling LegacyReplicationManager so that
-     MoveManager is used.
-     */
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-    numContainers = containerBalancerTask.getContainerToTargetMap().size();
-    verify(moveManager, times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
-  }
-
-  @Test
-  public void balancerShouldNotSelectConfiguredExcludeContainers()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setExcludeContainers("1, 4, 5");
-
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Set<ContainerID> excludeContainers =
-        balancerConfiguration.getExcludeContainers();
-    for (ContainerID container :
-        containerBalancerTask.getContainerToSourceMap().keySet()) {
-      assertThat(excludeContainers).doesNotContain(container);
-    }
-  }
-
-  @Test
-  public void balancerShouldObeyMaxSizeEnteringTargetLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    conf.set("ozone.scm.container.size", "1MB");
-    balancerConfiguration =
-        conf.getObject(ContainerBalancerConfiguration.class);
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-
-    // no containers should be selected when the limit is just 2 MB
-    balancerConfiguration.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
-    startBalancer(balancerConfiguration);
-
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    stopBalancer();
-
-    // some containers should be selected when using default values
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ContainerBalancerConfiguration cbc = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
-    cbc.setBalancingInterval(1);
-    ContainerBalancer sb = new ContainerBalancer(scm);
-    containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc, false);
-    containerBalancerTask.run();
-
-    stopBalancer();
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertFalse(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-  }
-
-  @Test
-  public void balancerShouldObeyMaxSizeLeavingSourceLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    conf.set("ozone.scm.container.size", "1MB");
-    balancerConfiguration =
-        conf.getObject(ContainerBalancerConfiguration.class);
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-
-    // no source containers should be selected when the limit is just 2 MB
-    balancerConfiguration.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
-    startBalancer(balancerConfiguration);
-
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    stopBalancer();
-
-    // some containers should be selected when using default values
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ContainerBalancerConfiguration cbc = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
-    cbc.setBalancingInterval(1);
-    ContainerBalancer sb = new ContainerBalancer(scm);
-    containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc, false);
-    containerBalancerTask.run();
-
-    stopBalancer();
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertFalse(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    assertNotEquals(0,
-        containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
-  }
-
-  @Test
-  public void testMetrics()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException,
-      NodeNotFoundException {
-    conf.set("hdds.datanode.du.refresh.period", "1ms");
-    balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(6 * STORAGE_UNIT);
-    // deliberately set max size per iteration to a low value, 6 GB
-    balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    when(moveManager.move(any(), any(), any()))
-           .thenReturn(CompletableFuture.completedFuture(
-               MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
-           .thenReturn(CompletableFuture.completedFuture(
-               MoveManager.MoveResult.COMPLETED));
-
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    assertEquals(determineExpectedUnBalancedNodes(
-            balancerConfiguration.getThreshold()).size(),
-        metrics.getNumDatanodesUnbalanced());
-    assertThat(metrics.getDataSizeMovedGBInLatestIteration()).isLessThanOrEqualTo(6);
-    assertThat(metrics.getDataSizeMovedGB()).isGreaterThan(0);
-    assertEquals(1, metrics.getNumIterations());
-    assertThat(metrics.getNumContainerMovesScheduledInLatestIteration()).isGreaterThan(0);
-    assertEquals(metrics.getNumContainerMovesScheduled(),
-        metrics.getNumContainerMovesScheduledInLatestIteration());
-    assertEquals(metrics.getNumContainerMovesScheduled(),
-        metrics.getNumContainerMovesCompleted() +
-            metrics.getNumContainerMovesFailed() +
-            metrics.getNumContainerMovesTimeout());
-    assertEquals(0, metrics.getNumContainerMovesTimeout());
-    assertEquals(1, metrics.getNumContainerMovesFailed());
   }
 
   /**
@@ -1115,32 +628,68 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * Determines unBalanced nodes, that is, over and under utilized nodes,
-   * according to the generated utilization values for nodes and the threshold.
-   *
-   * @param threshold A percentage in the range 0 to 100
-   * @return List of DatanodeUsageInfo containing the expected(correct)
-   * unBalanced nodes.
+   * Tests if balancer is adding the polled source datanode back to potentialSources queue
+   * if a move has failed due to a container related failure, like REPLICATION_FAIL_NOT_EXIST_IN_SOURCE.
    */
-  private List<DatanodeUsageInfo> determineExpectedUnBalancedNodes(
-      double threshold) {
-    threshold /= 100;
-    double lowerLimit = averageUtilization - threshold;
-    double upperLimit = averageUtilization + threshold;
+  @Test
+  public void testSourceDatanodeAddedBack()
+      throws NodeNotFoundException, IOException, IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException, TimeoutException, InterruptedException {
 
-    // use node utilizations to determine over and under utilized nodes
-    List<DatanodeUsageInfo> expectedUnBalancedNodes = new ArrayList<>();
-    for (int i = 0; i < numberOfNodes; i++) {
-      if (nodeUtilizations.get(numberOfNodes - i - 1) > upperLimit) {
-        expectedUnBalancedNodes.add(nodesInCluster.get(numberOfNodes - i - 1));
+    when(moveManager.move(any(ContainerID.class),
+        any(DatanodeDetails.class),
+        any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
+        nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails().getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+    GenericTestUtils.waitFor(() -> ContainerBalancerTask.IterationResult.ITERATION_COMPLETED ==
+        containerBalancerTask.getIterationResult(), 10, 50);
+
+    assertEquals(2, containerBalancerTask.getCountDatanodesInvolvedPerIteration());
+    assertTrue(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration() >= 1);
+    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed()).isEqualTo(1);
+    assertTrue(containerBalancerTask.getSelectedTargets().contains(nodesInCluster.get(0)
+        .getDatanodeDetails()));
+    assertTrue(containerBalancerTask.getSelectedSources().contains(nodesInCluster.get(nodesInCluster.size() - 1)
+        .getDatanodeDetails()));
+    stopBalancer();
+  }
+
+   /**
+   * Test to check if balancer picks up only positive size
+   * containers to move from source to destination.
+   */
+  @Test
+  public void balancerShouldMoveOnlyPositiveSizeContainers()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+
+    startBalancer(balancerConfiguration);
+    /*
+     Get all containers that were selected by balancer and assert none of
+     them is a zero or negative size container.
+     */
+    Map<ContainerID, DatanodeDetails> containerToSource =
+            containerBalancerTask.getContainerToSourceMap();
+    assertFalse(containerToSource.isEmpty());
+    boolean zeroOrNegSizeContainerMoved = false;
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+            containerToSource.entrySet()) {
+      ContainerInfo containerInfo = cidToInfoMap.get(entry.getKey());
+      if (containerInfo.getUsedBytes() <= 0) {
+        zeroOrNegSizeContainerMoved = true;
       }
     }
-    for (int i = 0; i < numberOfNodes; i++) {
-      if (nodeUtilizations.get(i) < lowerLimit) {
-        expectedUnBalancedNodes.add(nodesInCluster.get(i));
-      }
-    }
-    return expectedUnBalancedNodes;
+    assertFalse(zeroOrNegSizeContainerMoved);
   }
 
   /**
@@ -1169,10 +718,9 @@ public class TestContainerBalancerTask {
    * cluster have utilization values determined by generateUtilizations method.
    * @return average utilization (used space / capacity) of the cluster
    */
-  private double createCluster() {
-    generateData();
+  private void createCluster(int[] sizeArray) {
+    generateData(sizeArray);
     createReplicasForContainers();
-    long clusterCapacity = 0, clusterUsedSpace = 0;
 
     // for each node utilization, calculate that datanode's used space and
     // capacity
@@ -1195,16 +743,13 @@ public class TestContainerBalancerTask {
           datanodeCapacity - datanodeUsedSpace, 0,
           datanodeCapacity - datanodeUsedSpace - 1);
       nodesInCluster.get(i).setScmNodeStat(stat);
-      clusterUsedSpace += datanodeUsedSpace;
-      clusterCapacity += datanodeCapacity;
     }
-    return (double) clusterUsedSpace / clusterCapacity;
   }
 
   /**
    * Create some datanodes and containers for each node.
    */
-  private void generateData() {
+  private void generateData(int[] sizeArray) {
     this.numberOfNodes = 10;
     generateUtilizations(numberOfNodes);
     nodesInCluster = new ArrayList<>(nodeUtilizations.size());
@@ -1216,13 +761,19 @@ public class TestContainerBalancerTask {
           new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
               new SCMNodeStat());
 
-      // create containers with varying used space
       int sizeMultiple = 0;
+      if (sizeArray == null) {
+        sizeArray = new int[10];
+        for (int j = 0; j < numberOfNodes; j++) {
+          sizeArray[j] = sizeMultiple;
+          sizeMultiple %= 5;
+          sizeMultiple++;
+        }
+      }
+      // create containers with varying used space
       for (int j = 0; j < i; j++) {
-        sizeMultiple %= 5;
-        sizeMultiple++;
         ContainerInfo container =
-            createContainer((long) i * i + j, sizeMultiple);
+            createContainer((long) i * i + j, sizeArray[j]);
 
         cidToInfoMap.put(container.containerID(), container);
         containerIDSet.add(container.containerID());

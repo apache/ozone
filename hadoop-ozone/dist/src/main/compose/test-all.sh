@@ -27,16 +27,17 @@ rm "$ALL_RESULT_DIR"/* || true
 
 source "$SCRIPT_DIR"/testlib.sh
 
+: ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
-   java -cp "$PROJECT_DIR"/share/coverage/$(ls "$PROJECT_DIR"/share/coverage | grep test-util):"$PROJECT_DIR"/share/coverage/jacoco-core.jar org.apache.hadoop.test.JacocoServer &
+   java -cp "$PROJECT_DIR"/share/coverage/$(ls "$PROJECT_DIR"/share/coverage | grep test-util):"$PROJECT_DIR"/share/coverage/jacoco-core.jar org.apache.ozone.test.JacocoServer &
    DOCKER_BRIDGE_IP=$(docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}')
-   export OZONE_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*"
+   export OZONE_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*:org.apache.ozone.*:org.hadoop.ozone.*"
 fi
 
-tests=$(find_tests)
 cd "$SCRIPT_DIR"
+tests=$(find_tests)
 
 RESULT=0
 run_test_scripts ${tests} || RESULT=$?
@@ -46,7 +47,9 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
 
-generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
-
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
+  # does not apply to JUnit tests run via Maven
+  generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
+fi
 
 exit $RESULT

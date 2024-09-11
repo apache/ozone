@@ -28,6 +28,8 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
+source ${_testlib_dir}/compose_v2_compatibility.sh
+
 : ${SCM:=scm}
 
 ## @description create results directory, purging any prior data
@@ -35,8 +37,6 @@ create_results_dir() {
   #delete previous results
   [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
-  #Should be writeable from the docker containers where user is different.
-  chmod ogu+w "$RESULT_DIR"
 }
 
 ## @description find all the test*.sh scripts in the immediate child dirs
@@ -142,9 +142,30 @@ start_docker_env(){
 
   trap stop_docker_env EXIT HUP INT TERM
 
-  docker-compose --ansi never up -d --scale datanode="${datanode_count}"
+  opts=""
+  if has_scalable_datanode; then
+    opts="--scale datanode=${datanode_count}"
+  fi
+
+  docker-compose --ansi never up -d $opts
+
   wait_for_safemode_exit
   wait_for_om_leader
+}
+
+has_scalable_datanode() {
+  local files="${COMPOSE_FILE:-docker-compose.yaml}"
+  local oifs=${IFS}
+  local rc=1
+  IFS=:
+  for f in ${files}; do
+    if [[ -e "${f}" ]] && grep -q '^\s*datanode:' ${f}; then
+      rc=0
+      break
+    fi
+  done
+  IFS=${oifs}
+  return ${rc}
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -189,7 +210,7 @@ execute_robot_test(){
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
-  FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
+  FULL_CONTAINER_NAME=$(docker-compose ps -a | grep "[-_]${CONTAINER}[-_]" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
@@ -228,7 +249,7 @@ create_stack_dumps() {
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
-  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+  for c in $(docker-compose ps -a | grep "^${COMPOSE_ENV_NAME}[_-]" | awk '{print $1}'); do
     for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
@@ -281,9 +302,10 @@ get_output_name() {
 
 save_container_logs() {
   local output_name=$(get_output_name)
-  local c
-  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
-    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
+  local id
+  for i in $(docker-compose ps -a -q "$@"); do
+    local c=$(docker ps -a --filter "id=${i}" --format "{{ .Names }}")
+    docker logs "${i}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
   done
 }
 
@@ -366,22 +388,44 @@ cleanup_docker_images() {
   fi
 }
 
+## @description  Run Robot Framework report generator (rebot) in ozone-runner container.
+## @param input directory where source Robot XML files are
+## @param output directory where report should be placed
+## @param rebot options and arguments
+run_rebot() {
+  local input_dir="$(realpath "$1")"
+  local output_dir="$(realpath "$2")"
+
+  shift 2
+
+  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
+  #Should be writeable from the docker containers where user is different.
+  chmod a+wx "${tempdir}"
+  if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
+      $(get_runner_image_spec) \
+      bash -c "rebot --nostatusrc -d /rebot-output $@"; then
+    mv -v "${tempdir}"/* "${output_dir}"/
+  fi
+  rmdir "${tempdir}"
+}
+
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
   local xunitdir="${3:-}"
 
-  if command -v rebot > /dev/null 2>&1; then
-     #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     if [ -z "${xunitdir}" ]; then
-       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
-     else
-       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
-     fi
-  else
-     echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
-     exit 1
+  if [[ -n "$(find "${dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    xunit_args=""
+    if [[ -n "${xunitdir}" ]] && [[ -e "${xunitdir}" ]]; then
+      xunit_args="--xunit TEST-ozone.xml"
+    fi
+
+    run_rebot "$dir" "$dir" "--reporttitle '${title}' -N '${title}' ${xunit_args} *.xml"
+
+    if [[ -n "${xunit_args}" ]]; then
+      mv -v "${dir}"/TEST-ozone.xml "${xunitdir}"/ || rm -f "${dir}"/TEST-ozone.xml
+    fi
   fi
 }
 
@@ -405,12 +449,12 @@ copy_results() {
     target_dir="${target_dir}/${test_script_name}"
   fi
 
-  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
+  if [[ -n "$(find "${result_dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    run_rebot "${result_dir}" "${all_result_dir}" "-N '${test_name}' -l NONE -r NONE -o '${test_name}.xml' *.xml" \
       && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  mkdir -p "${target_dir}"
+  mkdir -pv "${target_dir}"
   mv -v "${result_dir}"/* "${target_dir}"/
 }
 
@@ -481,14 +525,21 @@ prepare_for_binary_image() {
 ## @description Define variables required for using `ozone-runner` docker image
 ##   (no binaries included)
 ## @param `ozone-runner` image version (optional)
-prepare_for_runner_image() {
+get_runner_image_spec() {
   local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
   local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
+  echo "${runner_image}:${v}"
+}
+
+## @description Define variables required for using `ozone-runner` docker image
+##   (no binaries included)
+## @param `ozone-runner` image version (optional)
+prepare_for_runner_image() {
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="${runner_image}:${v}"
+  export OZONE_IMAGE="$(get_runner_image_spec "$@")"
 }
 
 ## @description Executing the Ozone Debug CLI related robot tests

@@ -23,13 +23,17 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 import java.util.stream.Stream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -54,11 +58,21 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -156,6 +170,7 @@ class TestObjectPut {
     assertEquals(replication, keyDetails.getReplicationConfig());
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    assertThat(keyDetails.getTags()).isEmpty();
   }
 
   @Test
@@ -187,6 +202,129 @@ class TestObjectPut {
     objectEndpoint.put(BUCKET_NAME, KEY_NAME, chunkedContent.length(), 0, null,
         new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertEquals(15, getKeyDataSize());
+  }
+
+  @Test
+  public void testPutObjectWithTags() throws IOException, OS3Exception {
+    HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
+    when(headersWithTags.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headersWithTags);
+
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+        1, null, body);
+
+    assertEquals(200, response.getStatus());
+
+    OzoneKeyDetails keyDetails =
+        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
+    Map<String, String> tags = keyDetails.getTags();
+    assertEquals(2, tags.size());
+    assertEquals("value1", tags.get("tag1"));
+    assertEquals("value2", tags.get("tag2"));
+  }
+
+  @Test
+  public void testPutObjectWithOnlyTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headerWithOnlyTagKey = Mockito.mock(HttpHeaders.class);
+    // Try to send with only the key (no value)
+    when(headerWithOnlyTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1");
+    objectEndpoint.setHeaders(headerWithOnlyTagKey);
+
+    try {
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+          1, null, body);
+      fail("request with invalid query param should fail");
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
+      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
+    }
+  }
+
+  @Test
+  public void testPutObjectWithDuplicateTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headersWithDuplicateTagKey = Mockito.mock(HttpHeaders.class);
+    when(headersWithDuplicateTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag1=value2");
+    objectEndpoint.setHeaders(headersWithDuplicateTagKey);
+    try {
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+          1, null, body);
+      fail("request with duplicate tag key should fail");
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("There are tags with duplicate tag keys");
+      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
+    }
+  }
+
+  @Test
+  public void testPutObjectWithLongTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headersWithLongTagKey = Mockito.mock(HttpHeaders.class);
+    String longTagKey = StringUtils.repeat('k', TAG_KEY_LENGTH_LIMIT + 1);
+    when(headersWithLongTagKey.getHeaderString(TAG_HEADER)).thenReturn(longTagKey + "=value1");
+    objectEndpoint.setHeaders(headersWithLongTagKey);
+    try {
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+          1, null, body);
+      fail("request with tag key exceeding the length limit should fail");
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tag key exceeds the maximum length");
+      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
+    }
+  }
+
+  @Test
+  public void testPutObjectWithLongTagValue() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headersWithLongTagValue = Mockito.mock(HttpHeaders.class);
+    objectEndpoint.setHeaders(headersWithLongTagValue);
+    String longTagValue = StringUtils.repeat('v', TAG_VALUE_LENGTH_LIMIT + 1);
+    when(headersWithLongTagValue.getHeaderString(TAG_HEADER)).thenReturn("tag1=" + longTagValue);
+    try {
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+          1, null, body);
+      fail("request with tag value exceeding the length limit should fail");
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tag value exceeds the maximum length");
+      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
+    }
+  }
+
+  @Test
+  public void testPutObjectWithTooManyTags() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headersWithTooManyTags = Mockito.mock(HttpHeaders.class);
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < TAG_NUM_LIMIT + 1; i++) {
+      sb.append(String.format("tag%d=value%d", i, i));
+      if (i < TAG_NUM_LIMIT) {
+        sb.append("&");
+      }
+    }
+    when(headersWithTooManyTags.getHeaderString(TAG_HEADER)).thenReturn(sb.toString());
+    objectEndpoint.setHeaders(headersWithTooManyTags);
+    try {
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+          1, null, body);
+      fail("request with number of tags exceeding limit should fail");
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("exceeded the maximum number of tags");
+      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
+    }
   }
 
   private long getKeyDataSize() throws IOException {
@@ -254,6 +392,14 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
+    // Add some custom metadata
+    MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1", "custom-value-1");
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2", "custom-value-2");
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    // Add COPY metadata directive (default)
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
+
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
         CONTENT.length(), 1, null, body);
 
@@ -268,8 +414,13 @@ class TestObjectPut {
     assertEquals(CONTENT, keyContent);
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    assertThat(keyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
+    assertThat(keyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
 
     String sourceETag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+
+    // This will be ignored since the copy directive is COPY
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-3", "custom-value-3");
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
@@ -296,9 +447,53 @@ class TestObjectPut {
     // the same Etag since the key content is the same
     assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
     assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertThat(destKeyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
+    assertThat(destKeyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-3")).isFalse();
+
+    // Now use REPLACE metadata directive (default) and remove some custom metadata used in the source key
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1");
+    metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2");
+
+    response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
+        null, body);
+
+    ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
+        .readKey(DEST_KEY);
+
+    keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    sourceKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
+    destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(DEST_BUCKET_NAME).getKey(DEST_KEY);
+
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    // Source key eTag should remain unchanged and the dest key should have
+    // the same Etag since the key content is the same
+    assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-1")).isFalse();
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-2")).isFalse();
+    assertThat(destKeyDetails.getMetadata().get("custom-key-3")).isEqualTo("custom-value-3");
+
+
+    // wrong copy metadata directive
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("INVALID");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+            DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1, null, body),
+        "test copy object failed");
+    assertThat(e.getHttpCode()).isEqualTo(400);
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+    assertThat(e.getErrorMessage()).contains("The metadata copy directive specified is invalid");
+
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
 
     // source and dest same
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
             BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, body),
         "test copy object failed");
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
@@ -374,6 +569,99 @@ class TestObjectPut {
         // next request in the same thread
         verify(messageDigest, times(1)).reset();
       }
+    }
+  }
+
+  @Test
+  public void testCopyObjectWithTags() throws IOException, OS3Exception {
+    // Put object in to source bucket
+    HttpHeaders headersForPut = Mockito.mock(HttpHeaders.class);
+    when(headersForPut.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headersForPut);
+
+    String sourceKeyName = "sourceKey";
+
+    Response putResponse = objectEndpoint.put(BUCKET_NAME, sourceKeyName,
+        CONTENT.length(), 1, null, body);
+    OzoneKeyDetails keyDetails =
+        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(sourceKeyName);
+
+    assertEquals(200, putResponse.getStatus());
+    Map<String, String> tags = keyDetails.getTags();
+    assertEquals(2, tags.size());
+    assertEquals("value1", tags.get("tag1"));
+    assertEquals("value2", tags.get("tag2"));
+
+    // Copy object without x-amz-tagging-directive (default to COPY)
+    String destKey = "key=value/2";
+    HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
+    when(headersForCopy.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME  + "/" + urlEncode(sourceKeyName));
+
+    objectEndpoint.setHeaders(headersForCopy);
+    Response copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
+
+    OzoneKeyDetails destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+
+    assertEquals(200, copyResponse.getStatus());
+    Map<String, String> destKeyTags = destKeyDetails.getTags();
+
+    // Since the default directive is COPY, it will copy the source key's tags
+    // to the destination key
+    assertEquals(2, destKeyTags.size());
+    assertEquals("value1", destKeyTags.get("tag1"));
+    assertEquals("value2", destKeyTags.get("tag2"));
+
+    // Copy object with x-amz-tagging-directive = COPY
+    when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("COPY");
+
+    // With x-amz-tagging-directive = COPY with a different x-amz-tagging
+    when(headersForCopy.getHeaderString(TAG_HEADER)).thenReturn("tag3=value3");
+    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
+    assertEquals(200, copyResponse.getStatus());
+
+    destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+    destKeyTags = destKeyDetails.getTags();
+
+    // Since the x-amz-tagging-directive is COPY, we ignore the x-amz-tagging
+    // header
+    assertEquals(2, destKeyTags.size());
+    assertEquals("value1", destKeyTags.get("tag1"));
+    assertEquals("value2", destKeyTags.get("tag2"));
+
+    // Copy object with x-amz-tagging-directive = REPLACE
+    when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
+    assertEquals(200, copyResponse.getStatus());
+
+    destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+    destKeyTags = destKeyDetails.getTags();
+
+    // Since the x-amz-tagging-directive is REPLACE, we replace the source key
+    // tags with the one specified in the copy request
+    assertEquals(1, destKeyTags.size());
+    assertEquals("value3", destKeyTags.get("tag3"));
+    assertThat(destKeyTags).doesNotContainKeys("tag1", "tag2");
+  }
+
+  @Test
+  public void testCopyObjectWithInvalidTagCopyDirective() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    // Copy object with invalid x-amz-tagging-directive
+    HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
+    when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("INVALID");
+    try {
+      objectEndpoint.put(DEST_BUCKET_NAME, "somekey", CONTENT.length(), 1, null, body);
+    } catch (OS3Exception ex) {
+      assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tagging copy directive specified is invalid");
+      assertEquals(INVALID_ARGUMENT.getHttpCode(), ex.getHttpCode());
     }
   }
 

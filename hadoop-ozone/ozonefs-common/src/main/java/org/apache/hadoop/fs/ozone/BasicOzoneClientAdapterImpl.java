@@ -36,18 +36,26 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.SafeModeAction;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -56,7 +64,12 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -71,6 +84,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 import org.slf4j.Logger;
@@ -448,6 +465,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
+    return objectStore.getServerDefaults();
+  }
+
+  @Override
   public KeyProvider getKeyProvider() throws IOException {
     return objectStore.getKeyProvider();
   }
@@ -514,7 +536,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         keyInfo.getModificationTime(),
         keyInfo.getModificationTime(),
         status.isDirectory() ? (short) 00777 : (short) 00666,
-        owner,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
         owner,
         null,
         getBlockLocations(status),
@@ -598,18 +620,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String createSnapshot(String pathStr, String snapshotName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    return objectStore.createSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
-        snapshotName);
+    return objectStore.createSnapshot(volume.getName(), bucket.getName(), snapshotName);
   }
 
   @Override
   public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    objectStore.renameSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
+    objectStore.renameSnapshot(volume.getName(),
+        bucket.getName(),
         snapshotOldName,
         snapshotNewName);
   }
@@ -617,9 +635,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public void deleteSnapshot(String pathStr, String snapshotName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    objectStore.deleteSnapshot(ofsPath.getVolumeName(),
-        ofsPath.getBucketName(),
+    objectStore.deleteSnapshot(volume.getName(),
+        bucket.getName(),
         snapshotName);
   }
 
@@ -662,12 +679,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
-        OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, snapPath);
+          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, volume.getName(), bucket.getName());
         }
         if (takeTemporaryFromSnapshot) {
-          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, snapPath);
+          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, volume.getName(), bucket.getName());
         }
       }
     }
@@ -690,11 +706,75 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public boolean recoverLease(final String pathStr) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+  public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
-    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-        volume.getName(), bucket.getName(), pathStr);
+    try {
+      ClientProtocol clientProtocol = ozoneClient.getProxy();
+      return clientProtocol.recoverLease(volume.getName(), bucket.getName(), pathStr, force);
+    } catch (OMException ome) {
+      if (ome.getResult() == NOT_A_FILE) {
+        throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
+      } else if (ome.getResult() == KEY_NOT_FOUND ||
+          ome.getResult() == DIRECTORY_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
+    }
+  }
+
+  @Override
+  public void recoverFile(OmKeyArgs keyArgs) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
+
+    ClientProtocol clientProtocol = ozoneClient.getProxy();
+    clientProtocol.recoverKey(keyArgs, 0L);
+  }
+
+  @Override
+  public long finalizeBlock(OmKeyLocationInfo block) throws IOException {
+    incrementCounter(Statistic.INVOCATION_FINALIZE_BLOCK, 1);
+    RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
+    XceiverClientFactory xceiverClientFactory = rpcClient.getXceiverClientManager();
+    Pipeline pipeline = block.getPipeline();
+    XceiverClientSpi client = null;
+    try {
+      // If pipeline is still open
+      if (pipeline.isOpen()) {
+        client = xceiverClientFactory.acquireClient(pipeline);
+        ContainerProtos.FinalizeBlockResponseProto finalizeBlockResponseProto =
+            ContainerProtocolCalls.finalizeBlock(client, block.getBlockID().getDatanodeBlockIDProtobuf(),
+                block.getToken());
+        return BlockData.getFromProtoBuf(finalizeBlockResponseProto.getBlockData()).getSize();
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to execute finalizeBlock command", e);
+    } finally {
+      if (client != null) {
+        xceiverClientFactory.releaseClient(client, false);
+      }
+    }
+
+    // Try fetch block committed length from DN
+    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
+    if (!(replicationConfig instanceof ReplicatedReplicationConfig)) {
+      throw new IOException("ReplicationConfig type " + replicationConfig.getClass().getSimpleName() +
+          " is not supported in finalizeBlock");
+    }
+    StandaloneReplicationConfig newConfig = StandaloneReplicationConfig.getInstance(
+        ((ReplicatedReplicationConfig) replicationConfig).getReplicationFactor());
+    Pipeline.Builder builder = Pipeline.newBuilder().setReplicationConfig(newConfig).setId(PipelineID.randomId())
+        .setNodes(block.getPipeline().getNodes()).setState(Pipeline.PipelineState.OPEN);
+    try {
+      client = xceiverClientFactory.acquireClientForReadData(builder.build());
+      ContainerProtos.GetCommittedBlockLengthResponseProto responseProto =
+          ContainerProtocolCalls.getCommittedBlockLength(client, block.getBlockID(), block.getToken());
+      return responseProto.getBlockLength();
+    } finally {
+      if (client != null) {
+        xceiverClientFactory.releaseClient(client, false);
+      }
+    }
   }
 
   @Override
@@ -706,15 +786,21 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (!ofsPath.isKey()) {
+    if (StringUtils.isEmpty(pathStr)) {
       throw new IOException("not a file");
     }
-    OzoneFileStatus status = bucket.getFileStatus(pathStr);
-    if (!status.isFile()) {
-      throw new IOException("not a file");
+    try {
+      OzoneFileStatus status = bucket.getFileStatus(pathStr);
+      if (!status.isFile()) {
+        throw new FileNotFoundException("Path is not a file.");
+      }
+      return !status.getKeyInfo().isHsync();
+    } catch (OMException ome) {
+      if (ome.getResult() == FILE_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
     }
-    return !status.getKeyInfo().isHsync();
   }
 
   @Override

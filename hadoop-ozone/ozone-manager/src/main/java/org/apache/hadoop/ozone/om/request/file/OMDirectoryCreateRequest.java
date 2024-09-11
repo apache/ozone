@@ -240,7 +240,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, result,
@@ -369,6 +369,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             .setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
             .setKeyName(dirName)
+            .setOwnerName(keyArgs.getOwnerName())
             .setOmKeyLocationInfos(Collections.singletonList(
                 new OmKeyLocationInfoGroup(0, new ArrayList<>())))
             .setCreationTime(keyArgs.getModificationTime())

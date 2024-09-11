@@ -34,7 +34,6 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -232,7 +231,6 @@ public class TestOzoneAclUtil {
     assertEquals(2, ozoneAcls.size());
     assertNotEquals(ozoneAcls.get(0).getAclScope(),
         ozoneAcls.get(1).getAclScope());
-    assertArrayEquals(ozoneAcls.get(0).getAclByteArray(),
-        ozoneAcls.get(1).getAclByteArray());
+    assertEquals(ozoneAcls.get(0).getAclByteString(), ozoneAcls.get(1).getAclByteString());
   }
 }

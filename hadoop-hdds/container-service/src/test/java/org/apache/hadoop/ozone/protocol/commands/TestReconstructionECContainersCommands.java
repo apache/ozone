@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -24,11 +26,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -40,7 +43,7 @@ public class TestReconstructionECContainersCommands {
   @Test
   public void testExceptionIfSourceAndMissingNotSameLength() {
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    byte[] missingContainerIndexes = {1, 2};
+    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(new byte[]{1, 2});
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -52,11 +55,8 @@ public class TestReconstructionECContainersCommands {
 
   @Test
   public void protobufConversion() {
-    byte[] missingContainerIndexes = {1, 2};
-    List<Long> srcNodesIndexes = new ArrayList<>();
-    for (int i = 0; i < srcNodesIndexes.size(); i++) {
-      srcNodesIndexes.add(i + 1L);
-    }
+    byte[] missingIndexes = {1, 2};
+    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(missingIndexes);
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
     final List<DatanodeDetails> dnDetails = getDNDetails(5);
 
@@ -69,6 +69,10 @@ public class TestReconstructionECContainersCommands {
     ReconstructECContainersCommand reconstructECContainersCommand =
         new ReconstructECContainersCommand(1L, sources, targets,
             missingContainerIndexes, ecReplicationConfig);
+
+    assertThat(reconstructECContainersCommand.toString())
+        .contains("missingIndexes: " + Arrays.toString(missingIndexes));
+
     StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto
         proto = reconstructECContainersCommand.getProto();
 
@@ -82,8 +86,7 @@ public class TestReconstructionECContainersCommands {
     assertEquals(1L, proto.getContainerID());
     assertEquals(sources, srcDnsFromProto);
     assertEquals(targets, targetDnsFromProto);
-    assertArrayEquals(missingContainerIndexes,
-        proto.getMissingContainerIndexes().toByteArray());
+    assertEquals(missingContainerIndexes, proto.getMissingContainerIndexes());
     assertEquals(ecReplicationConfig,
         new ECReplicationConfig(proto.getEcReplicationConfig()));
 
@@ -96,8 +99,7 @@ public class TestReconstructionECContainersCommands {
         fromProtobuf.getSources());
     assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
         fromProtobuf.getTargetDatanodes());
-    assertArrayEquals(
-        reconstructECContainersCommand.getMissingContainerIndexes(),
+    assertEquals(reconstructECContainersCommand.getMissingContainerIndexes(),
         fromProtobuf.getMissingContainerIndexes());
     assertEquals(
         reconstructECContainersCommand.getEcReplicationConfig(),

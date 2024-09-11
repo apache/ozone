@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This interface can be used to implement strategies to get a
@@ -44,6 +45,16 @@ public interface FindSourceStrategy {
    * data nodes.
    */
   void removeCandidateSourceDataNode(DatanodeDetails dui);
+
+  /**
+   * add the specified data node to the candidate source
+   * data nodes.
+   * This method does not check whether the specified Datanode is already present in the Collection.
+   * Callers must take the responsibility of checking and removing the Datanode before adding, if required.
+   *
+   * @param dn datanode to be added to potentialSources
+   */
+  void addBackSourceDataNode(DatanodeDetails dn);
 
   /**
    * increase the Leaving size of a candidate source data node.
@@ -75,4 +86,6 @@ public interface FindSourceStrategy {
    *                {@link DatanodeDetails} that containers can move from
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
+
+  Map<DatanodeDetails, Long> getSizeLeavingNodes();
 }

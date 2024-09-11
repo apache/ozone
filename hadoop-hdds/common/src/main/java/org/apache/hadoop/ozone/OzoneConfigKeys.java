@@ -121,12 +121,28 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
+   */
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
+      = false;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
       = "ozone.fs.hsync.enabled";
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
       = false;
+
+  /**
+   * hsync lease soft limit.
+   */
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT
+      = "ozone.om.lease.soft.limit";
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
+      = "60s";
 
 
   /**
@@ -455,7 +471,7 @@ public final class OzoneConfigKeys {
       "hdds.datanode.replication.work.dir";
 
 
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
@@ -527,10 +543,6 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
-  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
-      "ozone.client.list.trash.keys.max";
-  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
-
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   public static final String OZONE_HTTP_POLICY_KEY =
@@ -574,6 +586,13 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
+      "ozone.client.server-defaults.validity.period.ms";
+
+  public static final long
+      OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1); // 1 hour
 
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
           "ozone.network.flexible.fqdn.resolution.enabled";
@@ -681,6 +700,10 @@ public final class OzoneConfigKeys {
       "ozone.om.network.topology.refresh.duration";
   public static final String
       OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
+
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
+      "ozone.security.crypto.compliance.mode";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
 
   /**

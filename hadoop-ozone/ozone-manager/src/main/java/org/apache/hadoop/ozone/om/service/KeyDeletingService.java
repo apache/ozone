@@ -42,8 +42,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
@@ -67,8 +66,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,12 +184,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
 
-        // Acquire active DB deletedTable write lock because of the
-        // deletedTable read-write here to avoid interleaving with
-        // the table range delete operation in createOmSnapshotCheckpoint()
-        // that is called from OMSnapshotCreateResponse#addToDBBatch.
-        manager.getMetadataManager().getTableLock(
-            OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -214,10 +205,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
-        } finally {
-          // Release deletedTable write lock
-          manager.getMetadataManager().getTableLock(
-              OmMetadataManagerImpl.DELETED_TABLE).writeLock().unlock();
         }
 
         try {
@@ -289,13 +276,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-                currSnapInfo, snapChainManager, omSnapshotManager);
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(currSnapInfo, snapChainManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             if (previousSnapshot != null) {
-              previousToPrevSnapshot = getPreviousActiveSnapshot(
-                  previousSnapshot, snapChainManager, omSnapshotManager);
+              previousToPrevSnapshot = getPreviousActiveSnapshot(previousSnapshot, snapChainManager);
             }
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -493,24 +478,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     public void submitRequest(OMRequest omRequest, ClientId clientId) {
       try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(getRunCount().get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          getOzoneManager().getOmServerProtocol()
-              .submitRequest(null, omRequest);
-        }
+        OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
       } catch (ServiceException e) {
         LOG.error("Snapshot deep cleaning request failed. " +
             "Will retry at next run.", e);

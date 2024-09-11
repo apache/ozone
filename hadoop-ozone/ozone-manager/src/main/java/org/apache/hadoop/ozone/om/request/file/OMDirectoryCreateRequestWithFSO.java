@@ -193,7 +193,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, numKeysCreated,
@@ -308,6 +308,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     return OmDirectoryInfo.newBuilder()
         .setName(dirName)
+        .setOwner(keyArgs.getOwnerName())
         .setCreationTime(keyArgs.getModificationTime())
         .setModificationTime(keyArgs.getModificationTime())
         .setObjectID(objectId)

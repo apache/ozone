@@ -31,14 +31,14 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -48,8 +48,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.util.Preconditions;
 
 import java.io.IOException;
@@ -116,7 +114,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
     List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
+      startTime = Time.monotonicNow();
       if (isRatisEnabled()) {
         delCount = submitPurgeKeysRequest(blockDeletionResults,
             keysToModify, snapTableKey);
@@ -126,11 +127,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         //  OMRequest model.
         delCount = deleteAllKeys(blockDeletionResults, manager);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Blocks for {} (out of {}) keys are deleted in {} ms",
-            delCount, blockDeletionResults.size(),
-            Time.monotonicNow() - startTime);
-      }
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
     }
     return delCount;
   }
@@ -247,10 +245,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      RaftClientRequest raftClientRequest =
-          createRaftClientRequestForPurge(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest,
-          raftClientRequest);
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.");
       return 0;
@@ -259,30 +254,18 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return deletedCount;
   }
 
-  protected RaftClientRequest createRaftClientRequestForPurge(
-      OMRequest omRequest) {
-    return RaftClientRequest.newBuilder()
-        .setClientId(clientId)
-        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
-        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
-        .setCallId(runCount.get())
-        .setMessage(
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-  }
-
   /**
    * Parse Volume and Bucket Name from ObjectKey and add it to given map of
    * keys to be purged per bucket.
    */
-  private void addToMap(Map<Pair<String, String>, List<String>> map,
-                        String objectKey) {
+  private void addToMap(Map<Pair<String, String>, List<String>> map, String objectKey) {
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length > 3, "Volume and/or Bucket Name " +
-        "missing from Key Name.");
+    Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
+        "missing from Key Name " + objectKey);
+    if (split.length == 3) {
+      LOG.warn("{} missing Key Name", objectKey);
+    }
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
     if (!map.containsKey(volumeBucketPair)) {
       map.put(volumeBucketPair, new ArrayList<>());
@@ -309,15 +292,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      if (isRatisEnabled()) {
-        RaftClientRequest raftClientRequest =
-            createRaftClientRequestForPurge(omRequest);
-        ozoneManager.getOmRatisServer().submitRequest(omRequest,
-            raftClientRequest);
-      } else {
-        getOzoneManager().getOmServerProtocol()
-            .submitRequest(null, omRequest);
-      }
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -574,8 +549,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return cLimit + increment >= maxLimit;
   }
 
-  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
       throws IOException {
     SnapshotInfo currSnapInfo = snapInfo;
     while (chainManager.hasPreviousPathSnapshot(
@@ -584,7 +558,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       UUID prevPathSnapshot = chainManager.previousPathSnapshot(
           currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
       String tableKey = chainManager.getTableKey(prevPathSnapshot);
-      SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo prevSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
       if (prevSnapInfo.getSnapshotStatus() ==
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         return prevSnapInfo;

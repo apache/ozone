@@ -80,16 +80,17 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier
   ) throws IOException {
-    super(blockID, xceiverClientManager,
+    super(blockID, -1, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }
 
   @Override
-  public void write(byte[] b, int off, int len) throws IOException {
+  public synchronized void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
-        writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+        writeChunkToContainer(
+            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
     updateWrittenDataLength(len);
   }
 
@@ -115,17 +116,28 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     BlockData checksumBlockData = null;
+    BlockID blockID = null;
     //Reverse Traversal as all parity will have checksumBytes
     for (int i = blockData.length - 1; i >= 0; i--) {
       BlockData bd = blockData[i];
       if (bd == null) {
         continue;
       }
+      if (blockID == null) {
+        // store the BlockID for logging
+        blockID = bd.getBlockID();
+      }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.size() > 0 && chunks.get(0)
-          .hasStripeChecksum()) {
-        checksumBlockData = bd;
-        break;
+      if (chunks != null && chunks.size() > 0) {
+        if (chunks.get(0).hasStripeChecksum()) {
+          checksumBlockData = bd;
+          break;
+        } else {
+          ChunkInfo chunk = chunks.get(0);
+          LOG.debug("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block " +
+                  "size: {}. Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i,
+              bd.getBlockID(), bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
+        }
       }
     }
 
@@ -158,9 +170,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
       getContainerBlockData().clearChunks();
       getContainerBlockData().addAllChunks(newChunkList);
     } else {
-      throw new IOException("None of the block data have checksum " +
-          "which means " + parity + "(parity)+1 blocks are " +
-          "not present");
+      LOG.warn("Could not find checksum data in any index for blockData with BlockID {}, length {} and " +
+          "blockGroupLength {}.", blockID, blockData.length, blockGroupLength);
     }
 
     return executePutBlock(close, force, blockGroupLength);
@@ -188,7 +199,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {
     updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
-    return executePutBlock(close, force);
+    return executePutBlock(close, force).thenApply(PutBlockResult::getResponse);
   }
 
   private void updateBlockGroupLengthInPutBlockMeta(final long blockGroupLen) {
@@ -221,13 +232,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  public CompletableFuture<ContainerProtos.
-      ContainerCommandResponseProto> executePutBlock(boolean close,
+  @Override
+  public CompletableFuture<PutBlockResult> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
 
     CompletableFuture<ContainerProtos.
-        ContainerCommandResponseProto> flushFuture = null;
+        ContainerCommandResponseProto> flushFuture;
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
@@ -262,9 +273,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
+      // never reach.
+      return null;
     }
     this.putBlkRspFuture = flushFuture;
-    return flushFuture;
+    return flushFuture.thenApply(r -> new PutBlockResult(0, 0, r));
   }
 
   /**

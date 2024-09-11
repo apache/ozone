@@ -147,7 +147,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.S3_SETSECRET_USER, accessId);
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.SET_S3_SECRET, auditMap,
         exception, getOmRequest().getUserInfo()));
 

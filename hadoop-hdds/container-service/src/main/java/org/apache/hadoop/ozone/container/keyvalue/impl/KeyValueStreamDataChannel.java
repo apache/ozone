@@ -27,10 +27,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
-import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,13 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -54,91 +46,6 @@ import java.util.concurrent.atomic.AtomicReference;
 public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
-
-  /**
-   * Keep the last {@link Buffers#max} bytes in the buffer
-   * in order to create putBlockRequest
-   * at {@link #closeBuffers(Buffers, WriteMethod)}}.
-   */
-  static class Buffers {
-    private final Deque<ReferenceCountedObject<ByteBuffer>> deque
-        = new LinkedList<>();
-    private final int max;
-    private int length;
-
-    Buffers(int max) {
-      this.max = max;
-    }
-
-    private boolean isExtra(int n) {
-      return length - n >= max;
-    }
-
-    private boolean hasExtraBuffer() {
-      return Optional.ofNullable(deque.peek())
-          .map(ReferenceCountedObject::get)
-          .filter(b -> isExtra(b.remaining()))
-          .isPresent();
-    }
-
-    /**
-     * @return extra buffers which are safe to be written.
-     */
-    Iterable<ReferenceCountedObject<ByteBuffer>> offer(
-        ReferenceCountedObject<ByteBuffer> ref) {
-      final ByteBuffer buffer = ref.retain();
-      LOG.debug("offer {}", buffer);
-      final boolean offered = deque.offer(ref);
-      Preconditions.checkState(offered, "Failed to offer");
-      length += buffer.remaining();
-
-      return () -> new Iterator<ReferenceCountedObject<ByteBuffer>>() {
-        @Override
-        public boolean hasNext() {
-          return hasExtraBuffer();
-        }
-
-        @Override
-        public ReferenceCountedObject<ByteBuffer> next() {
-          final ReferenceCountedObject<ByteBuffer> polled = poll();
-          length -= polled.get().remaining();
-          Preconditions.checkState(length >= max);
-          return polled;
-        }
-      };
-    }
-
-    ReferenceCountedObject<ByteBuffer> poll() {
-      final ReferenceCountedObject<ByteBuffer> polled
-          = Objects.requireNonNull(deque.poll());
-      RatisHelper.debug(polled.get(), "polled", LOG);
-      return polled;
-    }
-
-    ReferenceCountedObject<ByteBuf> pollAll() {
-      Preconditions.checkState(!deque.isEmpty(), "The deque is empty");
-      final ByteBuffer[] array = new ByteBuffer[deque.size()];
-      final List<ReferenceCountedObject<ByteBuffer>> refs
-          = new ArrayList<>(deque.size());
-      for (int i = 0; i < array.length; i++) {
-        final ReferenceCountedObject<ByteBuffer> ref = poll();
-        refs.add(ref);
-        array[i] = ref.get();
-      }
-      final ByteBuf buf = Unpooled.wrappedBuffer(array).asReadOnly();
-      return ReferenceCountedObject.wrap(buf, () -> {
-      }, () -> {
-        buf.release();
-        refs.forEach(ReferenceCountedObject::release);
-      });
-    }
-
-    void cleanUpAll() {
-      while (!deque.isEmpty()) {
-        poll().release();
-      }
-    }
-  }
 
   interface WriteMethod {
     int applyAsInt(ByteBuffer src) throws IOException;
@@ -167,11 +74,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
 
-    final long l = Time.monotonicNow();
-    int len = writeBuffers(referenceCounted, buffers, super::writeFileChannel);
-    getMetrics()
-        .incContainerOpsLatencies(getType(), Time.monotonicNow() - l);
-    return len;
+    return writeBuffers(referenceCounted, buffers, this::writeFileChannel);
   }
 
   static int writeBuffers(ReferenceCountedObject<ByteBuffer> src,
@@ -189,7 +92,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
   private static void writeFully(ByteBuffer b, WriteMethod writeMethod)
       throws IOException {
-    for (; b.remaining() > 0;) {
+    while (b.remaining() > 0) {
       final int written = writeMethod.applyAsInt(b);
       if (written <= 0) {
         throw new IOException("Unable to write");

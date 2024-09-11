@@ -120,6 +120,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
       }
+      validateAtomicRewrite(dbFileInfo, keyArgs);
 
       // Check if a file or directory exists with same key name.
       if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
@@ -186,7 +187,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(),
+              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
               trxnLogIndex);
 
       // Add cache entries for the prefix directories.
@@ -227,7 +228,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ALLOCATE_KEY, auditMap, exception,
             getOmRequest().getUserInfo()));
 

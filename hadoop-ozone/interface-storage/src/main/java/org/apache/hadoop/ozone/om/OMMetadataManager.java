@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -46,14 +46,16 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-import org.apache.hadoop.ozone.storage.proto.
-    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * OM metadata manager interface.
@@ -125,6 +127,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
+   * Get DB key for a key or prefix in an FSO bucket given existing
+   * volume and bucket names.
+   */
+  String getOzoneKeyFSO(String volumeName,
+                        String bucketName,
+                        String keyPrefix)
+      throws IOException;
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB directory
    * key.
    *
@@ -146,7 +157,32 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id - the id for this open
    * @return bytes of DB key.
    */
-  String getOpenKey(String volume, String bucket, String key, long id);
+  default String getOpenKey(String volume, String bucket, String key, long id) {
+    return getOpenKey(volume, bucket, key, String.valueOf(id));
+  }
+
+  /**
+   * Returns the DB key name of a open key in OM metadata store. Should be
+   * #open# prefix followed by actual key name.
+   *
+   * @param volume - volume name
+   * @param bucket - bucket name
+   * @param key - key name
+   * @param clientId - client Id String for this open key
+   * @return bytes of DB key.
+   */
+  String getOpenKey(String volume, String bucket, String key, String clientId);
+
+  /**
+   * Returns client ID in Long of an OpenKeyTable DB Key String.
+   * @param dbOpenKeyName An OpenKeyTable DB Key String.
+   * @return Client ID (Long)
+   */
+  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
+    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
+    return Long.parseLong(clientIdString);
+  }
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
@@ -188,6 +224,24 @@ public interface OMMetadataManager extends DBStoreHAManager {
       throws IOException;
 
   /**
+   * Inner implementation of listOpenFiles. Called after all the arguments are
+   * checked and processed by Ozone Manager.
+   * @param bucketLayout
+   * @param maxKeys
+   * @param dbOpenKeyPrefix
+   * @param hasContToken
+   * @param dbContTokenPrefix
+   * @return ListOpenFilesResult
+   * @throws IOException
+   */
+  ListOpenFilesResult listOpenFiles(BucketLayout bucketLayout,
+                                    int maxKeys,
+                                    String dbOpenKeyPrefix,
+                                    boolean hasContToken,
+                                    String dbContTokenPrefix)
+      throws IOException;
+
+  /**
    * Returns a list of keys represented by {@link OmKeyInfo} in the given
    * bucket.
    *
@@ -209,24 +263,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   */
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException;
-
-  /**
    * Returns snapshot info for volume/bucket snapshot path.
    * @param volumeName volume name
    * @param bucketName bucket name
@@ -242,25 +278,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
    * @return list of snapshot
    */
-  List<SnapshotInfo> listSnapshot(
+  ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
-
-  /**
-   * Recover trash allows the user to recover the keys
-   * that were marked as deleted, but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   */
-  boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException;
 
   /**
    * Returns a list of volumes owned by a given user; if user is null, returns
@@ -278,6 +302,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
+   * Get total open key count (estimated, due to the nature of RocksDB impl)
+   * of both OpenKeyTable and OpenFileTable.
+   */
+  long getTotalOpenKeyCount() throws IOException;
+
+  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
@@ -288,7 +318,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @throws IOException
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
-      BucketLayout bucketLayout) throws IOException;
+      BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
 
   /**
    * Returns the names of up to {@code count} MPU key whose age is greater
@@ -306,13 +336,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
-
-  /**
-   * Retrieve RWLock for the table.
-   * @param tableName table name.
-   * @return ReentrantReadWriteLock
-   */
-  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -538,9 +561,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id             - client id for this open request
    * @return DB directory key as String.
    */
-  String getOpenFileName(long volumeId, long bucketId,
-                         long parentObjectId, String fileName, long id);
+  default String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, long id) {
+    return getOpenFileName(volumeId, bucketId, parentObjectId, fileName, String.valueOf(id));
+  }
 
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param clientId       - client id String for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, String clientId);
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in

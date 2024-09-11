@@ -104,6 +104,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -122,7 +124,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -653,12 +655,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(
-      List<String> nodes, int endInHours) throws IOException {
+      List<String> nodes, int endInHours, boolean force) throws IOException {
     Preconditions.checkNotNull(nodes);
     StartMaintenanceNodesRequestProto request =
         StartMaintenanceNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
             .setEndInHours(endInHours)
+            .setForce(force)
             .build();
     StartMaintenanceNodesResponseProto response =
         submitRequest(Type.StartMaintenanceNodes,
@@ -1088,6 +1091,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setContainerBalancerStatusRequest(request))
             .getContainerBalancerStatusResponse();
     return response.getIsRunning();
+
+  }
+
+  @Override
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException {
+
+    ContainerBalancerStatusInfoRequestProto request =
+            ContainerBalancerStatusInfoRequestProto.getDefaultInstance();
+    ContainerBalancerStatusInfoResponseProto response =
+            submitRequest(Type.GetContainerBalancerStatusInfo,
+                    builder -> builder.setContainerBalancerStatusInfoRequest(request))
+                    .getContainerBalancerStatusInfoResponse();
+    return response;
 
   }
 

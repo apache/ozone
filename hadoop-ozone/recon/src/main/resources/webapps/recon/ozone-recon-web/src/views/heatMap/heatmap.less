@@ -19,11 +19,14 @@
 .heatmap-container {
 
   .heatmap-header-container {
-    height: 7vh;
     display: flex;
     justify-content: space-between;
     align-items: stretch;
     margin: 10px 15px 20px 15px;
+
+    @media (max-width: 1680px) {
+      flex-direction: column;
+    }
 
     .go-back-button {
       display: inline-block;

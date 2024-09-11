@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Updates the exclusive size of the snapshot.
@@ -51,8 +52,9 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
 
-    OMClientResponse omClientResponse = null;
+    OMClientResponse omClientResponse;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
@@ -60,18 +62,16 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.SetSnapshotPropertyRequest
         setSnapshotPropertyRequest = getOmRequest()
         .getSetSnapshotPropertyRequest();
-    SnapshotInfo updatedSnapInfo = null;
+
+    String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
 
     try {
-      String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
-      updatedSnapInfo = metadataManager.getSnapshotInfoTable()
-          .get(snapshotKey);
-
+      SnapshotInfo updatedSnapInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
       if (updatedSnapInfo == null) {
-        LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
-        throw new OMException("SnapshotInfo for Snapshot: " + snapshotKey +
-            " is not found", INVALID_SNAPSHOT_ERROR);
+        LOG.error("Snapshot: '{}' doesn't not exist in snapshot table.", snapshotKey);
+        throw new OMException("Snapshot: '{" + snapshotKey + "}' doesn't not exist in snapshot table.", FILE_NOT_FOUND);
       }
+
 
       if (setSnapshotPropertyRequest.hasDeepCleanedDeletedDir()) {
         updatedSnapInfo.setDeepCleanedDeletedDir(setSnapshotPropertyRequest
@@ -101,9 +101,13 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
           CacheValue.get(termIndex.getIndex(), updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfo);
+      omMetrics.incNumSnapshotSetProperties();
+      LOG.info("Successfully executed snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
+      omMetrics.incNumSnapshotSetPropertyFails();
+      LOG.error("Failed to execute snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest, ex);
     }
 
     return omClientResponse;

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -35,11 +36,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
+@CleanupTableInfo(cleanupTables = {FILE_TABLE, OPEN_FILE_TABLE, DIRECTORY_TABLE,
     DELETED_TABLE, DELETED_DIR_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
@@ -51,8 +53,8 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
       boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId) {
-    super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo);
+      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId, OmKeyInfo deletedOpenKeyInfo) {
+    super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo, deletedOpenKeyInfo);
     this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
     this.volumeId = volumeId;
@@ -108,6 +110,18 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
             omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
                     getOmBucketInfo().getBucketName()), getOmBucketInfo());
+
+    // Update metadata which will be used to cleanup openKey in openKeyCleanupService
+    OmKeyInfo deletedOpenKeyInfo = getDeletedOpenKeyInfo();
+    if (deletedOpenKeyInfo != null) {
+      String hsyncClientId = getDeletedOpenKeyInfo().getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      if (hsyncClientId != null) {
+        String dbOpenKey = omMetadataManager.getOpenKey(deletedOpenKeyInfo.getVolumeName(),
+            deletedOpenKeyInfo.getBucketName(), deletedOpenKeyInfo.getKeyName(), hsyncClientId);
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, dbOpenKey, deletedOpenKeyInfo);
+      }
+    }
   }
 
   @Override

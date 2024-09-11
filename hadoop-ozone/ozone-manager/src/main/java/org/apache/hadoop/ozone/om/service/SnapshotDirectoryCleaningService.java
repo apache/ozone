@@ -34,13 +34,12 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -48,8 +47,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnap
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -176,8 +173,7 @@ public class SnapshotDirectoryCleaningService
                   "unexpected state.");
             }
 
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-                currSnapInfo, snapChainManager, omSnapshotManager);
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(currSnapInfo, snapChainManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -194,8 +190,7 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
               prevRenamedTable = omPreviousSnapshot
                   .getMetadataManager().getSnapshotRenamedTable();
-              previousToPrevSnapshot = getPreviousActiveSnapshot(
-                  previousSnapshot, snapChainManager, omSnapshotManager);
+              previousToPrevSnapshot = getPreviousActiveSnapshot(previousSnapshot, snapChainManager);
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
@@ -438,25 +433,7 @@ public class SnapshotDirectoryCleaningService
 
   public void submitRequest(OMRequest omRequest, ClientId clientId) {
     try {
-      if (isRatisEnabled()) {
-        OzoneManagerRatisServer server =
-            getOzoneManager().getOmRatisServer();
-
-        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(server.getRaftPeerId())
-            .setGroupId(server.getRaftGroupId())
-            .setCallId(getRunCount().get())
-            .setMessage(Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build();
-
-        server.submitRequest(omRequest, raftClientRequest);
-      } else {
-        getOzoneManager().getOmServerProtocol()
-            .submitRequest(null, omRequest);
-      }
+      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
     } catch (ServiceException e) {
       LOG.error("Snapshot deep cleaning request failed. " +
           "Will retry at next run.", e);

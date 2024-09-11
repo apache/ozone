@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
+
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import javax.inject.Inject;
@@ -39,12 +42,14 @@ public class ReconNamespaceSummaryManagerImpl
 
   private Table<Long, NSSummary> nsSummaryTable;
   private DBStore namespaceDbStore;
+  private NSSummaryTask nsSummaryTask;
 
   @Inject
-  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider)
+  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider, NSSummaryTask nsSummaryTask)
           throws IOException {
     namespaceDbStore = reconDBProvider.getDbStore();
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
+    this.nsSummaryTask = nsSummaryTask;
   }
 
   @Override
@@ -79,6 +84,11 @@ public class ReconNamespaceSummaryManagerImpl
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
+  }
+
+  @Override
+  public void rebuildNSSummaryTree(OMMetadataManager omMetadataManager) {
+    nsSummaryTask.reprocess(omMetadataManager);
   }
 
   public Table getNSSummaryTable() {

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -271,7 +272,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       throws IOException;
 
   List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
-      int endInHours) throws IOException;
+      int endInHours, boolean force) throws IOException;
 
   /**
    * Close a container.
@@ -447,6 +448,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return True if ContainerBalancer is running, false otherwise.
    */
   boolean getContainerBalancerStatus() throws IOException;
+
+  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
 
   /**
    * Get Datanode usage information by ip or hostname or uuid.

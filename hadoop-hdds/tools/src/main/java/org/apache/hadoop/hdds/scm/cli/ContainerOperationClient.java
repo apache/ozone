@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -119,7 +120,7 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
           new ClientTrustManager(caCerts, null));
@@ -188,7 +189,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  private String getEncodedContainerToken(long containerId) throws IOException {
+  public String getEncodedContainerToken(long containerId) throws IOException {
     if (!containerTokenEnabled) {
       return "";
     }
@@ -254,9 +255,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
-      int endHours) throws IOException {
+      int endHours, boolean force) throws IOException {
     return storageContainerLocationClient.startMaintenanceNodes(
-        hosts, endHours);
+        hosts, endHours, force);
   }
 
   @Override
@@ -539,6 +540,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public boolean getContainerBalancerStatus() throws IOException {
     return storageContainerLocationClient.getContainerBalancerStatus();
+  }
+
+  @Override
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatusInfo();
   }
 
   @Override

@@ -22,7 +22,6 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -60,7 +59,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
@@ -78,8 +76,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
-      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,
-          snapshotChainManager, omSnapshotManager);
+      // Check the snapshot exists.
+      SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
+
+      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, ozoneManager);
 
       // Get next non-deleted snapshot.
       List<SnapshotMoveKeyInfos> nextDBKeysList =
