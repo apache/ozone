@@ -41,6 +41,7 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -673,6 +674,41 @@ public final class OmSnapshotManager implements AutoCloseable {
     // retrieve the snapshot from the cache
     return snapshotCache.get(snapshotInfo.getSnapshotId());
   }
+
+  /**
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
+   * @param metadataManager Metadatamanager of Active OM.
+   * @param snapshotTableKey table key corresponding to snapshot in snapshotInfoTable.
+   * @return True if the changes have been flushed to DB otherwise false
+   * @throws IOException
+   */
+  public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, String snapshotTableKey)
+      throws IOException {
+    // Need this info from cache since the snapshot could have been updated only on cache and not on disk.
+    SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+    return areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+  }
+
+  /**
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
+   * @param metadataManager Metadatamanager of Active OM.
+   * @param snapshotInfo SnapshotInfo value.
+   * @return True if the changes have been flushed to DB otherwise false. It would return true if the snapshot
+   * provided is null meaning the snapshot doesn't exist.
+   * @throws IOException
+   */
+  public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, SnapshotInfo snapshotInfo)
+      throws IOException {
+    if (snapshotInfo != null) {
+      TransactionInfo snapshotTransactionInfo = snapshotInfo.getLastTransactionInfo() != null ?
+          TransactionInfo.fromByteString(snapshotInfo.getLastTransactionInfo()) : null;
+      TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
+      // If transactionInfo field is null then return true to keep things backward compatible.
+      return snapshotTransactionInfo == null || omTransactionInfo.compareTo(snapshotTransactionInfo) >= 0;
+    }
+    return true;
+  }
+
 
   /**
    * Returns OmSnapshot object and skips active check.

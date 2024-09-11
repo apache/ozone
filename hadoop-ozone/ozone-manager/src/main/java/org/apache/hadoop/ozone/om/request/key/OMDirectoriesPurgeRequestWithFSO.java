@@ -149,6 +149,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
       }
+      if (fromSnapshotInfo != null) {
+        SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshotInfo, termIndex);
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+      }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
