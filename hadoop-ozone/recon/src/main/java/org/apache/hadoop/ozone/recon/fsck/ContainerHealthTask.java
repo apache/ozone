@@ -80,7 +80,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private final PlacementPolicy placementPolicy;
   private final long interval;
   private Map<UnHealthyContainerStates, Map<String, Long>>
-      unhealthyContainerStateStatsMap;
+      unhealthyContainerStateStatsMapForTesting;
 
   private final Set<ContainerInfo> processedContainers = new HashSet<>();
 
@@ -130,7 +130,8 @@ public class ContainerHealthTask extends ReconScmTask {
     // <MISSING, <TOTAL_USED_BYTES, 2048>>,
     // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
-    unhealthyContainerStateStatsMap.clear();
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap;
     try {
       unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
       initializeUnhealthyContainerStateStatsMap(
@@ -187,6 +188,8 @@ public class ContainerHealthTask extends ReconScmTask {
   private void logUnhealthyContainerStats(
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
+    unhealthyContainerStateStatsMapForTesting =
+        new HashMap<>(unhealthyContainerStateStatsMap);
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
@@ -708,9 +711,8 @@ public class ContainerHealthTask extends ReconScmTask {
    * Expose the unhealthyContainerStateStatsMap for testing purposes.
    */
   @VisibleForTesting
-  public Map<UnHealthyContainerStates, Map<String, Long>>
-  getUnhealthyContainerStateStatsMap() {
-    return unhealthyContainerStateStatsMap;
+  public Map<UnHealthyContainerStates, Map<String, Long>> getUnhealthyContainerStateStatsMap() {
+    return unhealthyContainerStateStatsMapForTesting;
   }
 
 }
