@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -150,7 +151,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
       }
       if (fromSnapshotInfo != null) {
-        SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshotInfo, termIndex);
+        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
       }

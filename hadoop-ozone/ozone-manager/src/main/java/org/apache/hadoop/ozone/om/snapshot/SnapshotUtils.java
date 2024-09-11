@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -27,7 +26,6 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -138,14 +136,6 @@ public final class SnapshotUtils {
           "Snapshot with table key '" + snapInfo.getTableKey() +
           "' is no longer active", FILE_NOT_FOUND);
     }
-  }
-
-  /**
-   * Set transactionInfo in snapshotInfo.
-   */
-  public static void setTransactionInfoInSnapshot(SnapshotInfo snapshot, TermIndex termIndex) throws IOException {
-    TransactionInfo transactionInfo = TransactionInfo.valueOf(termIndex);
-    snapshot.setLastTransactionInfo(transactionInfo.toByteString());
   }
 
   /**

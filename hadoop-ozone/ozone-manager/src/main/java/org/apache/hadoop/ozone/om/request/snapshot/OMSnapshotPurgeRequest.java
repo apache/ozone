@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -117,7 +118,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       }
 
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
-        SnapshotUtils.setTransactionInfoInSnapshot(snapshotInfo, termIndex);
+        snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
             CacheValue.get(termIndex.getIndex(), snapshotInfo));
       }

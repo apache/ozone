@@ -135,7 +135,7 @@ public class TestSnapshotInfo {
     // Checking if changes have been flushed when lastTransactionInfo is null
     assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, info));
     TermIndex termIndex = TermIndex.valueOf(1, 1);
-    SnapshotUtils.setTransactionInfoInSnapshot(info, termIndex);
+    info.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
     // Checking if changes to snapshot object has been updated but not updated on cache or disk.
     assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
     snapshotInfo.addCacheEntry(new CacheKey<>(EXPECTED_SNAPSHOT_KEY), CacheValue.get(termIndex.getIndex(), info));
