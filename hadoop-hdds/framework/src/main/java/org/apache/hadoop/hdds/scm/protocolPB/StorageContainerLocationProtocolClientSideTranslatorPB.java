@@ -781,7 +781,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       if (!peerRolesList.isEmpty()) {
         boolean containsScmRoles = peerRolesList.stream().map(String::toLowerCase)
             .anyMatch(scmRatisRolesToCheck::contains);
-        if(containsScmRoles) {
+        if (containsScmRoles) {
           builder.setScmRatisEnabled(Boolean.TRUE);
         }
       }
