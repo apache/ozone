@@ -44,33 +44,50 @@ Test ozone debug ldb ls
                         Should contain      ${output}       keyTable
 
 Test ozone debug ldb scan
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --count
+    # test count option
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --count
                         Should Not Be Equal     ${output}       0
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable | jq -r '.'
-                        Should contain      ${output}       keyName
-                        Should contain      ${output}       testfile1
-                        Should contain      ${output}       testfile2
-                        Should contain      ${output}       testfile3
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --startkey="/cli-debug-volume/cli-debug-bucket/testfile2"
-                        Should not contain  ${output}       testfile1
-                        Should contain      ${output}       testfile2
-                        Should contain      ${output}       testfile3
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --endkey="/cli-debug-volume/cli-debug-bucket/testfile2"
-                        Should contain      ${output}       testfile1
-                        Should contain      ${output}       testfile2
-                        Should not contain  ${output}       testfile3
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --fields="volumeName,bucketName,keyName"
-                        Should contain      ${output}       volumeName
-                        Should contain      ${output}       bucketName
-                        Should contain      ${output}       keyName
-                        Should not contain  ${output}       objectID
-                        Should not contain  ${output}       dataSize
-                        Should not contain  ${output}       keyLocationVersions
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:equals:testfile2"
-                        Should not contain  ${output}       testfile1
-                        Should contain      ${output}       testfile2
-                        Should not contain  ${output}       testfile3
-    ${output} =         Execute             ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="acls.name:equals:systest"
-                        Should not contain  ${output}       testfile1
-                        Should not contain  ${output}       testfile2
-                        Should contain      ${output}       testfile3
+    # test valid json for scan command
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable | jq -r '.'
+                        Should contain          ${output}       keyName
+                        Should contain          ${output}       testfile1
+                        Should contain          ${output}       testfile2
+                        Should contain          ${output}       testfile3
+    # test startkey option
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --startkey="/cli-debug-volume/cli-debug-bucket/testfile2"
+                        Should not contain      ${output}       testfile1
+                        Should contain          ${output}       testfile2
+                        Should contain          ${output}       testfile3
+    # test endkey option
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --endkey="/cli-debug-volume/cli-debug-bucket/testfile2"
+                        Should contain          ${output}       testfile1
+                        Should contain          ${output}       testfile2
+                        Should not contain      ${output}       testfile3
+    # test fields option
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --fields="volumeName,bucketName,keyName"
+                        Should contain          ${output}       volumeName
+                        Should contain          ${output}       bucketName
+                        Should contain          ${output}       keyName
+                        Should not contain      ${output}       objectID
+                        Should not contain      ${output}       dataSize
+                        Should not contain      ${output}       keyLocationVersions
+    # test filter option with one filter
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:equals:testfile2"
+                        Should not contain      ${output}       testfile1
+                        Should contain          ${output}       testfile2
+                        Should not contain      ${output}       testfile3
+    # test filter option with one multi-level filter
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="acls.name:equals:systest"
+                        Should not contain      ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should contain          ${output}       testfile3
+    # test filter option with multiple filter
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:equals:testfile3,acls.name:equals:systest"
+                        Should not contain      ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should contain          ${output}       testfile3
+    # test filter option with no records match both filters
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="acls.name:equals:systest,keyName:equals:testfile2"
+                        Should not contain      ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should not contain      ${output}       testfile3
