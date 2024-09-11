@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveTableKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
@@ -69,6 +70,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
@@ -211,7 +213,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                     deletedDirEntries.stream()
                     .map(kv -> {
                       try {
-                        return kv.getKey();
+                        return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey())
+                            .addKeyInfos(kv.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build();
                       } catch (IOException e) {
                         throw new UncheckedIOException(e);
                       }
@@ -257,38 +260,34 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
 
     public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        List<SnapshotMoveKeyInfos> keysToMove, List<HddsProtos.KeyValue> renamedList,
-        List<String> dirsToMove) {
+        List<SnapshotMoveKeyInfos> deletedKeys, List<HddsProtos.KeyValue> renamedList,
+        List<SnapshotMoveKeyInfos> dirsToMove) {
 
-      OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
-          OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest.newBuilder()
-              .setFromSnapshot(snapInfo.getProtobuf());
+      SnapshotMoveTableKeysRequest.Builder moveDeletedKeysBuilder = SnapshotMoveTableKeysRequest.newBuilder()
+              .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
 
-      OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-          .addAllNextDBKeys(keysToMove)
+      SnapshotMoveTableKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
+          .addAllDeletedKeys(deletedKeys)
           .addAllRenamedKeys(renamedList)
-          .addAllDeletedDirsToMove(dirsToMove)
-          .setPurgeMovedKeys(true)
+          .addAllDeletedDirs(dirsToMove)
           .build();
       if (isBufferLimitCrossed(ratisByteLimit, 0, moveDeletedKeys.getSerializedSize())) {
         int remaining = MIN_ERR_LIMIT_PER_TASK;
-        keysToMove = keysToMove.subList(0, Math.min(remaining, keysToMove.size()));
-        remaining -= keysToMove.size();
+        deletedKeys = deletedKeys.subList(0, Math.min(remaining, deletedKeys.size()));
+        remaining -= deletedKeys.size();
         renamedList = renamedList.subList(0, Math.min(remaining, renamedList.size()));
         remaining -= renamedList.size();
         dirsToMove = dirsToMove.subList(0, Math.min(remaining, dirsToMove.size()));
-        remaining -= dirsToMove.size();
         moveDeletedKeys = moveDeletedKeysBuilder
-            .addAllNextDBKeys(keysToMove)
+            .addAllDeletedKeys(deletedKeys)
             .addAllRenamedKeys(renamedList)
-            .addAllDeletedDirsToMove(dirsToMove)
-            .setPurgeMovedKeys(true)
+            .addAllDeletedDirs(dirsToMove)
             .build();
       }
 
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(Type.SnapshotMoveDeletedKeys)
-          .setSnapshotMoveDeletedKeysRequest(moveDeletedKeys)
+          .setSnapshotMoveTableKeysRequest(moveDeletedKeys)
           .setClientId(clientId.toString())
           .build();
 

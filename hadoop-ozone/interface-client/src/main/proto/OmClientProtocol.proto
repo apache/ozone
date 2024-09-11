@@ -153,6 +153,7 @@ enum Type {
   GetServerDefaults = 134;
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
 }
 
 enum SafeMode {
@@ -273,7 +274,7 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
-  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116 [deprecated = true];
 
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
@@ -296,6 +297,7 @@ message OMRequest {
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests     = 135;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 136;
 }
 
 message OMResponse {
@@ -1979,13 +1981,18 @@ message PrintCompactionLogDagRequest {
 }
 
 message SnapshotMoveDeletedKeysRequest {
-  optional SnapshotInfo fromSnapshot = 1 [deprecated = true];
+  optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
-  repeated SnapshotMoveKeyInfos reclaimKeys = 3 [deprecated = true];
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
   repeated string deletedDirsToMove = 5;
-  optional bool purgeMovedKeys = 6;
-  optional hadoop.hdds.UUID fromSnapshotID = 7;
+}
+
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
 }
 
 message SnapshotMoveKeyInfos {

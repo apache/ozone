@@ -108,8 +108,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
 
     for (SnapshotMoveKeyInfos keyToUpdate : keysToUpdateList) {
       List<KeyInfo> keyInfosList = keyToUpdate.getKeyInfosList();
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          createRepeatedOmKeyInfo(keyInfosList);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = createRepeatedOmKeyInfo(keyInfosList);
       metadataManager.getDeletedTable().putWithBatch(batchOp,
           keyToUpdate.getKey(), repeatedOmKeyInfo);
     }
