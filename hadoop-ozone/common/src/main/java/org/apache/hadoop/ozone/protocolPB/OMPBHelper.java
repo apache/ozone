@@ -242,11 +242,13 @@ public final class OMPBHelper {
     DataOutputBuffer buf = new DataOutputBuffer();
     checksum.write(buf);
     byte[] bytes = buf.getData();
-    DataInputBuffer buffer = new DataInputBuffer();
-    buffer.reset(bytes, 0, bytes.length);
-    int bytesPerCRC = buffer.readInt();
-    long crcPerBlock = buffer.readLong();
-    buffer.close();
+    int bytesPerCRC;
+    long crcPerBlock;
+    try (DataInputBuffer buffer = new DataInputBuffer()) {
+      buffer.reset(bytes, 0, bytes.length);
+      bytesPerCRC = buffer.readInt();
+      crcPerBlock = buffer.readLong();
+    }
 
     int offset = Integer.BYTES + Long.BYTES;
     ByteString byteString = ByteString.copyFrom(
