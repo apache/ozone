@@ -85,7 +85,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
   @SuppressWarnings("checkstyle:methodlength")
   @Test
-  public void testRun2() throws Exception {
+  public void testRun() throws Exception {
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
 

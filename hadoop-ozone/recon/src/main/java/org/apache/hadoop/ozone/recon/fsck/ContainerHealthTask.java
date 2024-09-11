@@ -408,7 +408,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   /**
    * This method is used to handle containers with negative sizes. It logs an
-   * error message and inserts a record into the UNHEALTHY_CONTAINERS table.
+   * error message.
    * @param containerHealthStatus
    * @param currentTime
    * @param unhealthyContainerStateStatsMap
@@ -418,10 +418,7 @@ public class ContainerHealthTask extends ReconScmTask {
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
     ContainerInfo container = containerHealthStatus.getContainer();
-    LOG.error(
-        "Container {} has negative size. Please visit Recon's unhealthy " +
-            "container endpoint for more details.",
-        container.getContainerID());
+    LOG.error("Container {} has negative size.", container.getContainerID());
     populateContainerStats(containerHealthStatus,
         UnHealthyContainerStates.NEGATIVE_SIZE,
         unhealthyContainerStateStatsMap);

@@ -160,10 +160,6 @@ public class ContainerHealthStatus {
     return numKeys == 0;
   }
 
-  public boolean isEmptyMissing() {
-    return numKeys == 0 && numReplicas == 0;
-  }
-
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
     List<DatanodeDetails> dns = healthyReplicas.stream()
