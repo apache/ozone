@@ -122,15 +122,40 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * @return a list of pipeline.
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException;
 
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   *
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count) throws IOException;
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   * @param replicationConfig container replication Config.
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
+      throws IOException;
 
   /**
    * Lists a range of containers and get their info.
@@ -143,12 +168,6 @@ public interface ScmClient extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig replicationConfig)
-      throws IOException;
-
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,

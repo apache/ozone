@@ -146,15 +146,49 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big)
    *
-   * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * @return a list of container.
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException;
 
+  /**
+   * Ask SCM a list of containers with a range of container names
+   * and the limit of count.
+   * Search container names between start name(exclusive), and
+   * use prefix name to filter the result. the max size of the
+   * searching range cannot exceed the value of count.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   *
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count) throws IOException;
+
+  /**
+   * Ask SCM a list of containers with a range of container names
+   * and the limit of count.
+   * Search container names between start name(exclusive), and
+   * use prefix name to filter the result. the max size of the
+   * searching range cannot exceed the value of count.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   *
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
    * Ask SCM a list of containers with a range of container names
@@ -173,11 +207,28 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException;
-
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Ask SCM a list of containers with a range of container names
+   * and the limit of count.
+   * Search container names between start name(exclusive), and
+   * use prefix name to filter the result. the max size of the
+   * searching range cannot exceed the value of count.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   * @param factor Container factor
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException;
 
   /**
    * Ask SCM a list of containers with a range of container names
@@ -196,14 +247,30 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException;
-
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
 
+  /**
+   * Ask SCM for a list of containers with a range of container ID, state
+   * and replication config, and the limit of count.
+   * The containers are returned from startID (exclusive), and
+   * filtered by state and replication config. The returned list is limited to
+   * count entries.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   * @param replicationConfig Replication config for the containers
+   * @return a list of container.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig) throws IOException;
 
   /**
    * Ask SCM for a list of containers with a range of container ID, state
@@ -222,11 +289,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig replicationConfig) throws IOException;
-
   Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
