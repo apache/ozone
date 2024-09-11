@@ -44,18 +44,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>com.nimbusds</groupId>
-          <artifactId>nimbus-jose-jwt</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.xerial.snappy</groupId>
-          <artifactId>snappy-java</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>hadoop-shaded-guava</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
         </exclusion>
@@ -192,10 +180,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>dnsjava</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.nimbusds</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>*</artifactId>
         </exclusion>
@@ -211,23 +195,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.nimbusds</groupId>
-      <artifactId>nimbus-jose-jwt</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
       <scope>compile</scope>
       <exclusions>
-        <exclusion>
-          <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>hadoop-shaded-guava</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
@@ -313,10 +285,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jackson-databind</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.xerial.snappy</groupId>
-      <artifactId>snappy-java</artifactId>
     </dependency>
   </dependencies>
 

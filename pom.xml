@@ -148,7 +148,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.19</jnr-posix.version>
-    <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <jsp-api.version>2.1</jsp-api.version>
@@ -162,7 +161,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jackson1.version>1.9.13</jackson1.version>
     <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <woodstox.version>5.4.0</woodstox.version>
 
     <!-- jaegertracing veresion -->
     <jaeger.version>1.8.1</jaeger.version>
@@ -187,9 +185,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <prometheus.version>0.16.0</prometheus.version>
     <reflections.version>0.10.2</reflections.version>
 
-    <!-- com.google.re2j version -->
-    <re2j.version>1.7</re2j.version>
-
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
     <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
@@ -197,15 +192,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
 
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <dnsjava.version>2.1.9</dnsjava.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <javax.inject.version>1</javax.inject.version>
-    <joda.time.version>2.12.7</joda.time.version>
 
     <aopalliance.version>1.0</aopalliance.version>
     <compile-testing.version>0.21.0</compile-testing.version>
@@ -215,7 +207,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <gson.version>2.10.1</gson.version>
 
     <okhttp.version>2.7.5</okhttp.version>
-    <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <junit5.version>5.10.3</junit5.version>
@@ -309,18 +300,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.9</maven.core.version>
-    <snappy-java.version>1.1.10.6</snappy-java.version>
-    <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
-    <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>com.squareup.okio</groupId>
-        <artifactId>okio</artifactId>
-        <version>${okio.version}</version>
-      </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
@@ -981,11 +964,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${spring.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.woodstox</groupId>
-        <artifactId>woodstox-core</artifactId>
-        <version>${woodstox.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson2-bom.version}</version>
@@ -1008,11 +986,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${compile-testing.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.re2j</groupId>
-        <artifactId>re2j</artifactId>
-        <version>${re2j.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
         <version>${proto2.hadooprpc.protobuf.version}</version>
@@ -1026,11 +999,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>commons-daemon</groupId>
         <artifactId>commons-daemon</artifactId>
         <version>${commons-daemon.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.jcraft</groupId>
-        <artifactId>jsch</artifactId>
-        <version>${jsch.version}</version>
       </dependency>
 
       <dependency>
@@ -1171,12 +1139,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>dnsjava</groupId>
-        <artifactId>dnsjava</artifactId>
-        <version>${dnsjava.version}</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
         <version>${snakeyaml.version}</version>
@@ -1223,11 +1185,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${okhttp3.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.woodstox</groupId>
-        <artifactId>stax2-api</artifactId>
-        <version>${stax2.version}</version>
-      </dependency>
-      <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
         <version>${java.dev.jna.version}</version>
@@ -1256,11 +1213,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>jakarta.ws.rs</groupId>
         <artifactId>jakarta.ws.rs-api</artifactId>
         <version>${jakarta.ws.rs-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>joda-time</groupId>
-        <artifactId>joda-time</artifactId>
-        <version>${joda.time.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.curator</groupId>
@@ -1293,24 +1245,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${mockito.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.xerial.snappy</groupId>
-        <artifactId>snappy-java</artifactId>
-        <version>${snappy-java.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-guava</artifactId>
-        <version>${hadoop-shaded-guava.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.github.vlsi.mxgraph</groupId>
         <artifactId>jgraphx</artifactId>
         <version>${jgraphx.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.nimbusds</groupId>
-        <artifactId>nimbus-jose-jwt</artifactId>
-        <version>${com.nimbusds.nimbus-jose-jwt.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

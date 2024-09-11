@@ -315,6 +315,25 @@
               <rules>
                 <DependencyConvergence>
                   <uniqueVersions>true</uniqueVersions>
+                  <excludes>
+                    <!--
+                      Dependency convergence error for org.codehaus.woodstox:stax2-api
+
+                      +-org.apache.ozone:ozone-common:jar:1.5.0-SNAPSHOT
+                        +-org.apache.ozone:hdds-common:jar:1.5.0-SNAPSHOT:compile
+                          +-org.apache.ozone:hdds-hadoop-dependency-client:jar:1.5.0-SNAPSHOT:compile
+                            +-org.apache.hadoop:hadoop-common:jar:3.3.6:compile
+                              +-org.codehaus.woodstox:stax2-api:jar:4.2.1:compile
+
+                      +-org.apache.ozone:ozone-common:jar:1.5.0-SNAPSHOT
+                        +-org.apache.ozone:hdds-common:jar:1.5.0-SNAPSHOT:compile
+                          +-org.apache.ozone:hdds-hadoop-dependency-client:jar:1.5.0-SNAPSHOT:compile
+                            +-org.apache.hadoop:hadoop-common:jar:3.3.6:compile
+                              +-com.fasterxml.woodstox:woodstox-core:jar:5.4.0:compile
+                                +-org.codehaus.woodstox:stax2-api:jar:4.2:compile
+                    -->
+                    <exclude>org.codehaus.woodstox:stax2-api</exclude>
+                  </excludes>
                 </DependencyConvergence>
               </rules>
             </configuration>

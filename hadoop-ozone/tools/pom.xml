@@ -196,6 +196,25 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-core</artifactId>
+      <exclusions>
+        <!--
+          Dependency convergence error for joda-time:joda-time
+
+          +-org.apache.ozone:ozone-tools:jar:1.5.0-SNAPSHOT
+            +-org.apache.ozone:ozone-manager:jar:1.5.0-SNAPSHOT:compile
+              +-org.apache.ranger:ranger-plugins-common:jar:2.3.0:compile
+                +-org.apache.ranger:ranger-plugins-audit:jar:2.3.0:compile
+                  +-joda-time:joda-time:jar:2.10.6:compile
+
+          +-org.apache.ozone:ozone-tools:jar:1.5.0-SNAPSHOT
+            +-com.amazonaws:aws-java-sdk-core:jar:1.12.661:compile
+              +-joda-time:joda-time:jar:2.8.1:compile
+        -->
+        <exclusion>
+          <groupId>joda-time</groupId>
+          <artifactId>joda-time</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>

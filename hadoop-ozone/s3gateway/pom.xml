@@ -226,6 +226,24 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-server</artifactId>
+      <exclusions>
+        <!--
+          Dependency convergence error for com.fasterxml.woodstox:woodstox-core
+
+          +-org.apache.ozone:ozone-s3gateway:jar:1.5.0-SNAPSHOT
+            +-com.fasterxml.jackson.dataformat:jackson-dataformat-xml:jar:2.16.2:compile
+              +-com.fasterxml.woodstox:woodstox-core:jar:6.5.1:compile
+
+          +-org.apache.ozone:ozone-s3gateway:jar:1.5.0-SNAPSHOT
+            +-org.apache.ozone:hdds-hadoop-dependency-server:jar:1.5.0-SNAPSHOT:compile
+              +-org.apache.hadoop:hadoop-common:jar:3.3.6:compile
+                +-com.fasterxml.woodstox:woodstox-core:jar:5.4.0:compile
+        -->
+        <exclusion>
+          <groupId>com.fasterxml.woodstox</groupId>
+          <artifactId>woodstox-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
