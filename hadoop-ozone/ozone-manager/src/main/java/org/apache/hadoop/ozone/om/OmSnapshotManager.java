@@ -692,8 +692,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   /**
    * Checks if the last transaction performed on the snapshot has been flushed to disk.
    * @param metadataManager Metadatamanager of Active OM.
-   * @param snapshotInfo table key corresponding to snapshot in snapshotInfoTable, this should be a value from cache
-   *                     and not from disk.
+   * @param snapshotInfo SnapshotInfo value.
    * @return True if the changes have been flushed to DB otherwise false. It would return true if the snapshot
    * provided is null meaning the snapshot doesn't exist.
    * @throws IOException
