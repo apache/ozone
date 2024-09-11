@@ -28,6 +28,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -36,7 +37,12 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -46,6 +52,7 @@ import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
@@ -426,8 +433,12 @@ public final class OzoneManagerDoubleBuffer {
    * in RocksDB callback flush. If multiple operations are flushed in one
    * specific batch, we are not sure at the flush of which specific operation
    * the callback is coming.
-   * There could be a possibility of race condition that is exposed to rocksDB
-   * behaviour for the batch.
+   * PurgeSnapshot is also considered a barrier, since purgeSnapshot transaction on a standalone basis is an
+   * idempotent operation. Once the directory gets deleted the previous transactions that have been performed on the
+   * snapshotted rocksdb would start failing on replay since those transactions have not been committed but the
+   * directory could have been partially deleted/ fully deleted. This could also lead to inconsistencies in the DB
+   * reads from the purged rocksdb if operations are not performed consciously.
+   * There could be a possibility of race condition that is exposed to rocksDB behaviour for the batch.
    * Hence, we treat createSnapshot as separate batch flush.
    * <p>
    * e.g. requestBuffer = [request1, request2, snapshotRequest1,
@@ -437,17 +448,22 @@ public final class OzoneManagerDoubleBuffer {
    */
   private List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
     final List<Queue<Entry>> response = new ArrayList<>();
-
+    final Set<OzoneManagerProtocolProtos.Type> standaloneBatchCmdTypes = ImmutableSet.of(
+        OzoneManagerProtocolProtos.Type.SnapshotPurge, OzoneManagerProtocolProtos.Type.CreateSnapshot);
+    final List<Function<OMResponse, Boolean>> standaloneBatchConditions =
+        ImmutableList.of(OMResponse::hasCreateSnapshotResponse,
+        (omResponse) -> standaloneBatchCmdTypes.contains(omResponse.getCmdType()));
     OMResponse previousOmResponse = null;
     for (final Entry entry : readyBuffer) {
+      OMResponse prevResponse = previousOmResponse;
       OMResponse omResponse = entry.getResponse().getOMResponse();
       // New queue gets created in three conditions:
       // 1. It is first element in the response,
       // 2. Current request is createSnapshot request.
       // 3. Previous request was createSnapshot request.
-      if (response.isEmpty() || omResponse.hasCreateSnapshotResponse()
+      if (response.isEmpty() || standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(omResponse))
           || (previousOmResponse != null &&
-          previousOmResponse.hasCreateSnapshotResponse())) {
+          standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(prevResponse)))) {
         response.add(new LinkedList<>());
       }
 
