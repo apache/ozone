@@ -317,6 +317,11 @@ public final class OzoneFSUtils {
     if (confHBaseEnhancementsAllowed) {
       return confHsyncEnabled;
     } else {
+      if (confHsyncEnabled) {
+        LOG.warn("Ignoring {} = {} because HBase enhancements are disallowed. To enable it, set {} = true as well.",
+            OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true,
+            confKey);
+      }
       return false;
     }
   }
