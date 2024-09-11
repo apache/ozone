@@ -339,13 +339,6 @@ public class ContainerHealthTask extends ReconScmTask {
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
 
-      // Handle negative sized containers separately
-      if (h.getContainer().getUsedBytes() < 0) {
-        handleNegativeSizedContainers(h, currentTime,
-            unhealthyContainerStateStatsMap);
-        return;
-      }
-
       if (h.isHealthilyReplicated() || h.isDeleted()) {
         return;
       }
@@ -413,14 +406,44 @@ public class ContainerHealthTask extends ReconScmTask {
    * @param currentTime
    * @param unhealthyContainerStateStatsMap
    */
-  private void handleNegativeSizedContainers(
+  private static void handleNegativeSizedContainers(
       ContainerHealthStatus containerHealthStatus, long currentTime,
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
+    // NEGATIVE_SIZE containers are also not inserted into the database.
+    // This condition usually arises due to corrupted or invalid metadata, where
+    // the container's size is inaccurately recorded as negative. Since this does not
+    // represent a typical unhealthy scenario and may not have any meaningful
+    // impact on system health, such containers are logged for investigation but
+    // excluded from the UNHEALTHY_CONTAINERS table to maintain data integrity.
     ContainerInfo container = containerHealthStatus.getContainer();
     LOG.error("Container {} has negative size.", container.getContainerID());
-    populateContainerStats(containerHealthStatus,
-        UnHealthyContainerStates.NEGATIVE_SIZE,
+    populateContainerStats(containerHealthStatus, UnHealthyContainerStates.NEGATIVE_SIZE,
+        unhealthyContainerStateStatsMap);
+  }
+
+  /**
+   * This method is used to handle containers that are empty and missing. It logs
+   * a debug message.
+   * @param containerHealthStatus
+   * @param currentTime
+   * @param unhealthyContainerStateStatsMap
+   */
+  private static void handleEmptyMissingContainers(
+      ContainerHealthStatus containerHealthStatus, long currentTime,
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
+    // EMPTY_MISSING containers are not inserted into the database.
+    // These containers typically represent those that were never written to
+    // or remain in an incomplete state. Tracking such containers as unhealthy
+    // would not provide valuable insights since they don't pose a risk or issue
+    // to the system. Instead, they are logged for awareness, but not stored in
+    // the UNHEALTHY_CONTAINERS table to avoid unnecessary entries.
+    ContainerInfo container = containerHealthStatus.getContainer();
+    LOG.debug("Empty container {} is missing. It will be logged in the " +
+        "unhealthy container statistics, but no record will be created in the " +
+        "UNHEALTHY_CONTAINERS table.", container.getContainerID());
+    populateContainerStats(containerHealthStatus, EMPTY_MISSING,
         unhealthyContainerStateStatsMap);
   }
 
@@ -512,20 +535,7 @@ public class ContainerHealthTask extends ReconScmTask {
           populateContainerStats(container, UnHealthyContainerStates.MISSING,
               unhealthyContainerStateStatsMap);
         } else {
-
-        // EMPTY_MISSING containers are not inserted into the database.
-        // These containers typically represent those that were never written to
-        // or remain in an incomplete state. Tracking such containers as unhealthy
-        // would not provide valuable insights since they don't pose a risk or issue
-        // to the system. Instead, they are logged for awareness, but not stored in
-        // the UNHEALTHY_CONTAINERS table to avoid unnecessary entries.
-
-          LOG.debug("Empty container {} is missing. It will be logged in the " +
-              "unhealthy container statistics, but no record will be created in the " +
-              "UNHEALTHY_CONTAINERS table.", container.getContainerID());
-
-          populateContainerStats(container,
-              EMPTY_MISSING,
+          handleEmptyMissingContainers(container, time,
               unhealthyContainerStateStatsMap);
         }
         // A container cannot have any other records if it is missing so return
@@ -536,16 +546,8 @@ public class ContainerHealthTask extends ReconScmTask {
       if (container.getContainer().getUsedBytes() < 0
           && !recordForStateExists.contains(
           UnHealthyContainerStates.NEGATIVE_SIZE.toString())) {
-        // NEGATIVE_SIZE containers are also not inserted into the database.
-        // This condition usually arises due to corrupted or invalid metadata, where
-        // the container's size is inaccurately recorded as negative. Since this does not
-        // represent a typical unhealthy scenario and may not have any meaningful
-        // impact on system health, such containers are logged for investigation but
-        // excluded from the UNHEALTHY_CONTAINERS table to maintain data integrity.
-        populateContainerStats(container,
-            UnHealthyContainerStates.NEGATIVE_SIZE,
+        handleNegativeSizedContainers(container, time,
             unhealthyContainerStateStatsMap);
-        return records;
       }
 
       if (container.isUnderReplicated()
