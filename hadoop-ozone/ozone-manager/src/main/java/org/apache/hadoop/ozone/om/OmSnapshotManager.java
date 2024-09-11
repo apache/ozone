@@ -676,7 +676,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Checks if the last transaction performed on the snapshot has been flushed to disk
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
    * @param metadataManager Metadatamanager of Active OM.
    * @param snapshotTableKey table key corresponding to snapshot in snapshotInfoTable.
    * @return True if the changes have been flushed to DB otherwise false
@@ -690,23 +690,23 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Checks if the last transaction performed on the snapshot has been flushed to disk
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
    * @param metadataManager Metadatamanager of Active OM.
-   * @param snapshotInfo table key corresponding to snapshot in snapshotInfoTable, this should be a value from cache
-   *                     and not from disk.
-   * @return True if the changes have been flushed to DB otherwise false
+   * @param snapshotInfo SnapshotInfo value.
+   * @return True if the changes have been flushed to DB otherwise false. It would return true if the snapshot
+   * provided is null meaning the snapshot doesn't exist.
    * @throws IOException
    */
   public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, SnapshotInfo snapshotInfo)
       throws IOException {
-    TransactionInfo snapshotTransactionInfo = null;
-    if (snapshotInfo != null && snapshotInfo.getLastTransactionInfo() != null) {
-      snapshotTransactionInfo = TransactionInfo.getCodec()
-          .fromPersistedFormat(snapshotInfo.getLastTransactionInfo().toByteArray());
+    if (snapshotInfo != null) {
+      TransactionInfo snapshotTransactionInfo = snapshotInfo.getLastTransactionInfo() != null ?
+          TransactionInfo.fromByteString(snapshotInfo.getLastTransactionInfo()) : null;
       TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
+      // If transactionInfo field is null then return true to keep things backward compatible.
       return snapshotTransactionInfo == null || omTransactionInfo.compareTo(snapshotTransactionInfo) >= 0;
     }
-    return false;
+    return true;
   }
 
 

@@ -37,7 +37,6 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.ZoneId;
 
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Map;
@@ -629,8 +628,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return lastTransactionInfo;
   }
 
-  public void setLastTransactionInfo(byte[] lastTransactionInfo) {
-    this.lastTransactionInfo = lastTransactionInfo == null ? null : ByteString.copyFrom(lastTransactionInfo);
+  public void setLastTransactionInfo(ByteString lastTransactionInfo) {
+    this.lastTransactionInfo = lastTransactionInfo;
   }
 
   /**

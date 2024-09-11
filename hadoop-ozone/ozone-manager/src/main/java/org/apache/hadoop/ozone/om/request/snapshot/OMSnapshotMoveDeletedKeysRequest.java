@@ -84,14 +84,11 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
       // Get next non-deleted snapshot.
-      List<SnapshotMoveKeyInfos> nextDBKeysList =
-          moveDeletedKeysRequest.getNextDBKeysList();
-      List<SnapshotMoveKeyInfos> reclaimKeysList =
-          moveDeletedKeysRequest.getReclaimKeysList();
-      List<HddsProtos.KeyValue> renamedKeysList =
-          moveDeletedKeysRequest.getRenamedKeysList();
-      List<String> movedDirs =
-          moveDeletedKeysRequest.getDeletedDirsToMoveList();
+      List<SnapshotMoveKeyInfos> nextDBKeysList = moveDeletedKeysRequest.getNextDBKeysList();
+      List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
+      List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
+      List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
+
       // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
       SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshot, termIndex);
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
