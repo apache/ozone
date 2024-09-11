@@ -3973,11 +3973,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         time = Time.monotonicNow();
         reloadOMState();
         setTransactionInfo(TransactionInfo.valueOf(termIndex));
-        if (isLeaderExecutorEnabled()) {
-          omRatisServer.getOmBasicStateMachine().unpause(lastAppliedIndex, term);
-        } else {
-          omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-        }
+        unpauseStateMachine(term, lastAppliedIndex);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
             term, lastAppliedIndex, Time.monotonicNow() - time);
@@ -3986,11 +3982,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         keyManager.start(configuration);
         startSecretManagerIfNecessary();
         startTrashEmptier(configuration);
-        if (isLeaderExecutorEnabled()) {
-          omRatisServer.getOmBasicStateMachine().unpause(lastAppliedIndex, term);
-        } else {
-          omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-        }
+        unpauseStateMachine(term, lastAppliedIndex);
         LOG.info("OM DB is not stopped. Started services with Term: {} and " +
             "Index: {}", term, lastAppliedIndex);
       }
@@ -4037,6 +4029,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
+  }
+
+  private void unpauseStateMachine(long term, long lastAppliedIndex) {
+    if (isLeaderExecutorEnabled()) {
+      omRatisServer.getOmBasicStateMachine().unpause(lastAppliedIndex, term);
+    } else {
+      omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+    }
   }
 
   private void stopTrashEmptier() {

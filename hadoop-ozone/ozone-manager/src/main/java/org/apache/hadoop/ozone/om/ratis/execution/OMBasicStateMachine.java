@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
@@ -370,6 +371,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
       } catch (IOException e) {
         LOG.warn("Failed to apply command, Exception occurred ", e);
         omClientResponse = new DummyOMClientResponse(createErrorResponse(request, e, termIndex));
+        validateResponseError(omClientResponse.getOMResponse());
         ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
             TransactionInfo.valueOf(termIndex));
       }
@@ -383,7 +385,6 @@ public class OMBasicStateMachine extends BaseStateMachine {
           ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
         }
       }
-      updateLastAppliedTermIndex(termIndex);
     } catch (Throwable e) {
       // For any further exceptions, terminate OM as db update fails
       String errorMessage = "Request " + request + " failed with exception";
@@ -391,13 +392,18 @@ public class OMBasicStateMachine extends BaseStateMachine {
     } finally {
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (null != omResponse) {
-        if (omResponse.getStatus() == INTERNAL_ERROR) {
-          terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
-        } else if (omResponse.getStatus() == METADATA_ERROR) {
-          terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
-        }
+        validateResponseError(omResponse);
       }
+      updateLastAppliedTermIndex(termIndex);
       return omResponse;
+    }
+  }
+
+  private static void validateResponseError(OMResponse omResponse) {
+    if (omResponse.getStatus() == INTERNAL_ERROR) {
+      terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+    } else if (omResponse.getStatus() == METADATA_ERROR) {
+      terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
     }
   }
 

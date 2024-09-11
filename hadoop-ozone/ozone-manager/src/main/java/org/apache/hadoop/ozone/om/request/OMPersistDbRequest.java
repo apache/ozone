@@ -88,7 +88,7 @@ public class OMPersistDbRequest extends OMClientRequest {
       ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
       omResponse.setPersistDbResponse(OzoneManagerProtocolProtos.PersistDbResponse.newBuilder().build());
       refreshCache(ozoneManager, tableUpdatesList);
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       audit(ozoneManager, dbUpdateRequest, termIndex, ex);
       LOG.error("Db persist exception", ex);
       return new DummyOMClientResponse(createErrorOMResponse(omResponse, ex));

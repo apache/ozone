@@ -78,7 +78,7 @@ public interface RequestHandler {
   OMClientResponse handleWriteRequestImpl(OMRequest omRequest, TermIndex termIndex) throws IOException;
 
   /**
-   * Handle write request at leader execution
+   * Handle write request at leader execution.
    *
    * @param omClientRequest the write cleitn request
    * @param termIndex - ratis transaction term and index
