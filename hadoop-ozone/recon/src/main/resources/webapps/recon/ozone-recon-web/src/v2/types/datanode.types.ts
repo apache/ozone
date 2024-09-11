@@ -154,3 +154,14 @@ export type SummaryData = {
   metrics: SummaryMetrics;
   containers: SummaryContainers;
 }
+
+export type DatanodeTableProps = {
+  loading: boolean;
+  selectedRows: React.Key[];
+  data: Datanode[];
+  decommissionUuids: string | string[];
+  searchColumn: 'hostname' | 'uuid' | 'version' | 'revision';
+  searchTerm: string;
+  selectedColumns: MultiOption[];
+  handleSelectionChange: (arg0: React.Key[]) => void;
+}
