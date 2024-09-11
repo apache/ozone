@@ -422,9 +422,6 @@ public class ContainerHealthTask extends ReconScmTask {
         "Container {} has negative size. Please visit Recon's unhealthy " +
             "container endpoint for more details.",
         container.getContainerID());
-    UnhealthyContainers record =
-        ContainerHealthRecords.recordForState(containerHealthStatus,
-            UnHealthyContainerStates.NEGATIVE_SIZE, currentTime);
     populateContainerStats(containerHealthStatus,
         UnHealthyContainerStates.NEGATIVE_SIZE,
         unhealthyContainerStateStatsMap);
