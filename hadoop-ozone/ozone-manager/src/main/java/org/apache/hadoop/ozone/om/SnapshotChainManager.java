@@ -114,6 +114,47 @@ public class SnapshotChainManager {
   }
 
   /**
+   * Add snapshot to global snapshot chain.
+   */
+  private void addSnapshotInBetweenGlobal(UUID snapshotID, UUID prevGlobalID)
+      throws IOException {
+    if (globalSnapshotChain.containsKey(snapshotID)) {
+      throw new IOException(String.format(
+          "Global Snapshot chain corruption. Snapshot with snapshotId: %s is " +
+              "already present in the chain.", snapshotID));
+    }
+    if (globalSnapshotChain.size() > 0 && prevGlobalID == null) {
+      throw new IOException(String.format("Snapshot chain " +
+              "corruption. Adding snapshot %s as head node while there are %d " +
+              "snapshots in the global snapshot chain.", snapshotID,
+          globalSnapshotChain.size()));
+    }
+
+    if (prevGlobalID != null &&
+        !globalSnapshotChain.containsKey(prevGlobalID)) {
+      throw new IOException(String.format(
+          "Global Snapshot chain corruption. Previous snapshotId: %s is " +
+              "set for snapshotId: %s but no associated snapshot found in " +
+              "snapshot chain.", prevGlobalID, snapshotID));
+    }
+    UUID nextSnapshotId = null;
+    if (prevGlobalID != null) {
+
+      nextSnapshotId = globalSnapshotChain.get(prevGlobalID).hasNextSnapshotId() ?
+          globalSnapshotChain.get(prevGlobalID).getNextSnapshotId() : null;
+      // On add snapshot, set previous snapshot entry nextSnapshotID = snapshotID
+      globalSnapshotChain.get(prevGlobalID).setNextSnapshotId(snapshotID);
+    }
+
+    globalSnapshotChain.put(snapshotID, new SnapshotChainInfo(snapshotID, prevGlobalID, null));
+    if (nextSnapshotId != null) {
+      globalSnapshotChain.get(snapshotID).setNextSnapshotId(nextSnapshotId);
+    } else {
+      latestGlobalSnapshotId = snapshotID;
+    }
+  }
+
+  /**
    * Add snapshot to bucket snapshot chain(path based).
    */
   private void addSnapshotPath(String snapshotPath, UUID snapshotID,
@@ -163,6 +204,57 @@ public class SnapshotChainManager {
 
     // set state variable latestPath snapshot entry to this snapshotID
     latestSnapshotIdByPath.put(snapshotPath, snapshotID);
+  }
+
+  /**
+   * Add snapshot to bucket snapshot chain(path based).
+   */
+  private void addSnapshotInBetweenPath(String snapshotPath, UUID snapshotID,
+                               UUID prevPathID) throws IOException {
+    // On add snapshot, set previous snapshot entry nextSnapshotId = snapshotId
+    if (prevPathID != null &&
+        ((!snapshotChainByPath.containsKey(snapshotPath)) ||
+            (!snapshotChainByPath.get(snapshotPath).containsKey(prevPathID)))) {
+      throw new IOException(String.format(
+          "Path Snapshot chain corruption. Previous snapshotId: %s is set " +
+              "for snapshotId: %s but no associated snapshot found in " +
+              "snapshot chain.", prevPathID, snapshotID));
+    }
+
+    if (prevPathID == null && snapshotChainByPath.containsKey(snapshotPath) &&
+        !snapshotChainByPath.get(snapshotPath).isEmpty()) {
+      throw new IOException(String.format(
+          "Path Snapshot chain corruption. Error while adding snapshot with " +
+              "snapshotId %s with as the first snapshot in snapshot path: " +
+              "%s which already has %d snapshots.", snapshotID, snapshotPath,
+          snapshotChainByPath.get(snapshotPath).size()));
+    }
+    UUID nextSnapshotId = null;
+    if (prevPathID != null && snapshotChainByPath.containsKey(snapshotPath)) {
+
+      if (snapshotChainByPath.get(snapshotPath).get(prevPathID)
+          .hasNextSnapshotId()) {
+        nextSnapshotId = snapshotChainByPath.get(snapshotPath).get(prevPathID)
+            .getNextSnapshotId();
+      }
+      snapshotChainByPath
+          .get(snapshotPath)
+          .get(prevPathID)
+          .setNextSnapshotId(snapshotID);
+    }
+
+    if (!snapshotChainByPath.containsKey(snapshotPath)) {
+      snapshotChainByPath.put(snapshotPath, new LinkedHashMap<>());
+    }
+
+    snapshotChainByPath.get(snapshotPath)
+        .put(snapshotID, new SnapshotChainInfo(snapshotID, prevPathID, null));
+    if (nextSnapshotId != null) {
+      snapshotChainByPath.get(snapshotPath).get(snapshotID).setNextSnapshotId(nextSnapshotId);
+    } else {
+      // set state variable latestPath snapshot entry to this snapshotID
+      latestSnapshotIdByPath.put(snapshotPath, snapshotID);
+    }
   }
 
   private boolean deleteSnapshotGlobal(UUID snapshotID) throws IOException {
@@ -341,6 +433,22 @@ public class SnapshotChainManager {
     addSnapshotGlobal(snapshotInfo.getSnapshotId(),
         snapshotInfo.getGlobalPreviousSnapshotId());
     addSnapshotPath(snapshotInfo.getSnapshotPath(),
+        snapshotInfo.getSnapshotId(),
+        snapshotInfo.getPathPreviousSnapshotId());
+    // store snapshot ID to snapshot DB table key in the map
+    snapshotIdToTableKey.put(snapshotInfo.getSnapshotId(),
+        snapshotInfo.getTableKey());
+  }
+
+  /**
+   * Add snapshot to snapshot chain.
+   */
+  public synchronized void addSnapshotInBetween(SnapshotInfo snapshotInfo)
+      throws IOException {
+    validateSnapshotChain();
+    addSnapshotInBetweenGlobal(snapshotInfo.getSnapshotId(),
+        snapshotInfo.getGlobalPreviousSnapshotId());
+    addSnapshotInBetweenPath(snapshotInfo.getSnapshotPath(),
         snapshotInfo.getSnapshotId(),
         snapshotInfo.getPathPreviousSnapshotId());
     // store snapshot ID to snapshot DB table key in the map
