@@ -31,9 +31,12 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -43,11 +46,15 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -155,9 +162,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             = new ArrayList<>((int) remainNum);
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
+
         try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
                  deleteTableIterator = getOzoneManager().getMetadataManager().
             getDeletedDirTable().iterator()) {
+          // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+          // snapshotId since AOS could process multiple buckets in one iteration.
+          UUID expectedPreviousSnapshotId =
+              ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager()).getSnapshotChainManager()
+                  .getLatestGlobalSnapshotId();
 
           long startTime = Time.monotonicNow();
           while (remainNum > 0 && deleteTableIterator.hasNext()) {
@@ -204,7 +217,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestList, null, startTime,
               ratisByteLimit - consumedSize,
-              getOzoneManager().getKeyManager());
+              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
@@ -224,12 +237,21 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           getOzoneManager().getOmSnapshotManager();
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
-
+      SnapshotInfo previousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
+          deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
+      // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
+      // iteration.
+      if (previousSnapshotInfo != null &&
+          (previousSnapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+              !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
+                  previousSnapshotInfo))) {
+        return true;
+      }
       try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
-          metadataManager.getLatestActiveSnapshot(
+          omSnapshotManager.getSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),
-              omSnapshotManager)) {
+              previousSnapshotInfo.getName())) {
 
         if (rcLatestSnapshot != null) {
           String dbRenameKey = metadataManager
@@ -250,7 +272,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           String prevDbKey = prevDirTableDBKey == null ?
               metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
           OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
-          return prevDirInfo != null &&
+          //Check the snapshot chain hasn't changed while the checking the previous snapshot.
+          SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
+              deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
+          return Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
+              Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId)) && prevDirInfo != null &&
               prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
         }
       }

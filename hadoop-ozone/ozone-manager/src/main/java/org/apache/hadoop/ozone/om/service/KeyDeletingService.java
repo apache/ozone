@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,12 +39,14 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
@@ -92,11 +95,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
+  private final boolean deepCleanSnapshots;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
-      long serviceTimeout, ConfigurationSource conf) {
+      long serviceTimeout, ConfigurationSource conf,
+      boolean deepCleanSnapshots) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
         serviceTimeout, ozoneManager, scmClient);
@@ -111,6 +116,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
+    this.deepCleanSnapshots = deepCleanSnapshots;
   }
 
   /**
@@ -191,7 +197,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
-
+          // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+          // snapshotId since AOS could process multiple buckets in one iteration.
+          UUID expectedPreviousSnapshotId =
+              ((OmMetadataManagerImpl)manager.getMetadataManager()).getSnapshotChainManager()
+                  .getLatestGlobalSnapshotId();
           PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(getKeyLimitPerTask());
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
@@ -199,7 +209,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), null);
+                pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {
@@ -208,7 +218,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
         try {
-          if (delCount < keyLimitPerTask) {
+          if (deepCleanSnapshots && delCount < keyLimitPerTask) {
             processSnapshotDeepClean(delCount);
           }
         } catch (Exception e) {
@@ -276,11 +286,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(currSnapInfo, snapChainManager);
+            SnapshotInfo previousSnapshot = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
+                currSnapInfo);
             SnapshotInfo previousToPrevSnapshot = null;
 
             if (previousSnapshot != null) {
-              previousToPrevSnapshot = getPreviousActiveSnapshot(previousSnapshot, snapChainManager);
+              previousToPrevSnapshot = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
+                  previousSnapshot);
             }
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -409,7 +421,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
               if (!keysToPurge.isEmpty()) {
                 processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
-                    keysToModify, currSnapInfo.getTableKey());
+                    keysToModify, currSnapInfo.getTableKey(), null);
               }
             } finally {
               IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);

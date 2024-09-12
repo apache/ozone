@@ -36,6 +36,8 @@ import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -84,6 +86,13 @@ public final class SnapshotUtils {
           KEY_NOT_FOUND);
     }
     return snapshotInfo;
+  }
+
+  public static SnapshotInfo getSnapshotInfo(OzoneManager ozoneManager,
+                                             SnapshotChainManager chainManager,
+                                             UUID snapshotId) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
   public static void dropColumnFamilyHandle(
@@ -139,36 +148,60 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Get the next non deleted snapshot in the snapshot chain.
+   * Get the next in the snapshot chain.
    */
-  public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OzoneManager ozoneManager)
+  public static SnapshotInfo getNextSnapshot(OzoneManager ozoneManager,
+                                             SnapshotChainManager chainManager,
+                                             SnapshotInfo snapInfo)
       throws IOException {
-
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
       throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
     }
-
     try {
-      while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
+      if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
           snapInfo.getSnapshotId())) {
+        UUID nextPathSnapshot = chainManager.nextPathSnapshot(snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+        return getSnapshotInfo(ozoneManager, chainManager, nextPathSnapshot);
+      }
+    } catch (NoSuchElementException ex) {
+      LOG.error("The snapshot {} is not longer in snapshot chain, It " +
+              "maybe removed in the previous Snapshot purge request.",
+          snapInfo.getTableKey());
+    }
+    return null;
+  }
 
-        UUID nextPathSnapshot =
-            chainManager.nextPathSnapshot(
-                snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+  /**
+   * Get the previous in the snapshot chain.
+   */
+  public static SnapshotInfo getPreviousSnapshot(OzoneManager ozoneManager,
+                                                 SnapshotChainManager chainManager,
+                                                 SnapshotInfo snapInfo)
+      throws IOException {
+    UUID previousSnapshotId = getPreviousSnapshotId(snapInfo, chainManager);
+    return previousSnapshotId == null ? null : getSnapshotInfo(ozoneManager, chainManager, previousSnapshotId);
+  }
 
-        String tableKey = chainManager.getTableKey(nextPathSnapshot);
-        SnapshotInfo nextSnapshotInfo = getSnapshotInfo(ozoneManager, tableKey);
-
-        if (nextSnapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-          return nextSnapshotInfo;
-        }
-
-        snapInfo = nextSnapshotInfo;
+  /**
+   * Get the previous in the snapshot chain.
+   */
+  public static UUID getPreviousSnapshotId(SnapshotInfo snapInfo,
+                                           SnapshotChainManager chainManager)
+      throws IOException {
+    // If the snapshot is deleted in the previous run, then the in-memory
+    // SnapshotChainManager might throw NoSuchElementException as the snapshot
+    // is removed in-memory but OMDoubleBuffer has not flushed yet.
+    if (snapInfo == null) {
+      throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
+    }
+    try {
+      if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
+          snapInfo.getSnapshotId())) {
+        return chainManager.previousPathSnapshot(snapInfo.getSnapshotPath(),
+            snapInfo.getSnapshotId());
       }
     } catch (NoSuchElementException ex) {
       LOG.error("The snapshot {} is not longer in snapshot chain, It " +
@@ -241,5 +274,48 @@ public final class SnapshotUtils {
     final long volumeId = metadataManager.getVolumeId(volumeName);
     final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
+
+  public static SnapshotInfo getLatestGlobalSnapshotInfo(OzoneManager ozoneManager,
+                                                         SnapshotChainManager snapshotChainManager) throws IOException {
+    Optional<UUID> latestGlobalSnapshot  = Optional.ofNullable(snapshotChainManager.getLatestGlobalSnapshotId());
+    return latestGlobalSnapshot.isPresent() ? getSnapshotInfo(ozoneManager, snapshotChainManager,
+        latestGlobalSnapshot.get()) : null;
+  }
+
+  public static SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
+                                                   OzoneManager ozoneManager,
+                                                   SnapshotChainManager snapshotChainManager) throws IOException {
+    Optional<UUID> latestPathSnapshot = Optional.ofNullable(
+        getLatestSnapshotId(volumeName, bucketName, snapshotChainManager));
+    return latestPathSnapshot.isPresent() ?
+        getSnapshotInfo(ozoneManager, snapshotChainManager, latestPathSnapshot.get()) : null;
+  }
+
+  public static UUID getLatestSnapshotId(String volumeName, String bucketName,
+                                         SnapshotChainManager snapshotChainManager) throws IOException {
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
+  }
+
+  // Validates previous snapshotId given a snapshotInfo or volumeName & bucketName. Incase snapshotInfo is null, this
+  // would be considered as AOS and previous snapshot becomes the latest snapshot in the global snapshot chain.
+  // Would throw OMException if validation fails otherwise function would pass.
+  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+                                                SnapshotChainManager snapshotChainManager,
+                                                UUID expectedPreviousSnapshotId) throws IOException {
+    try {
+      UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
+          SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
+      if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
+        throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+                expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+                OMException.ResultCodes.INVALID_REQUEST);
+      }
+    } catch (IOException e) {
+      LOG.error("Error while validating previous snapshot for snapshot: {}",
+          snapshotInfo == null ? null : snapshotInfo.getName(), e);
+      throw e;
+    }
   }
 }
