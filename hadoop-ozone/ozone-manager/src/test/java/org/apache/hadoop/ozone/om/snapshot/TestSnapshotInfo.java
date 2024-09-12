@@ -41,6 +41,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -127,12 +128,14 @@ public class TestSnapshotInfo {
         omMetadataManager.getSnapshotInfoTable();
     SnapshotInfo info = createSnapshotInfo();
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
-    assertEquals(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getLastTransactionInfo(), null);
+    assertNull(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getLastTransactionInfo());
+    // checking if true value is returned when snapshot is null.
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, (SnapshotInfo)null));
     omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(0, 0));
     // Checking if changes have been flushed when lastTransactionInfo is null
     assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, info));
     TermIndex termIndex = TermIndex.valueOf(1, 1);
-    SnapshotUtils.setTransactionInfoInSnapshot(info, termIndex);
+    info.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
     // Checking if changes to snapshot object has been updated but not updated on cache or disk.
     assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
     snapshotInfo.addCacheEntry(new CacheKey<>(EXPECTED_SNAPSHOT_KEY), CacheValue.get(termIndex.getIndex(), info));

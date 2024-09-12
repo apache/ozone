@@ -181,6 +181,8 @@ public class TestHSync {
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    CONF.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    CONF.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
@@ -324,8 +326,6 @@ public class TestHSync {
   }
 
   @Test
-  // Making this the second test to be run to avoid lingering block files from previous tests
-  @Order(2)
   public void testEmptyHsync() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.
@@ -349,6 +349,8 @@ public class TestHSync {
   }
 
   @Test
+  // Making this the second test to be run to avoid lingering block files from previous tests
+  @Order(2)
   public void testKeyHSyncThenClose() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.nio.file.InvalidPathException;
@@ -99,6 +100,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneOb
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.ClientId;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -118,6 +120,7 @@ import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
+  private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private OzoneManagerRatisUtils() {
   }
@@ -504,5 +507,14 @@ public final class OzoneManagerRatisUtils {
     }
 
     return null;
+  }
+
+  public static OzoneManagerProtocolProtos.OMResponse submitRequest(
+      OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
+    if (om.isRatisEnabled()) {
+      return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
+    } else {
+      return om.getOmServerProtocol().submitRequest(NULL_RPC_CONTROLLER, omRequest);
+    }
   }
 }

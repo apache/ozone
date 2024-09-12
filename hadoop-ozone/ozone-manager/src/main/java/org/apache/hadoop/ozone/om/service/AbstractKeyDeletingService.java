@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
@@ -333,10 +334,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      RaftClientRequest raftClientRequest =
-          createRaftClientRequestForPurge(omRequest);
-      OzoneManagerProtocolProtos.OMResponse omResponse = ozoneManager.getOmRatisServer().submitRequest(omRequest,
-          raftClientRequest);
+      OzoneManagerProtocolProtos.OMResponse omResponse = OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest
+          , clientId, runCount.get());
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
@@ -432,15 +431,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      if (isRatisEnabled()) {
-        RaftClientRequest raftClientRequest =
-            createRaftClientRequestForPurge(omRequest);
-        return ozoneManager.getOmRatisServer().submitRequest(omRequest,
-            raftClientRequest);
-      } else {
-        return getOzoneManager().getOmServerProtocol()
-            .submitRequest(null, omRequest);
-      }
+      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }

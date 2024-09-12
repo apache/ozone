@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -119,35 +121,6 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .build();
   }
 
-  /**
-   * Create snapshot and checkpoint directory.
-   */
-  private SnapshotInfo createSnapshot(String snapshotName) throws Exception {
-    when(ozoneManager.isAdmin(any())).thenReturn(true);
-    BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation();
-    OMRequest omRequest = OMRequestTestUtils
-        .createSnapshotRequest(volumeName, bucketName, snapshotName);
-    // Pre-Execute OMSnapshotCreateRequest.
-    OMSnapshotCreateRequest omSnapshotCreateRequest =
-        TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
-
-    // validateAndUpdateCache OMSnapshotCreateResponse.
-    OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
-    // Add to batch and commit to DB.
-    omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    batchOperation.close();
-
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
-    SnapshotInfo snapshotInfo =
-        omMetadataManager.getSnapshotInfoTable().get(key);
-    assertNotNull(snapshotInfo);
-    return snapshotInfo;
-  }
-
   private OMRequest preExecute(OMRequest originalOmRequest) throws IOException {
     OMKeyPurgeRequest omKeyPurgeRequest =
         new OMKeyPurgeRequest(originalOmRequest);
@@ -218,6 +191,8 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     Pair<List<String>, List<String>> deleteKeysAndRenamedEntry = createAndDeleteKeysAndRenamedEntry(1, null);
 
     SnapshotInfo snapInfo = createSnapshot("snap1");
+    assertEquals(snapInfo.getLastTransactionInfo(),
+        TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
     // The keys should be not present in the active Db's deletedTable
     for (String deletedKey : deleteKeysAndRenamedEntry.getKey()) {
       assertFalse(omMetadataManager.getDeletedTable().isExist(deletedKey));
@@ -251,6 +226,12 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L);
 
+    SnapshotInfo snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapInfo.getTableKey());
+    SnapshotInfo updatedSnapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapInfo.getTableKey());
+    assertEquals(snapshotInfoOnDisk, snapInfo);
+    snapInfo.setLastTransactionInfo(TransactionInfo.valueOf(TransactionInfo.getTermIndex(100L))
+        .toByteString());
+    assertEquals(snapInfo, updatedSnapshotInfo);
     OMResponse omResponse = OMResponse.newBuilder()
         .setPurgeKeysResponse(PurgeKeysResponse.getDefaultInstance())
         .setCmdType(Type.PurgeKeys)
@@ -267,7 +248,8 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       // Do manual commit and see whether addToBatch is successful or not.
       omMetadataManager.getStore().commitBatchOperation(batchOperation);
     }
-
+    snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapInfo.getTableKey());
+    assertEquals(snapshotInfoOnDisk, snapInfo);
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deleteKeysAndRenamedEntry.getKey()) {
       assertFalse(omSnapshot.getMetadataManager()

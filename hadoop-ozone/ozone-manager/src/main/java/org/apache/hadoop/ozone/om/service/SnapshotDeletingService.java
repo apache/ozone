@@ -52,8 +52,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -299,23 +297,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
     public void submitRequest(OMRequest omRequest) {
       try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(getRunCount().get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
-        }
+        OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get());
       } catch (ServiceException e) {
         LOG.error("Snapshot Deleting request failed. " +
             "Will retry at next run.", e);
