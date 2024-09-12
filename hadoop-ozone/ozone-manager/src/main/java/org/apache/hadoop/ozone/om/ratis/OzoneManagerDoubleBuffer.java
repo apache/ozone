@@ -175,13 +175,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   private Queue<Entry> currentBuffer;
-
-  /**
-   * Warning: this field has been added to the spotbugs exclude file to suppress inconsistent synchronization warnings.
-   * Be conscious while using this field.
-   */
   private Queue<Entry> readyBuffer;
-
   /**
    * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
    * It is set to null if ratis is disabled; see {@link #isRatisEnabled()}.
