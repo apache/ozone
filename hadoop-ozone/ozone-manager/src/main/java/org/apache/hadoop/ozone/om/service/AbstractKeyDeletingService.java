@@ -284,9 +284,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (snapTableKey != null) {
       purgeKeysRequest.setSnapshotTableKey(snapTableKey);
     }
+    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
+        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
 
     if (expectedPreviousSnapshotId != null) {
-      purgeKeysRequest.setExpectedPreviousSnapshotID(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+      purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID);
     }
 
     // Add keys to PurgeKeysRequest bucket wise.
@@ -415,10 +420,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (snapTableKey != null) {
       purgeDirRequest.setSnapshotTableKey(snapTableKey);
     }
-
+    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
+        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
     if (expectedPreviousSnapshotId != null) {
-      purgeDirRequest.setExpectedPreviousSnapshotID(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
     }
+    purgeDirRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
 
     purgeDirRequest.addAllDeletedPath(requests);
 
@@ -543,7 +550,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
-    // This is not supposed to be done for snapshots.
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;

@@ -77,29 +77,35 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
-    List<OzoneManagerProtocolProtos.PurgePathRequest> validPurgePathRequests = Lists.newArrayList();
-    final SnapshotInfo fromSnapshotInfo;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
-        OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetrics omMetrics = ozoneManager.getMetrics();
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
+    final SnapshotInfo fromSnapshotInfo;
     try {
-      fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot) : null;
-      // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
-      // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
-      // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
-      // file/directory would be present in the newly created snapshot.
-      // Validating previous snapshot can ensure the chain hasn't changed.
-      UUID expectedPreviousSnapshotId = purgeDirsRequest.hasExpectedPreviousSnapshotID()
-          ? fromProtobuf(purgeDirsRequest.getExpectedPreviousSnapshotID()) : null;
-      validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-          expectedPreviousSnapshotId);
-
+       fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
+          fromSnapshot) : null;
+      // Checking if this request is an old request or new one.
+      if (purgeDirsRequest.hasExpectedPreviousSnapshotID()) {
+        // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
+        // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
+        // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
+        // file/directory would be present in the newly created snapshot.
+        // Validating previous snapshot can ensure the chain hasn't changed.
+        UUID expectedPreviousSnapshotId = purgeDirsRequest.getExpectedPreviousSnapshotID().hasUuid()
+            ? fromProtobuf(purgeDirsRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
+        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId);
+      }
+    } catch (IOException e) {
+      LOG.error("Error occured while performing OMDirectoriesPurge. ", e);
+      return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
+    }
+    try {
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
-        validPurgePathRequests.add(path);
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
@@ -176,9 +182,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
       }
     } catch (IOException ex) {
-      // Handling IOException thrown when snapshot is not found or previous snapshot validation fails.
-      LOG.error("Error occured while performing OMDirectoriesPurge. ", ex);
-      return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, ex));
+      // Case of IOException for fromProtobuf will not happen
+      // as this is created and send within OM
+      // only case of upgrade where compatibility is broken can have
+      throw new IllegalStateException(ex);
     } finally {
       lockSet.stream().forEach(e -> omMetadataManager.getLock()
           .releaseWriteLock(BUCKET_LOCK, e.getKey(),
@@ -188,10 +195,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         entry.setValue(entry.getValue().copyObject());
       }
     }
-    OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
-        omResponse.build(), validPurgePathRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
 
-    return omClientResponse;
+    return new OMDirectoriesPurgeResponseWithFSO(
+        omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
   }
 }

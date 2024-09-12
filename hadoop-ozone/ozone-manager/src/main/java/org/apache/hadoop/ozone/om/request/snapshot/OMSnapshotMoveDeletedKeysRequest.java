@@ -82,9 +82,9 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
       // Check the snapshot exists.
-      SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
+      SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
 
-      nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
+      nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, snapshotInfo);
 
       // Get next non-deleted snapshot.
       List<SnapshotMoveKeyInfos> nextDBKeysList = moveDeletedKeysRequest.getNextDBKeysList();
@@ -93,16 +93,16 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
       // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+      snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
-          CacheValue.get(termIndex.getIndex(), fromSnapshot));
+          CacheValue.get(termIndex.getIndex(), snapshotInfo));
       if (nextSnapshot != null) {
         nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
             CacheValue.get(termIndex.getIndex(), nextSnapshot));
       }
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), fromSnapshot, nextSnapshot,
+          omResponse.build(), snapshotInfo, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
 
     } catch (IOException ex) {

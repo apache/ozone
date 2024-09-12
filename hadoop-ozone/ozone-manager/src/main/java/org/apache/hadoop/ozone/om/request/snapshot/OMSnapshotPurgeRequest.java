@@ -131,13 +131,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
         updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
       }
-
-      for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
-        snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
-        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
-            CacheValue.get(termIndex.getIndex(), snapshotInfo));
-      }
-
+      // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
         snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),

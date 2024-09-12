@@ -153,13 +153,6 @@ public final class SnapshotUtils {
     }
   }
 
-  /**
-   * Set transactionInfo in snapshotInfo.
-   */
-  public static void setTransactionInfoInSnapshot(SnapshotInfo snapshot, TermIndex termIndex) throws IOException {
-    TransactionInfo transactionInfo = TransactionInfo.valueOf(termIndex);
-    snapshot.setLastTransactionInfo(transactionInfo.toByteString());
-  }
 
   /**
    * Get the next in the snapshot chain.

@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -46,6 +48,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -57,6 +60,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
@@ -104,11 +108,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Map<String, String> snapshotSeekMap;
+  private final boolean deepCleanSnapshots;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
-      long serviceTimeout, ConfigurationSource conf) {
+      long serviceTimeout, ConfigurationSource conf,
+      boolean deepCleanSnapshots) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
         serviceTimeout, ozoneManager, scmClient);
@@ -122,6 +128,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.snapshotSeekMap = new HashMap<>();
+    this.deepCleanSnapshots = deepCleanSnapshots;
   }
 
   /**
@@ -333,7 +340,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               "background task. Will retry at next run. on active object store", e);
         }
 
-        if (remainNum > 0) {
+        if (deepCleanSnapshots && remainNum > 0) {
           SnapshotChainManager chainManager =
               ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager()).getSnapshotChainManager();
           OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();

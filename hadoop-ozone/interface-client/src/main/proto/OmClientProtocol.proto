@@ -1382,8 +1382,9 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
-    optional hadoop.hdds.UUID  expectedPreviousSnapshotID = 4;
-    repeated string renamedKeys = 5;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 4;
+  repeated string renamedKeys = 5;
 
 }
 
@@ -1407,7 +1408,12 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
-  optional hadoop.hdds.UUID  expectedPreviousSnapshotID = 3;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 3;
+}
+
+message NullableUUID {
+  optional hadoop.hdds.UUID uuid = 1;
 }
 
 message PurgeDirectoriesResponse {

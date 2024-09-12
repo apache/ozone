@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -48,6 +49,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.UUID;
+
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
 import java.util.Map;
 import java.util.UUID;
 
@@ -77,11 +82,24 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     final SnapshotInfo fromSnapshotInfo;
-
     try {
-      fromSnapshotInfo = fromSnapshot == null ? null : SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
-    } catch (IOException ex) {
-      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, ex));
+      fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
+          fromSnapshot) : null;
+      // Checking if this request is an old request or new one.
+      if (purgeKeysRequest.hasExpectedPreviousSnapshotID()) {
+        // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
+        // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
+        // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
+        // file/directory would be present in the newly created snapshot.
+        // Validating previous snapshot can ensure the chain hasn't changed.
+        UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
+            ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
+        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId);
+      }
+    } catch (IOException e) {
+      LOG.error("Error occured while performing OMDirectoriesPurge. ", e);
+      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
 
     List<String> keysToBePurgedList = new ArrayList<>();

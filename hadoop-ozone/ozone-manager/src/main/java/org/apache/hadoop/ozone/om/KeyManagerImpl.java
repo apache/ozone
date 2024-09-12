@@ -145,6 +145,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
@@ -227,6 +229,8 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void start(OzoneConfiguration configuration) {
+    boolean isSnapshotDeepCleaningEnabled = configuration.getBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED,
+        OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT);
     if (keyDeletingService == null) {
       long blockDeleteInterval = configuration.getTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -238,7 +242,7 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS);
       keyDeletingService = new KeyDeletingService(ozoneManager,
           scmClient.getBlockClient(), this, blockDeleteInterval,
-          serviceTimeout, configuration);
+          serviceTimeout, configuration, isSnapshotDeepCleaningEnabled);
       keyDeletingService.start();
     }
 
