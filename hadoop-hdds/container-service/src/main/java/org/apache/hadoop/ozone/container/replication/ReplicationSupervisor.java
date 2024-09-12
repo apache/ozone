@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Sta
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,7 @@ public final class ReplicationSupervisor {
   private final Map<String, AtomicLong> failureCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> requestTotalTime = new ConcurrentHashMap<>();
 
   private static final Map<String, String> METRICS_MAP;
 
@@ -240,6 +242,7 @@ public final class ReplicationSupervisor {
           failureCounter.put(task.getMetricName(), new AtomicLong(0));
           timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
           skippedCounter.put(task.getMetricName(), new AtomicLong(0));
+          requestTotalTime.put(task.getMetricName(), new AtomicLong(0));
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
@@ -353,6 +356,7 @@ public final class ReplicationSupervisor {
 
     @Override
     public void run() {
+      final long startTime = Time.monotonicNow();
       try {
         requestCounter.get(task.getMetricName()).incrementAndGet();
 
@@ -401,6 +405,8 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
       } finally {
+        requestTotalTime.get(task.getMetricName()).addAndGet(
+            Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
@@ -508,6 +514,11 @@ public final class ReplicationSupervisor {
 
   public long getReplicationSkippedCount(String metricsName) {
     AtomicLong counter = skippedCounter.get(metricsName);
+    return counter != null ? counter.get() : 0;
+  }
+
+  public long getReplicationRequestTotalTime(String metricsName) {
+    AtomicLong counter = requestTotalTime.get(metricsName);
     return counter != null ? counter.get() : 0;
   }
 

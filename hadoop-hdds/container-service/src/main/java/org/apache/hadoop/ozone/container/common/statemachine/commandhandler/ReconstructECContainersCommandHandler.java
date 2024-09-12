@@ -36,6 +36,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;
+  private String metricsName;
 
   public ReconstructECContainersCommandHandler(ConfigurationSource conf,
       ReplicationSupervisor supervisor,
@@ -52,8 +53,16 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
         (ReconstructECContainersCommand) command;
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
-    this.supervisor.addTask(new ECReconstructionCoordinatorTask(
-        coordinator, reconstructionCommandInfo));
+    ECReconstructionCoordinatorTask task = new ECReconstructionCoordinatorTask(
+        coordinator, reconstructionCommandInfo);
+    if (this.metricsName == null) {
+      this.metricsName = task.getMetricName();
+    }
+    this.supervisor.addTask(task);
+  }
+
+  public String getMetricsName() {
+    return this.metricsName;
   }
 
   @Override
@@ -63,17 +72,23 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return 0;
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestCount(metricsName);
   }
 
   @Override
   public long getAverageRunTime() {
+    long invocationCount = getInvocationCount();
+    if (invocationCount > 0) {
+      return getTotalRunTime() / invocationCount;
+    }
     return 0;
   }
 
   @Override
   public long getTotalRunTime() {
-    return 0;
+    return this.metricsName == null ? 0 : this.supervisor
+        .getReplicationRequestTotalTime(metricsName);
   }
 
   @Override
