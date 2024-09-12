@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -446,7 +445,6 @@ public final class OzoneManagerDoubleBuffer {
    * response = [[request1, request2], [snapshotRequest1], [request3],
    * [snapshotRequest2], [request4]]
    */
-  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   private List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
     final List<Queue<Entry>> response = new ArrayList<>();
     final Set<OzoneManagerProtocolProtos.Type> standaloneBatchCmdTypes = ImmutableSet.of(
@@ -628,7 +626,6 @@ public final class OzoneManagerDoubleBuffer {
     return currentBuffer.size();
   }
 
-  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   int getReadyBufferSize() {
     return readyBuffer.size();
   }
