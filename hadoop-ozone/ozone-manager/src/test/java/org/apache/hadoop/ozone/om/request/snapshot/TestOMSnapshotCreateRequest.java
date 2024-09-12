@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -229,7 +230,8 @@ public class TestOMSnapshotCreateRequest {
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfoInCache);
     assertEquals(snapshotInfoFromProto, snapshotInfoInCache);
-
+    assertEquals(snapshotInfoInCache.getLastTransactionInfo(),
+        TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
     assertEquals(0, omMetrics.getNumSnapshotCreateFails());
     assertEquals(1, omMetrics.getNumSnapshotActive());
     assertEquals(1, omMetrics.getNumSnapshotCreates());
