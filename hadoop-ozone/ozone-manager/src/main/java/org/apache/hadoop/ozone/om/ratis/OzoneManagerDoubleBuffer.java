@@ -445,23 +445,17 @@ public final class OzoneManagerDoubleBuffer {
    * response = [[request1, request2], [snapshotRequest1], [request3],
    * [snapshotRequest2], [request4]]
    */
-  private List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
+  private synchronized List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
     final List<Queue<Entry>> response = new ArrayList<>();
-    final Set<OzoneManagerProtocolProtos.Type> standaloneBatchCmdTypes = ImmutableSet.of(
-        OzoneManagerProtocolProtos.Type.SnapshotPurge, OzoneManagerProtocolProtos.Type.CreateSnapshot);
-    final List<Function<OMResponse, Boolean>> standaloneBatchConditions =
-        ImmutableList.of((omResponse) -> standaloneBatchCmdTypes.contains(omResponse.getCmdType()));
     OMResponse previousOmResponse = null;
     for (final Entry entry : readyBuffer) {
-      OMResponse prevResponse = previousOmResponse;
       OMResponse omResponse = entry.getResponse().getOMResponse();
       // New queue gets created in three conditions:
       // 1. It is first element in the response,
       // 2. Current request is createSnapshot/purgeSnapshot request.
       // 3. Previous request was createSnapshot/purgeSnapshot request.
-      if (response.isEmpty() || standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(omResponse))
-          || (previousOmResponse != null &&
-          standaloneBatchConditions.stream().anyMatch(condition -> condition.apply(prevResponse)))) {
+      if (response.isEmpty() || isStandaloneBatchCmdTypes(omResponse)
+          || isStandaloneBatchCmdTypes(previousOmResponse)) {
         response.add(new LinkedList<>());
       }
 
@@ -470,6 +464,15 @@ public final class OzoneManagerDoubleBuffer {
     }
 
     return response;
+  }
+
+  private static boolean isStandaloneBatchCmdTypes(OMResponse response) {
+    if (response == null) {
+      return false;
+    }
+    final OzoneManagerProtocolProtos.Type type = response.getCmdType();
+    return type == OzoneManagerProtocolProtos.Type.SnapshotPurge
+        || type == OzoneManagerProtocolProtos.Type.CreateSnapshot;
   }
 
   private void addCleanupEntry(Entry entry, Map<String, List<Long>> cleanupEpochs) {
@@ -626,7 +629,7 @@ public final class OzoneManagerDoubleBuffer {
     return currentBuffer.size();
   }
 
-  int getReadyBufferSize() {
+  synchronized int getReadyBufferSize() {
     return readyBuffer.size();
   }
 
