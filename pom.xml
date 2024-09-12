@@ -2347,6 +2347,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <configuration>
                   <outputDirectory>${project.build.directory}/share/ozone/lib</outputDirectory>
                   <includeScope>runtime</includeScope>
+                  <excludeArtifactIds>ozone-filesystem-shaded</excludeArtifactIds>
                 </configuration>
               </execution>
             </executions>
