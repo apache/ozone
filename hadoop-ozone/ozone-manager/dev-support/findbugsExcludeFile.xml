@@ -91,12 +91,7 @@
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer" />
-    <Method name="splitReadyBufferAtCreateSnapshot" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer" />
-    <Method name="getReadyBufferSize" />
+    <Field name="readyBuffer" />
     <Bug pattern="IS2_INCONSISTENT_SYNC" />
   </Match>
 </FindBugsFilter>
