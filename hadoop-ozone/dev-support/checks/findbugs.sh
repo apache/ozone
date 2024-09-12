@@ -25,7 +25,7 @@ source "${DIR}/_lib.sh"
 
 install_spotbugs
 
-MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress -pl :ozone-manager'
+MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
