@@ -89,14 +89,4 @@
     <Class name="org.apache.hadoop.ozone.om.upgrade.TestOMLayoutFeatureAspect"/>
     <Bug pattern="BC_IMPOSSIBLE_CAST" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer" />
-    <Method name="splitReadyBufferAtCreateSnapshot" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer" />
-    <Method name="getReadyBufferSize" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
-  </Match>
 </FindBugsFilter>
