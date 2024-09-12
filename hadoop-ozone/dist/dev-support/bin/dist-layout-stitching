@@ -71,6 +71,7 @@ run cp -p "${ROOT}/HISTORY.md" .
 run cp -p "${ROOT}/SECURITY.md" .
 run cp -p "${ROOT}/CONTRIBUTING.md" .
 
+run mkdir -p ./share/ozone/classpath
 run mkdir -p ./share/ozone/lib
 run mkdir -p ./share/ozone/web
 run mkdir -p ./bin
@@ -130,7 +131,11 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 #Copy pre-generated keytabs
 run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/_keytabs
 
-for file in $(find "${ROOT}" -path '*/share/ozone/lib/*jar' -not -path '*test*/share/ozone/lib/*' | sort); do
+for file in $(find "${ROOT}" -path '*/target/classes/*.classpath' | sort); do
+  cp -n -p -v "$file" share/ozone/classpath/
+done
+
+for file in $(find "${ROOT}" -path '*/share/ozone/lib/*jar' | sort); do
   cp -n -p -v "$file" share/ozone/lib/
 done
 
