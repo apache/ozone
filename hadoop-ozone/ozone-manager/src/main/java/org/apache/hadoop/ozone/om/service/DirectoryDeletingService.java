@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -185,16 +187,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           .setSnapshotKey(snapshotKeyTable)
           .setDeepCleanedDeletedDir(true)
           .build();
-    }
-
-    private void submitSetSnapshotRequest(
-        List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests) {
-      OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-          .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
-          .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
-          .setClientId(clientId.toString())
-          .build();
-      submitRequest(omRequest, clientId);
     }
 
 

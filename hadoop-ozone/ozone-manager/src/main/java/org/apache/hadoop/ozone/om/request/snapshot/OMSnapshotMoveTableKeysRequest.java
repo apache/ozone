@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -98,11 +99,11 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
           .collect(Collectors.toList());
 
       // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-      SnapshotUtils.setTransactionInfoInSnapshot(fromSnapshot, termIndex);
+      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
           CacheValue.get(termIndex.getIndex(), fromSnapshot));
       if (nextSnapshot != null) {
-        SnapshotUtils.setTransactionInfoInSnapshot(nextSnapshot, termIndex);
+        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
             CacheValue.get(termIndex.getIndex(), nextSnapshot));
       }

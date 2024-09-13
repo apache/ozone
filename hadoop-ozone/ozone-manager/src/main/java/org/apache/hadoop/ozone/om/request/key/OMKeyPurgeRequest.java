@@ -21,17 +21,11 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import com.google.common.collect.Maps;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -49,11 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.UUID;
-
-import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
@@ -103,21 +92,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     List<String> keysToBePurgedList = new ArrayList<>();
-
-    // Validating previous snapshot since while purging rename keys, a snapshot create request could make this purge
-    // rename entry invalid on AOS since the key could be now present on the newly created snapshot since a rename
-    // request could have come through after creation of a snapshot. The purged deletedKey would not be even
-    // present.
-    UUID expectedPreviousSnapshotId = purgeKeysRequest.hasExpectedPreviousSnapshotID()
-        ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID()) : null;
-    try {
-      validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-          expectedPreviousSnapshotId);
-    } catch (IOException e) {
-      LOG.error("Previous snapshot validation failed.", e);
-      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
-    }
-
 
     List<String> renamedKeysToBePurged = new ArrayList<>(purgeKeysRequest.getRenamedKeysList());
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {

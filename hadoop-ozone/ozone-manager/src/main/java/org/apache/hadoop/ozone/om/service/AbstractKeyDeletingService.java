@@ -352,47 +352,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return Pair.of(deletedCount, purgeSuccess);
   }
 
-  protected void submitRequest(OMRequest omRequest, ClientId clientId) {
-    try {
-      if (isRatisEnabled()) {
-        OzoneManagerRatisServer server =
-            getOzoneManager().getOmRatisServer();
-
-        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(server.getRaftPeerId())
-            .setGroupId(server.getRaftGroupId())
-            .setCallId(getRunCount().get())
-            .setMessage(Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build();
-
-        server.submitRequest(omRequest, raftClientRequest);
-      } else {
-        getOzoneManager().getOmServerProtocol()
-            .submitRequest(null, omRequest);
-      }
-    } catch (ServiceException e) {
-      LOG.error("Snapshot deep cleaning request failed. " +
-          "Will retry at next run.", e);
-    }
-  }
-
-  protected RaftClientRequest createRaftClientRequestForPurge(
-      OMRequest omRequest) {
-    return RaftClientRequest.newBuilder()
-        .setClientId(clientId)
-        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
-        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
-        .setCallId(runCount.get())
-        .setMessage(
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-  }
-
   /**
    * Parse Volume and Bucket Name from ObjectKey and add it to given map of
    * keys to be purged per bucket.
@@ -903,6 +862,24 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  /**
+   * Submits SetSnapsnapshotPropertyRequest to OM.
+   * @param setSnapshotPropertyRequests request to be sent to OM
+   */
+  protected void submitSetSnapshotRequest(
+      List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests) {
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
+        .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
+        .setClientId(clientId.toString())
+        .build();
+    try {
+      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
+    } catch (ServiceException e) {
+      LOG.error("Failed to submit set snapshot property request", e);
+    }
   }
 
   /**
