@@ -2593,11 +2593,11 @@ public class RpcClient implements ClientProtocol {
       try {
         for (ServiceInfo si : ozoneManagerClient.getServiceInfo()
             .getServiceInfoList()) {
-          if (si.getServerDefaults() == null) {
-            continue;
+          if (si.getServerDefaults() != null) {
+            serverDefaults = si.getServerDefaults();
+            serverDefaultsLastUpdate = now;
+            break;
           }
-          serverDefaults = si.getServerDefaults();
-          serverDefaultsLastUpdate = now;
         }
       } catch (Exception e) {
         LOG.warn("Could not get server defaults from OM.", e);
