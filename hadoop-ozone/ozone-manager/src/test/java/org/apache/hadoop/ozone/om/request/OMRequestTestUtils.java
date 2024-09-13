@@ -286,7 +286,7 @@ public final class OMRequestTestUtils {
   }
 
   /**
-   * Add key entry to SnapshotRenamedTable
+   * Add key entry to SnapshotRenamedTable.
    */
   public static String addRenamedEntryToTable(long trxnLogIndex, String volumeName, String bucketName, String key,
                                             OMMetadataManager omMetadataManager) throws Exception {

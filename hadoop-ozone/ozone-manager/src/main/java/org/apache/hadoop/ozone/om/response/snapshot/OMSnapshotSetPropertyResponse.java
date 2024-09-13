@@ -28,8 +28,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
-import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 

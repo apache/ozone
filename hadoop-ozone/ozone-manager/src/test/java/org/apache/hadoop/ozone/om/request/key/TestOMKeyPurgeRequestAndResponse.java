@@ -28,9 +28,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
-import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
-import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.junit.jupiter.api.Test;
 
@@ -47,10 +44,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.

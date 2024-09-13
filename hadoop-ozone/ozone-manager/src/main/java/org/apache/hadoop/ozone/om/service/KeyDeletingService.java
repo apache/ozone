@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -82,9 +81,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
-  private final Map<String, Long> exclusiveSizeMap;
-  private final Map<String, Long> exclusiveReplicatedSizeMap;
-  private final Map<String, String> snapshotSeekMap;
   private final boolean deepCleanSnapshots;
 
   public KeyDeletingService(OzoneManager ozoneManager,
@@ -102,9 +98,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
-    this.exclusiveSizeMap = new HashMap<>();
-    this.exclusiveReplicatedSizeMap = new HashMap<>();
-    this.snapshotSeekMap = new HashMap<>();
     this.deepCleanSnapshots = deepCleanSnapshots;
   }
 
@@ -218,8 +211,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         // Purge deleted Keys in the deletedTable && rename entries in the snapshotRenamedTable which doesn't have a
         // reference in the previous snapshot.
-        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(omSnapshotManager, snapshotChainManager,
-            currentSnapshotInfo, keyManager.getMetadataManager(), lock);
+        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(omSnapshotManager,
+            snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
                  omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
           List<String> renamedTableEntries =
@@ -239,8 +232,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
-             Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
+            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, getOzoneManager().getKeyManager(),
+                 pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
+                 expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();
             successStatus = purgeResult.getValue();
           }

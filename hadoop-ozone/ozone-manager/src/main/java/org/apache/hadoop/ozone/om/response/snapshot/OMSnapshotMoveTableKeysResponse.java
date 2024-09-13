@@ -180,7 +180,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
     if (result == null) {
       result = new RepeatedOmKeyInfo(keyInfoList);
-    } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)){
+    } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
       keyInfoList.forEach(result::addOmKeyInfo);
     }
     return result;
@@ -190,7 +190,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
                                           RepeatedOmKeyInfo result) {
     int size = result.getOmKeyInfoList().size();
     if (size >= omKeyInfos.size()) {
-        return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
+      return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
     }
     return false;
   }

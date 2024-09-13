@@ -37,16 +37,12 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -159,7 +155,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               snapshotChainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
-          if (nextSnapshot != null &&  nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+          if (nextSnapshot != null &&
+              nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
             continue;
           }
 
@@ -175,9 +172,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               .isLockAcquired()) {
             continue;
           }
-          try(ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
-              snapInfo.getBucketName(),
-              snapInfo.getName())) {
+          try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
+              snapInfo.getBucketName(), snapInfo.getName())) {
             KeyManager snapshotKeyManager = snapshot.get().getKeyManager();
             int moveCount = 0;
             // Get all entries from deletedKeyTable.
@@ -191,11 +187,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null , (kv) -> true, remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               try {
-                submitSnapshotMoveDeletedKeys(snapInfo, deletedKeyEntries.stream().map(kv -> {
+                submitSnapshotMoveDeletedKeys(
+                    snapInfo,
+                    deletedKeyEntries.stream().map(kv -> {
                       try {
                         return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey()).addAllKeyInfos(kv.getValue()
                             .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT_VERSION))

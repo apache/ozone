@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 

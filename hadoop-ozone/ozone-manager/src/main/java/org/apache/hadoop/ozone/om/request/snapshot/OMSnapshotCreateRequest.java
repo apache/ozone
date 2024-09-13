@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.server.protocol.TermIndex;

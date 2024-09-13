@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -49,7 +48,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -59,11 +57,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.util.CheckExceptionOperation;
+import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.util.Preconditions;
 
 import java.io.Closeable;
@@ -91,10 +87,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
-
+  private static final ClientId CLIENT_ID = ClientId.randomId();
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
-  protected static ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -334,13 +329,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.PurgeKeys)
         .setPurgeKeysRequest(purgeKeysRequest)
-        .setClientId(clientId.toString())
+        .setClientId(CLIENT_ID.toString())
         .build();
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerProtocolProtos.OMResponse omResponse = OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest
-          , clientId, runCount.get());
+      OzoneManagerProtocolProtos.OMResponse omResponse = OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest,
+          CLIENT_ID, runCount.get());
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
@@ -392,12 +387,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
             .setPurgeDirectoriesRequest(purgeDirRequest)
-            .setClientId(clientId.toString())
+            .setClientId(CLIENT_ID.toString())
             .build();
 
     // Submit Purge paths request to OM
     try {
-      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.get());
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -438,7 +433,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
       List<Pair<String, OmKeyInfo>> subDirList,
       KeyManager keyManager, boolean deleteDir,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker)
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker)
       throws IOException {
     // step-0: Get one pending deleted directory
     if (LOG.isDebugEnabled()) {
@@ -503,8 +498,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       long remainNum, long dirNum, long subDirNum, long subFileNum, List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList, String snapTableKey, long startTime, int remainingBufLimit,
       KeyManager keyManager,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> subDirPurgeChecker,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker,
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> subDirPurgeChecker,
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker,
       UUID expectedPreviousSnapshotId) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
@@ -516,7 +511,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt);
         Boolean result = subDirPurgeChecker.apply(Table.newKeyValue(stringOmKeyInfoPair.getKey(),
-                stringOmKeyInfoPair.getValue()) );
+                stringOmKeyInfoPair.getValue()));
         Optional<PurgePathRequest> request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
@@ -873,10 +868,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
         .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
-        .setClientId(clientId.toString())
+        .setClientId(CLIENT_ID.toString())
         .build();
     try {
-      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
+      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, CLIENT_ID, getRunCount().get());
     } catch (ServiceException e) {
       LOG.error("Failed to submit set snapshot property request", e);
     }
@@ -931,8 +926,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   /**
    * This class is responsible for opening last N snapshot given snapshot or AOS metadata manager by acquiring a lock.
    */
-  private abstract class ReclaimableFilter<V> implements CheckExceptionOperation<Table.KeyValue<String, V>,
-      Boolean, IOException>, Closeable {
+  private abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<Table.KeyValue<String, V>,
+        Boolean, IOException>, Closeable {
 
     private final SnapshotInfo currentSnapshotInfo;
     private final OmSnapshotManager omSnapshotManager;
@@ -956,7 +951,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
      * @param metadataManager : MetadataManager corresponding to snapshot or AOS.
      * @param lock : Lock for Active OM.
      */
-    public ReclaimableFilter(OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
+    private ReclaimableFilter(OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
                              SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
                              IOzoneManagerLock lock,
                              int numberOfPreviousSnapshotsFromChain) {
@@ -1037,7 +1032,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               } else {
                 previousOmSnapshots.add(null);
                 previousSnapshotInfos.add(null);
-            }
+              }
 
               // TODO: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
               //  support.

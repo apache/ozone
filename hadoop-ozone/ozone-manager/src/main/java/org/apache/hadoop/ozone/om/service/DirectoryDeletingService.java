@@ -17,11 +17,9 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -35,45 +33,32 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
-import org.apache.hadoop.ozone.util.CheckExceptionOperation;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -182,7 +167,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     private OzoneManagerProtocolProtos.SetSnapshotPropertyRequest
-    getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(String snapshotKeyTable) {
+        getSetSnapshotPropertyRequestupdatingDeepCleanSnapshotDir(String snapshotKeyTable) {
       return OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
           .setSnapshotKey(snapshotKeyTable)
           .setDeepCleanedDeletedDir(true)
@@ -224,8 +209,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
         IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
 
-        try(ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager, snapshotChainManager,
-            currentSnapshotInfo, keyManager.getMetadataManager(), lock);
+        try (ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager,
+            snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
             ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager,
                 snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
           long startTime = Time.monotonicNow();
@@ -284,8 +269,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
             Map<String, Long> exclusiveReplicatedSizeMap = reclaimableSubFileFilter.getExclusiveReplicatedSizeMap();
             Map<String, Long> exclusiveSizeMap = reclaimableSubFileFilter.getExclusiveSizeMap();
-            for (String snapshot : Stream.of(exclusiveSizeMap.keySet(),
-                exclusiveReplicatedSizeMap.keySet()).flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
+            for (String snapshot : Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
+                .flatMap(Collection::stream).distinct().collect(Collectors.toList())) {
               setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
                   exclusiveReplicatedSizeMap, snapshot));
             }
@@ -350,7 +335,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 continue;
               }
               try (ReferenceCounted<OmSnapshot> omSnapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
-               snapInfo.getBucketName(), snapInfo.getName())) {
+                  snapInfo.getBucketName(), snapInfo.getName())) {
                 remainNum = processDeletedDirsForStore(snapInfo, omSnapshot.get().getKeyManager(), remainNum);
               }
 

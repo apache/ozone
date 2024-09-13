@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-import org.apache.hadoop.ozone.util.CheckExceptionOperation;
+import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -122,7 +122,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   PendingKeysDeletion getPendingDeletionKeys(
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
       throws IOException;
   /**
    * Returns a PendingKeysDeletion. It has a list of pending deletion key info
@@ -137,7 +137,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
       throws IOException;
 
   /**
@@ -151,7 +151,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
+      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
       throws IOException;
 
   /**
@@ -165,7 +165,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey,
-      CheckExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter, int count)
+      CheckedExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter, int count)
       throws IOException;
 
   /**
@@ -271,8 +271,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs() throws IOException;
 
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(String volume, String bucket)
-      throws IOException;
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+      String volume, String bucket) throws IOException;
 
   default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int count)
       throws IOException {
@@ -297,7 +297,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<OmKeyInfo> getPendingDeletionSubDirs(
       long volumeId, long bucketId, OmKeyInfo parentInfo,
-      CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       long numEntries) throws IOException;
 
 
@@ -311,8 +311,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId, long bucketId, OmKeyInfo parentInfo,
-                                             CheckExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean,
-                                             IOException> filter,
+                                             CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean,
+                                                                                          IOException> filter,
                                              long numEntries) throws IOException;
 
   /**
