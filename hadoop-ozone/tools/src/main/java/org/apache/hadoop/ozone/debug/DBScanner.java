@@ -648,7 +648,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             // Currently, only equals operation is supported
             if (Filter.FilterOperator.EQUALS.equals(fieldValue.getOperator()) &&
                 !String.valueOf(valueObject).equals(fieldValue.getValue())) {
-              err().println("in equals, result false: " + valueObject + " " + fieldValue.getValue());
               return false;
             } else if (!Filter.FilterOperator.EQUALS.equals(fieldValue.getOperator())) {
               throw new IOException("Only EQUALS operator is supported currently.");
