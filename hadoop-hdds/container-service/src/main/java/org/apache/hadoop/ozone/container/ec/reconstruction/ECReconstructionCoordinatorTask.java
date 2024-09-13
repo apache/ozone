@@ -47,6 +47,16 @@ public class ECReconstructionCoordinatorTask
   }
 
   @Override
+  public String getMetricName() {
+    return "ECReconstructions";
+  }
+
+  @Override
+  public String getMetricDescriptionSegment() {
+    return "EC reconstructions";
+  }
+
+  @Override
   public void runTask() {
     // Implement the coordinator logic to handle a container group
     // reconstruction.

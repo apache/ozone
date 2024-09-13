@@ -198,9 +198,7 @@ public class BlockOutputStream extends OutputStream {
         blkIDBuilder.build()).addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
-    // EC does not support incremental chunk list.
-    this.supportIncrementalChunkList = config.getIncrementalChunkList() &&
-        this instanceof RatisBlockOutputStream && allDataNodesSupportPiggybacking();
+    this.supportIncrementalChunkList = canEnableIncrementalChunkList();
     LOG.debug("incrementalChunkList is {}", supportIncrementalChunkList);
     if (supportIncrementalChunkList) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
@@ -237,9 +235,49 @@ public class BlockOutputStream extends OutputStream {
         config.getBytesPerChecksum());
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
-    this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
-            allDataNodesSupportPiggybacking();
+    this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
     LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
+  }
+
+  /**
+   * Helper method to check if incremental chunk list can be enabled.
+   * Prints debug messages if it cannot be enabled.
+   */
+  private boolean canEnableIncrementalChunkList() {
+    boolean confEnableIncrementalChunkList = config.getIncrementalChunkList();
+    if (!confEnableIncrementalChunkList) {
+      return false;
+    }
+
+    if (!(this instanceof RatisBlockOutputStream)) {
+      // Note: EC does not support incremental chunk list
+      LOG.debug("Unable to enable incrementalChunkList because BlockOutputStream is not a RatisBlockOutputStream");
+      return false;
+    }
+    if (!allDataNodesSupportPiggybacking()) {
+      // Not all datanodes support piggybacking and incremental chunk list.
+      LOG.debug("Unable to enable incrementalChunkList because not all datanodes support piggybacking");
+      return false;
+    }
+    return confEnableIncrementalChunkList;
+  }
+
+  /**
+   * Helper method to check if PutBlock piggybacking can be enabled.
+   * Prints debug message if it cannot be enabled.
+   */
+  private boolean canEnablePutblockPiggybacking() {
+    boolean confEnablePutblockPiggybacking = config.getEnablePutblockPiggybacking();
+    if (!confEnablePutblockPiggybacking) {
+      return false;
+    }
+
+    if (!allDataNodesSupportPiggybacking()) {
+      // Not all datanodes support piggybacking and incremental chunk list.
+      LOG.debug("Unable to enable PutBlock piggybacking because not all datanodes support piggybacking");
+      return false;
+    }
+    return confEnablePutblockPiggybacking;
   }
 
   private boolean allDataNodesSupportPiggybacking() {

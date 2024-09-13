@@ -70,6 +70,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities;
 
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -83,7 +84,9 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -93,6 +96,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -177,6 +181,8 @@ public class TestHSync {
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    CONF.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    CONF.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
@@ -343,6 +349,8 @@ public class TestHSync {
   }
 
   @Test
+  // Making this the second test to be run to avoid lingering block files from previous tests
+  @Order(2)
   public void testKeyHSyncThenClose() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.
@@ -358,10 +366,16 @@ public class TestHSync {
     String data = "random data";
     final Path file = new Path(dir, "file-hsync-then-close");
     try (FileSystem fs = FileSystem.get(CONF)) {
+      String chunkPath;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.write(data.getBytes(UTF_8), 0, data.length());
         outputStream.hsync();
+        // locate the container chunk path on the first DataNode.
+        chunkPath = getChunkPathOnDataNode(outputStream);
+        assertFalse(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
       }
+      // After close, the chunk file should be closed.
+      assertTrue(AbstractTestChunkManager.checkChunkFilesClosed(chunkPath));
     }
 
     OzoneManager ozoneManager = cluster.getOzoneManager();
@@ -385,6 +399,22 @@ public class TestHSync {
         }
       }
     }
+  }
+
+  private static String getChunkPathOnDataNode(FSDataOutputStream outputStream)
+      throws IOException {
+    String chunkPath;
+    KeyOutputStream groupOutputStream =
+        ((OzoneFSOutputStream) outputStream.getWrappedStream()).getWrappedOutputStream().getKeyOutputStream();
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo, cluster);
+    chunkPath = dn.getDatanodeStateMachine()
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID()).
+        getContainerData().getChunksPath();
+    return chunkPath;
   }
 
   @ParameterizedTest
