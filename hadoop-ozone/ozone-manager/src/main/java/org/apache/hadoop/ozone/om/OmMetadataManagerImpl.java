@@ -838,6 +838,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return builder.toString();
   }
 
+  /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - User name
+   * @param bucket - Bucket name
+   */
+  @Override
+  public String getBucketKeyPrefix(String volume, String bucket) {
+    return OzoneFSUtils.addTrailingSlashIfNeeded(getBucketKey(volume, bucket));
+  }
+
+  /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - User name
+   * @param bucket - Bucket name
+   */
+  @Override
+  public String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException {
+    return OzoneFSUtils.addTrailingSlashIfNeeded(getOzoneKeyFSO(volume, bucket, ""));
+  }
+
   @Override
   public String getOzoneKey(String volume, String bucket, String key) {
     StringBuilder builder = new StringBuilder()

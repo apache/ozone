@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
@@ -199,8 +200,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     for (SnapshotMoveKeyInfos dBKey : nextDBKeysList) {
-      RepeatedOmKeyInfo omKeyInfos =
-          createRepeatedOmKeyInfo(dBKey, metadataManager);
+      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(dBKey, metadataManager);
       if (omKeyInfos == null) {
         continue;
       }
@@ -224,35 +224,35 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     return result;
   }
 
-  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(
-      SnapshotMoveKeyInfos snapshotMoveKeyInfos,
-      OMMetadataManager metadataManager) throws IOException {
+  public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
+      SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws IOException {
     String dbKey = snapshotMoveKeyInfos.getKey();
-    List<KeyInfo> keyInfoList = snapshotMoveKeyInfos.getKeyInfosList();
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
+    for (KeyInfo info : snapshotMoveKeyInfos.getKeyInfosList()) {
+      OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(info);
+      keyInfoList.add(fromProtobuf);
+    }
     // When older version of keys are moved to the next snapshot's deletedTable
     // The newer version might also be in the next snapshot's deletedTable and
     // it might overwrite. This is to avoid that and also avoid having
-    // orphans blocks.
+    // orphans blocks. Checking the last keyInfoList size omKeyInfo versions,
+    // this is to avoid redundant additions if the last n versions match.
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
-
-    for (KeyInfo keyInfo : keyInfoList) {
-      OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(keyInfo);
-      if (result == null) {
-        result = new RepeatedOmKeyInfo(omKeyInfo);
-      } else if (!isSameAsLatestOmKeyInfo(omKeyInfo, result)) {
-        result.addOmKeyInfo(omKeyInfo);
-      }
+    if (result == null) {
+      result = new RepeatedOmKeyInfo(keyInfoList);
+    } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
+      keyInfoList.forEach(result::addOmKeyInfo);
     }
-
     return result;
   }
 
-  private boolean isSameAsLatestOmKeyInfo(OmKeyInfo omKeyInfo,
-                                          RepeatedOmKeyInfo result) {
+  private static boolean isSameAsLatestOmKeyInfo(List<OmKeyInfo> omKeyInfos,
+                                                 RepeatedOmKeyInfo result) {
     int size = result.getOmKeyInfoList().size();
-    assert size > 0;
-    OmKeyInfo keyInfoFromRepeated = result.getOmKeyInfoList().get(size - 1);
-    return omKeyInfo.equals(keyInfoFromRepeated);
+    if (size >= omKeyInfos.size()) {
+      return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
+    }
+    return false;
   }
 }
 
