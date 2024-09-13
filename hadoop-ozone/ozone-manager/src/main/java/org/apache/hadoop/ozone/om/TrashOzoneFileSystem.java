@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -35,15 +34,12 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +64,6 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
  * Only the apis used by the trash emptier are implemented.
  */
 public class TrashOzoneFileSystem extends FileSystem {
-
-  private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private static final int OZONE_FS_ITERATE_BATCH_SIZE = 100;
 
@@ -97,34 +91,15 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneConfiguration = OzoneConfiguration.of(getConf());
   }
 
-  private RaftClientRequest getRatisRequest(
-      OzoneManagerProtocolProtos.OMRequest omRequest) {
-    return RaftClientRequest.newBuilder()
-        .setClientId(CLIENT_ID)
-        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
-        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
-        .setCallId(runCount.getAndIncrement())
-        .setMessage(
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-
-  }
-
   private void submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
       throws Exception {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
     if (ozoneManager.isRatisEnabled()) {
-      OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+      // perform preExecute as ratis submit do no perform preExecute
+      OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
       omRequest = omClientRequest.preExecute(ozoneManager);
-      RaftClientRequest req = getRatisRequest(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest, req);
-    } else {
-      ozoneManager.getOmServerProtocol().
-          submitRequest(NULL_RPC_CONTROLLER, omRequest);
     }
+    OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement());
   }
 
   @Override

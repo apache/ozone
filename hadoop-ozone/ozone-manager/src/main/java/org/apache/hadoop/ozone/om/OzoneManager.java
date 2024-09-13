@@ -2056,6 +2056,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException e) {
       LOG.error("{}: Couldn't add OM {} to peer list.", getOMNodeId(),
           newOMNodeId);
+      return;
     }
 
     if (omRatisSnapshotProvider == null) {
