@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.erasurecode.rawcoder.InvalidDecodingException;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -319,6 +320,9 @@ public class ECReconstructionCoordinator implements Closeable {
               // lengths etc.
               logBlockGroupDetails(blockLocationInfo, repConfig,
                   blockDataGroup);
+              if (e instanceof InvalidDecodingException) {
+                getECReconstructionMetrics().incrECInvalidReconstructionTasks();
+              }
               throw e;
             }
             // TODO: can be submitted in parallel

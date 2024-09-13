@@ -207,6 +207,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
+  @Config(key = "ec.reconstruct.validation",
+      defaultValue = "false",
+      description = "The flag whether to validate that EC reconstruction tasks " +
+          "reconstruct target containers correctly. When validation fails, " +
+          "reconstruction tasks will fail.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecReconstructValidation = false;
+
   @Config(key = "ec.reconstruct.stripe.read.pool.limit",
       defaultValue = "30",
       description = "Thread pool max size for parallelly read" +
@@ -491,6 +499,14 @@ public class OzoneClientConfig {
       return ChecksumCombineMode.valueOf(
           ChecksumCombineMode.COMPOSITE_CRC.name());
     }
+  }
+
+  public void setEcReconstructValidation(boolean ecReconstructValidation) {
+    this.ecReconstructValidation = ecReconstructValidation;
+  }
+
+  public boolean isEcReconstructValidation() {
+    return ecReconstructValidation;
   }
 
   public void setEcReconstructStripeReadPoolLimit(int poolLimit) {

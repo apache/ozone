@@ -34,16 +34,20 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class TestRawCoderBase extends TestCoderBase {
-  private final Class<? extends RawErasureCoderFactory> encoderFactoryClass;
-  private final Class<? extends RawErasureCoderFactory> decoderFactoryClass;
-  private RawErasureEncoder encoder;
-  private RawErasureDecoder decoder;
+  protected Class<? extends RawErasureCoderFactory> encoderFactoryClass;
+  protected Class<? extends RawErasureCoderFactory> decoderFactoryClass;
+  protected RawErasureEncoder encoder;
+  protected RawErasureDecoder decoder;
 
   public TestRawCoderBase(
       Class<? extends RawErasureCoderFactory> encoderFactoryClass,
       Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
     this.encoderFactoryClass = encoderFactoryClass;
     this.decoderFactoryClass = decoderFactoryClass;
+  }
+
+  public TestRawCoderBase() {
+
   }
 
   /**
@@ -319,7 +323,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     verifyBufferPositionAtEnd(inputChunks);
   }
 
-  private void verifyBufferPositionAtEnd(ECChunk[] inputChunks) {
+  void verifyBufferPositionAtEnd(ECChunk[] inputChunks) {
     for (ECChunk chunk : inputChunks) {
       if (chunk != null) {
         assertEquals(0, chunk.getBuffer().remaining());

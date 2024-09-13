@@ -813,6 +813,7 @@ public class TestECBlockReconstructedStripeInputStream {
       BlockLocationInfo keyInfo) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
+    clientConfig.setEcReconstructValidation(true);
     return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
         null, null, streamFactory, bufferPool, ecReconstructExecutor,
         clientConfig);

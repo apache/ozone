@@ -39,6 +39,8 @@ public final class ECReconstructionMetrics {
   private @Metric MutableCounterLong blockGroupReconstructionFailsTotal;
   private @Metric MutableCounterLong reconstructionTotal;
   private @Metric MutableCounterLong reconstructionFailsTotal;
+  @Metric("Count of erasure coding invalidated reconstruction tasks")
+  private MutableCounterLong ecInvalidReconstructionTasks;
 
   private ECReconstructionMetrics() {
   }
@@ -76,5 +78,13 @@ public final class ECReconstructionMetrics {
 
   public long getBlockGroupReconstructionTotal() {
     return blockGroupReconstructionTotal.value();
+  }
+
+  public void incrECInvalidReconstructionTasks() {
+    ecInvalidReconstructionTasks.incr();
+  }
+
+  public long getECInvalidReconstructionTasks() {
+    return ecInvalidReconstructionTasks.value();
   }
 }

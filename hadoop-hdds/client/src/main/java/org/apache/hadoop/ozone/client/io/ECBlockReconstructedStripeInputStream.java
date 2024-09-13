@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.ozone.erasurecode.rawcoder.DecodingValidator;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureDecoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
@@ -143,7 +144,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private final ByteBufferPool byteBufferPool;
 
   private RawErasureDecoder decoder;
-
+  private DecodingValidator validator;
+  private boolean isValidationEnabled = false;
   private boolean initialized = false;
 
   private final ExecutorService executor;
@@ -171,6 +173,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     paddingIndexes = setOfRange(expectedDataBlocks, d);
     parityIndexes = setOfRange(d, repConfig.getRequiredNodes());
     allIndexes = setOfRange(0, repConfig.getRequiredNodes());
+    this.isValidationEnabled = config.isEcReconstructValidation();
   }
 
   /**
@@ -230,6 +233,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     initialized = false;
     if (decoder == null) {
       decoder = CodecUtil.createRawDecoderWithFallback(getRepConfig());
+    }
+    if (isValidationEnabled && validator == null) {
+      LOG.debug("Init decoding validator.");
+      validator = new DecodingValidator(decoder);
     }
     if (!hasSufficientLocations()) {
       String msg = "There are insufficient datanodes to read the EC block";
@@ -690,7 +697,15 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     int[] erasedIndexes = missingIndexes.stream()
         .mapToInt(Integer::valueOf)
         .toArray();
-    decoder.decode(decoderInputBuffers, erasedIndexes, decoderOutputBuffers);
+    if (isValidationEnabled) {
+      markBuffers(decoderInputBuffers);
+      decoder.decode(decoderInputBuffers, erasedIndexes, decoderOutputBuffers);
+      resetBuffers(decoderInputBuffers);
+
+      validator.validate(decoderInputBuffers, erasedIndexes, decoderOutputBuffers);
+    } else {
+      decoder.decode(decoderInputBuffers, erasedIndexes, decoderOutputBuffers);
+    }
     flipInputs();
   }
 
@@ -824,6 +839,22 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
     return range(startInclusive, endExclusive)
         .boxed().collect(toCollection(TreeSet::new));
+  }
+
+  private static void markBuffers(ByteBuffer[] buffers) {
+    for (ByteBuffer buffer: buffers) {
+      if (buffer != null) {
+        buffer.mark();
+      }
+    }
+  }
+
+  private static void resetBuffers(ByteBuffer[] buffers) {
+    for (ByteBuffer buffer: buffers) {
+      if (buffer != null) {
+        buffer.reset();
+      }
+    }
   }
 
 }
