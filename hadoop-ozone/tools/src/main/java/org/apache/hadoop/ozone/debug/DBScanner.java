@@ -516,7 +516,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return fieldMap;
     }
 
-    Map<String, Object> getFilterSplit(List<String> fields, Map<String, Object> fieldMap, Filter value) {
+    Map<String, Filter> getFilterSplit(List<String> fields, Map<String, Filter> fieldMap, Filter value) {
       int len = fields.size();
       if (fieldMap == null) {
         fieldMap = new HashMap<>();
@@ -524,12 +524,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       if (len == 1) {
         fieldMap.putIfAbsent(fields.get(0), value);
       } else {
-        Map<String, Object> fieldMapGet = (Map<String, Object>) fieldMap.get(fields.get(0));
+        Filter fieldMapGet = fieldMap.get(fields.get(0));
+        Map<String, Filter> nextLevel;
         if (fieldMapGet == null) {
-          fieldMap.put(fields.get(0), getFilterSplit(fields.subList(1, len), null, value));
+          fieldMapGet = new Filter();
+          nextLevel = getFilterSplit(fields.subList(1, len), null, value);
         } else {
-          fieldMap.put(fields.get(0), getFilterSplit(fields.subList(1, len), fieldMapGet, value));
+          nextLevel = getFilterSplit(fields.subList(1, len), fieldMapGet.getNextLevel(), value);
         }
+        fieldMapGet.setNextLevel(nextLevel);
+        fieldMap.put(fields.get(0), fieldMapGet);
       }
       return fieldMap;
     }
@@ -547,7 +551,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           }
         }
 
-        Map<String, Object> fieldsFilterSplitMap = new HashMap<>();
+        Map<String, Filter> fieldsFilterSplitMap = new HashMap<>();
         if (valueFilter != null) {
           for (String field : valueFilter.split(",")) {
             String[] fieldValue = field.split(":");
@@ -625,13 +629,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    boolean checkFilteredObject(Object obj, Class<?> clazz, Map<String, Object> fieldsSplitMap)
+    boolean checkFilteredObject(Object obj, Class<?> clazz, Map<String, Filter> fieldsSplitMap)
         throws IOException {
-      for (Map.Entry<String, Object> field : fieldsSplitMap.entrySet()) {
+      for (Map.Entry<String, Filter> field : fieldsSplitMap.entrySet()) {
         try {
           Field valueClassField = getRequiredFieldFromAllFields(clazz, field.getKey());
           Object valueObject = valueClassField.get(obj);
-          Object fieldValue = field.getValue();
+          Filter fieldValue = field.getValue();
 
           if (valueObject == null) {
             // there is no such field in the record. This filter will be ignored for the current record.
@@ -639,18 +643,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           }
           if (fieldValue == null) {
             throw new IOException("Malformed filter. Check input");
-          } else if (fieldValue instanceof Filter) {
-            Filter filter = (Filter)fieldValue;
+          } else if (fieldValue.getNextLevel() == null) {
             // reached the end of fields hierarchy, check if they match the filter
             // Currently, only equals operation is supported
-            if (Filter.FilterOperator.EQUALS.equals(filter.getOperator()) &&
-                !String.valueOf(valueObject).equals(filter.getValue())) {
+            if (Filter.FilterOperator.EQUALS.equals(fieldValue.getOperator()) &&
+                !String.valueOf(valueObject).equals(fieldValue.getValue())) {
+              err().println("in equals, result false: " + valueObject + " " + fieldValue.getValue());
               return false;
-            } else if (!Filter.FilterOperator.EQUALS.equals(filter.getOperator())) {
+            } else if (!Filter.FilterOperator.EQUALS.equals(fieldValue.getOperator())) {
               throw new IOException("Only EQUALS operator is supported currently.");
             }
           } else {
-            Map<String, Object> subfields = (Map<String, Object>)fieldValue;
+            Map<String, Filter> subfields = fieldValue.getNextLevel();
             if (Collection.class.isAssignableFrom(valueObject.getClass())) {
               if (!checkFilteredObjectCollection((Collection) valueObject, subfields)) {
                 return false;
@@ -699,7 +703,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return true;
     }
 
-    boolean checkFilteredObjectCollection(Collection<?> valueObject, Map<String, Object> fields)
+    boolean checkFilteredObjectCollection(Collection<?> valueObject, Map<String, Filter> fields)
         throws NoSuchFieldException, IllegalAccessException, IOException {
       for (Object ob : valueObject) {
         if (checkFilteredObject(ob, ob.getClass(), fields)) {

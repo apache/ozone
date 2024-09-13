@@ -18,12 +18,20 @@
 
 package org.apache.hadoop.ozone.utils;
 
+import java.util.Map;
+
 /**
  * Represent class which has info of what operation and value a set of records should be filtered with.
  */
 public class Filter {
   private FilterOperator operator;
   private Object value;
+  private Map<String, Filter> nextLevel = null;
+
+  public Filter() {
+    this.operator = null;
+    this.value = null;
+  }
 
   public Filter(FilterOperator operator, Object value) {
     this.operator = operator;
@@ -33,6 +41,18 @@ public class Filter {
   public Filter(String op, Object value) {
     this.operator = getFilterOperator(op);
     this.value = value;
+  }
+
+  public Filter(FilterOperator operator, Object value, Map<String, Filter> next) {
+    this.operator = operator;
+    this.value = value;
+    this.nextLevel = next;
+  }
+
+  public Filter(String op, Object value, Map<String, Filter> next) {
+    this.operator = getFilterOperator(op);
+    this.value = value;
+    this.nextLevel = next;
   }
 
   public FilterOperator getOperator() {
@@ -51,6 +71,14 @@ public class Filter {
     this.value = value;
   }
 
+  public Map<String, Filter> getNextLevel() {
+    return nextLevel;
+  }
+
+  public void setNextLevel(Map<String, Filter> nextLevel) {
+    this.nextLevel = nextLevel;
+  }
+
   public FilterOperator getFilterOperator(String op) {
     if (op.equalsIgnoreCase("equals")) {
       return FilterOperator.EQUALS;
@@ -65,7 +93,7 @@ public class Filter {
 
   @Override
   public String toString() {
-    return operator + ", " + value;
+    return "(" + operator + "," + value + "," + nextLevel + ")";
   }
 
   /**
