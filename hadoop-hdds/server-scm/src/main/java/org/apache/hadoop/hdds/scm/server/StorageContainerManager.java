@@ -2147,7 +2147,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final SCMRatisServer server = getScmHAManager().getRatisServer();
 
     // If Ratis is enabled
-    if(server != null) {
+    if (server != null) {
 
       // To attempt to find the SCM Leader,
       // and if the Leader is not found
