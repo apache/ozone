@@ -123,12 +123,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
-    handlerThread = new Daemon(new DeleteCmdWorker(interval));
-    handlerThread.start();
     MetricsRegistry registry = new MetricsRegistry(
         DeleteBlocksCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteBlocksCommand + "Ms");
+    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
+    handlerThread = new Daemon(new DeleteCmdWorker(interval));
+    handlerThread.start();
   }
 
   @Override
