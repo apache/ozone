@@ -102,10 +102,12 @@ public class TestReplicateContainerCommandHandler {
 
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(5L);
       when(supervisor.getReplicationRequestTotalTime(metricsName)).thenReturn(10L);
-      when(supervisor.getInFlightReplications(ReplicationTask.class)).thenReturn(1);
+      when(supervisor.getReplicationRequestAvgTime(metricsName)).thenReturn(3L);
+      when(supervisor.getReplicationQueuedCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 5);
       assertEquals(commandHandler.getQueuedCount(), 1);
       assertEquals(commandHandler.getTotalRunTime(), 10);
+      assertEquals(commandHandler.getAverageRunTime(), 3);
 
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       metrics.getMetrics(metricsCollector, true);

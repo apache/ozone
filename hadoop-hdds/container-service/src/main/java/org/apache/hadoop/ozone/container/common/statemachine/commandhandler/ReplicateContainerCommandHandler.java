@@ -93,7 +93,8 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return supervisor.getInFlightReplications(ReplicationTask.class);
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationQueuedCount(metricsName);
   }
 
   @Override
@@ -109,11 +110,8 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    long invocationCount = getInvocationCount();
-    if (invocationCount > 0) {
-      return getTotalRunTime() / invocationCount;
-    }
-    return 0;
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestAvgTime(metricsName);
   }
 
   @Override

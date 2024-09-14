@@ -493,6 +493,10 @@ public class TestReplicationSupervisor {
           task1.getMetricName()) > 0);
       assertTrue(ecReconstructionSupervisor.getReplicationRequestTotalTime(
           task2.getMetricName()) > 0);
+      assertTrue(replicationSupervisor.getReplicationRequestAvgTime(
+          task1.getMetricName()) > 0);
+      assertTrue(ecReconstructionSupervisor.getReplicationRequestAvgTime(
+          task2.getMetricName()) > 0);
 
       MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
       replicationMetrics.getMetrics(replicationMetricsCollector, true);
