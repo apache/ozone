@@ -520,8 +520,8 @@ public class SCMNodeManager implements NodeManager {
    * @return true means replacement is needed, while false means replacement is not needed.
    */
   private boolean isVersionChange(String oldVersion, String newVersion) {
-    final boolean ipChanged = !Objects.equals(oldVersion, newVersion);
-    return ipChanged;
+    final boolean versionChanged = !Objects.equals(oldVersion, newVersion);
+    return versionChanged;
   }
 
   /**
