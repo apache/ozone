@@ -833,7 +833,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     count = request.getCount();
     HddsProtos.LifeCycleState state = null;
-    HddsProtos.ReplicationFactor factor = null;
     HddsProtos.ReplicationType replicationType = null;
     ReplicationConfig repConfig = null;
     if (request.hasState()) {
@@ -855,12 +854,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               .fromProtoTypeAndFactor(request.getType(), request.getFactor());
         }
       }
-    } else if (request.hasFactor()) {
-      factor = request.getFactor();
     }
     ContainerListResult containerListAndTotalCount =
-      impl.listContainerWithCount(startContainerID, count, state, replicationType,
-          repConfig);
+        impl.listContainerWithCount(startContainerID, count, state, replicationType, repConfig);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {

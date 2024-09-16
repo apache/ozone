@@ -18,10 +18,8 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
-import java.util.List;
 
 import com.google.common.base.Strings;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
