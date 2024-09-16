@@ -846,7 +846,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @Override
   public String getBucketKeyPrefix(String volume, String bucket) {
-    return OzoneFSUtils.addTrailingSlashIfNeeded(getBucketKey(volume, bucket));
+    return getOzoneKey(volume, bucket, OM_KEY_PREFIX);
   }
 
   /**
