@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -663,32 +664,38 @@ public class KeyManagerImpl implements KeyManager {
         .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
   }
 
+  private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
+          TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
+          Function<V, R> valueFunction, int count) throws IOException {
+    List<Table.KeyValue<String, R>> entries = new ArrayList<>();
+    /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
+         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
+    */
+    if (startKey != null) {
+      tableIterator.seek(startKey);
+    }
+    int currentCount = 0;
+    while (tableIterator.hasNext() && currentCount < count) {
+      Table.KeyValue<String, V> kv = tableIterator.next();
+      if (kv != null) {
+        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
+        currentCount++;
+      }
+    }
+    return entries;
+  }
+
+
   @Override
   public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey, int count) throws IOException {
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
         .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
-    List<Table.KeyValue<String, String>> renamedEntries = new ArrayList<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-
-      /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
-         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
-       */
-      if (startKey != null) {
-        renamedKeyIter.seek(startKey);
-      }
-      int currentCount = 0;
-      while (renamedKeyIter.hasNext() && currentCount < count) {
-        Table.KeyValue<String, String> kv = renamedKeyIter.next();
-        if (kv != null) {
-          renamedEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
-          currentCount++;
-        }
-      }
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), count);
     }
-    return renamedEntries;
   }
 
   @Override
@@ -700,22 +707,8 @@ public class KeyManagerImpl implements KeyManager {
     List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries = new ArrayList<>(count);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-
-      /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
-         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
-       */
-      if (startKey != null) {
-        delKeyIter.seek(startKey);
-      }
-      int currentCount = 0;
-      while (delKeyIter.hasNext() && currentCount < count) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
-        if (kv != null) {
-          deletedKeyEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue().cloneOmKeyInfoList()));
-        }
-      }
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, count);
     }
-    return deletedKeyEntries;
   }
 
   @Override
@@ -2030,12 +2023,6 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
     return null;
-  }
-
-  @Override
-  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs()
-      throws IOException {
-    return this.getPendingDeletionDirs(null, null);
   }
 
   @Override

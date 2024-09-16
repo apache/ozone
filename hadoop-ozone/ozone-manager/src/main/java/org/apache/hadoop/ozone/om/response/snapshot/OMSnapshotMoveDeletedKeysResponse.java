@@ -37,10 +37,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
@@ -222,37 +222,6 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     return result;
-  }
-
-  public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
-      SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws IOException {
-    String dbKey = snapshotMoveKeyInfos.getKey();
-    List<OmKeyInfo> keyInfoList = new ArrayList<>();
-    for (KeyInfo info : snapshotMoveKeyInfos.getKeyInfosList()) {
-      OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(info);
-      keyInfoList.add(fromProtobuf);
-    }
-    // When older version of keys are moved to the next snapshot's deletedTable
-    // The newer version might also be in the next snapshot's deletedTable and
-    // it might overwrite. This is to avoid that and also avoid having
-    // orphans blocks. Checking the last keyInfoList size omKeyInfo versions,
-    // this is to avoid redundant additions if the last n versions match.
-    RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
-    if (result == null) {
-      result = new RepeatedOmKeyInfo(keyInfoList);
-    } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
-      keyInfoList.forEach(result::addOmKeyInfo);
-    }
-    return result;
-  }
-
-  private static boolean isSameAsLatestOmKeyInfo(List<OmKeyInfo> omKeyInfos,
-                                                 RepeatedOmKeyInfo result) {
-    int size = result.getOmKeyInfoList().size();
-    if (size >= omKeyInfos.size()) {
-      return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
-    }
-    return false;
   }
 }
 

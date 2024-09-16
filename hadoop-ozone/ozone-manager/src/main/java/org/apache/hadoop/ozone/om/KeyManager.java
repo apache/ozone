@@ -123,7 +123,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list renamed entries from the snapshotRenamedTable.
+   * Returns a list rename entries from the snapshotRenamedTable.
    *
    * @param count max number of keys to return.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
@@ -246,8 +246,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs() throws IOException;
-
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
       String volume, String bucket) throws IOException;
 

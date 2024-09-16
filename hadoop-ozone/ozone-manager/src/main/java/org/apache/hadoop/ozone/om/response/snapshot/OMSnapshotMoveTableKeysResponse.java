@@ -39,7 +39,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.

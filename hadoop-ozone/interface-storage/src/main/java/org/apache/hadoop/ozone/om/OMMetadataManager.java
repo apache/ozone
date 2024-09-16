@@ -119,15 +119,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * Given a volume and bucket, return the corresponding DB key prefix.
    *
-   * @param volume - User name
+   * @param volume - Volume name
    * @param bucket - Bucket name
    */
   String getBucketKeyPrefix(String volume, String bucket);
 
   /**
-   * Given a volume and bucket, return the corresponding DB key prefix.
+   * Given a volume and bucket, return the corresponding DB key prefix for FSO buckets.
    *
-   * @param volume - User name
+   * @param volume - Volume name
    * @param bucket - Bucket name
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
