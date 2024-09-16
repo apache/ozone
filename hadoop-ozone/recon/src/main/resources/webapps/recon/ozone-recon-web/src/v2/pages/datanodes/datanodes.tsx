@@ -73,9 +73,6 @@ const SearchableColumnOpts = [{
 }, {
   label: 'Version',
   value: 'version'
-}, {
-  label: 'Revision',
-  value: 'revision'
 }];
 
 let decommissionUuids: string | string[] = [];

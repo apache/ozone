@@ -268,9 +268,9 @@ const DatanodesTable: React.FC<DatanodeTableProps> = ({
   }
 
   function getFilteredData(data: Datanode[]) {
-    return data.filter(
+    return data?.filter(
       (datanode: Datanode) => datanode[searchColumn].includes(searchTerm)
-    );
+    ) ?? [];
   }
 
   function isSelectable(record: Datanode) {
