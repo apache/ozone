@@ -26,4 +26,11 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
  */
 @InterfaceAudience.Private
 public interface DNMXBean extends ServiceRuntimeInfo {
+    public String getNamespace();
+
+    public String getHostname();
+
+    public String getRpcPort();
+
+    public String getHttpPort();
 }

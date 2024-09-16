@@ -122,6 +122,8 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   public abstract Iterator<Container<?>> getContainerIterator();
 
+  public abstract void recordContainersMetric();
+
   public abstract void scanContainer(Container<?> c)
       throws IOException, InterruptedException;
 

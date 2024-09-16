@@ -253,6 +253,21 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * Get the number of containers based on the given volume.
+   *
+   * @param volume hdds volume.
+   * @return number of containers
+   */
+  public long getContainerCount(HddsVolume volume) {
+    Preconditions.checkNotNull(volume);
+    Preconditions.checkNotNull(volume.getStorageID());
+    String volumeUuid = volume.getStorageID();
+    return containerMap.values().stream()
+        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
+        .getStorageID())).count();
+  }
+
+  /**
    * Return an containerMap iterator over {@link ContainerSet#containerMap}.
    * @return containerMap Iterator
    */

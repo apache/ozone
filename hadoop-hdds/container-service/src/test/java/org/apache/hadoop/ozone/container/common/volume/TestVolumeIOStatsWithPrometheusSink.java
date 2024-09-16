@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -30,6 +31,7 @@ import java.io.OutputStreamWriter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
 
 /**
  * Test PrometheusMetricSink regarding VolumeIOStats.
@@ -54,11 +56,14 @@ public class TestVolumeIOStatsWithPrometheusSink {
 
   @Test
   public void testMultipleVolumeIOMetricsExist() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    int[] intervals = conf.getInts(OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
+
     //GIVEN
     VolumeIOStats volumeIOStats1 = new VolumeIOStats("VolumeIOStat1",
-        "vol1/dir");
+        "vol1/dir", intervals);
     VolumeIOStats volumeIOStat2 = new VolumeIOStats("VolumeIOStat2",
-        "vol2/dir");
+        "vol2/dir", intervals);
 
     //WHEN
     String writtenMetrics = publishMetricsAndGetOutput();

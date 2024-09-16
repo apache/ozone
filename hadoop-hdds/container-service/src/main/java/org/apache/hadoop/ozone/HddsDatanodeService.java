@@ -222,6 +222,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
+      serviceRuntimeInfo.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
@@ -303,14 +304,16 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
                   httpServer.getHttpsAddress().getPort()));
         }
+        serviceRuntimeInfo.setHttpPort(String.valueOf(httpServer.getHttpAddress().getPort()));
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
+
+      serviceRuntimeInfo.setRpcPort(String.valueOf(clientProtocolServer.getClientRpcAddress().getPort()));
 
       // Get admin list
       String starterUser =

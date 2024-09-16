@@ -63,6 +63,7 @@ public class BackgroundContainerDataScanner extends
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
+    this.metrics.setStorageDirectory(volume.toString());
     this.minScanGap = conf.getContainerScanMinGap();
   }
 
@@ -110,7 +111,14 @@ public class BackgroundContainerDataScanner extends
 
   @Override
   public Iterator<Container<?>> getContainerIterator() {
+    recordContainersMetric();
     return controller.getContainers(volume);
+  }
+
+  @Override
+  public void recordContainersMetric() {
+    long containerCount = controller.getContainerCount(volume);
+    volume.getVolumeInfoStats().setContainers(containerCount);
   }
 
   private static void logScanStart(ContainerData containerData) {
