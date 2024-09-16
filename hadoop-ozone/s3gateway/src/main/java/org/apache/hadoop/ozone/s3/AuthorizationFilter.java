@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone.s3;
 
 import javax.annotation.Priority;
 import javax.inject.Inject;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.PreMatching;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -41,6 +39,7 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Filter used to construct string to sign from unfiltered request.
@@ -116,10 +115,4 @@ public class AuthorizationFilter implements ContainerRequestFilter {
     return signatureInfo;
   }
 
-  private WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {
-    return new WebApplicationException(os3Exception.getErrorMessage(),
-        os3Exception,
-        Response.status(os3Exception.getHttpCode())
-            .entity(os3Exception.toXml()).build());
-  }
 }
