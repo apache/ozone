@@ -15,29 +15,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { lazy } from 'react';
 
-const Overview = lazy(() => import('@/v2/pages/overview/overview'));
-const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
-const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
+export type DUSubpath = {
+  path: string;
+  size: number;
+  sizeWithReplica: number;
+  isKey: boolean;
+}
 
-const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
+export type DUResponse = {
+  status: string;
+  path: string;
+  subPathCount: number;
+  size: number;
+  sizeWithReplica: number;
+  subPaths: DUSubpath[];
+  sizeDirectKey: number;
+}
 
-export const routesV2 = [
-  {
-    path: '/Overview',
-    component: Overview
-  },
-  {
-    path: '/Volumes',
-    component: Volumes
-  },
-  {
-    path: '/Buckets',
-    component: Buckets
-  },
-  {
-    path: '/DiskUsage',
-    component: DiskUsage
-  }
-];
+export type PlotData = {
+  value: number;
+  name: string;
+  size: string;
+  percentage: string;
+}
+
+export type DUState = {
+  duResponse: DUResponse;
+  plotData: PlotData[];
+}
