@@ -134,10 +134,7 @@ public class TestSCMClientProtocolServer {
             mockStorageContainerManager(), mock(ReconfigurationHandler.class));
 
     assertEquals(10, scmServer.listContainerWithCount(1, 10,
-        null, HddsProtos.ReplicationType.RATIS, null).getLeft().size());
-    // Test call from a legacy client, which uses a different method of listContainer
-    assertEquals(10, scmServer.listContainerWithCount(1, 10, null,
-        HddsProtos.ReplicationFactor.THREE).getLeft().size());
+        null, HddsProtos.ReplicationType.RATIS, null).getContainerInfoList().size());
   }
 
   private StorageContainerManager mockStorageContainerManager() {

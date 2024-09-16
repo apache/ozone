@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.client.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -168,7 +169,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  ContainerListResult listContainerWithCount(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -207,7 +208,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  ContainerListResult listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
@@ -227,27 +228,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException;
-
-  /**
-   * Ask SCM a list of containers with a range of container names
-   * and the limit of count.
-   * Search container names between start name(exclusive), and
-   * use prefix name to filter the result. the max size of the
-   * searching range cannot exceed the value of count.
-   *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   * @param state Container with this state will be returned.
-   * @param factor Container factor
-   * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
 
@@ -289,7 +269,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  ContainerListResult listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig) throws IOException;

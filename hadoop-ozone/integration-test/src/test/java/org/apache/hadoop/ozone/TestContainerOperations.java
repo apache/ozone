@@ -160,7 +160,7 @@ public class TestContainerOperations {
     }
 
     assertEquals(1, storageClient.listContainerWithCount(0, 2)
-        .getLeft().size());
+        .getContainerInfoList().size());
   }
 
   /**

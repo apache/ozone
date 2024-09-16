@@ -101,7 +101,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainerWithCount(0L, 1_000_000).getLeft();
+        containerOperationClient.listContainerWithCount(0L, 1_000_000).getContainerInfoList();
 
     //logic same as the download+import on the destination datanode
     initializeReplicationSupervisor(conf, containerInfos.size() * 2);

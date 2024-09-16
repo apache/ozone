@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
+import org.apache.hadoop.hdds.scm.client.ContainerListResult;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
@@ -124,34 +125,34 @@ public class ListSubcommand extends ScmSubcommand {
         .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
             ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
     if (all) {
-      System.out.printf("Attempting to list all containers." +
+      System.err.printf("Attempting to list all containers." +
           " The total number of container might exceed" +
           " the cluster's current limit of %s. The results will be capped at the" +
           " maximum allowed count.%n", ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
       count = maxCountAllowed;
     } else {
       if (count > maxCountAllowed) {
-        System.out.printf("Attempting to list the first %d records of containers." +
+        System.err.printf("Attempting to list the first %d records of containers." +
             " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
             " maximum allowed count.%n", count, ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
         count = maxCountAllowed;
       }
     }
 
-    Pair<List<ContainerInfo>, Long> containerListAndTotalCount =
+    ContainerListResult containerListAndTotalCount =
         scmClient.listContainerWithCount(startId, count, state, type, repConfig);
 
     // Output data list
-    for (ContainerInfo container : containerListAndTotalCount.getLeft()) {
+    for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
       outputContainerInfo(container);
     }
 
-    if (containerListAndTotalCount.getRight() > count) {
-      System.out.printf("Container List is truncated since it's too long. " +
+    if (containerListAndTotalCount.getTotalCount() > count) {
+      System.err.printf("Container List is truncated since it's too long. " +
               "List the first %d records of %d. " +
               "User won't be able to view the full list of containers until " +
               "pagination feature is supported.  %n",
-          count, containerListAndTotalCount.getRight());
+          count, containerListAndTotalCount.getTotalCount());
     }
   }
 }

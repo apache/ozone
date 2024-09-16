@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.client.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -388,7 +389,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count)
+  public ContainerListResult listContainerWithCount(long startContainerID, int count)
       throws IOException {
     return listContainerWithCount(startContainerID, count, null, null, null);
   }
@@ -400,7 +401,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
+  public ContainerListResult listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
     return listContainerWithCount(startContainerID, count, state, null, null);
   }
@@ -452,7 +453,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
+  public ContainerListResult listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -494,21 +495,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainersList()) {
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
-    return Pair.of(containerList, response.getContainerCount());
+    return new ContainerListResult(containerList, response.getContainerCount());
   }
 
   @Deprecated
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
-      throws IOException {
-    throw new UnsupportedOperationException("Should no longer be called from " +
-        "the client side");
-  }
-
-  @Deprecated
-  @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
       throws IOException {
     throw new UnsupportedOperationException("Should no longer be called from " +
@@ -1254,7 +1246,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainerWithCount(startContainerID, count, state).getLeft();
+    return listContainerWithCount(startContainerID, count, state).getContainerInfoList();
   }
 
   @Override

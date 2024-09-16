@@ -115,6 +115,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.client.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -857,22 +858,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
-    Pair<List<ContainerInfo>, Long> containerListAndTotalCount;
-    if (factor != null) {
-      // Call from a legacy client
-      containerListAndTotalCount =
-          impl.listContainerWithCount(startContainerID, count, state, factor);
-    } else {
-      containerListAndTotalCount =
-          impl.listContainerWithCount(startContainerID, count, state, replicationType,
-              repConfig);
-    }
+    ContainerListResult containerListAndTotalCount =
+      impl.listContainerWithCount(startContainerID, count, state, replicationType,
+          repConfig);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
-    for (ContainerInfo container : containerListAndTotalCount.getLeft()) {
+    for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
       builder.addContainers(container.getProtobuf());
     }
-    builder.setContainerCount(containerListAndTotalCount.getRight());
+    builder.setContainerCount(containerListAndTotalCount.getTotalCount());
     return builder.build();
   }
 

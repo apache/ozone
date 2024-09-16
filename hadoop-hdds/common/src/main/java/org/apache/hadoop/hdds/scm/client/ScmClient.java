@@ -138,7 +138,7 @@ public interface ScmClient extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  ContainerListResult listContainerWithCount(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -168,7 +168,7 @@ public interface ScmClient extends Closeable {
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID, int count,
+  ContainerListResult listContainerWithCount(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)

@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.client.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -438,7 +439,7 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainerWithCount(long startContainerID,
       int count) throws IOException {
     return listContainerWithCount(startContainerID, count, null, null, null);
   }
@@ -471,7 +472,7 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
     return listContainerWithCount(startContainerID, count, state, null, null);
   }
@@ -543,26 +544,7 @@ public class SCMClientProtocolServer implements
     }
   }
 
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param factor Container factor.
-   * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  @Override
-  @Deprecated
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException {
-    return listContainerInternal(startContainerID, count, state, factor, null, null);
-  }
-
-  private Pair<List<ContainerInfo>, Long> listContainerInternal(long startContainerID, int count,
+  private ContainerListResult listContainerInternal(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
@@ -576,7 +558,10 @@ public class SCMClientProtocolServer implements
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
               .sorted().collect(Collectors.toList());
-      return Pair.of(containerInfos.stream().limit(count).collect(Collectors.toList()), (long) containerInfos.size());
+      List<ContainerInfo> limitedContainers =
+          containerInfos.stream().limit(count).collect(Collectors.toList());
+      long totalCount = (long) containerInfos.size();
+      return new ContainerListResult(limitedContainers, totalCount);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -723,7 +708,7 @@ public class SCMClientProtocolServer implements
    * @throws IOException
    */
   @Override
-  public Pair<List<ContainerInfo>, Long> listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainerWithCount(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
