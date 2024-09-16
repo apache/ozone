@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestOzoneClientConfig {
 
@@ -35,5 +37,43 @@ class TestOzoneClientConfig {
     OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
 
     assertEquals(OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE, subject.getBytesPerChecksum());
+  }
+
+  @Test
+  void testClientHBaseEnhancementsAllowedTrue() {
+    // When ozone.client.hbase.enhancements.allowed = true,
+    // related client configs should be effective as-is.
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+
+    // Note: ozone.fs.hsync.enabled is checked by OzoneFSUtils.canEnableHsync(), thus not checked here
+    conf.setBoolean("ozone.client.incremental.chunk.list", true);
+    conf.setBoolean("ozone.client.stream.putblock.piggybacking", true);
+    conf.setInt("ozone.client.key.write.concurrency", -1);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertTrue(subject.getIncrementalChunkList());
+    assertTrue(subject.getEnablePutblockPiggybacking());
+    assertEquals(-1, subject.getMaxConcurrentWritePerKey());
+  }
+
+  @Test
+  void testClientHBaseEnhancementsAllowedFalse() {
+    // When ozone.client.hbase.enhancements.allowed = false,
+    // related client configs should be reverted back to default.
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", false);
+
+    // Note: ozone.fs.hsync.enabled is checked by OzoneFSUtils.canEnableHsync(), thus not checked here
+    conf.setBoolean("ozone.client.incremental.chunk.list", true);
+    conf.setBoolean("ozone.client.stream.putblock.piggybacking", true);
+    conf.setInt("ozone.client.key.write.concurrency", -1);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertFalse(subject.getIncrementalChunkList());
+    assertFalse(subject.getEnablePutblockPiggybacking());
+    assertEquals(1, subject.getMaxConcurrentWritePerKey());
   }
 }
