@@ -74,7 +74,7 @@ public final class ContainerDataScannerMetrics
     return storageDirectory;
   }
 
-  public void setStorageDirectory(final String volumeName){
+  public void setStorageDirectory(final String volumeName) {
     this.storageDirectory = volumeName;
   }
 }

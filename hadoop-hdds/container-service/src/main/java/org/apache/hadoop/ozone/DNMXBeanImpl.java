@@ -25,48 +25,43 @@ import org.apache.hadoop.hdds.utils.VersionInfo;
  * This is the JMX management class for DN information.
  */
 public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
-    private String nameSpace;
-    private String hostName;
-    private String rpcPort;
-    private String httpPort;
 
-    public DNMXBeanImpl(
-      VersionInfo versionInfo) {
+  private String hostName;
+  private String rpcPort;
+  private String httpPort;
+
+  public DNMXBeanImpl(VersionInfo versionInfo) {
     super(versionInfo);
   }
 
-    public String getNamespace() {
-        return nameSpace;
-    }
+  @Override
+  public String getHostname() {
+    return hostName;
+  }
 
-    @Override
-    public String getHostname() {
-        return hostName;
-    }
+  @Override
+  public String getRpcPort() {
+    return rpcPort;
+  }
 
-    @Override
-    public String getRpcPort() {
-        return rpcPort;
-    }
+  @Override
+  public String getHttpPort() {
+    return httpPort;
+  }
 
-    @Override
-    public String getHttpPort() {
-      return httpPort;
-    }
+  public void setHttpPort(String httpPort) {
+    this.httpPort = httpPort;
+  }
 
-    public void setHttpPort(String httpPort) {
-        this.httpPort = httpPort;
-    }
+  public void setNameSpace(String nameSpace) {
+    this.nameSpace = nameSpace;
+  }
 
-    public void setNameSpace(String nameSpace) {
-        this.nameSpace = nameSpace;
-    }
+  public void setHostName(String hostName) {
+    this.hostName = hostName;
+  }
 
-    public void setHostName(String hostName) {
-        this.hostName = hostName;
-    }
-
-    public void setRpcPort(String rpcPort) {
-        this.rpcPort = rpcPort;
-    }
+  public void setRpcPort(String rpcPort) {
+    this.rpcPort = rpcPort;
+  }
 }
