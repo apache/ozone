@@ -171,8 +171,6 @@ jobs:
       - build-info
       - build
       - basic
-      - dependency
-      - license
     timeout-minutes: 45
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
@@ -409,8 +407,6 @@ jobs:
       - build-info
       - build
       - basic
-      - dependency
-      - license
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
@@ -458,8 +454,6 @@ jobs:
       - build-info
       - build
       - basic
-      - dependency
-      - license
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
