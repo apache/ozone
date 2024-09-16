@@ -2136,62 +2136,50 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisRoles() {
-    final SCMRatisServer server = getScmHAManager().getRatisServer();
-    return server != null ?
-        HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
-  }
-
-  @Override
-  public List<List<String>> getRatisRoles() {
+  public List<List<String>> getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
 
     // If Ratis is disabled
     if (server == null) {
-      return getRatisRolesException("Ratis is disabled")
-    }
-    ...
-
-      // To attempt to find the SCM Leader,
-      // and if the Leader is not found
-      // return Leader is not found message.
-      RaftServer.Division division = server.getDivision();
-      RaftPeer leader = getLeader(division);
-      if (leader == null) {
-        return getRatisRolesException("No leader found");
-      }
-
-      // If the SCMRatisServer is stopped, return a service stopped message.
-      if (server.isStopped()) {
-        return getRatisRolesException("Server is shutting down");
-      }
-
-      // Attempt to retrieve role information.
-      try {
-        List<String> ratisRoles = server.getRatisRoles();
-        List<List<String>> result = new ArrayList<>();
-        for (String role : ratisRoles) {
-          String[] roleArr = role.split(":");
-          List<String> scmInfo = new ArrayList<>();
-          // Host Name
-          scmInfo.add(roleArr[0]);
-          // Node ID
-          scmInfo.add(roleArr[3]);
-          // Ratis Port
-          scmInfo.add(roleArr[1]);
-          // Role
-          scmInfo.add(roleArr[2]);
-          result.add(scmInfo);
-        }
-        return result;
-      } catch (Exception e) {
-        LOG.error("Failed to getRatisRoles.", e);
-        return getRatisRolesException("Exception Occurred, " + e.getMessage());
-      }
+      return getRatisRolesException("Ratis is disabled");
     }
 
-    // If Ratis is not enabled, we will throw an exception directly.
-    return getRatisRolesException("Ratis is disabled");
+    // To attempt to find the SCM Leader,
+    // and if the Leader is not found
+    // return Leader is not found message.
+    RaftServer.Division division = server.getDivision();
+    RaftPeer leader = getLeader(division);
+    if (leader == null) {
+      return getRatisRolesException("No leader found");
+    }
+
+    // If the SCMRatisServer is stopped, return a service stopped message.
+    if (server.isStopped()) {
+      return getRatisRolesException("Server is shutting down");
+    }
+
+    // Attempt to retrieve role information.
+    try {
+      List<String> ratisRoles = server.getRatisRoles();
+      List<List<String>> result = new ArrayList<>();
+      for (String role : ratisRoles) {
+        String[] roleArr = role.split(":");
+        List<String> scmInfo = new ArrayList<>();
+        // Host Name
+        scmInfo.add(roleArr[0]);
+        // Node ID
+        scmInfo.add(roleArr[3]);
+        // Ratis Port
+        scmInfo.add(roleArr[1]);
+        // Role
+        scmInfo.add(roleArr[2]);
+        result.add(scmInfo);
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("Failed to getRatisRoles.", e);
+      return getRatisRolesException("Exception Occurred, " + e.getMessage());
+    }
   }
 
   public RaftPeer getLeader(RaftServer.Division division) {
