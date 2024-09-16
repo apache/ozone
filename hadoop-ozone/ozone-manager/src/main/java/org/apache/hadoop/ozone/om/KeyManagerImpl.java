@@ -2026,9 +2026,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(String volume,
-                                                                                                   String bucket)
-      throws IOException {
+  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+      String volume, String bucket) throws IOException {
 
     // Either both volume & bucket should be null or none of them should be null.
     if (!StringUtils.isBlank(volume) && StringUtils.isBlank(bucket) ||

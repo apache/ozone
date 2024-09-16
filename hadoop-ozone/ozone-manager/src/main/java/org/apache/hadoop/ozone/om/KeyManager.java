@@ -246,14 +246,14 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
   default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int count)
       throws IOException {
     List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(count);
     try (TableIterator<String, ? extends  Table.KeyValue<String, OmKeyInfo>> iterator =
-             getPendingDeletionDirs(volume, bucket)) {
+             getDeletedDirEntries(volume, bucket)) {
       while (deletedDirEntries.size() < count && iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         deletedDirEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));

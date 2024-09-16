@@ -824,7 +824,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Given a volume and bucket, return the corresponding DB key.
    *
-   * @param volume - User name
+   * @param volume - Volume name
    * @param bucket - Bucket name
    */
   @Override
@@ -841,7 +841,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Given a volume and bucket, return the corresponding DB key prefix.
    *
-   * @param volume - User name
+   * @param volume - Volume name
    * @param bucket - Bucket name
    */
   @Override
@@ -852,12 +852,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Given a volume and bucket, return the corresponding DB key prefix.
    *
-   * @param volume - User name
+   * @param volume - Volume name
    * @param bucket - Bucket name
    */
   @Override
   public String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException {
-    return OzoneFSUtils.addTrailingSlashIfNeeded(getOzoneKeyFSO(volume, bucket, ""));
+    return getOzoneKeyFSO(volume, bucket, OM_KEY_PREFIX);
   }
 
   @Override
