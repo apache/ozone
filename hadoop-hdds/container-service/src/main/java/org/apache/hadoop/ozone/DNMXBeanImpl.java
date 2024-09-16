@@ -53,10 +53,6 @@ public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
     this.httpPort = httpPort;
   }
 
-  public void setNameSpace(String nameSpace) {
-    this.nameSpace = nameSpace;
-  }
-
   public void setHostName(String hostName) {
     this.hostName = hostName;
   }
