@@ -2182,19 +2182,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public RaftPeer getLeader(RaftServer.Division division) {
-    if (division.getInfo().isLeader()) {
-      return division.getPeer();
-    } else {
-      DivisionInfo info = division.getInfo();
-      RaftProtos.RoleInfoProto roleInfoProto = info.getRoleInfoProto();
-      RaftProtos.FollowerInfoProto followerInfo = roleInfoProto.getFollowerInfo();
-      RaftProtos.ServerRpcProto leaderInfo = followerInfo.getLeaderInfo();
-      RaftProtos.RaftPeerProto peerLeaderId = leaderInfo.getId();
-      ByteString leaderId = peerLeaderId.getId();
-      return leaderId.isEmpty() ? null :
-          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
-    }
+  public RaftPeerId getLeaderId(RaftServer.Division division) {
+    return division.getInfo().getLeaderId();
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
