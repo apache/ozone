@@ -168,6 +168,14 @@ public interface DBStore extends Closeable, BatchOperationHandler {
   DBCheckpoint getCheckpoint(boolean flush) throws IOException;
 
   /**
+   * Get current snapshot of DB store as an artifact stored on
+   * the local filesystem with different parent path.
+   * @return An object that encapsulates the checkpoint information along with
+   * location.
+   */
+  DBCheckpoint getCheckpoint(String parentDir, boolean flush) throws IOException;
+
+  /**
    * Get DB Store location.
    * @return DB file location.
    */

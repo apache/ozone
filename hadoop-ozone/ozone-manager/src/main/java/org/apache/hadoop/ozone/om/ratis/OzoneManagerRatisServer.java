@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -300,15 +301,23 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
-   * API used internally from OzoneManager Server when requests needs to be
-   * submitted to ratis, where the crafted RaftClientRequest is passed along.
+   * API used internally from OzoneManager Server when requests need to be submitted.
    * @param omRequest
-   * @param raftClientRequest
+   * @param cliId
+   * @param callId
    * @return OMResponse
    * @throws ServiceException
    */
-  public OMResponse submitRequest(OMRequest omRequest,
-      RaftClientRequest raftClientRequest) throws ServiceException {
+  public OMResponse submitRequest(OMRequest omRequest, ClientId cliId, long callId) throws ServiceException {
+    RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+        .setClientId(cliId)
+        .setServerId(getRaftPeerId())
+        .setGroupId(getRaftGroupId())
+        .setCallId(callId)
+        .setMessage(Message.valueOf(
+            OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
     RaftClientReply raftClientReply =
         submitRequestToRatis(raftClientRequest);
     return createOmResponse(omRequest, raftClientReply);
@@ -624,16 +633,15 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties, Collections.singletonList(new File(ratisStorageDir)));
 
-    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
+    final int logAppenderBufferByteLimit = (int) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES);
+    setRaftLogProperties(properties, logAppenderBufferByteLimit, conf);
 
     // For grpc config
-    setGrpcConfig(properties, logAppenderQueueByteLimit);
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
 
     setRaftLeaderElectionProperties(properties, conf);
-
-    setRaftLogProperties(properties, logAppenderQueueByteLimit, conf);
 
     setRaftRpcProperties(properties, conf);
 
@@ -691,12 +699,6 @@ public final class OzoneManagerRatisServer {
 
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
-  }
-
-  private static void setGrpcConfig(RaftProperties properties, int logAppenderQueueByteLimit) {
-    // For grpc set the maximum message size
-    // TODO: calculate the optimal max message size
-    GrpcConfigKeys.setMessageSizeMax(properties, SizeInBytes.valueOf(logAppenderQueueByteLimit));
   }
 
   private static void setRaftRpcProperties(RaftProperties properties, ConfigurationSource conf) {

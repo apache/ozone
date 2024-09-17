@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 import { Card, Row, Table } from 'antd';
 
 import { ColumnType } from 'antd/es/table';
@@ -100,7 +100,10 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
         size="small"
         pagination={false}
         dataSource={tableData}
-        columns={columns} />
+        columns={columns}
+        onRow={(record: TableData) => ({
+          'data-testid': `overview-${title}-${record.name}`
+        } as HTMLAttributes<HTMLElement>)}/>
     </Card>
   )
 }

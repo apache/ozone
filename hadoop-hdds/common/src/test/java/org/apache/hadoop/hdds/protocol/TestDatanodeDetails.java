@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.protocol;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,24 @@ public class TestDatanodeDetails {
     HddsProtos.DatanodeDetailsProto protoV1 =
         subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     assertPorts(protoV1, ALL_PORTS);
+  }
+
+  @Test
+  public void testNewBuilderCurrentVersion() {
+    // test that if the current version is not set (Ozone 1.4.0 and earlier),
+    // it falls back to SEPARATE_RATIS_PORTS_AVAILABLE
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+    protoBuilder.clearCurrentVersion();
+    DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
+    assertEquals(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
+
+    // test that if the current version is set, it is used
+    protoBuilder =
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+    DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
+    assertEquals(DatanodeVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,
