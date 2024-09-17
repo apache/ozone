@@ -30,7 +30,7 @@ public final class RequestContext {
   private OMRequest request;
   private OMClientRequest clientRequest;
   private OMResponse response;
-  private TermIndex cacheIndex;
+  private TermIndex index;
   private CompletableFuture<OMResponse> future;
   private OzoneManagerProtocolProtos.PersistDbRequest.Builder nextRequest;
 
@@ -53,12 +53,12 @@ public final class RequestContext {
     this.response = response;
   }
 
-  public TermIndex getCacheIndex() {
-    return cacheIndex;
+  public TermIndex getIndex() {
+    return index;
   }
 
-  public void setCacheIndex(TermIndex cacheIndex) {
-    this.cacheIndex = cacheIndex;
+  public void setIndex(TermIndex index) {
+    this.index = index;
   }
 
   public CompletableFuture<OMResponse> getFuture() {

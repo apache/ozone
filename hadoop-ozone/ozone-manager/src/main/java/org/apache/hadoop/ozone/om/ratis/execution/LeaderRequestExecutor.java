@@ -59,14 +59,14 @@ public class LeaderRequestExecutor {
   private static final int RATIS_TASK_POOL_SIZE = 1;
   private static final int RATIS_TASK_QUEUE_SIZE = 1000;
   private static final long DUMMY_TERM = -1;
-  private final AtomicLong cacheIndex = new AtomicLong(0);
+  private final AtomicLong uniqueIndex;
   private final int ratisByteLimit;
   private final OzoneManager ozoneManager;
   private final PoolExecutor<RequestContext> leaderExecutor;
   private final OzoneManagerRequestHandler handler;
   private final AtomicBoolean isEnabled = new AtomicBoolean(true);
 
-  public LeaderRequestExecutor(OzoneManager om) {
+  public LeaderRequestExecutor(OzoneManager om, AtomicLong uniqueIndex) {
     this.ozoneManager = om;
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
     PoolExecutor<RequestContext> ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE,
@@ -79,6 +79,7 @@ public class LeaderRequestExecutor {
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.8);
+    this.uniqueIndex = uniqueIndex;
   }
 
   public int batchSize() {
@@ -161,8 +162,8 @@ public class LeaderRequestExecutor {
   }
   private void executeRequest(RequestContext ctx, PoolExecutor<RequestContext> nxtPool) {
     OMRequest request = ctx.getRequest();
-    TermIndex termIndex = TermIndex.valueOf(DUMMY_TERM, cacheIndex.incrementAndGet());
-    ctx.setCacheIndex(termIndex);
+    TermIndex termIndex = TermIndex.valueOf(DUMMY_TERM, uniqueIndex.incrementAndGet());
+    ctx.setIndex(termIndex);
     try {
       validate(request);
       handleRequest(ctx, termIndex);
@@ -277,7 +278,7 @@ public class LeaderRequestExecutor {
         tblBuilder.addAllRecords(tblUpdates.getRecordsList());
         reqBuilder.addTableUpdates(tblBuilder.build());
       }
-      reqBuilder.addIndex(ctx.getCacheIndex().getIndex());
+      reqBuilder.addIndex(ctx.getIndex().getIndex());
       sendList.add(ctx);
     }
     if (sendList.size() > 0) {
@@ -293,7 +294,7 @@ public class LeaderRequestExecutor {
         .setClientId(lastReqCtx.getRequest().getClientId());
     try {
       OMRequest reqBatch = omReqBuilder.build();
-      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getCacheIndex());
+      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getIndex());
       if (dbUpdateRsp != null) {
         throw new OMException(dbUpdateRsp.getMessage(),
             OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
@@ -337,7 +338,7 @@ public class LeaderRequestExecutor {
     for (RequestContext ctx : ctxs) {
       if (th != null) {
         OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getClientRequest(), ozoneManager,
-            ctx.getCacheIndex(), th);
+            ctx.getIndex(), th);
         if (th instanceof IOException) {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
         } else {
@@ -347,7 +348,7 @@ public class LeaderRequestExecutor {
         // TODO: no-cache, remove disable processing, let every request deal with ratis failure
         disableProcessing();
       } else {
-        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getCacheIndex());
+        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getIndex());
         ctx.getFuture().complete(ctx.getResponse());
       }
 
@@ -356,7 +357,7 @@ public class LeaderRequestExecutor {
         List<OzoneManagerProtocolProtos.DBTableUpdate> tblList = ctx.getNextRequest().getTableUpdatesList();
         for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdate : tblList) {
           List<Long> epochs = cleanupMap.computeIfAbsent(tblUpdate.getTableName(), k -> new ArrayList<>());
-          epochs.add(ctx.getCacheIndex().getIndex());
+          epochs.add(ctx.getIndex().getIndex());
         }
       }
     }
