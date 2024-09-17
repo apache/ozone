@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeInfoMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,7 +119,10 @@ public class BackgroundContainerDataScanner extends
   @Override
   public void recordContainersMetric() {
     long containerCount = controller.getContainerCount(volume);
-    volume.getVolumeInfoStats().setContainers(containerCount);
+    VolumeInfoMetrics volumeInfoStats = volume.getVolumeInfoStats();
+    if (volumeInfoStats != null) {
+      volumeInfoStats.setContainers(containerCount);
+    }
   }
 
   private static void logScanStart(ContainerData containerData) {
