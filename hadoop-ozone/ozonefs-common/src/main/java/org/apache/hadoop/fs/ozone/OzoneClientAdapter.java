@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -74,6 +75,8 @@ public interface OzoneClientAdapter {
 
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;
+  
+  OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   KeyProvider getKeyProvider() throws IOException;
 

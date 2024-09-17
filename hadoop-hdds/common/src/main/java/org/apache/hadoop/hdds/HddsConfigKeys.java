@@ -367,6 +367,9 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
       "hdds.datanode.handler.count";
   public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 10;
+  public static final String HDDS_DATANODE_READ_THREADPOOL_KEY =
+      "hdds.datanode.read.threadpool";
+  public static final int HDDS_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;

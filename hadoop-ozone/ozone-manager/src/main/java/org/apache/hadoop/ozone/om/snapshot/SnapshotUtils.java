@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -143,7 +142,7 @@ public final class SnapshotUtils {
    * Get the next non deleted snapshot in the snapshot chain.
    */
   public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+      SnapshotChainManager chainManager, OzoneManager ozoneManager)
       throws IOException {
 
     // If the snapshot is deleted in the previous run, then the in-memory
@@ -162,8 +161,7 @@ public final class SnapshotUtils {
                 snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
 
         String tableKey = chainManager.getTableKey(nextPathSnapshot);
-        SnapshotInfo nextSnapshotInfo =
-            omSnapshotManager.getSnapshotInfo(tableKey);
+        SnapshotInfo nextSnapshotInfo = getSnapshotInfo(ozoneManager, tableKey);
 
         if (nextSnapshotInfo.getSnapshotStatus().equals(
             SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {

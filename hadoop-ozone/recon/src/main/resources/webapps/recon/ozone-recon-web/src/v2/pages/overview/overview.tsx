@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
 import axios, { CanceledError } from 'axios';
@@ -99,14 +99,14 @@ const getSummaryTableValue = (
   colType: 'value' | undefined = undefined
 ): string => {
   if (!value) return 'N/A';
-  if (colType === 'value') String(value as string)
+  if (colType === 'value') return String(value as string)
   return size(value as number)
 }
 
 const Overview: React.FC<{}> = () => {
 
-  let cancelOverviewSignal: AbortController;
-  let cancelOMDBSyncSignal: AbortController;
+  const cancelOverviewSignal = useRef<AbortController>();
+  const cancelOMDBSyncSignal = useRef<AbortController>();
 
   const [state, setState] = useState<OverviewState>({
     loading: false,
@@ -147,8 +147,8 @@ const Overview: React.FC<{}> = () => {
       // Component will Un-mount
       autoReloadHelper.stopPolling();
       cancelRequests([
-        cancelOMDBSyncSignal,
-        cancelOverviewSignal
+        cancelOMDBSyncSignal.current!,
+        cancelOverviewSignal.current!
       ]);
     })
   }, [])
@@ -161,8 +161,8 @@ const Overview: React.FC<{}> = () => {
 
     // Cancel any previous pending requests
     cancelRequests([
-      cancelOMDBSyncSignal,
-      cancelOverviewSignal
+      cancelOMDBSyncSignal.current!,
+      cancelOverviewSignal.current!
     ]);
 
     const { requests, controller } = PromiseAllSettledGetHelper([
@@ -170,8 +170,8 @@ const Overview: React.FC<{}> = () => {
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
       '/api/v1/keys/deletePending/summary'
-    ], cancelOverviewSignal);
-    cancelOverviewSignal = controller;
+    ], cancelOverviewSignal.current);
+    cancelOverviewSignal.current = controller;
 
     requests.then(axios.spread((
       clusterStateResponse: Awaited<Promise<any>>,
@@ -264,10 +264,10 @@ const Overview: React.FC<{}> = () => {
 
     const { request, controller } = AxiosGetHelper(
       '/api/v1/triggerdbsync/om',
-      cancelOMDBSyncSignal,
+      cancelOMDBSyncSignal.current,
       'OM-DB Sync request cancelled because data was updated'
     );
-    cancelOMDBSyncSignal = controller;
+    cancelOMDBSyncSignal.current = controller;
 
     request.then(omStatusResponse => {
       const omStatus = omStatusResponse.data;

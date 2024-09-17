@@ -56,11 +56,6 @@ public final class CommandDispatcher {
   private CommandDispatcher(OzoneContainer container, SCMConnectionManager
       connectionManager, StateContext context,
       CommandHandler... handlers) {
-    Preconditions.checkNotNull(context);
-    Preconditions.checkNotNull(handlers);
-    Preconditions.checkArgument(handlers.length > 0);
-    Preconditions.checkNotNull(container);
-    Preconditions.checkNotNull(connectionManager);
     this.context = context;
     this.container = container;
     this.connectionManager = connectionManager;
@@ -77,6 +72,7 @@ public final class CommandDispatcher {
     commandHandlerMetrics = CommandHandlerMetrics.create(handlerMap);
   }
 
+  @VisibleForTesting
   public CommandHandler getCloseContainerHandler() {
     return handlerMap.get(Type.closeContainerCommand);
   }
@@ -201,11 +197,12 @@ public final class CommandDispatcher {
      * @return Command Dispatcher.
      */
     public CommandDispatcher build() {
-      Preconditions.checkNotNull(this.connectionManager, "Missing connection" +
-          " manager.");
-      Preconditions.checkNotNull(this.container, "Missing container.");
-      Preconditions.checkNotNull(this.context, "Missing context.");
-      Preconditions.checkArgument(this.handlerList.size() > 0);
+      Preconditions.checkNotNull(this.connectionManager,
+          "Missing scm connection manager.");
+      Preconditions.checkNotNull(this.container, "Missing ozone container.");
+      Preconditions.checkNotNull(this.context, "Missing state context.");
+      Preconditions.checkArgument(this.handlerList.size() > 0,
+          "The number of command handlers must be greater than 0.");
       return new CommandDispatcher(this.container, this.connectionManager,
           this.context, handlerList.toArray(
               new CommandHandler[handlerList.size()]));

@@ -91,19 +91,13 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
             .getOzoneManager().getOmSnapshotManager();
 
     try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
-        omSnapshotManager.getSnapshot(
-            fromSnapshot.getVolumeName(),
-            fromSnapshot.getBucketName(),
-            fromSnapshot.getName())) {
+        omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
       OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
         try (ReferenceCounted<OmSnapshot>
-            rcOmNextSnapshot = omSnapshotManager.getSnapshot(
-                nextSnapshot.getVolumeName(),
-                nextSnapshot.getBucketName(),
-                nextSnapshot.getName())) {
+            rcOmNextSnapshot = omSnapshotManager.getSnapshot(nextSnapshot.getSnapshotId())) {
 
           OmSnapshot nextOmSnapshot = rcOmNextSnapshot.get();
           RDBStore nextSnapshotStore =
@@ -139,6 +133,11 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       }
     }
 
+    // Flush snapshot info to rocksDB.
+    omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
+    if (nextSnapshot != null) {
+      omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, nextSnapshot.getTableKey(), nextSnapshot);
+    }
   }
 
   private void deleteDirsFromSnapshot(BatchOperation batchOp,

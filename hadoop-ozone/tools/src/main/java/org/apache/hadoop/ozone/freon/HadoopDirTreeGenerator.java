@@ -19,17 +19,14 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import java.net.URI;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,16 +42,11 @@ import java.util.concurrent.atomic.AtomicLong;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @SuppressWarnings("java:S2245") // no need for secure random
-public class HadoopDirTreeGenerator extends BaseFreonGenerator
+public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopDirTreeGenerator.class);
-
-  @Option(names = {"-r", "--rpath"},
-      description = "Hadoop FS root path",
-      defaultValue = "o3fs://bucket2.vol2")
-  private String rootPath;
 
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
@@ -99,8 +91,6 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   private ContentGenerator contentGenerator;
 
-  private FileSystem fileSystem;
-
   @Override
   public Void call() throws Exception {
     String s;
@@ -111,10 +101,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       s = "Invalid span value, span value should be greater than zero!";
       print(s);
     } else {
-      init();
-      OzoneConfiguration configuration = createOzoneConfiguration();
-      fileSystem = FileSystem.get(URI.create(rootPath), configuration);
-
+      super.init();
       contentGenerator = new ContentGenerator(fileSize.toBytes(), bufferSize);
       timer = getMetrics().timer("file-create");
 
@@ -152,7 +139,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
      created.
    */
   private void createDir(long counter) throws Exception {
-    String dir = makeDirWithGivenNumberOfFiles(rootPath);
+    String dir = makeDirWithGivenNumberOfFiles(getRootPath());
     if (depth > 1) {
       createSubDirRecursively(dir, 1, 1);
     }
@@ -196,8 +183,8 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   private String makeDirWithGivenNumberOfFiles(String parent)
           throws Exception {
     String dir = RandomStringUtils.randomAlphanumeric(length);
-    dir = parent.toString().concat("/").concat(dir);
-    fileSystem.mkdirs(new Path(dir));
+    dir = parent.concat("/").concat(dir);
+    getFileSystem().mkdirs(new Path(dir));
     totalDirsCnt.incrementAndGet();
     // Add given number of files into the created directory.
     createFiles(dir);
@@ -212,7 +199,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       LOG.debug("FilePath:{}", file);
     }
     timer.time(() -> {
-      try (FSDataOutputStream output = fileSystem.create(file)) {
+      try (FSDataOutputStream output = getFileSystem().create(file)) {
         contentGenerator.write(output);
       }
       return null;
