@@ -2221,7 +2221,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  long getLastTrxnIndexForNonRatis() throws IOException {
+  public long getLastTrxnIndexForNonRatis() throws IOException {
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(metadataManager);
     // If the OMTransactionInfo does not exist in DB, return 0 so that new incoming
