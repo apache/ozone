@@ -250,7 +250,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
+    private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
                                               List<SnapshotMoveKeyInfos> deletedKeys,
                                               List<HddsProtos.KeyValue> renamedList,
                                               List<SnapshotMoveKeyInfos> dirsToMove) {

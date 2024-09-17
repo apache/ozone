@@ -1984,7 +1984,7 @@ message SnapshotMoveDeletedKeysRequest {
 }
 
 message SnapshotMoveTableKeysRequest {
-  required hadoop.hdds.UUID fromSnapshotID = 1;
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
   repeated SnapshotMoveKeyInfos deletedKeys = 2;
   repeated SnapshotMoveKeyInfos deletedDirs = 3;
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
