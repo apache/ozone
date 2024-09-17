@@ -229,20 +229,22 @@ public class OMBasicStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
+    final Object context = trx.getStateMachineContext();
+    final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
     try {
       // For the Leader, the OMRequest is set in trx in startTransaction.
       // For Followers, the OMRequest hast to be converted from the log entry.
-      final Object context = trx.getStateMachineContext();
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
-      final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
-      OMResponse response = runCommand(request, termIndex);
+      OMResponse response = runCommand(request, termIndex, handler, ozoneManager);
       CompletableFuture<Message> future = new CompletableFuture<>();
       future.complete(OMRatisHelper.convertResponseToMessage(response));
       return future;
     } catch (Exception e) {
       return completeExceptionally(e);
+    } finally {
+      updateLastAppliedTermIndex(termIndex);
     }
   }
 
@@ -362,7 +364,8 @@ public class OMBasicStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+  private static OMResponse runCommand(
+      OMRequest request, TermIndex termIndex, RequestHandler handler, OzoneManager om) {
     OMClientResponse omClientResponse = null;
     try {
       try {
@@ -372,17 +375,17 @@ public class OMBasicStateMachine extends BaseStateMachine {
         LOG.warn("Failed to apply command, Exception occurred ", e);
         omClientResponse = new DummyOMClientResponse(createErrorResponse(request, e, termIndex));
         validateResponseError(omClientResponse.getOMResponse());
-        ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        om.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
             TransactionInfo.valueOf(termIndex));
       }
 
       if (!(omClientResponse instanceof DummyOMClientResponse)) {
         // need perform db operation for other request (not for PersistDB request)
-        try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore().initBatchOperation()) {
-          omClientResponse.checkAndUpdateDB(ozoneManager.getMetadataManager(), batchOperation);
-          ozoneManager.getMetadataManager().getTransactionInfoTable().putWithBatch(
+        try (BatchOperation batchOperation = om.getMetadataManager().getStore().initBatchOperation()) {
+          omClientResponse.checkAndUpdateDB(om.getMetadataManager(), batchOperation);
+          om.getMetadataManager().getTransactionInfoTable().putWithBatch(
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex));
-          ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
+          om.getMetadataManager().getStore().commitBatchOperation(batchOperation);
         }
       }
       return omClientResponse.getOMResponse();
@@ -390,8 +393,6 @@ public class OMBasicStateMachine extends BaseStateMachine {
       // For any further exceptions, terminate OM as db update fails
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
-    } finally {
-      updateLastAppliedTermIndex(termIndex);
     }
     return null;
   }
@@ -404,7 +405,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
     }
   }
 
-  private OMResponse createErrorResponse(
+  private static OMResponse createErrorResponse(
       OMRequest omRequest, IOException exception, TermIndex termIndex) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
