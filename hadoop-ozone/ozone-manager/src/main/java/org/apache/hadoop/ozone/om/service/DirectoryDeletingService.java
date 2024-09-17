@@ -223,7 +223,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               "background task. Will retry at next run.", e);
         }
         isRunningOnAOS.set(false);
-        directoryDeletingService.notifyAll();
+        synchronized (directoryDeletingService) {
+          this.directoryDeletingService.notify();
+        }
       }
       // place holder by returning empty results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
