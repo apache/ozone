@@ -450,6 +450,9 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          LOG.info("Update the version for registered datanode = {}, " +
+              "oldVersion = {}, newVersion = {}.",
+              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
