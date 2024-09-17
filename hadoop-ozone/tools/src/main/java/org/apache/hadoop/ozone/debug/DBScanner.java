@@ -516,26 +516,29 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return fieldMap;
     }
 
-    Map<String, Filter> getFilterSplit(List<String> fields, Map<String, Filter> fieldMap, Filter value) {
+    void getFilterSplit(List<String> fields, Map<String, Filter> fieldMap, Filter leafValue) throws IOException {
       int len = fields.size();
-      if (fieldMap == null) {
-        fieldMap = new HashMap<>();
-      }
       if (len == 1) {
-        fieldMap.putIfAbsent(fields.get(0), value);
-      } else {
-        Filter fieldMapGet = fieldMap.get(fields.get(0));
-        Map<String, Filter> nextLevel;
-        if (fieldMapGet == null) {
-          fieldMapGet = new Filter();
-          nextLevel = getFilterSplit(fields.subList(1, len), null, value);
-        } else {
-          nextLevel = getFilterSplit(fields.subList(1, len), fieldMapGet.getNextLevel(), value);
+        Filter currentValue = fieldMap.get(fields.get(0));
+        if (currentValue != null) {
+          err().println("Cannot pass multiple values for the same field and " +
+              "cannot have filter for both parent and child");
+          throw new IOException("Invalid filter passed");
         }
-        fieldMapGet.setNextLevel(nextLevel);
-        fieldMap.put(fields.get(0), fieldMapGet);
+        fieldMap.put(fields.get(0), leafValue);
+      } else {
+        Filter fieldMapGet = fieldMap.computeIfAbsent(fields.get(0), k -> new Filter());
+        if (fieldMapGet.getValue() != null) {
+          err().println("Cannot pass multiple values for the same field and " +
+              "cannot have filter for both parent and child");
+          throw new IOException("Invalid filter passed");
+        }
+        Map<String, Filter> nextLevel = fieldMapGet.getNextLevel();
+        if (nextLevel == null) {
+          fieldMapGet.setNextLevel(new HashMap<>());
+        }
+        getFilterSplit(fields.subList(1, len), fieldMapGet.getNextLevel(), leafValue);
       }
-      return fieldMap;
     }
 
     @Override
@@ -565,7 +568,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                     + "\". <operator> can be one of [EQUALS,MIN,MAX]. Ignoring filter passed");
               } else {
                 String[] subfields = fieldValue[0].split("\\.");
-                fieldsFilterSplitMap = getFilterSplit(Arrays.asList(subfields), fieldsFilterSplitMap, filter);
+                getFilterSplit(Arrays.asList(subfields), fieldsFilterSplitMap, filter);
               }
             }
           }
@@ -642,7 +645,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             continue;
           }
           if (fieldValue == null) {
-            throw new IOException("Malformed filter. Check input");
+            err().println("Malformed filter. Check input");
+            throw new IOException("Invalid filter passed");
           } else if (fieldValue.getNextLevel() == null) {
             // reached the end of fields hierarchy, check if they match the filter
             // Currently, only equals operation is supported
@@ -650,7 +654,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 !String.valueOf(valueObject).equals(fieldValue.getValue())) {
               return false;
             } else if (!Filter.FilterOperator.EQUALS.equals(fieldValue.getOperator())) {
-              throw new IOException("Only EQUALS operator is supported currently.");
+              err().println("Only EQUALS operator is supported currently.");
+              throw new IOException("Invalid filter passed");
             }
           } else {
             Map<String, Filter> subfields = fieldValue.getNextLevel();
