@@ -2148,7 +2148,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // and if the Leader is not found
     // return Leader is not found message.
     RaftServer.Division division = server.getDivision();
-    RaftPeer leader = getLeader(division);
+    RaftPeerId leader = getLeaderId(division);
     if (leader == null) {
       return getRatisRolesException("No leader found");
     }
