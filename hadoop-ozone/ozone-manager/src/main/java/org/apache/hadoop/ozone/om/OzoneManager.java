@@ -1275,7 +1275,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     BlockingService omInterService =
         OzoneManagerInterService.newReflectiveBlockingService(
             omInterServerProtocol);
-    this.omGateway = new OMGateway(omRatisServer);
+    this.omGateway = new OMGateway(this);
 
     OMAdminProtocolServerSideImpl omMetadataServerProtocol =
         new OMAdminProtocolServerSideImpl(this);
