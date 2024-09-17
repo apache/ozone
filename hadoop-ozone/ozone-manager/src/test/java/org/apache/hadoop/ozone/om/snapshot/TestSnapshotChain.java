@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -36,8 +37,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,6 +306,34 @@ public class TestSnapshotChain {
     assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
     assertThrows(NoSuchElementException.class,
         () -> chainManager.nextGlobalSnapshot(snapshotID1));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 5, 10})
+  public void testSnapshotChainIterator(int numberOfSnapshots) throws IOException {
+    Table<String, SnapshotInfo> snapshotInfo = omMetadataManager.getSnapshotInfoTable();
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+
+    UUID prevSnapshotID = null;
+    long time = System.currentTimeMillis();
+    for (int i = 0; i < numberOfSnapshots; i++) {
+      UUID snapshotID = UUID.randomUUID();
+      SnapshotInfo snapInfo = createSnapshotInfo(snapshotID, prevSnapshotID,
+          prevSnapshotID, time++);
+      snapshotInfo.put(snapshotID.toString(), snapInfo);
+      prevSnapshotID = snapshotID;
+      snapshotInfoList.add(snapInfo);
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+    assertFalse(chainManager.isSnapshotChainCorrupted());
+    List<UUID> reverseChain = Lists.newArrayList(chainManager.iterator(true));
+    Collections.reverse(reverseChain);
+    List<UUID> forwardChain = Lists.newArrayList(chainManager.iterator(false));
+    List<UUID> expectedChain = snapshotInfoList.stream().map(SnapshotInfo::getSnapshotId).collect(Collectors.toList());
+    assertEquals(expectedChain, reverseChain);
+    assertEquals(expectedChain, forwardChain);
+    assertEquals(forwardChain, reverseChain);
+
   }
 
   private static Stream<? extends Arguments> invalidSnapshotChain() {

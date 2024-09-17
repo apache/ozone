@@ -145,7 +145,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
-
           SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
@@ -158,14 +157,18 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // DirectoryDeletingService is not running while the entries are moving.
           if (nextSnapshot == null) {
             KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
-            while (keyDeletingService != null && keyDeletingService.isRunningOnAOS()) {
-              keyDeletingService.wait(serviceTimeout);
+            synchronized (keyDeletingService) {
+              while (keyDeletingService != null && keyDeletingService.isRunningOnAOS()) {
+                keyDeletingService.wait(serviceTimeout);
+              }
             }
 
             DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
                 .getDirDeletingService();
-            while (directoryDeletingService != null && directoryDeletingService.isRunningOnAOS()) {
-              directoryDeletingService.wait(serviceTimeout);
+            synchronized (directoryDeletingService) {
+              while (directoryDeletingService != null && directoryDeletingService.isRunningOnAOS()) {
+                directoryDeletingService.wait(serviceTimeout);
+              }
             }
           }
           try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
@@ -278,7 +281,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
 
       OMRequest omRequest = OMRequest.newBuilder()
-          .setCmdType(Type.SnapshotMoveDeletedKeys)
+          .setCmdType(Type.SnapshotMoveTableKeys)
           .setSnapshotMoveTableKeysRequest(moveDeletedKeys)
           .setClientId(clientId.toString())
           .build();

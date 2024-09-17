@@ -92,7 +92,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
-  private boolean isRunningOnAOS;
+  private AtomicBoolean isRunningOnAOS;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -112,7 +112,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
-    this.isRunningOnAOS = false;
+    this.isRunningOnAOS = new AtomicBoolean(false);
   }
 
   /**
@@ -126,7 +126,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   public boolean isRunningOnAOS() {
-    return isRunningOnAOS;
+    return isRunningOnAOS.get();
   }
 
   @Override
@@ -194,7 +194,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
-        isRunningOnAOS = true;
+        isRunningOnAOS.set(true);
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -228,8 +228,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
-      isRunningOnAOS = false;
-      this.deletingService.notify();
+      isRunningOnAOS.set(false);
+      synchronized (deletingService) {
+        this.deletingService.notify();
+      }
+
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
     }

@@ -82,7 +82,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final long pathLimitPerTask;
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
-  private boolean isRunningOnAOS;
+  private AtomicBoolean isRunningOnAOS;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -99,7 +99,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
-    this.isRunningOnAOS = false;
+    this.isRunningOnAOS = new AtomicBoolean(false);
   }
 
   private boolean shouldRun() {
@@ -111,7 +111,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   public boolean isRunningOnAOS() {
-    return isRunningOnAOS;
+    return isRunningOnAOS.get();
   }
 
   /**
@@ -155,7 +155,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
         }
-        isRunningOnAOS = true;
+        isRunningOnAOS.set(true);
         getRunCount().incrementAndGet();
         long dirNum = 0L;
         long subDirNum = 0L;
@@ -222,7 +222,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
         }
-        isRunningOnAOS = false;
+        isRunningOnAOS.set(false);
         directoryDeletingService.notifyAll();
       }
       // place holder by returning empty results of this call back.
