@@ -704,7 +704,6 @@ public class KeyManagerImpl implements KeyManager {
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
         .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
-    List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries = new ArrayList<>(count);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, count);
