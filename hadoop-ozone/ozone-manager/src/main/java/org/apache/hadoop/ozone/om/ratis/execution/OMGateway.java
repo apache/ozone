@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.ratis.execution;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,8 +28,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -47,20 +49,22 @@ import org.slf4j.LoggerFactory;
 public class OMGateway {
   private static final Logger LOG = LoggerFactory.getLogger(OMGateway.class);
   private final LeaderRequestExecutor leaderExecutor;
-  private final OzoneManagerRatisServer ratisServer;
+  private final OzoneManager om;
   private final AtomicLong requestInProgress = new AtomicLong(0);
 
-  public OMGateway(OzoneManagerRatisServer ratisServer) {
-    this.leaderExecutor = new LeaderRequestExecutor(ratisServer);
-    this.ratisServer = ratisServer;
-    if (ratisServer.getOzoneManager().isLeaderExecutorEnabled()) {
+  public OMGateway(OzoneManager om) {
+    this.om = om;
+    this.leaderExecutor = new LeaderRequestExecutor(om);
+    if (om.isLeaderExecutorEnabled() && om.isRatisEnabled()) {
+      OzoneManagerRatisServer ratisServer = om.getOmRatisServer();
       ratisServer.getOmBasicStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
     }
   }
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
-    if (!ratisServer.getOzoneManager().isLeaderReady()) {
-      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(
-          ratisServer.getRaftPeerId().toString() + " is not ready to process request yet.");
+    if (!om.isLeaderReady()) {
+      String peerId = om.isRatisEnabled() ? om.getOmRatisServer().getRaftPeerId().toString() : om.getOMNodeId();
+      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(peerId
+          + " is not ready to process request yet.");
       throw new ServiceException(leaderNotReadyException);
     }
     executorEnable();
@@ -73,7 +77,7 @@ public class OMGateway {
     try {
       // TODO gateway locking: take lock with OMLockDetails
       // TODO scheduling of request to pool
-      ratisServer.getOzoneManager().checkLeaderStatus();
+      om.checkLeaderStatus();
       leaderExecutor.submit(0, requestContext);
     } catch (InterruptedException e) {
       requestContext.getFuture().completeExceptionally(e);
@@ -97,9 +101,9 @@ public class OMGateway {
   }
   
   public void leaderChangeNotifier(String newLeaderId) {
-    boolean isLeader = ratisServer.getOzoneManager().getOMNodeId().equals(newLeaderId);
+    boolean isLeader = om.getOMNodeId().equals(newLeaderId);
     if (isLeader) {
-      cleanupCache(Long.MAX_VALUE);
+      cleanupCache();
     } else {
       leaderExecutor.disableProcessing();
     }
@@ -107,7 +111,7 @@ public class OMGateway {
 
   private void rebuildBucketVolumeCache() throws IOException {
     LOG.info("Rebuild of bucket and volume cache");
-    Table<String, OmBucketInfo> bucketTable = ratisServer.getOzoneManager().getMetadataManager().getBucketTable();
+    Table<String, OmBucketInfo> bucketTable = om.getMetadataManager().getBucketTable();
     Set<String> cachedBucketKeySet = new HashSet<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> cacheItr = bucketTable.cacheIterator();
     while (cacheItr.hasNext()) {
@@ -126,7 +130,7 @@ public class OMGateway {
     }
 
     Set<String> cachedVolumeKeySet = new HashSet<>();
-    Table<String, OmVolumeArgs> volumeTable = ratisServer.getOzoneManager().getMetadataManager().getVolumeTable();
+    Table<String, OmVolumeArgs> volumeTable = om.getMetadataManager().getVolumeTable();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> volCacheItr = volumeTable.cacheIterator();
     while (volCacheItr.hasNext()) {
       cachedVolumeKeySet.add(volCacheItr.next().getKey().getCacheKey());
@@ -144,12 +148,15 @@ public class OMGateway {
     }
   }
 
-  public void cleanupCache(long lastIndex) {
+  public void cleanupCache() {
     // TODO no-cache case, no need re-build bucket/volume cache and cleanup of cache
     LOG.debug("clean all table cache and update bucket/volume with db");
-    for (String tbl : ratisServer.getOzoneManager().getMetadataManager().listTableNames()) {
-      ratisServer.getOzoneManager().getMetadataManager().getTable(tbl).cleanupCache(
-          Collections.singletonList(lastIndex));
+    for (String tbl : om.getMetadataManager().listTableNames()) {
+      Table table = om.getMetadataManager().getTable(tbl);
+      if (table instanceof TypedTable) {
+        ArrayList<Long> epochs = new ArrayList<>(((TypedTable<?, ?>) table).getCache().getEpochEntries().keySet());
+        table.cleanupCache(epochs);
+      }
     }
     try {
       rebuildBucketVolumeCache();
@@ -168,7 +175,7 @@ public class OMGateway {
       return;
     }
     if (requestInProgress.get() == 0) {
-      cleanupCache(Long.MAX_VALUE);
+      cleanupCache();
       leaderExecutor.enableProcessing();
     } else {
       LOG.warn("Executor is not enabled, previous request {} is still not cleaned", requestInProgress.get());

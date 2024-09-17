@@ -549,7 +549,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @VisibleForTesting
-  TableCache<KEY, VALUE> getCache() {
+  public TableCache<KEY, VALUE> getCache() {
     return cache;
   }
 

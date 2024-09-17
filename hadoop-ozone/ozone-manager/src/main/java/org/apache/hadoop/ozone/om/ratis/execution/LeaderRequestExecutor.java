@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -62,15 +61,13 @@ public class LeaderRequestExecutor {
   private static final long DUMMY_TERM = -1;
   private final AtomicLong cacheIndex = new AtomicLong(0);
   private final int ratisByteLimit;
-  private final OzoneManagerRatisServer ratisServer;
   private final OzoneManager ozoneManager;
   private final PoolExecutor<RequestContext> leaderExecutor;
   private final OzoneManagerRequestHandler handler;
   private final AtomicBoolean isEnabled = new AtomicBoolean(true);
 
-  public LeaderRequestExecutor(OzoneManagerRatisServer ratisServer) {
-    this.ratisServer = ratisServer;
-    this.ozoneManager = ratisServer.getOzoneManager();
+  public LeaderRequestExecutor(OzoneManager om) {
+    this.ozoneManager = om;
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
     PoolExecutor<RequestContext> ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE,
         RATIS_TASK_QUEUE_SIZE, ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
@@ -106,9 +103,11 @@ public class LeaderRequestExecutor {
   }
 
   private void rejectRequest(RequestContext ctx) {
-    if (!ratisServer.getOzoneManager().isLeaderReady()) {
-      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(
-          ratisServer.getRaftPeerId().toString() + " is not ready to process request yet.");
+    if (!ozoneManager.isLeaderReady()) {
+      String peerId = ozoneManager.isRatisEnabled() ? ozoneManager.getOmRatisServer().getRaftPeerId().toString()
+          : ozoneManager.getOMNodeId();
+      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(peerId
+          + " is not ready to process request yet.");
       ctx.getFuture().completeExceptionally(leaderNotReadyException);
     } else {
       ctx.getFuture().completeExceptionally(new OMException("Request processing is disabled due to error",
@@ -308,6 +307,9 @@ public class LeaderRequestExecutor {
 
   private OMResponse sendDbUpdateRequest(OMRequest nextRequest, TermIndex termIndex) throws Exception {
     try {
+      if (ozoneManager.isRatisEnabled()) {
+        throw new IOException("Non-ratis call is not supported");
+      }
       OMResponse response = ozoneManager.getOmRatisServer().submitRequest(nextRequest, ClientId.randomId(),
           termIndex.getIndex());
       if (!response.getSuccess()) {
