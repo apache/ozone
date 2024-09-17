@@ -135,7 +135,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
 
   /**
-   * Returns a list rename entries from the deletedTable.
+   * Returns a list deleted entries from the deletedTable.
    *
    * @param count max number of keys to return.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
