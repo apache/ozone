@@ -16,35 +16,35 @@
 
 services:
   old_client_1_0_0:
-    image: apache/ozone:1.0.0
+    image: apache/ozone:1.0.0-rocky
     env_file:
       - docker-config
     volumes:
       - ../..:/opt/ozone
     command: ["sleep","1000000"]
   old_client_1_1_0:
-    image: apache/ozone:1.1.0
+    image: apache/ozone:1.1.0-rocky
     env_file:
       - docker-config
     volumes:
       - ../..:/opt/ozone
     command: ["sleep","1000000"]
   old_client_1_2_1:
-    image: apache/ozone:1.2.1
+    image: apache/ozone:1.2.1-rocky
     env_file:
       - docker-config
     volumes:
       - ../..:/opt/ozone
     command: ["sleep","1000000"]
   old_client_1_3_0:
-    image: apache/ozone:1.3.0
+    image: apache/ozone:1.3.0-rocky
     env_file:
       - docker-config
     volumes:
       - ../..:/opt/ozone
     command: ["sleep","1000000"]
   old_client_1_4_0:
-    image: apache/ozone:1.4.0
+    image: apache/ozone:1.4.0-rocky
     env_file:
       - docker-config
     volumes:
