@@ -258,7 +258,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @param volume hdds volume.
    * @return number of containers
    */
-  public long getContainerCount(HddsVolume volume) {
+  public long containerCount(HddsVolume volume) {
     Preconditions.checkNotNull(volume);
     Preconditions.checkNotNull(volume.getStorageID());
     String volumeUuid = volume.getStorageID();
