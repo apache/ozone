@@ -125,25 +125,25 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   /**
    * Returns a list rename entries from the snapshotRenamedTable.
    *
-   * @param count max number of keys to return.
+   * @param size max number of keys to return.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
    */
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey, int count) throws IOException;
+      String volume, String bucket, String startKey, int size) throws IOException;
 
 
   /**
    * Returns a list deleted entries from the deletedTable.
    *
-   * @param count max number of keys to return.
+   * @param size max number of keys to return.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
    */
   List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey, int count) throws IOException;
+      String volume, String bucket, String startKey, int size) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -249,12 +249,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
-  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int count)
+  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)
       throws IOException {
-    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(count);
+    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(size);
     try (TableIterator<String, ? extends  Table.KeyValue<String, OmKeyInfo>> iterator =
              getDeletedDirEntries(volume, bucket)) {
-      while (deletedDirEntries.size() < count && iterator.hasNext()) {
+      while (deletedDirEntries.size() < size && iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         deletedDirEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
       }

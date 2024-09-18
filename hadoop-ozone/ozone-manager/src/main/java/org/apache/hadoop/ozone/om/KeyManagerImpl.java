@@ -666,16 +666,17 @@ public class KeyManagerImpl implements KeyManager {
 
   private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
           TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
-          Function<V, R> valueFunction, int count) throws IOException {
+          Function<V, R> valueFunction, int size) throws IOException {
     List<Table.KeyValue<String, R>> entries = new ArrayList<>();
-    /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
+    /* Seek to the start key if it not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
     if (startKey != null) {
       tableIterator.seek(startKey);
+      tableIterator.seekToFirst();
     }
     int currentCount = 0;
-    while (tableIterator.hasNext() && currentCount < count) {
+    while (tableIterator.hasNext() && currentCount < size) {
       Table.KeyValue<String, V> kv = tableIterator.next();
       if (kv != null) {
         entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
@@ -685,28 +686,27 @@ public class KeyManagerImpl implements KeyManager {
     return entries;
   }
 
-
   @Override
   public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey, int count) throws IOException {
+      String volume, String bucket, String startKey, int size) throws IOException {
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
         .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), count);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
     }
   }
 
   @Override
   public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey, int count) throws IOException {
+      String volume, String bucket, String startKey, int size) throws IOException {
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
         .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, count);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, size);
     }
   }
 
@@ -771,8 +771,7 @@ public class KeyManagerImpl implements KeyManager {
             TimeUnit.MILLISECONDS);
     return serviceInterval != DISABLE_VALUE;
   }
-
-
+  
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException {

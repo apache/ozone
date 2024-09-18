@@ -84,7 +84,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   private final OzoneManager ozoneManager;
   private final OmSnapshotManager omSnapshotManager;
-  private final SnapshotChainManager snapshotChainManager;
+  private final SnapshotChainManager chainManager;
   private final AtomicBoolean suspended;
   private final OzoneConfiguration conf;
   private final AtomicLong successRunCount;
@@ -103,7 +103,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
-    this.snapshotChainManager = omMetadataManager.getSnapshotChainManager();
+    this.chainManager = omMetadataManager.getSnapshotChainManager();
     this.successRunCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.conf = ozoneManager.getConfiguration();
@@ -159,15 +159,15 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       try {
         int remaining = keyLimitPerTask;
-        Iterator<UUID> iterator = snapshotChainManager.iterator(true);
+        Iterator<UUID> iterator = chainManager.iterator(true);
         List<String> snapshotsToBePurged = new ArrayList<>();
         long snapshotLimit = snapshotDeletionPerTask;
         while (iterator.hasNext() && snapshotLimit > 0) {
-          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotChainManager, iterator.next());
+          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
-          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, snapInfo);
+          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
           if (nextSnapshot != null &&

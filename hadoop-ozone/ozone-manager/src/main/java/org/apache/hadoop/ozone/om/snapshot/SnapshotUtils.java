@@ -152,7 +152,7 @@ public final class SnapshotUtils {
 
 
   /**
-   * Get the next in the snapshot chain.
+   * Get the next snapshot in the snapshot chain.
    */
   public static SnapshotInfo getNextSnapshot(OzoneManager ozoneManager,
                                              SnapshotChainManager chainManager,

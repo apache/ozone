@@ -850,7 +850,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Given a volume and bucket, return the corresponding DB key prefix.
+   * Given a volume and bucket, return the corresponding DB key prefix for FSO buckets.
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
