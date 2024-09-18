@@ -16,34 +16,38 @@
  * limitations under the License.
  */
 
-import { ReplicationIcon } from '@/utils/themeIcons';
-import DecommissionSummary from '@/v2/components/decommissioningSummary/decommissioningSummary';
-import StorageBar from '@/v2/components/storageBar/storageBar';
-import { Datanode, DatanodeOpState, DatanodeOpStateList, DatanodeState, DatanodeStateList, DatanodeTableProps } from '@/v2/types/datanode.types';
-import { Pipeline } from '@/v2/types/pipelines.types';
-import { CheckCircleFilled, CloseCircleFilled, HourglassFilled, InfoCircleOutlined, WarningFilled } from '@ant-design/icons';
-import { Popover, Tooltip } from 'antd'
-import Table, { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import { TableRowSelection } from 'antd/es/table/interface';
-import moment from 'moment';
 import React from 'react';
+import moment from 'moment';
+import { Popover, Tooltip } from 'antd'
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  HourglassFilled,
+  InfoCircleOutlined,
+  WarningFilled
+} from '@ant-design/icons';
+import Table, {
+  ColumnsType,
+  TablePaginationConfig
+} from 'antd/es/table';
+import { TableRowSelection } from 'antd/es/table/interface';
 
-moment.updateLocale('en', {
-  relativeTime: {
-    past: '%s ago',
-    s: '%ds',
-    m: '1min',
-    mm: '%dmins',
-    h: '1hr',
-    hh: '%dhrs',
-    d: '1d',
-    dd: '%dd',
-    M: '1m',
-    MM: '%dm',
-    y: '1y',
-    yy: '%dy'
-  }
-});
+import StorageBar from '@/v2/components/storageBar/storageBar';
+import DecommissionSummary from '@/v2/components/decommissioningSummary/decommissioningSummary';
+
+import { ReplicationIcon } from '@/utils/themeIcons';
+import { getTimeDiffFromTimestamp } from '@/v2/utils/momentUtils';
+
+import {
+  Datanode,
+  DatanodeOpState,
+  DatanodeOpStateList,
+  DatanodeState,
+  DatanodeStateList,
+  DatanodeTableProps
+} from '@/v2/types/datanode.types';
+import { Pipeline } from '@/v2/types/pipelines.types';
+
 
 let decommissioningUuids: string | string[] = [];
 
@@ -73,11 +77,6 @@ const renderDatanodeOpState = (opState: DatanodeOpState) => {
   const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
   return <span>{icon} {opState}</span>;
 };
-
-const getTimeDiffFromTimestamp = (timestamp: number): string => {
-  const timestampDate = new Date(timestamp);
-  return moment(timestampDate).fromNow();
-}
 
 export const COLUMNS: ColumnsType<Datanode> = [
   {
