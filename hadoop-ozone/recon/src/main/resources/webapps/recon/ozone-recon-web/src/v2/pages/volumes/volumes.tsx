@@ -18,22 +18,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
-import { Table } from 'antd';
-import { Link } from 'react-router-dom';
-import {
-  TablePaginationConfig,
-  ColumnsType
-} from 'antd/es/table';
 import { ValueType } from 'react-select/src/types';
 
-import QuotaBar from '@/components/quotaBar/quotaBar';
 import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
-import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 import SingleSelect from '@/v2/components/select/singleSelect';
+import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
+import VolumesTable, { COLUMNS } from '@/v2/components/tables/volumesTable';
 import Search from '@/v2/components/search/search';
 
-import { byteToSize, showDataFetchError } from '@/utils/common';
+import { showDataFetchError } from '@/utils/common';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { useDebounce } from '@/v2/hooks/debounce.hook';
@@ -72,93 +66,6 @@ const Volumes: React.FC<{}> = () => {
 
   const cancelSignal = useRef<AbortController>();
 
-  const COLUMNS: ColumnsType<Volume> = [
-    {
-      title: 'Volume',
-      dataIndex: 'volume',
-      key: 'volume',
-      sorter: (a: Volume, b: Volume) => a.volume.localeCompare(b.volume),
-      defaultSortOrder: 'ascend' as const,
-      width: '15%'
-    },
-    {
-      title: 'Owner',
-      dataIndex: 'owner',
-      key: 'owner',
-      sorter: (a: Volume, b: Volume) => a.owner.localeCompare(b.owner)
-    },
-    {
-      title: 'Admin',
-      dataIndex: 'admin',
-      key: 'admin',
-      sorter: (a: Volume, b: Volume) => a.admin.localeCompare(b.admin)
-    },
-    {
-      title: 'Creation Time',
-      dataIndex: 'creationTime',
-      key: 'creationTime',
-      sorter: (a: Volume, b: Volume) => a.creationTime - b.creationTime,
-      render: (creationTime: number) => {
-        return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
-      }
-    },
-    {
-      title: 'Modification Time',
-      dataIndex: 'modificationTime',
-      key: 'modificationTime',
-      sorter: (a: Volume, b: Volume) => a.modificationTime - b.modificationTime,
-      render: (modificationTime: number) => {
-        return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
-      }
-    },
-    {
-      title: 'Quota (Size)',
-      dataIndex: 'quotaInBytes',
-      key: 'quotaInBytes',
-      render: (quotaInBytes: number) => {
-        return quotaInBytes && quotaInBytes !== -1 ? byteToSize(quotaInBytes, 3) : 'NA';
-      }
-    },
-    {
-      title: 'Namespace Capacity',
-      key: 'namespaceCapacity',
-      sorter: (a: Volume, b: Volume) => a.usedNamespace - b.usedNamespace,
-      render: (text: string, record: Volume) => (
-        <QuotaBar
-          quota={record.quotaInNamespace}
-          used={record.usedNamespace}
-          quotaType='namespace'
-        />
-      )
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: Volume) => {
-        const searchParams = new URLSearchParams();
-        searchParams.append('volume', record.volume);
-
-        return (
-          <>
-            <Link
-              key="listBuckets"
-              to={`/Buckets?${searchParams.toString()}`}
-              style={{
-                marginRight: '16px'
-              }}>
-              Show buckets
-            </Link>
-            <a
-              key='acl'
-              onClick={() => handleAclLinkClick(record)}>
-              Show ACL
-            </a>
-          </>
-        );
-      }
-    }
-  ];
-
   const defaultColumns = COLUMNS.map(column => ({
     label: column.title as string,
     value: column.key as string,
@@ -167,10 +74,10 @@ const Volumes: React.FC<{}> = () => {
   const [state, setState] = useState<VolumesState>({
     data: [],
     lastUpdated: 0,
-    columnOptions: defaultColumns,
-    currentRow: {}
+    columnOptions: defaultColumns
   });
   const [loading, setLoading] = useState<boolean>(false);
+  const [currentRow, setCurrentRow] = useState<Volume | Record<string, never>>({});
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
   const [searchColumn, setSearchColumn] = useState<'volume' | 'owner' | 'admin'>('volume');
@@ -255,35 +162,13 @@ const Volumes: React.FC<{}> = () => {
 
 
   function handleAclLinkClick(volume: Volume) {
-    setState({
-      ...state,
-      currentRow: volume
-    });
+    setCurrentRow(volume);
     setShowPanel(true);
   }
 
-  function filterSelectedColumns() {
-    const columnKeys = selectedColumns.map((column) => column.value);
-    return COLUMNS.filter(
-      (column) => columnKeys.indexOf(column.key as string) >= 0
-    )
-  }
-
-  function getFilteredData(data: Volume[]) {
-    return data.filter(
-      (volume: Volume) => volume[searchColumn].includes(debouncedSearch)
-    );
-  }
-
-
-  const paginationConfig: TablePaginationConfig = {
-    showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} volumes`,
-    showSizeChanger: true
-  };
-
   const {
     data, lastUpdated,
-    columnOptions, currentRow
+    columnOptions
   } = state;
 
   return (
@@ -329,17 +214,13 @@ const Volumes: React.FC<{}> = () => {
                 setSearchColumn(value as 'volume' | 'owner' | 'admin');
               }} />
           </div>
-          <div>
-            <Table
-              dataSource={getFilteredData(data)}
-              columns={filterSelectedColumns()}
-              loading={loading}
-              rowKey='volume'
-              pagination={paginationConfig}
-              scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
-              locale={{ filterTitle: '' }}
-            />
-          </div>
+          <VolumesTable
+            loading={loading}
+            data={data}
+            handleAclClick={handleAclLinkClick}
+            selectedColumns={selectedColumns}
+            searchColumn={searchColumn}
+            searchTerm={debouncedSearch} />
         </div>
         <AclPanel
           visible={showPanel}
