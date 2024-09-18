@@ -75,12 +75,13 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     String expectedBucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
 
-    // Filter only deleted keys with atleast one keyInfo per key.
+
     Set<String> keys = new HashSet<>();
     List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(moveTableKeysRequest.getDeletedKeysList().size());
 
     //validate deleted key starts with bucket prefix.[/<volName>/<bucketName>/]
     for (SnapshotMoveKeyInfos deletedKey : moveTableKeysRequest.getDeletedKeysList()) {
+      // Filter only deleted keys with atleast one keyInfo per key.
       if (!deletedKey.getKeyInfosList().isEmpty()) {
         deletedKeys.add(deletedKey);
         if (!deletedKey.getKey().startsWith(expectedBucketKeyPrefix)) {
@@ -120,6 +121,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(moveTableKeysRequest.getDeletedDirsList().size());
     //validate deleted key starts with bucket FSO path prefix.[/<volId>/<bucketId>/]
     for (SnapshotMoveKeyInfos deletedDir : moveTableKeysRequest.getDeletedDirsList()) {
+      // Filter deleted directories with exactly one keyInfo per key.
       if (deletedDir.getKeyInfosList().size() == 1) {
         deletedDirs.add(deletedDir);
         if (!deletedDir.getKey().startsWith(expectedBucketKeyPrefixFSO)) {
@@ -153,8 +155,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     try {
       SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
           snapshotChainManager, fromProtobuf(moveTableKeysRequest.getFromSnapshotID()));
-      // If there is no Non-Deleted Snapshot move the
-      // keys to Active Object Store.
+      // If there is no snapshot in the chain after the current snapshot move the keys to Active Object Store.
       SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
       // If next snapshot is not active then ignore move. Since this could be a redundant operations.
