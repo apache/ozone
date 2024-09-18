@@ -55,6 +55,12 @@ public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
     }
   }
 
+  @Override
+  public void upgradeSchema(String fromVersion, String toVersion)
+      throws SQLException {
+
+  }
+
   /**
    * Create the Recon Task Status table.
    * @param conn connection

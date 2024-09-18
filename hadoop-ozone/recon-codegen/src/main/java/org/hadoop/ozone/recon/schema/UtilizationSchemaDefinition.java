@@ -75,6 +75,12 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
     }
   }
 
+  @Override
+  public void upgradeSchema(String fromVersion, String toVersion)
+      throws SQLException {
+
+  }
+
   private void createClusterGrowthTable() {
     dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
         .column("timestamp", SQLDataType.TIMESTAMP.nullable(false))

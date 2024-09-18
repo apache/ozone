@@ -22,6 +22,7 @@ import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.hadoop.ozone.recon.codegen.ReconSchemaVersionTableManager;
 import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,21 +38,62 @@ public class ReconSchemaManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconSchemaManager.class);
   private Set<ReconSchemaDefinition> reconSchemaDefinitions = new HashSet<>();
+  private final ReconSchemaVersionTableManager schemaVersionTableManager;
 
   @Inject
-  public ReconSchemaManager(Set<ReconSchemaDefinition> reconSchemaDefinitions) {
+  public ReconSchemaManager(Set<ReconSchemaDefinition> reconSchemaDefinitions,
+                            ReconSchemaVersionTableManager schemaVersionTableManager) {
+    this.schemaVersionTableManager = schemaVersionTableManager;
     this.reconSchemaDefinitions.addAll(reconSchemaDefinitions);
   }
 
   @VisibleForTesting
-  public void createReconSchema() {
-    reconSchemaDefinitions.forEach(reconSchemaDefinition -> {
+  public void createAndUpgradeReconSchema() {
+
+    // Initialize all tables
+    initializeAllSchemas();
+
+    // Fetch current version from the SchemaVersionTable
+    String currentVersion = schemaVersionTableManager.getCurrentSchemaVersion();
+    String latestVersion = ReconConstants.LATEST_SCHEMA_VERSION;
+
+    // Upgrade schema if necessary.
+    if (currentVersion == null || !currentVersion.equals(latestVersion)) {
+      upgradeAllSchemas(currentVersion, latestVersion);
+      // Update the schema version in the version table
+      schemaVersionTableManager.updateSchemaVersion(latestVersion);
+    } else {
+      LOG.info("Recon Derby Schema is already up to date.");
+    }
+  }
+
+  /**
+   * Initialize all schemas.
+   */
+  private void initializeAllSchemas() {
+    for (ReconSchemaDefinition reconSchemaDefinition : reconSchemaDefinitions) {
       try {
         reconSchemaDefinition.initializeSchema();
       } catch (SQLException e) {
-        LOG.error("Error creating Recon schema {}.",
-            reconSchemaDefinition.getClass().getSimpleName(), e);
+        LOG.error("Error initializing schema: {}", reconSchemaDefinition.getClass().getSimpleName(), e);
       }
-    });
+    }
+    LOG.info("All Derby table schemas initialized.");
   }
+
+  /**
+   * Upgrade all schemas to the latest version.
+   */
+  private void upgradeAllSchemas(String currentVersion, String latestVersion) {
+    for (ReconSchemaDefinition schemaDefinition : reconSchemaDefinitions) {
+      try {
+        // Use the upgrade logic from each schema
+        schemaDefinition.upgradeSchema(currentVersion, latestVersion);
+      } catch (SQLException e) {
+        LOG.error("Error upgrading schema: {}", schemaDefinition.getClass().getSimpleName(), e);
+      }
+    }
+    LOG.info("All schemas upgraded to the latest version: {}", latestVersion);
+  }
+
 }

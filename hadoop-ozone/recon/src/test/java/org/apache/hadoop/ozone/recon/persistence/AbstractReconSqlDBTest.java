@@ -115,7 +115,7 @@ public class AbstractReconSqlDBTest {
   public void createSchema(Injector inj) {
     ReconSchemaManager reconSchemaManager =
         inj.getInstance(ReconSchemaManager.class);
-    reconSchemaManager.createReconSchema();
+    reconSchemaManager.createAndUpgradeReconSchema();
   }
 
   protected Injector getInjector() {

@@ -71,25 +71,34 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
 
-    if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      // Drop the existing constraint if it exists
-      String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
-      dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
-          .dropConstraint(constraintName)
-          .execute();
-
-      // Add the updated constraint with all enum states
-      addUpdatedConstraint();
-    } else {
-      // Create the table if it does not exist
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
       createUnhealthyContainersTable();
     }
   }
 
+  @Override
+  public void upgradeSchema(String fromVersion, String toVersion)
+      throws SQLException {
+    Connection conn = dataSource.getConnection();
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      return;
+    }
+    // Example upgrade script
+    if (fromVersion.equals("1.0") && toVersion.equals("2.0")) {
+      runMigrationToVersion2(conn);
+    }
+  }
+
   /**
-   * Add the updated constraint to the table.
+   * Run the upgrade to version 2.0.
    */
-  private void addUpdatedConstraint() {
+  private void runMigrationToVersion2(Connection conn) throws SQLException {
+    // Drop the existing constraint if it exists
+    String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
+    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .dropConstraint(constraintName)
+        .execute();
+
     // Get all enum values as a list of strings
     String[] enumStates = Arrays.stream(UnHealthyContainerStates.values())
         .map(Enum::name)

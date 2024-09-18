@@ -31,4 +31,10 @@ public interface ReconSchemaDefinition {
    * Execute DDL that will create Recon schema.
    */
   void initializeSchema() throws SQLException;
+
+  /**
+   * Upgrade the schema for the table.
+   * This method will be called during schema upgrades.
+   */
+  void upgradeSchema(String fromVersion, String toVersion) throws SQLException;
 }

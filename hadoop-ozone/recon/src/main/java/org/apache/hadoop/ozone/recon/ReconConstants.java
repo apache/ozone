@@ -35,6 +35,9 @@ public final class ReconConstants {
 
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
+  // Latest Schema Version for all Recon Derby Tables
+  public static final String LATEST_SCHEMA_VERSION = "2.0";  // Replace this as needed
+
   // By default, limit the number of results returned
 
   /**

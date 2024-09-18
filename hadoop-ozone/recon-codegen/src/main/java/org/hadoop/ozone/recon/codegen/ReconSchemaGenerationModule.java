@@ -17,11 +17,7 @@
  */
 package org.hadoop.ozone.recon.codegen;
 
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.*;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
@@ -40,5 +36,6 @@ public class ReconSchemaGenerationModule extends AbstractModule {
     schemaBinder.addBinding().to(ContainerSchemaDefinition.class);
     schemaBinder.addBinding().to(ReconTaskSchemaDefinition.class);
     schemaBinder.addBinding().to(StatsSchemaDefinition.class);
+    schemaBinder.addBinding().to(SchemaVersionTableDefinition.class);
   }
 }

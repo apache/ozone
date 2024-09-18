@@ -54,6 +54,12 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
     }
   }
 
+  @Override
+  public void upgradeSchema(String fromVersion, String toVersion)
+      throws SQLException {
+
+  }
+
   /**
    * Create the Ozone Global Stats table.
    */
