@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
@@ -43,7 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
@@ -129,43 +127,11 @@ public class LeaderRequestExecutor {
     }
   }
 
-  /**
-   * Validate the incoming update request.
-   */
-  private void validate(OMRequest omRequest) throws IOException {
-    handler.validateRequest(omRequest);
-    // validate prepare state
-    OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
-    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
-    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-      // Must authenticate prepare requests here, since we must determine
-      // whether or not to apply the prepare gate before proceeding with the
-      // prepare request.
-      UserGroupInformation userGroupInformation =
-          UserGroupInformation.createRemoteUser(omRequest.getUserInfo().getUserName());
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(userGroupInformation)) {
-        String message = "Access denied for user " + userGroupInformation + ". "
-            + "Superuser privilege is required to prepare ozone managers.";
-        throw new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
-      } else {
-        prepareState.enablePrepareGate();
-      }
-    }
-
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    if (!prepareState.requestAllowed(cmdType)) {
-      String message = "Cannot apply write request " +
-          omRequest.getCmdType().name() + " when OM is in prepare mode.";
-      throw new OMException(message, OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-    }
-  }
   private void executeRequest(RequestContext ctx, PoolExecutor<RequestContext> nxtPool) {
     OMRequest request = ctx.getRequest();
     TermIndex termIndex = TermIndex.valueOf(DUMMY_TERM, uniqueIndex.incrementAndGet());
     ctx.setIndex(termIndex);
     try {
-      validate(request);
       handleRequest(ctx, termIndex);
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
@@ -187,10 +153,9 @@ public class LeaderRequestExecutor {
   }
 
   private void handleRequest(RequestContext ctx, TermIndex termIndex) throws IOException {
-    OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(ctx.getRequest(), ozoneManager);
+    OMClientRequest omClientRequest = ctx.getClientRequest();
     try {
       OMClientResponse omClientResponse = handler.handleLeaderWriteRequest(omClientRequest, termIndex);
-      ctx.setClientRequest(omClientRequest);
       ctx.setResponse(omClientResponse.getOMResponse());
       if (!omClientResponse.getOMResponse().getSuccess()) {
         OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);

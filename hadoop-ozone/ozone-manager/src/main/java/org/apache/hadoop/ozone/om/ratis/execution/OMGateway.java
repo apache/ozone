@@ -32,13 +32,19 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -90,6 +96,11 @@ public class OMGateway {
       // TODO gateway locking: take lock with OMLockDetails
       // TODO scheduling of request to pool
       om.checkLeaderStatus();
+      validate(omRequest);
+      OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, om);
+      requestContext.setClientRequest(omClientRequest);
+
+      // submit request
       ExecutorType executorType = executorSelector(omRequest);
       if (executorType == ExecutorType.LEADER_COMPATIBLE) {
         leaderExecutor.submit(0, requestContext);
@@ -114,11 +125,39 @@ public class OMGateway {
     }
   }
 
+  private void validate(OMRequest omRequest) throws IOException {
+    OzoneManagerRequestHandler.requestParamValidation(omRequest);
+    // validate prepare state
+    OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
+    OzoneManagerPrepareState prepareState = om.getPrepareState();
+    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+      // Must authenticate prepare requests here, since we must determine
+      // whether or not to apply the prepare gate before proceeding with the
+      // prepare request.
+      UserGroupInformation userGroupInformation =
+          UserGroupInformation.createRemoteUser(omRequest.getUserInfo().getUserName());
+      if (om.getAclsEnabled() && !om.isAdmin(userGroupInformation)) {
+        String message = "Access denied for user " + userGroupInformation + ". "
+            + "Superuser privilege is required to prepare ozone managers.";
+        throw new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
+      } else {
+        prepareState.enablePrepareGate();
+      }
+    }
+
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    if (!prepareState.requestAllowed(cmdType)) {
+      String message = "Cannot apply write request " +
+          omRequest.getCmdType().name() + " when OM is in prepare mode.";
+      throw new OMException(message, OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
+    }
+  }
   private void handleAfterExecution(RequestContext ctx, Throwable th) {
     // TODO: gateway locking: release lock and OMLockDetails update
     requestInProgress.decrementAndGet();
   }
-  
+
   public void leaderChangeNotifier(String newLeaderId) {
     boolean isLeader = om.getOMNodeId().equals(newLeaderId);
     if (isLeader) {

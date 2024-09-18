@@ -75,7 +75,14 @@ public class FollowerRequestExecutor {
         ctx.getFuture().complete(response);
         return;
       }
-      OzoneManagerProtocolProtos.OMResponse response = ozoneManager.getOmRatisServer().submitRequest(ctx.getRequest(),
+      // TODO hack way of transferring Leader index to follower nodes to use this index
+      // need check proper way of index
+      OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder
+          = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
+      reqBuilder.addIndex(uniqueIndex.incrementAndGet());
+      OzoneManagerProtocolProtos.OMRequest req = ctx.getRequest().toBuilder()
+          .setPersistDbRequest(reqBuilder.build()).build();
+      OzoneManagerProtocolProtos.OMResponse response = ozoneManager.getOmRatisServer().submitRequest(req,
           ClientId.randomId(), callId.incrementAndGet());
       ctx.getFuture().complete(response);
     } catch (Throwable th) {
