@@ -70,9 +70,9 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     SnapshotMoveTableKeysRequest moveTableKeysRequest = getOmRequest().getSnapshotMoveTableKeysRequest();
     SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
         snapshotChainManager, fromProtobuf(moveTableKeysRequest.getFromSnapshotID()));
-    String expectedBucketKeyPrefix = omMetadataManager.getBucketKeyPrefix(fromSnapshot.getVolumeName(),
+    String bucketKeyPrefix = omMetadataManager.getBucketKeyPrefix(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
-    String expectedBucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
+    String bucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
 
 
@@ -84,8 +84,8 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
       // Filter only deleted keys with atleast one keyInfo per key.
       if (!deletedKey.getKeyInfosList().isEmpty()) {
         deletedKeys.add(deletedKey);
-        if (!deletedKey.getKey().startsWith(expectedBucketKeyPrefix)) {
-          throw new OMException("Deleted Key: " + deletedKey + " doesn't start with prefix " + expectedBucketKeyPrefix,
+        if (!deletedKey.getKey().startsWith(bucketKeyPrefix)) {
+          throw new OMException("Deleted Key: " + deletedKey + " doesn't start with prefix " + bucketKeyPrefix,
               OMException.ResultCodes.INVALID_KEY_NAME);
         }
         if (keys.contains(deletedKey.getKey())) {
@@ -103,8 +103,8 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     for (HddsProtos.KeyValue renamedKey : moveTableKeysRequest.getRenamedKeysList()) {
       if (renamedKey.hasKey() && renamedKey.hasValue()) {
         renamedKeysList.add(renamedKey);
-        if (!renamedKey.getKey().startsWith(expectedBucketKeyPrefix)) {
-          throw new OMException("Rename Key: " + renamedKey + " doesn't start with prefix " + expectedBucketKeyPrefix,
+        if (!renamedKey.getKey().startsWith(bucketKeyPrefix)) {
+          throw new OMException("Rename Key: " + renamedKey + " doesn't start with prefix " + bucketKeyPrefix,
               OMException.ResultCodes.INVALID_KEY_NAME);
         }
         if (keys.contains(renamedKey.getKey())) {
@@ -124,9 +124,9 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
       // Filter deleted directories with exactly one keyInfo per key.
       if (deletedDir.getKeyInfosList().size() == 1) {
         deletedDirs.add(deletedDir);
-        if (!deletedDir.getKey().startsWith(expectedBucketKeyPrefixFSO)) {
+        if (!deletedDir.getKey().startsWith(bucketKeyPrefixFSO)) {
           throw new OMException("Deleted dir: " + deletedDir + " doesn't start with prefix " +
-              expectedBucketKeyPrefixFSO, OMException.ResultCodes.INVALID_KEY_NAME);
+              bucketKeyPrefixFSO, OMException.ResultCodes.INVALID_KEY_NAME);
         }
         if (keys.contains(deletedDir.getKey())) {
           throw new OMException("Duplicate deleted dir Key: " + deletedDir + " in request",
