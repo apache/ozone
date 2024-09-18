@@ -19,7 +19,7 @@
 import React, { useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import {
-  Alert, Layout,
+  Alert, Tree
 } from 'antd';
 import {
   InfoCircleFilled
@@ -34,6 +34,9 @@ import { DUResponse, DUState, DUSubpath, PlotData } from '@/v2/types/diskUsage.t
 
 import './diskUsage.less';
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
+import EChart from '@/v2/components/eChart/eChart';
+import FileNavBar from '@/v2/components/fileNavbar/fileNavbar';
+import { DataNode } from 'antd/es/tree';
 
 const OTHER_PATH_NAME = 'Other Objects';
 const MIN_BLOCK_SIZE = 0.05;
@@ -54,8 +57,26 @@ const DiskUsage: React.FC<{}> = () => {
     plotData: []
   });
   const [selectedPath, setSelectedPath] = useState<string>('/');
+  const [treeData, setTreeData] = useState<DataNode[]>([]);
 
   const cancelPieSignal = useRef<AbortController>();
+
+  function generateTreeData(path: string, subpaths: DUSubpath[]) {
+    const splitPath = (path === '/') ? ['/'] : path.split('/');
+    let treeData = [{
+      title: splitPath[splitPath.length - 1],
+      key: path,
+      children: subpaths.map((subpath) => {
+        const splitSubpath = subpath.path.split('/');
+        return {
+          title: splitSubpath[splitSubpath.length - 1],
+          key: subpath.path,
+          isLeaf: subpath.isKey
+        }
+      })
+    }];
+    return treeData;
+  }
 
   function updatePieChart(path: string) {
     setLoading(true);
@@ -159,14 +180,6 @@ const DiskUsage: React.FC<{}> = () => {
     });
   }
 
-  function handleMenuClick(e) {
-    cancelRequests([
-      cancelPieSignal.current!,
-    ]);
-
-    updatePieChart(selectedPath);
-  }
-
   function handleLimitChange(selected: ValueType<Option, false>) {
     setLimit(selected as Option);
   }
@@ -180,7 +193,7 @@ const DiskUsage: React.FC<{}> = () => {
     });
   }, [limit]);
 
-  const { plotData } = state;
+  const { plotData, duResponse } = state;
 
   const eChartsOptions = {
     tooltip: {
@@ -192,15 +205,10 @@ const DiskUsage: React.FC<{}> = () => {
         return `${nameEl}${dataEl}${percentageEl}`
       }
     },
-    legend: {
-      top: '10%',
-      orient: 'vertical',
-      left: 'left'
-    },
     series: [
       {
         type: 'pie',
-        radius: '50%',
+        radius: '70%',
         data: plotData.map((value) => {
           return {
             value: value.value,
@@ -233,16 +241,23 @@ const DiskUsage: React.FC<{}> = () => {
           showIcon={true}
           closable={false} />
         <div className='content-div'>
+          <FileNavBar
+            path={duResponse.path}
+            subPaths={duResponse.subPaths}
+            updateHandler={updatePieChart} />
           <div className='table-header-section'>
-            <div className='table-filter-section'>
-              <SingleSelect
-                options={LIMIT_OPTIONS}
-                defaultValue={limit}
-                placeholder='Limit'
-                onChange={handleLimitChange} />
-            </div>
+            <SingleSelect
+              options={LIMIT_OPTIONS}
+              defaultValue={limit}
+              placeholder='Limit'
+              onChange={handleLimitChange} />
           </div>
-          <DUMetadata path={state.duResponse.path} />
+          <div className='du-content'>
+            <EChart
+              option={eChartsOptions}
+              style={{ width: '80vw', height: '60vh' }} />
+            <DUMetadata path={duResponse.path} />
+          </div>
         </div>
       </div>
     </>

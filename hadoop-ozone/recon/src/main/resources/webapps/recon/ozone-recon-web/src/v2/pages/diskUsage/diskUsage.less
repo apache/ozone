@@ -28,18 +28,24 @@
 .content-div {
   min-height: unset;
 
+  .breadcrumb-nav {
+    font-size: 16px;
+    margin: 0px 0px 8px 8px;
+    .breadcrumb-nav-item {
+      background: transparent;
+      border: none !important;
+    }
+  }
+
   .table-header-section {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
+    flex-direction: column;
+  }
 
-    .table-filter-section {
-      font-size: 14px;
-      font-weight: normal;
-      display: flex;
-      column-gap: 8px;
-      padding: 16px 8px;
-    }
+  .du-content {
+    width: '80%';
+    display: flex;
   }
 
   .tag-block {
