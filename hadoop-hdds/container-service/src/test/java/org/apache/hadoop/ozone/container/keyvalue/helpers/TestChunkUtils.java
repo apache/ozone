@@ -42,6 +42,7 @@ import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.keyvalue.impl.MappedBufferManager;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -70,6 +71,7 @@ class TestChunkUtils {
   private static final int BUFFER_CAPACITY = 1 << 20;
   private static final int MAPPED_BUFFER_THRESHOLD = 32 << 10;
   private static final Random RANDOM = new Random();
+  private static final MappedBufferManager MAPPED_BUFFER_MANAGER = new MappedBufferManager(100);
 
   @TempDir
   private File tempDir;
@@ -78,7 +80,7 @@ class TestChunkUtils {
       throws StorageContainerException {
     LOG.info("off={}, len={}", off, len);
     return ChunkUtils.readData(len, BUFFER_CAPACITY, file, off, null,
-        MAPPED_BUFFER_THRESHOLD);
+        MAPPED_BUFFER_THRESHOLD, true, MAPPED_BUFFER_MANAGER);
   }
 
   @Test

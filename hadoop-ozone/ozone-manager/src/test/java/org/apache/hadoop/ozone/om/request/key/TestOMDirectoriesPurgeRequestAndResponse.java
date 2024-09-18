@@ -26,18 +26,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import jakarta.annotation.Nonnull;
@@ -109,7 +114,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
    * Create OMRequest which encapsulates DeleteKeyRequest.
    * @return OMRequest
    */
-  private OMRequest createPurgeKeysRequest(String purgeDeletedDir,
+  private OMRequest createPurgeKeysRequest(String fromSnapshot, String purgeDeletedDir,
       List<OmKeyInfo> keyList, OmBucketInfo bucketInfo) throws IOException {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList
         = new ArrayList<>();
@@ -127,7 +132,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
     purgeDirRequest.addAllDeletedPath(purgePathRequestList);
-
+    if (fromSnapshot != null) {
+      purgeDirRequest.setSnapshotTableKey(fromSnapshot);
+    }
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
@@ -138,8 +145,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   }
   private OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
       final long volumeId, final long bucketId, final String purgeDeletedDir,
-       final List<OmKeyInfo> purgeDeletedFiles,
-      final List<OmKeyInfo> markDirsAsDeleted) {
+      final List<OmKeyInfo> purgeDeletedFiles, final List<OmKeyInfo> markDirsAsDeleted) {
     // Put all keys to be purged in a list
     OzoneManagerProtocolProtos.PurgePathRequest.Builder purgePathsRequest
         = OzoneManagerProtocolProtos.PurgePathRequest.newBuilder();
@@ -182,13 +188,13 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
-    List<String> deletedKeyNames = validateDeletedKeysTable(deletedKeyInfos);
+    List<String> deletedKeyNames = validateDeletedKeysTable(omMetadataManager, deletedKeyInfos, true);
 
     // Create PurgeKeysRequest to purge the deleted keys
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
-    OMRequest omRequest = createPurgeKeysRequest(
+    OMRequest omRequest = createPurgeKeysRequest(null,
         null, deletedKeyInfos, omBucketInfo);
     OMRequest preExecutedRequest = preExecute(omRequest);
     OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
@@ -205,7 +211,59 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     performBatchOperationCommit(omClientResponse);
 
     // The keys should exist in the DeletedKeys table after dir delete
-    validateDeletedKeys(deletedKeyNames);
+    validateDeletedKeys(omMetadataManager, deletedKeyNames);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheSnapshotLastTransactionInfoUpdated() throws Exception {
+    // Create and Delete keys. The keys should be moved to DeletedKeys table
+    List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
+    // The keys should be present in the DeletedKeys table before purging
+    List<String> deletedKeyNames = validateDeletedKeysTable(omMetadataManager, deletedKeyInfos, true);
+
+    String snapshotName = "snap1";
+    SnapshotInfo snapshotInfo = createSnapshot(snapshotName);
+    ReferenceCounted<OmSnapshot> rcOmSnapshot = ozoneManager.getOmSnapshotManager()
+        .getSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName());
+    // Keys should be present in snapshot
+    validateDeletedKeysTable(rcOmSnapshot.get().getMetadataManager(), deletedKeyInfos, true);
+    // keys should have been moved from AOS
+    validateDeletedKeysTable(omMetadataManager, deletedKeyInfos, false);
+
+    // Create PurgeKeysRequest to purge the deleted keys
+    assertEquals(snapshotInfo.getLastTransactionInfo(),
+        TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    OMRequest omRequest = createPurgeKeysRequest(snapshotInfo.getTableKey(),
+        null, deletedKeyInfos, omBucketInfo);
+    OMRequest preExecutedRequest = preExecute(omRequest);
+    OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
+        new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
+
+    assertEquals(1000L * deletedKeyNames.size(), omBucketInfo.getUsedBytes());
+    OMDirectoriesPurgeResponseWithFSO omClientResponse
+        = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    SnapshotInfo snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapshotInfo.getTableKey());
+    SnapshotInfo updatedSnapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotInfo.getTableKey());
+
+    assertEquals(snapshotInfoOnDisk, snapshotInfo);
+    snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(TransactionInfo.getTermIndex(100L))
+        .toByteString());
+    assertEquals(snapshotInfo, updatedSnapshotInfo);
+    omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0L * deletedKeyNames.size(), omBucketInfo.getUsedBytes());
+
+    performBatchOperationCommit(omClientResponse);
+
+    // The keys should exist in the DeletedKeys table after dir delete
+    validateDeletedKeys(rcOmSnapshot.get().getMetadataManager(), deletedKeyNames);
+    snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapshotInfo.getTableKey());
+    assertEquals(snapshotInfo, snapshotInfoOnDisk);
+    rcOmSnapshot.close();
   }
 
   @Test
@@ -214,13 +272,13 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
-    List<String> deletedKeyNames = validateDeletedKeysTable(deletedKeyInfos);
+    List<String> deletedKeyNames = validateDeletedKeysTable(omMetadataManager, deletedKeyInfos, true);
 
     // Create PurgeKeysRequest to purge the deleted keys
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
-    OMRequest omRequest = createPurgeKeysRequest(
+    OMRequest omRequest = createPurgeKeysRequest(null,
         null, deletedKeyInfos, omBucketInfo);
     OMRequest preExecutedRequest = preExecute(omRequest);
     OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
@@ -258,35 +316,32 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     performBatchOperationCommit(omClientResponse);
 
     // The keys should exist in the DeletedKeys table after dir delete
-    validateDeletedKeys(deletedKeyNames);
+    validateDeletedKeys(omMetadataManager, deletedKeyNames);
   }
 
-  private void performBatchOperationCommit(
-      OMDirectoriesPurgeResponseWithFSO omClientResponse) throws IOException {
+  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse) throws IOException {
     try (BatchOperation batchOperation =
              omMetadataManager.getStore().initBatchOperation()) {
-
       omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-
       // Do manual commit and see whether addToBatch is successful or not.
       omMetadataManager.getStore().commitBatchOperation(batchOperation);
     }
   }
 
   @Nonnull
-  private List<String> validateDeletedKeysTable(
-      List<OmKeyInfo> deletedKeyInfos) throws IOException {
+  private List<String> validateDeletedKeysTable(OMMetadataManager omMetadataManager,
+      List<OmKeyInfo> deletedKeyInfos, boolean keyExists) throws IOException {
     List<String> deletedKeyNames = new ArrayList<>();
     for (OmKeyInfo deletedKey : deletedKeyInfos) {
       String keyName = omMetadataManager.getOzoneKey(deletedKey.getVolumeName(),
           deletedKey.getBucketName(), deletedKey.getKeyName());
-      assertTrue(omMetadataManager.getDeletedTable().isExist(keyName));
+      assertEquals(omMetadataManager.getDeletedTable().isExist(keyName), keyExists);
       deletedKeyNames.add(keyName);
     }
     return deletedKeyNames;
   }
 
-  private void validateDeletedKeys(
+  private void validateDeletedKeys(OMMetadataManager omMetadataManager,
       List<String> deletedKeyNames) throws IOException {
     for (String deletedKey : deletedKeyNames) {
       assertTrue(omMetadataManager.getDeletedTable().isExist(

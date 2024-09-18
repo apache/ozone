@@ -151,6 +151,8 @@ enum Type {
   ListOpenFiles = 132;
   QuotaRepair = 133;
   GetServerDefaults = 134;
+  GetQuotaRepairStatus = 135;
+  StartQuotaRepair = 136;
 }
 
 enum SafeMode {
@@ -291,6 +293,8 @@ message OMRequest {
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
+  optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
+  optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
 }
 
 message OMResponse {
@@ -419,6 +423,8 @@ message OMResponse {
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
   optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
+  optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
+  optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
 
 enum Status {
@@ -880,6 +886,7 @@ message SnapshotInfo {
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
+  optional bytes lastTransactionInfo = 20;
 }
 
 message SnapshotDiffJobProto {
@@ -2224,6 +2231,17 @@ message FsServerDefaultsProto {
 
 message ServerDefaultsResponse {
   required FsServerDefaultsProto serverDefaults = 1;
+}
+
+message GetQuotaRepairStatusRequest {
+}
+message GetQuotaRepairStatusResponse {
+    optional string status = 1;
+}
+message StartQuotaRepairRequest {
+    repeated string buckets = 1;
+}
+message StartQuotaRepairResponse {
 }
 
 message OMLockDetailsProto {

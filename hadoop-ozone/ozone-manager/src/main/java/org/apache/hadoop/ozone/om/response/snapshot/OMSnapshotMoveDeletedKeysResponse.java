@@ -133,6 +133,11 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       }
     }
 
+    // Flush snapshot info to rocksDB.
+    omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
+    if (nextSnapshot != null) {
+      omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, nextSnapshot.getTableKey(), nextSnapshot);
+    }
   }
 
   private void deleteDirsFromSnapshot(BatchOperation batchOp,
