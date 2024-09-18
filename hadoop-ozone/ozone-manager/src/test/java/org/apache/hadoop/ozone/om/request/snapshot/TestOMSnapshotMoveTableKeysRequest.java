@@ -20,6 +20,8 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -36,6 +38,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.deleteSnapshotRequest;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.moveSnapshotTableKeyRequest;
@@ -85,6 +89,8 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
+    omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(
+        omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
     OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
     Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_SNAPSHOT_ERROR,
@@ -92,7 +98,7 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidDeletedKeyPrefix() throws Exception {
+  public void testPreExecuteWithInvalidDeletedKeyPrefix() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -104,14 +110,13 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         deletedKeys, Collections.emptyList(), Collections.emptyList());
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
-    OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_KEY_NAME, omException.getResult());
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidDeletedDirPrefix() throws Exception {
+  public void testPreExecuteWithInvalidDeletedDirPrefix() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -123,14 +128,13 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         Collections.emptyList(), deletedDirs, Collections.emptyList());
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
-    OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_KEY_NAME, omException.getResult());
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidNumberDeletedDirPerKey() throws Exception {
+  public void testPreExecuteWithInvalidNumberDeletedDirPerKey() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -139,17 +143,34 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
         Stream.of(getDeletedDirKeys(getVolumeName(), getBucketName(), 0, 10, 1),
                 getDeletedDirKeys(invalidVolumeName, invalidBucketName, 0, 10, 10))
             .flatMap(List::stream).collect(Collectors.toList());
+    List<Pair<String, List<OmKeyInfo>>> deletedKeys =
+        Stream.of(getDeletedKeys(getVolumeName(), getBucketName(), 0, 10, 10, 0),
+            getDeletedKeys(invalidVolumeName, invalidBucketName, 0, 10, 0, 0))
+        .flatMap(List::stream).collect(Collectors.toList());
+    List<Pair<String, String>> renameKeys = getRenameKeys(getVolumeName(), getBucketName(), 0, 10, snapshotName1);
+    renameKeys.add(Pair.of(getOmMetadataManager().getRenameKey(getVolumeName(), getBucketName(), 11), null));
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
-        Collections.emptyList(), deletedDirs, Collections.emptyList());
+        deletedKeys, deletedDirs, renameKeys);
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
-    OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omClientResponse.getOMResponse().getStatus());
+    omRequest = omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager());
+    for (OzoneManagerProtocolProtos.SnapshotMoveKeyInfos deletedDir :
+         omRequest.getSnapshotMoveTableKeysRequest().getDeletedDirsList()) {
+      Assertions.assertEquals(1, deletedDir.getKeyInfosList().size());
+    }
+
+    for (OzoneManagerProtocolProtos.SnapshotMoveKeyInfos deletedKey :
+        omRequest.getSnapshotMoveTableKeysRequest().getDeletedKeysList()) {
+      Assertions.assertNotEquals(0, deletedKey.getKeyInfosList().size());
+    }
+
+    for (HddsProtos.KeyValue renameKey : omRequest.getSnapshotMoveTableKeysRequest().getRenamedKeysList()) {
+      Assertions.assertTrue(renameKey.hasKey() && renameKey.hasValue());
+    }
+
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidRenamePrefix() throws Exception {
+  public void testPreExecuteWithInvalidRenamePrefix() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -161,10 +182,9 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         Collections.emptyList(), Collections.emptyList(), renameKeys);
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
-    OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_KEY_NAME, omException.getResult());
   }
 
   @Test
@@ -179,6 +199,9 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         deletedKeys, deletedDirs, renameKeys);
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
+    // perform preExecute.
+    omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(
+        omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
     OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
@@ -186,7 +209,7 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidDuplicateDeletedKey() throws Exception {
+  public void testPreExecuteWithInvalidDuplicateDeletedKey() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -198,14 +221,13 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
         deletedKeys, Collections.emptyList(), Collections.emptyList());
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
-    OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_REQUEST, omException.getResult());
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidDuplicateDeletedDir() throws Exception {
+  public void testPreExecuteWithInvalidDuplicateDeletedDir() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -218,13 +240,13 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
         Collections.emptyList(), deletedDirs, Collections.emptyList());
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
     OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_REQUEST, omException.getResult());
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithInvalidDuplicateRenameKey() throws Exception {
+  public void testPreExecuteWithInvalidDuplicateRenameKey() throws Exception {
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -237,8 +259,8 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
         Collections.emptyList(), Collections.emptyList(), renameKeys);
     OMSnapshotMoveTableKeysRequest omSnapshotMoveTableKeysRequest = new OMSnapshotMoveTableKeysRequest(omRequest);
     OMClientResponse omClientResponse = omSnapshotMoveTableKeysRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
-        omClientResponse.getOMResponse().getStatus());
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> omSnapshotMoveTableKeysRequest.preExecute(getOzoneManager()));
+    Assertions.assertEquals(INVALID_REQUEST, omException.getResult());
   }
 }

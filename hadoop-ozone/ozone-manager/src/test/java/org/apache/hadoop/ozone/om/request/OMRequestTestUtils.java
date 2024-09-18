@@ -112,6 +112,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.logging.log4j.util.Strings;
 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -1355,7 +1356,12 @@ public final class OMRequestTestUtils {
 
     List<KeyValue> renameKeyList = new ArrayList<>();
     for (Pair<String, String> renameKey : renameKeys) {
-      renameKeyList.add(KeyValue.newBuilder().setKey(renameKey.getKey()).setValue(renameKey.getValue()).build());
+      KeyValue.Builder keyValue = KeyValue.newBuilder();
+      keyValue.setKey(renameKey.getKey());
+      if (!Strings.isBlank(renameKey.getValue())) {
+        keyValue.setValue(renameKey.getValue());
+      }
+      renameKeyList.add(keyValue.build());
     }
 
 
