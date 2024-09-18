@@ -75,8 +75,6 @@ public final class OzoneConsts {
       "EEE, dd MMM yyyy HH:mm:ss zzz";
   public static final String OZONE_TIME_ZONE = "GMT";
 
-  public static final String OZONE_REQUEST = "request";
-
   // OM Http server endpoints
   public static final String OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT =
       "/serviceList";
@@ -104,7 +102,7 @@ public final class OzoneConsts {
   public static final String MD5_HASH = "MD5";
   public static final String CHUNK_OVERWRITE = "OverWriteRequested";
 
-  public static final int CHUNK_SIZE = 1024 * 1024;
+  public static final int CHUNK_SIZE = 1 * 1024 * 1024;
   // for client and DataNode to label a block contains a incremental chunk list.
   public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final long KB = 1024L;
@@ -176,7 +174,6 @@ public final class OzoneConsts {
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
-  public static final String OM_S3_VOLUME_PREFIX = "s3";
   public static final String OM_S3_SECRET = "S3Secret:";
   public static final String OM_PREFIX = "Prefix:";
 
@@ -185,11 +182,6 @@ public final class OzoneConsts {
    */
   public static final int OZONE_SCM_CHUNK_MAX_SIZE = 32 * 1024 * 1024;
 
-
-  /**
-   * Max OM Quota size of Long.MAX_VALUE.
-   */
-  public static final long MAX_QUOTA_IN_BYTES = Long.MAX_VALUE;
 
   /**
    * Quota RESET default is -1, which means quota is not set.
