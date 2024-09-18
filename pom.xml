@@ -183,7 +183,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <metainf-services.version>1.11</metainf-services.version>
-    <picocli.version>4.7.6</picocli.version>
+    <picocli.version>4.7.5</picocli.version>
     <prometheus.version>0.16.0</prometheus.version>
     <reflections.version>0.10.2</reflections.version>
 
