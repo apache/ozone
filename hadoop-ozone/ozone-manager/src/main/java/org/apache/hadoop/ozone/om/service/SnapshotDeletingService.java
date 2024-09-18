@@ -23,7 +23,6 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -96,11 +95,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final long serviceTimeout;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
-                                 OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
+                                 OzoneManager ozoneManager)
       throws IOException {
     super(SnapshotDeletingService.class.getSimpleName(), interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, scmClient);
+        serviceTimeout, ozoneManager, null);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
@@ -121,6 +120,27 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     this.serviceTimeout = serviceTimeout;
+  }
+
+  @VisibleForTesting
+  public void waitForKeyDeletingService() throws InterruptedException {
+    KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
+    synchronized (keyDeletingService) {
+      while (keyDeletingService != null && keyDeletingService.isRunningOnAOS()) {
+        keyDeletingService.wait(serviceTimeout);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  public void waitForDirDeletingService() throws InterruptedException {
+    DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
+        .getDirDeletingService();
+    synchronized (directoryDeletingService) {
+      while (directoryDeletingService != null && directoryDeletingService.isRunningOnAOS()) {
+        directoryDeletingService.wait(serviceTimeout);
+      }
+    }
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -156,20 +176,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // nextSnapshot = null means entries would be moved to AOS, hence ensure that KeyDeletingService &
           // DirectoryDeletingService is not running while the entries are moving.
           if (nextSnapshot == null) {
-            KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
-            synchronized (keyDeletingService) {
-              while (keyDeletingService != null && keyDeletingService.isRunningOnAOS()) {
-                keyDeletingService.wait(serviceTimeout);
-              }
-            }
-
-            DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
-                .getDirDeletingService();
-            synchronized (directoryDeletingService) {
-              while (directoryDeletingService != null && directoryDeletingService.isRunningOnAOS()) {
-                directoryDeletingService.wait(serviceTimeout);
-              }
-            }
+            waitForKeyDeletingService();
+            waitForDirDeletingService();
           }
           try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {

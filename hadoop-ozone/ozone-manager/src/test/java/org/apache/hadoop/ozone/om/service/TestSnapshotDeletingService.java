@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.service;
 
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -58,8 +57,6 @@ public class TestSnapshotDeletingService {
   private SnapshotChainManager chainManager;
   @Mock
   private OmMetadataManagerImpl omMetadataManager;
-  @Mock
-  private ScmBlockLocationProtocol scmClient;
   private final OzoneConfiguration conf = new OzoneConfiguration();;
   private final long sdsRunInterval = Duration.ofMillis(1000).toMillis();
   private final  long sdsServiceTimeout = Duration.ofSeconds(10).toMillis();
@@ -100,7 +97,7 @@ public class TestSnapshotDeletingService {
     }
 
     SnapshotDeletingService snapshotDeletingService =
-        new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager, scmClient);
+        new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager);
 
     snapshotInfo.setSnapshotStatus(status);
     assertEquals(expectedOutcome, snapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo));

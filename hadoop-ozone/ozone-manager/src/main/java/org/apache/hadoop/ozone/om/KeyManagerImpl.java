@@ -307,7 +307,7 @@ public class KeyManagerImpl implements KeyManager {
       try {
         snapshotDeletingService = new SnapshotDeletingService(
             snapshotServiceInterval, snapshotServiceTimeout,
-            ozoneManager, scmClient.getBlockClient());
+            ozoneManager);
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
