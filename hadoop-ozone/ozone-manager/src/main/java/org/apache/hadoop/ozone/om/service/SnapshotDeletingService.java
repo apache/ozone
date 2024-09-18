@@ -53,7 +53,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -201,36 +200,31 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
-              try {
-                submitSnapshotMoveDeletedKeys(snapInfo, deletedKeyEntries.stream().map(kv -> {
-                  try {
-                    return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey()).addAllKeyInfos(kv.getValue()
+              List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
+              List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(deletedDirEntries.size());
+              List<HddsProtos.KeyValue> renameKeys = new ArrayList<>(renameEntries.size());
+
+              // Convert deletedKeyEntries to SnapshotMoveKeyInfos.
+              for (Table.KeyValue<String, List<OmKeyInfo>> deletedEntry : deletedKeyEntries) {
+                deletedKeys.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedEntry.getKey())
+                    .addAllKeyInfos(deletedEntry.getValue()
                         .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT_VERSION))
-                        .collect(Collectors.toList())).build();
-                  } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                  }
-                }).collect(Collectors.toList()),
-                    renameEntries.stream().map(kv -> {
-                      try {
-                        return HddsProtos.KeyValue.newBuilder().setKey(kv.getKey()).setValue(kv.getValue()).build();
-                      } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                      }
-                    }).collect(Collectors.toList()),
-                    deletedDirEntries.stream()
-                        .map(kv -> {
-                          try {
-                            return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey())
-                                .addKeyInfos(kv.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build();
-                          } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                          }
-                        }).collect(Collectors.toList()));
-                remaining -= moveCount;
-              } catch (UncheckedIOException e) {
-                throw e.getCause();
+                        .collect(Collectors.toList())).build());
               }
+
+              // Convert deletedDirEntries to SnapshotMoveKeyInfos.
+              for (Table.KeyValue<String, OmKeyInfo> deletedDirEntry : deletedDirEntries) {
+                deletedDirs.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedDirEntry.getKey())
+                    .addKeyInfos(deletedDirEntry.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build());
+              }
+
+              // Convert renamedEntries to KeyValue.
+              for (Table.KeyValue<String, String> renameEntry : renameEntries) {
+                renameKeys.add(HddsProtos.KeyValue.newBuilder().setKey(renameEntry.getKey())
+                    .setValue(renameEntry.getValue()).build());
+              }
+              submitSnapshotMoveDeletedKeys(snapInfo, deletedKeys, renameKeys, deletedDirs);
+              remaining -= moveCount;
             } else {
               snapshotsToBePurged.add(snapInfo.getTableKey());
             }
