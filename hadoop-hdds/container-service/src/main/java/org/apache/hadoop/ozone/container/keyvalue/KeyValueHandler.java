@@ -59,7 +59,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
@@ -987,36 +986,39 @@ public class KeyValueHandler extends Handler {
       checkContainerClose(kvContainer);
 
       DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
-
-      // Set CHUNK_OVERWRITE to overwrite existing chunk.
-      chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
       chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
           dispatcherContext);
 
       // Increment write stats for WriteChunk after write.
       metrics.incContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
       metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
-
-      if (blockData != null) {
-        long putBlockStartTime = Time.monotonicNowNanos();
-        // Add ChunkInfo to BlockData to be persisted in RocksDb
-        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
-        chunks.add(chunkInfo.getProtoBufMessage());
-        blockData.setChunks(chunks);
-
-        // To be set from the Replica's BCSId
-        blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
-
-        blockManager.putBlock(kvContainer, blockData);
-        ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
-        final long numBytes = blockDataProto.getSerializedSize();
-        // Increment write stats for PutBlock after write.
-        metrics.incContainerBytesStats(Type.PutBlock, numBytes);
-        metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - putBlockStartTime);
-      }
     } catch (IOException ex) {
       LOG.error("Write Chunk failed for closed container", ex);
     }
+  }
+
+  /**
+   * Handle Put Block operation for closed container. Calls BlockManager to process the request.
+   *
+   */
+  private void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
+                                          BlockData blockData, long blockCommitSequenceId) throws IOException {
+    if (blockData == null) {
+      return;
+    }
+    long startTime = Time.monotonicNowNanos();
+
+    checkContainerClose(kvContainer);
+    blockData.setChunks(chunkInfos);
+    // To be set from the Replica's BCSId
+    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+
+    blockManager.putBlock(kvContainer, blockData, false);
+    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+    final long numBytes = blockDataProto.getSerializedSize();
+    // Increment write stats for PutBlock after write.
+    metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+    metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
   }
 
   /**
@@ -1204,8 +1206,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
 
     final State containerState = kvContainer.getContainerState();
-    if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED
-        || containerState == State.UNHEALTHY) {
+    if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED || containerState == State.UNHEALTHY) {
       return;
     }
 
