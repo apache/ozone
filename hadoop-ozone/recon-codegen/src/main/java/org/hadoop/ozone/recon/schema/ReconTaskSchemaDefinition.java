@@ -58,7 +58,7 @@ public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
   @Override
   public void upgradeSchema(String fromVersion, String toVersion)
       throws SQLException {
-
+    // No schema upgrades needed for Recon Task Status table.
   }
 
   /**

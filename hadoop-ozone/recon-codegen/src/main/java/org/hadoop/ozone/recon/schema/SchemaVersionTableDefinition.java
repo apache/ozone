@@ -38,7 +38,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   @Override
   public void upgradeSchema(String fromVersion, String toVersion) throws SQLException {
-    // No specific upgrade logic needed for SchemaVersionTable for now
+    // No schema upgrades needed for the Schema Version table.
   }
 
   /**

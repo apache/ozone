@@ -1,4 +1,4 @@
-package org.hadoop.ozone.recon.codegen;
+package org.apache.hadoop.ozone.recon;
 
 import com.google.inject.Inject;
 import org.jooq.DSLContext;
@@ -15,10 +15,12 @@ public class ReconSchemaVersionTableManager {
   private static final Logger LOG = LoggerFactory.getLogger(ReconSchemaVersionTableManager.class);
   public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DSLContext dslContext;
+  private final DataSource dataSource;
 
   @Inject
-  public ReconSchemaVersionTableManager(DataSource dataSource) throws
+  public ReconSchemaVersionTableManager(DataSource src) throws
       SQLException {
+    this.dataSource = src;
     this.dslContext = DSL.using(dataSource.getConnection());
   }
 
@@ -41,9 +43,8 @@ public class ReconSchemaVersionTableManager {
    * @throws SQLException if any SQL error occurs.
    */
   public void updateSchemaVersion(String newVersion) {
-    boolean recordExists = dslContext.fetchExists(
-        dslContext.selectOne()
-            .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+    boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
+        .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
     );
 
     if (recordExists) {
@@ -61,4 +62,7 @@ public class ReconSchemaVersionTableManager {
     }
   }
 
+  public DataSource getDataSource() {
+    return dataSource;
+  }
 }

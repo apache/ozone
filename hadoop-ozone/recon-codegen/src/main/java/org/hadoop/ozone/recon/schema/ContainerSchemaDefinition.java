@@ -27,6 +27,8 @@ import com.google.inject.Singleton;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -38,6 +40,9 @@ import java.util.Arrays;
  */
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
@@ -86,6 +91,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     // Example upgrade script
     if (fromVersion.equals("1.0") && toVersion.equals("2.0")) {
       runMigrationToVersion2(conn);
+      LOG.info("Upgraded schema from version 1.0 to 2.0.");
     }
   }
 
