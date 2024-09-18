@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
@@ -369,7 +370,13 @@ public class OMBasicStateMachine extends BaseStateMachine {
     OMClientResponse omClientResponse = null;
     try {
       try {
-        omClientResponse = handler.handleWriteRequestImpl(request, termIndex);
+        TermIndex objectIndex = termIndex;
+        // TODO temp fix for index sharing from leader to follower in follower execution
+        if (request.getCmdType() != OzoneManagerProtocolProtos.Type.PersistDb && request.hasPersistDbRequest()
+            && request.getPersistDbRequest().getIndexCount() > 0) {
+          objectIndex = TermIndex.valueOf(termIndex.getTerm(), request.getPersistDbRequest().getIndex(0));
+        }
+        omClientResponse = handler.handleWriteRequestImpl(request, objectIndex);
         validateResponseError(omClientResponse.getOMResponse());
       } catch (IOException e) {
         LOG.warn("Failed to apply command, Exception occurred ", e);
