@@ -76,10 +76,11 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
       );
 
     const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
+      //omSyncLoad should be clickable at all times. If the response from the dbsync is false it will show DB update is already running else show triggered sync
       (
         <>
           &nbsp; | DB Synced at {lastUpdatedDeltaFullToolTip}
-          &nbsp;<Button shape='circle' icon={<PlayCircleOutlined />} size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true} />
+          &nbsp;<Button shape='circle' icon={<PlayCircleOutlined />} size='small' loading={isLoading} onClick={omSyncLoad} />
         </>
       );
 
