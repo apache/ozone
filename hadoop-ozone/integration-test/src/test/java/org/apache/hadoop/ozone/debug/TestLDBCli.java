@@ -171,6 +171,18 @@ public class TestLDBCli {
             Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter key3", Arrays.asList("--filter", "keyName:equals:key3")),
+            Named.of("Expect key3", Pair.of("key3", "key4"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter invalid key", Arrays.asList("--filter", "keyName:equals:key9")),
+            Named.of("Expect key1-key3", null)
+        ),
+        Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),

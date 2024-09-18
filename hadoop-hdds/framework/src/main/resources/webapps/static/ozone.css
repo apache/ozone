@@ -92,6 +92,10 @@ body {
     background-color: #dcfbcd!important;
 }
 
+.scm-roles-background {
+    background-color: #dcfbcd!important;
+}
+
 .toggle-btn {
     background: transparent; /* No background color */
     color: #007bff; /* Button text color */

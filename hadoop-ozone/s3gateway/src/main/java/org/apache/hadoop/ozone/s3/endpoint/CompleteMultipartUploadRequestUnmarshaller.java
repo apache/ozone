@@ -34,7 +34,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import javax.ws.rs.ext.Provider;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
@@ -69,6 +71,10 @@ public class CompleteMultipartUploadRequestUnmarshaller
       MultivaluedMap<String, String> multivaluedMap,
       InputStream inputStream) throws IOException, WebApplicationException {
     try {
+      if (inputStream.available() == 0) {
+        throw wrapOS3Exception(INVALID_REQUEST.withMessage("You must specify at least one part"));
+      }
+
       XMLReader xmlReader = saxParserFactory.newSAXParser().getXMLReader();
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
@@ -78,8 +84,11 @@ public class CompleteMultipartUploadRequestUnmarshaller
       filter.setParent(xmlReader);
       filter.parse(new InputSource(inputStream));
       return (CompleteMultipartUploadRequest) unmarshallerHandler.getResult();
+    } catch (WebApplicationException e) {
+      throw e;
     } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
+      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
     }
   }
+
 }

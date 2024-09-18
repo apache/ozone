@@ -227,11 +227,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
       // wait until all Buckets are cleaned or exception occurred.
       while (numberOfBucketsCleaned.get() != totalBucketCount
           && exception == null) {
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          throw e;
-        }
+        Thread.sleep(100);
       }
     } catch (InterruptedException e) {
       LOG.error("Failed to wait until all Buckets are cleaned", e);

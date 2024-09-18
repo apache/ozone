@@ -158,4 +158,9 @@ public class OS3Exception extends Exception {
         this.getErrorMessage(), this.getResource(),
         this.getRequestId());
   }
+
+  /** Create a copy with specific message. */
+  public OS3Exception withMessage(String message) {
+    return new OS3Exception(code, message, httpCode);
+  }
 }

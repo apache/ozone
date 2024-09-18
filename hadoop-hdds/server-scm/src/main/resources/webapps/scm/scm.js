@@ -56,6 +56,11 @@
                 }
             }
 
+            $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
+                .then(function (result) {
+                    ctrl.role = result.data.beans[0];
+            });
+
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
                 let port = -1;
@@ -95,6 +100,8 @@
                                     capacity: value && value.find((element) => element.key === "CAPACITY").value,
                                     comstate: value && value.find((element) => element.key === "COMSTATE").value,
                                     lastheartbeat: value && value.find((element) => element.key === "LASTHEARTBEAT").value,
+                                    uuid: value && value.find((element) => element.key === "UUID").value,
+                                    version: value && value.find((element) => element.key === "VERSION").value,
                                     port: portSpec.port,
                                     protocol: portSpec.proto
                                 }
