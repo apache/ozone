@@ -122,6 +122,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.serviceTimeout = serviceTimeout;
   }
 
+  // Wait for a notification from KeyDeletingService if the key deletion is running. This is to ensure, merging of
+  // entries do not start while the AOS is still processing the deleted keys.
   @VisibleForTesting
   public void waitForKeyDeletingService() throws InterruptedException {
     KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
@@ -132,6 +134,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
+  // Wait for a notification from DirectoryDeletingService if the directory deletion is running. This is to ensure,
+  // merging of entries do not start while the AOS is still processing the deleted keys.
   @VisibleForTesting
   public void waitForDirDeletingService() throws InterruptedException {
     DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
@@ -157,7 +161,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       try {
         int remaining = keyLimitPerTask;
         Iterator<UUID> iterator = snapshotChainManager.iterator(true);
-        List<SnapshotInfo> snapshotsToBePurged = new ArrayList<>();
+        List<String> snapshotsToBePurged = new ArrayList<>();
         long snapshotLimit = snapshotDeletionPerTask;
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotChainManager, iterator.next());
@@ -228,15 +232,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 throw e.getCause();
               }
             } else {
-              snapshotsToBePurged.add(snapInfo);
+              snapshotsToBePurged.add(snapInfo.getTableKey());
             }
           }
           successRunCount.incrementAndGet();
           snapshotLimit--;
         }
         if (!snapshotsToBePurged.isEmpty()) {
-          submitSnapshotPurgeRequest(snapshotsToBePurged.stream().map(SnapshotInfo::getTableKey)
-              .collect(Collectors.toList()));
+          submitSnapshotPurgeRequest(snapshotsToBePurged);
         }
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
@@ -303,7 +306,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       try {
         OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get());
       } catch (ServiceException e) {
-        LOG.error("Snapshot Deleting request failed. Will retry at next run.", e);
+        LOG.error("Request: {} fired by SnapshotDeletingService failed. Will retry in the next run", omRequest, e);
       }
     }
   }

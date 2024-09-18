@@ -244,7 +244,7 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Creates merged repeatedKeyInfo entry with the existing deleted entry in the table.
+   * Returns merged repeatedKeyInfo entry with the existing deleted entry in the table.
    * @param snapshotMoveKeyInfos keyInfos to be added.
    * @param metadataManager metadataManager for a store.
    * @return
@@ -261,9 +261,10 @@ public final class SnapshotUtils {
     }
     // When older version of keys are moved to the next snapshot's deletedTable
     // The newer version might also be in the next snapshot's deletedTable and
-    // it might overwrite. This is to avoid that and also avoid having
-    // orphans blocks. Checking the last keyInfoList size omKeyInfo versions,
-    // this is to avoid redundant additions if the last n versions match.
+    // it might overwrite the existing value which inturn could lead to orphan block in the system.
+    // Checking the keyInfoList with the last n versions of the omKeyInfo versions would ensure all versions are
+    // present in the list and would also avoid redundant additions to the list if the last n versions match, which
+    // can happen on om transaction replay on snapshotted rocksdb.
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
     if (result == null) {
       result = new RepeatedOmKeyInfo(keyInfoList);
@@ -274,7 +275,7 @@ public final class SnapshotUtils {
   }
 
   private static boolean isSameAsLatestOmKeyInfo(List<OmKeyInfo> omKeyInfos,
-                                                RepeatedOmKeyInfo result) {
+                                                 RepeatedOmKeyInfo result) {
     int size = result.getOmKeyInfoList().size();
     if (size >= omKeyInfos.size()) {
       return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
