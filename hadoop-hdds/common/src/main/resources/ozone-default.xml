@@ -4538,7 +4538,7 @@
   </property>
   <property>
     <name>ozone.om.leader.executor.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
       flag to enable / disable experimental feature for leader size execution for performance.
