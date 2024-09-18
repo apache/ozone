@@ -126,7 +126,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   public void waitForKeyDeletingService() throws InterruptedException {
     KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
     synchronized (keyDeletingService) {
-      while (keyDeletingService != null && keyDeletingService.isRunningOnAOS()) {
+      while (keyDeletingService.isRunningOnAOS()) {
         keyDeletingService.wait(serviceTimeout);
       }
     }
@@ -137,7 +137,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
         .getDirDeletingService();
     synchronized (directoryDeletingService) {
-      while (directoryDeletingService != null && directoryDeletingService.isRunningOnAOS()) {
+      while (directoryDeletingService.isRunningOnAOS()) {
         directoryDeletingService.wait(serviceTimeout);
       }
     }
