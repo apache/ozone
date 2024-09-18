@@ -1372,7 +1372,6 @@ public class KeyManagerImpl implements KeyManager {
     return null;
   }
 
-
   private OzoneFileStatus getOzoneFileStatusFSO(OmKeyArgs args,
       String clientAddress, boolean skipFileNotFoundError) throws IOException {
     final String volumeName = args.getVolumeName();
@@ -1831,17 +1830,13 @@ public class KeyManagerImpl implements KeyManager {
       }
       fileStatusFinalList.add(fileStatus);
     }
-
     return sortPipelineInfo(fileStatusFinalList, keyInfoList,
         omKeyArgs, clientAddress);
   }
 
-
   private List<OzoneFileStatus> sortPipelineInfo(
       List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
       OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
-
-
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
