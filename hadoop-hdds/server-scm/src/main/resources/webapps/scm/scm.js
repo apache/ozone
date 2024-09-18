@@ -52,6 +52,23 @@
                         scmused : "N/A",
                         remaining : "N/A",
                         nonscmused : "N/A"
+                    },
+                    data : {
+                        pipeline : {
+                            closed : "N/A",
+                            allocated : "N/A",
+                            open : "N/A",
+                            dormant : "N/A"
+                        },
+                        container : {
+                            open : "N/A",
+                            closing : "N/A",
+                            quasi_closed : "N/A",
+                            closed : "N/A",
+                            deleting : "N/A",
+                            deleted : "N/A",
+                            recovering : "N/A"
+                        }
                     }
                 }
             }
@@ -142,6 +159,47 @@
                         }
                     });
                 });
+
+            $http.get("jmx?qry=Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo")
+                .then(function (result) {
+                    const URLScheme = location.protocol.replace(":" , "");
+                    ctrl.scmpipelinemanager = result.data.beans[0];
+                    ctrl.scmpipelinemanager.PipelineInfo.forEach(({key, value}) => {
+                        if(key == "closed") {
+                            $scope.statistics.nodes.data.pipeline.closed = value;
+                        } else if(key == "allocated") {
+                            $scope.statistics.nodes.data.pipeline.allocated = value;
+                        } else if(key == "open") {
+                            $scope.statistics.nodes.data.pipeline.open = value;
+                        } else if(key == "dormant") {
+                            $scope.statistics.nodes.data.pipeline.dormant = value;
+                        }
+                    });
+                });
+
+            $http.get("jmx?qry=Hadoop:service=ContainerManager,name=SCMContainerManagerInfo")
+                .then(function (result) {
+                    const URLScheme = location.protocol.replace(":" , "");
+                    ctrl.scmcontainermanager = result.data.beans[0];
+                    ctrl.scmcontainermanager.ContainerInfos.forEach(({key, value}) => {
+                        if(key == "open") {
+                            $scope.statistics.nodes.data.container.open = value;
+                        } else if(key == "closing") {
+                            $scope.statistics.nodes.data.container.closing = value;
+                        } else if(key == "quasi_closed") {
+                            $scope.statistics.nodes.data.container.quasi_closed = value;
+                        } else if(key == "closed") {
+                            $scope.statistics.nodes.data.container.closed = value;
+                        } else if(key == "deleting") {
+                            $scope.statistics.nodes.data.container.deleting = value;
+                        } else if(key == "deleted") {
+                            $scope.statistics.nodes.data.container.deleted = value;
+                        } else if(key == "recovering") {
+                            $scope.statistics.nodes.data.container.recovering = value;
+                        }
+                    });
+                });
+
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
                 if($scope.RecordsToDisplay == 'All') {

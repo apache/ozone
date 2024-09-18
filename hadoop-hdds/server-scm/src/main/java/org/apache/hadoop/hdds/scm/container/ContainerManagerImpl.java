@@ -28,6 +28,7 @@ import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.HashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -48,10 +49,14 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.ObjectName;
 
 import static java.util.Comparator.reverseOrder;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
@@ -86,9 +91,8 @@ public class ContainerManagerImpl implements ContainerManager {
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
-  /**
-   *
-   */
+  private ObjectName pmInfoBean;
+
   public ContainerManagerImpl(
       final Configuration conf,
       final SCMHAManager scmHaManager,
@@ -116,6 +120,8 @@ public class ContainerManagerImpl implements ContainerManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.pmInfoBean = MBeans.register("ContainerManager",
+        "SCMContainerManagerInfo", this);
   }
 
   @Override
@@ -369,6 +375,16 @@ public class ContainerManagerImpl implements ContainerManager {
         ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
+  @Override
+  public Map<String, Integer> getContainerInfos() throws NotLeaderException {
+    final Map<String, Integer> containerInfos = new HashMap<>();
+    for (LifeCycleState state : LifeCycleState.values()) {
+      containerInfos.put(state.toString().toLowerCase(),
+          containerStateManager.getContainerIDs(state).size());
+    }
+    return containerInfos;
+  }
+
   /**
    * Returns the container ID's matching with specified owner.
    * @param pipeline
@@ -449,6 +465,10 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void close() throws IOException {
+    if (pmInfoBean != null) {
+      MBeans.unregister(this.pmInfoBean);
+      pmInfoBean = null;
+    }
     containerStateManager.close();
   }
 

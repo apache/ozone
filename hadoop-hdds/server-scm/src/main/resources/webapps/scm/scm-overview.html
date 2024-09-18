@@ -110,6 +110,70 @@
     </tbody>
 </table>
 
+<h2>Pipeline Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Pipeline State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.nodes.data.pipeline.closed}}</td>
+    </tr>
+    <tr>
+        <td>Allocated</td>
+        <td>{{statistics.nodes.data.pipeline.allocated}}</td>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.nodes.data.pipeline.open}}</td>
+    </tr>
+    <tr>
+        <td>Dormant</td>
+        <td>{{statistics.nodes.data.pipeline.dormant}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Container Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Container State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.nodes.data.container.open}}</td>
+    </tr>
+    <tr>
+        <td>Closing</td>
+        <td>{{statistics.nodes.data.container.closing}}</td>
+    </tr>
+    <tr>
+        <td>Quasi Closed</td>
+        <td>{{statistics.nodes.data.container.quasi_closed}}</td>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.nodes.data.container.closed}}</td>
+    </tr>
+    <tr>
+        <td>Deleting</td>
+        <td>{{statistics.nodes.data.container.deleting}}</td>
+    </tr>
+    <tr>
+        <td>Deleted</td>
+        <td>{{statistics.nodes.data.container.deleted}}</td>
+    </tr>
+    <tr>
+        <td>Recovering</td>
+        <td>{{statistics.nodes.data.container.recovering}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Node Status</h2>
 <div class="row">
     <div class="col-md-6 text-left">
