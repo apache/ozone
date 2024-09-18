@@ -102,7 +102,7 @@ public final class OzoneConsts {
   public static final String MD5_HASH = "MD5";
   public static final String CHUNK_OVERWRITE = "OverWriteRequested";
 
-  public static final int CHUNK_SIZE = 1 * 1024 * 1024;
+  public static final int CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
   // for client and DataNode to label a block contains a incremental chunk list.
   public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final long KB = 1024L;
