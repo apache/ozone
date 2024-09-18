@@ -68,3 +68,12 @@ export type BucketsState = {
   bucketsUnderVolume: Bucket[];
   volumeOptions: MultiOption[];
 }
+
+export type BucketsTableProps = {
+  loading: boolean;
+  data: Bucket[];
+  handleAclClick: (arg0: Bucket) => void;
+  selectedColumns: MultiOption[];
+  searchColumn: 'name' | 'volumeName';
+  searchTerm: string;
+}

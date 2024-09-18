@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+import { Option } from "@/v2/components/select/multiSelect";
+
 export const PipelineStatusList = [
   'OPEN',
   'CLOSING',
@@ -29,13 +31,6 @@ export const PipelineStatusList = [
 export type PipelineStatus = typeof PipelineStatusList[number];
 
 export type Pipeline = {
-  pipelineID: string;
-  replicationType: string;
-  replicationFactor: string;
-  leaderNode: string;
-}
-
-export type PipelineResponse = {
   pipelineId: string;
   status: PipelineStatus;
   replicationType: string;
@@ -50,12 +45,18 @@ export type PipelineResponse = {
 
 export type PipelinesResponse = {
   totalCount: number;
-  pipelines: PipelineResponse[];
+  pipelines: Pipeline[];
 }
 
 export type PipelinesState = {
-  activeLoading: boolean;
-  activeDataSource: PipelineResponse[];
-  activeTotalCount: number;
+  activeDataSource: Pipeline[];
+  columnOptions: Option[];
   lastUpdated: number;
+}
+
+export type PipelinesTableProps = {
+  loading: boolean;
+  data: Pipeline[];
+  selectedColumns: Option[];
+  searchTerm: string;
 }

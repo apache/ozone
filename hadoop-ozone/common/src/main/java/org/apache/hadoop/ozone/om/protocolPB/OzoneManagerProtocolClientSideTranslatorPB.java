@@ -2117,12 +2117,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setGetFileStatusRequest(req)
         .build();
 
-    final GetFileStatusResponse resp;
-    try {
-      resp = handleError(submitRequest(omRequest)).getGetFileStatusResponse();
-    } catch (IOException e) {
-      throw e;
-    }
+    final GetFileStatusResponse resp = handleError(submitRequest(omRequest))
+        .getGetFileStatusResponse();
     return OzoneFileStatus.getFromProtobuf(resp.getStatus());
   }
 
