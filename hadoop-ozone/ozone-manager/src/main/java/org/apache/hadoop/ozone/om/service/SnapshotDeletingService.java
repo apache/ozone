@@ -259,9 +259,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
 
     private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-                                              List<SnapshotMoveKeyInfos> deletedKeys,
-                                              List<HddsProtos.KeyValue> renamedList,
-                                              List<SnapshotMoveKeyInfos> dirsToMove) {
+                                               List<SnapshotMoveKeyInfos> deletedKeys,
+                                               List<HddsProtos.KeyValue> renamedList,
+                                               List<SnapshotMoveKeyInfos> dirsToMove) {
 
       SnapshotMoveTableKeysRequest.Builder moveDeletedKeysBuilder = SnapshotMoveTableKeysRequest.newBuilder()
           .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
@@ -305,6 +305,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
+  /**
+   * Checks if a given snapshot has been deleted and all the changes made to snapshot have been flushed to disk.
+   * @param snapInfo SnapshotInfo corresponding to the snapshot.
+   * @return true if the snapshot is still active or changes to snapshot have not been flushed to disk otherwise false.
+   * @throws IOException
+   */
   @VisibleForTesting
   boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo) throws IOException {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
