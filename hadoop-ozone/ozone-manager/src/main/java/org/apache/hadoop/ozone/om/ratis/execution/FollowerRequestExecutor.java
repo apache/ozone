@@ -22,7 +22,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +37,18 @@ public class FollowerRequestExecutor {
   private static final int RATIS_TASK_QUEUE_SIZE = 1000;
   private final AtomicLong callId = new AtomicLong(0);
   private final OzoneManager ozoneManager;
+  private AtomicLong uniqueIndex;
   private final PoolExecutor<RequestContext> ratisSubmitter;
+  private final OzoneManagerRequestHandler handler;
 
-  public FollowerRequestExecutor(OzoneManager om) {
+  public FollowerRequestExecutor(OzoneManager om, AtomicLong uniqueIndex) {
     this.ozoneManager = om;
+    this.uniqueIndex = uniqueIndex;
+    if (!om.isRatisEnabled()) {
+      this.handler = new OzoneManagerRequestHandler(ozoneManager);
+    } else {
+      this.handler = null;
+    }
     ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE, RATIS_TASK_QUEUE_SIZE,
         ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
   }
@@ -59,14 +69,15 @@ public class FollowerRequestExecutor {
 
   private void sendDbUpdateRequest(RequestContext ctx) {
     try {
-      if (ozoneManager.isRatisEnabled()) {
-        throw new IOException("Non-ratis call is not supported");
+      if (!ozoneManager.isRatisEnabled()) {
+        OzoneManagerProtocolProtos.OMResponse response = OMBasicStateMachine.runCommand(ctx.getRequest(),
+            TermIndex.valueOf(-1, uniqueIndex.incrementAndGet()), handler, ozoneManager);
+        ctx.getFuture().complete(response);
+        return;
       }
       OzoneManagerProtocolProtos.OMResponse response = ozoneManager.getOmRatisServer().submitRequest(ctx.getRequest(),
           ClientId.randomId(), callId.incrementAndGet());
       ctx.getFuture().complete(response);
-    } catch (IOException ex) {
-      ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), ex));
     } catch (Throwable th) {
       ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
     }

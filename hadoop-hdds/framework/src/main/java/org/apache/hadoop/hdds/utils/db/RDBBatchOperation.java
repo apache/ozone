@@ -274,7 +274,6 @@ public class RDBBatchOperation implements BatchOperation {
           }
         }
         isCommit = true;
-        clear();
       }
 
       @Override

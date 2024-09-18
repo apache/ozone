@@ -364,7 +364,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private static OMResponse runCommand(
+  public static OMResponse runCommand(
       OMRequest request, TermIndex termIndex, RequestHandler handler, OzoneManager om) {
     OMClientResponse omClientResponse = null;
     try {

@@ -62,7 +62,7 @@ public class OMGateway {
   public OMGateway(OzoneManager om) throws IOException {
     this.om = om;
     this.leaderExecutor = new LeaderRequestExecutor(om, uniqueIndex);
-    this.followerExecutor = new FollowerRequestExecutor(om);
+    this.followerExecutor = new FollowerRequestExecutor(om, uniqueIndex);
     if (om.isLeaderExecutorEnabled() && om.isRatisEnabled()) {
       OzoneManagerRatisServer ratisServer = om.getOmRatisServer();
       ratisServer.getOmBasicStateMachine().registerLeaderNotifier(this::leaderChangeNotifier);
@@ -156,11 +156,12 @@ public class OMGateway {
     while (cacheItr.hasNext()) {
       cachedBucketKeySet.add(cacheItr.next().getKey().getCacheKey());
     }
-    TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucItr = bucketTable.iterator();
-    while (bucItr.hasNext()) {
-      Table.KeyValue<String, OmBucketInfo> next = bucItr.next();
-      bucketTable.addCacheEntry(next.getKey(), next.getValue(), -1);
-      cachedBucketKeySet.remove(next.getKey());
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucItr = bucketTable.iterator()) {
+      while (bucItr.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> next = bucItr.next();
+        bucketTable.addCacheEntry(next.getKey(), next.getValue(), -1);
+        cachedBucketKeySet.remove(next.getKey());
+      }
     }
 
     // removing extra cache entry
@@ -174,11 +175,12 @@ public class OMGateway {
     while (volCacheItr.hasNext()) {
       cachedVolumeKeySet.add(volCacheItr.next().getKey().getCacheKey());
     }
-    TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>> volItr = volumeTable.iterator();
-    while (volItr.hasNext()) {
-      Table.KeyValue<String, OmVolumeArgs> next = volItr.next();
-      volumeTable.addCacheEntry(next.getKey(), next.getValue(), -1);
-      cachedVolumeKeySet.remove(next.getKey());
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>> volItr = volumeTable.iterator()) {
+      while (volItr.hasNext()) {
+        Table.KeyValue<String, OmVolumeArgs> next = volItr.next();
+        volumeTable.addCacheEntry(next.getKey(), next.getValue(), -1);
+        cachedVolumeKeySet.remove(next.getKey());
+      }
     }
 
     // removing extra cache entry

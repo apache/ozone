@@ -308,8 +308,8 @@ public class LeaderRequestExecutor {
 
   private OMResponse sendDbUpdateRequest(OMRequest nextRequest, TermIndex termIndex) throws Exception {
     try {
-      if (ozoneManager.isRatisEnabled()) {
-        throw new IOException("Non-ratis call is not supported");
+      if (!ozoneManager.isRatisEnabled()) {
+        return OMBasicStateMachine.runCommand(nextRequest, termIndex, handler, ozoneManager);
       }
       OMResponse response = ozoneManager.getOmRatisServer().submitRequest(nextRequest, ClientId.randomId(),
           termIndex.getIndex());
@@ -319,6 +319,7 @@ public class LeaderRequestExecutor {
     } catch (Exception ex) {
       throw ex;
     }
+    // on success, return null as db update response ignored
     return null;
   }
   private OMResponse createErrorResponse(OMRequest omRequest, IOException exception) {
