@@ -16,37 +16,33 @@
 * limitations under the License.
 */
 
-import { Acl } from "@/v2/types/acl.types";
-import { Option } from "@/v2/components/select/multiSelect";
+.content-div {
+  min-height: unset;
 
-export type Volume = {
-  volume: string;
-  owner: string;
-  admin: string;
-  creationTime: number;
-  modificationTime: number;
-  quotaInBytes: number;
-  quotaInNamespace: number;
-  usedNamespace: number;
-  acls?: Acl[];
-}
+  .table-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 
-export type VolumesResponse = {
-  totalCount: number;
-  volumes: Volume[];
-}
+    .table-filter-section {
+      font-size: 14px;
+      font-weight: normal;
+      display: flex;
+      column-gap: 8px;
+      padding: 16px 8px;
+    }
+  }
 
-export type VolumesState = {
-  data: Volume[];
-  lastUpdated: number;
-  columnOptions: Option[];
-}
+  .uuid-tooltip {
+    cursor: pointer;
+    .ant-tooltip-inner {
+      width: max-content;
+    }
+  }
 
-export type VolumesTableProps = {
-  loading: boolean;
-  data: Volume[];
-  handleAclClick: (arg0: Volume) => void;
-  selectedColumns: Option[];
-  searchColumn: 'volume' | 'owner' | 'admin';
-  searchTerm: string;
+  .tag-block {
+    display: flex;
+    column-gap: 8px;
+    padding: 0px 8px 16px 8px;
+  }
 }
