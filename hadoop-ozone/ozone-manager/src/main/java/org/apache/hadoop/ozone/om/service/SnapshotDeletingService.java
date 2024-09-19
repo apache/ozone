@@ -167,6 +167,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
+          LOG.info("Started Snapshot Deletion Processing for snapshot : {}", snapInfo.getTableKey());
           SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
