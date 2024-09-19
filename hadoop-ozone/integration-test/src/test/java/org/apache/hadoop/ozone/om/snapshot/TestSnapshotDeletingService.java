@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -631,7 +632,9 @@ public class TestSnapshotDeletingService {
     directoryDeletingThread.start();
     Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
     GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
-    LOG.info("Swaminathan Snapshot deletion started {}", snapshotDeletionStarted.get());
+    LOG.info("Swaminathan Snapshot deletion started {}", Arrays.asList(keyDeletionWaitStarted.get(),
+        keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
+        snapshotDeletionStarted.get()));
     future.get();
     Mockito.reset(snapshotDeletingService);
     SnapshotInfo snap2 = SnapshotUtils.getSnapshotInfo(om, testBucket.getVolumeName(),
