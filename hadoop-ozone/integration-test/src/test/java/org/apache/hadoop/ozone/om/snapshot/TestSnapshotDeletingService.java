@@ -570,13 +570,7 @@ public class TestSnapshotDeletingService {
         .thenAnswer(i -> unMockedSnapshotChainManager.getOldestGlobalSnapshotId());
     doAnswer(i -> {
       // KDS wait block reached in SDS.
-      LOG.info("KDS wait triggered {}", Arrays.asList(keyDeletionWaitStarted.get(),
-          keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
-          snapshotDeletionStarted.get()));
       GenericTestUtils.waitFor(() -> {
-        LOG.info("Swaminathan Snapshot deletion started {}", Arrays.asList(keyDeletionWaitStarted.get(),
-            keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
-            snapshotDeletionStarted.get()));
         return keyDeletingService.isRunningOnAOS();
       }, 1000, 100000);
       keyDeletionWaitStarted.set(true);
@@ -668,9 +662,6 @@ public class TestSnapshotDeletingService {
     directoryDeletingThread.start();
     Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
     GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
-    LOG.info("Swaminathan Snapshot deletion started {}", Arrays.asList(keyDeletionWaitStarted.get(),
-        keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
-        snapshotDeletionStarted.get()));
     future.get();
     Mockito.reset(snapshotDeletingService);
     SnapshotInfo snap2 = SnapshotUtils.getSnapshotInfo(om, testBucket.getVolumeName(),
