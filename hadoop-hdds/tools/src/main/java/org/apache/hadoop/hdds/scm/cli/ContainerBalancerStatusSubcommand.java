@@ -200,7 +200,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
   public static String getPrettySize(long sizeInBytes) {
     if (sizeInBytes / OzoneConsts.GB > 0) {
-      return sizeInBytes / OzoneConsts.GB + " Gb" + sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
+      return sizeInBytes / OzoneConsts.GB + " Gb " + sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
     } else if (sizeInBytes == 0) {
       return "0";
     } else {
