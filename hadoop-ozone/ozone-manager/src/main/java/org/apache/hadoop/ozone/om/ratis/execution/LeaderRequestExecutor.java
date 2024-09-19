@@ -147,7 +147,7 @@ public class LeaderRequestExecutor {
           Thread.currentThread().interrupt();
         }
       } else {
-        handleBatchUpdateComplete(Collections.singletonList(ctx), null);
+        handleBatchUpdateComplete(Collections.singletonList(ctx), null, null);
       }
     }
   }
@@ -260,14 +260,14 @@ public class LeaderRequestExecutor {
     try {
       OMRequest reqBatch = omReqBuilder.build();
       OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getIndex());
-      if (dbUpdateRsp != null) {
+      if (!dbUpdateRsp.getSuccess()) {
         throw new OMException(dbUpdateRsp.getMessage(),
             OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
       }
-      handleBatchUpdateComplete(sendList, null);
+      handleBatchUpdateComplete(sendList, null, dbUpdateRsp.getLeaderOMNodeId());
     } catch (Throwable e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      handleBatchUpdateComplete(sendList, e);
+      handleBatchUpdateComplete(sendList, e, null);
     }
   }
 
@@ -278,14 +278,10 @@ public class LeaderRequestExecutor {
       }
       OMResponse response = ozoneManager.getOmRatisServer().submitRequest(nextRequest, ClientId.randomId(),
           termIndex.getIndex());
-      if (!response.getSuccess()) {
-        return response;
-      }
+      return response;
     } catch (Exception ex) {
       throw ex;
     }
-    // on success, return null as db update response ignored
-    return null;
   }
   private OMResponse createErrorResponse(OMRequest omRequest, IOException exception) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
@@ -299,7 +295,7 @@ public class LeaderRequestExecutor {
     OMResponse omResponse = omResponseBuilder.build();
     return omResponse;
   }
-  private void handleBatchUpdateComplete(Collection<RequestContext> ctxs, Throwable th) {
+  private void handleBatchUpdateComplete(Collection<RequestContext> ctxs, Throwable th, String leaderOMNodeId) {
     Map<String, List<Long>> cleanupMap = new HashMap<>();
     for (RequestContext ctx : ctxs) {
       if (th != null) {
@@ -315,7 +311,11 @@ public class LeaderRequestExecutor {
         disableProcessing();
       } else {
         OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getIndex());
-        ctx.getFuture().complete(ctx.getResponse());
+        OMResponse newRsp = ctx.getResponse();
+        if (leaderOMNodeId != null) {
+          newRsp = OMResponse.newBuilder(newRsp).setLeaderOMNodeId(leaderOMNodeId).build();
+        }
+        ctx.getFuture().complete(newRsp);
       }
 
       // cache cleanup
