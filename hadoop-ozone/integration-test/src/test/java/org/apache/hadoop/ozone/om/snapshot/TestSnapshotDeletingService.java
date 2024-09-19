@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdfs.server.balancer.Matcher;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -39,6 +41,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -65,6 +68,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -86,6 +90,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -523,16 +528,23 @@ public class TestSnapshotDeletingService {
                                                                    AtomicBoolean keyDeletionWaitStarted,
                                                                    AtomicBoolean dirDeletionWaitStarted,
                                                                    AtomicBoolean keyDeletionStarted,
-                                                                   AtomicBoolean dirDeletionStarted)
+                                                                   AtomicBoolean dirDeletionStarted,
+                                                                   OzoneBucket testBucket)
       throws InterruptedException, TimeoutException, IOException {
     OzoneManager ozoneManager = Mockito.spy(om);
     om.getKeyManager().getSnapshotDeletingService().shutdown();
     GenericTestUtils.waitFor(() -> om.getKeyManager().getSnapshotDeletingService().getThreadCount() == 0, 1000,
         100000);
     KeyManager keyManager = Mockito.spy(om.getKeyManager());
+    OmMetadataManagerImpl omMetadataManager = Mockito.spy((OmMetadataManagerImpl)om.getMetadataManager());
+    SnapshotChainManager unMockedSnapshotChainManager =
+        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager();
+    SnapshotChainManager snapshotChainManager = Mockito.spy(unMockedSnapshotChainManager);
     OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(omMetadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
     when(keyManager.getDeletingService()).thenReturn(keyDeletingService);
     when(keyManager.getDirDeletingService()).thenReturn(directoryDeletingService);
     SnapshotDeletingService snapshotDeletingService = Mockito.spy(new SnapshotDeletingService(10000,
@@ -540,6 +552,22 @@ public class TestSnapshotDeletingService {
     snapshotDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> snapshotDeletingService.getThreadCount() == 0, 1000,
         100000);
+    when(snapshotChainManager.iterator(anyBoolean())).thenAnswer(i -> {
+      Iterator<UUID> itr = (Iterator<UUID>) i.callRealMethod();
+      return Lists.newArrayList(itr).stream().filter(uuid -> {
+        try {
+          SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(om, snapshotChainManager, uuid);
+          return snapshotInfo.getBucketName().equals(testBucket.getName()) &&
+              snapshotInfo.getVolumeName().equals(testBucket.getVolumeName());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }).iterator();
+    });
+    when(snapshotChainManager.getLatestGlobalSnapshotId())
+        .thenAnswer(i -> unMockedSnapshotChainManager.getLatestGlobalSnapshotId());
+    when(snapshotChainManager.getOldestGlobalSnapshotId())
+        .thenAnswer(i -> unMockedSnapshotChainManager.getOldestGlobalSnapshotId());
     doAnswer(i -> {
       // KDS wait block reached in SDS.
       LOG.info("KDS wait triggered {}", Arrays.asList(keyDeletionWaitStarted.get(),
@@ -583,6 +611,13 @@ public class TestSnapshotDeletingService {
     AtomicBoolean keyDeletionStarted = new AtomicBoolean(false);
     AtomicBoolean dirDeletionStarted = new AtomicBoolean(false);
     AtomicBoolean snapshotDeletionStarted = new AtomicBoolean(false);
+    Random random = new Random();
+    String bucketName = "bucket" + random.nextInt();
+    BucketArgs bucketArgs = new BucketArgs.Builder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    OzoneBucket testBucket = TestDataUtil.createBucket(
+        client, VOLUME_NAME, bucketArgs, bucketName);
     // mock keyDeletingService
     KeyDeletingService keyDeletingService = getMockedKeyDeletingService(keyDeletionWaitStarted, keyDeletionStarted);
 
@@ -593,14 +628,7 @@ public class TestSnapshotDeletingService {
     // mock snapshotDeletingService.
     SnapshotDeletingService snapshotDeletingService = getMockedSnapshotDeletingService(keyDeletingService,
         directoryDeletingService, snapshotDeletionStarted, keyDeletionWaitStarted, dirDeletionWaitStarted,
-        keyDeletionStarted, dirDeletionStarted);
-    Random random = new Random();
-    String bucketName = "bucket" + random.nextInt();
-    BucketArgs bucketArgs = new BucketArgs.Builder()
-        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .build();
-    OzoneBucket testBucket = TestDataUtil.createBucket(
-        client, VOLUME_NAME, bucketArgs, bucketName);
+        keyDeletionStarted, dirDeletionStarted, testBucket);
     createSnapshotFSODataForBucket(testBucket);
     List<Table.KeyValue<String, String>> renamesKeyEntries;
     List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries;
