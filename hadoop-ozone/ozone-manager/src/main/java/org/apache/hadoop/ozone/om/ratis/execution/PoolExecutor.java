@@ -73,4 +73,15 @@ public class PoolExecutor <T> {
       }
     }
   }
+
+  public void stop() {
+    for (int i = 0; i < threadPool.length; ++i) {
+      threadPool[i].interrupt();
+      try {
+        threadPool[i].join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 }

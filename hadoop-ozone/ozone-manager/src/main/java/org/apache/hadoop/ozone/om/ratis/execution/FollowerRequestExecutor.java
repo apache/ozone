@@ -52,7 +52,9 @@ public class FollowerRequestExecutor {
     ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE, RATIS_TASK_QUEUE_SIZE,
         ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
   }
-
+  public void stop() {
+    ratisSubmitter.stop();
+  }
   public int batchSize() {
     return RATIS_TASK_POOL_SIZE;
   }
