@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -66,11 +68,12 @@ public class OMPersistDbRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OzoneManagerProtocolProtos.PersistDbRequest dbUpdateRequest = getOmRequest().getPersistDbRequest();
 
-    try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore()
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    try (BatchOperation batchOperation = metadataManager.getStore()
         .initBatchOperation()) {
       List<OzoneManagerProtocolProtos.DBTableUpdate> tableUpdatesList = dbUpdateRequest.getTableUpdatesList();
       for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdates : tableUpdatesList) {
-        Table table = ozoneManager.getMetadataManager().getTable(tblUpdates.getTableName());
+        Table table = metadataManager.getTable(tblUpdates.getTableName());
         List<OzoneManagerProtocolProtos.DBTableRecord> recordsList = tblUpdates.getRecordsList();
         for (OzoneManagerProtocolProtos.DBTableRecord record : recordsList) {
           if (record.hasValue()) {
@@ -83,9 +86,12 @@ public class OMPersistDbRequest extends OMClientRequest {
           }
         }
       }
-      ozoneManager.getMetadataManager().getTransactionInfoTable().putWithBatch(
-          batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex));
-      ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
+      Long txIndex = TransactionInfo.readTransactionInfo(metadataManager).getIndex();
+      txIndex = txIndex != null ? txIndex : 0;
+      txIndex = Math.max(Collections.max(getOmRequest().getPersistDbRequest().getIndexList()).longValue(), txIndex);
+      metadataManager.getTransactionInfoTable().putWithBatch(
+          batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex, txIndex));
+      metadataManager.getStore().commitBatchOperation(batchOperation);
       omResponse.setPersistDbResponse(OzoneManagerProtocolProtos.PersistDbResponse.newBuilder().build());
       refreshCache(ozoneManager, tableUpdatesList);
     } catch (IOException ex) {
@@ -97,7 +103,7 @@ public class OMPersistDbRequest extends OMClientRequest {
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse.build());
     return omClientResponse;
   }
-  
+
   public void audit(OzoneManager ozoneManager, OzoneManagerProtocolProtos.PersistDbRequest request,
                           TermIndex termIndex, Throwable th) {
     List<Long> indexList = request.getIndexList();

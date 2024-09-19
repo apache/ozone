@@ -53,11 +53,15 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
 
   public static TransactionInfo valueOf(String transactionInfo) {
     final String[] tInfo = transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
-    Preconditions.checkArgument(tInfo.length == 2,
+    Preconditions.checkArgument(tInfo.length >= 2 && tInfo.length <= 3,
         "Unexpected split length: %s in \"%s\"", tInfo.length, transactionInfo);
 
     try {
-      return valueOf(Long.parseLong(tInfo[0]), Long.parseLong(tInfo[1]));
+      Long index = null;
+      if (tInfo.length == 3) {
+        index = Long.parseLong(tInfo[2]);
+      }
+      return valueOf(Long.parseLong(tInfo[0]), Long.parseLong(tInfo[1]), index);
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to parse " + transactionInfo, e);
     }
@@ -65,6 +69,14 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
 
   public static TransactionInfo valueOf(long currentTerm, long transactionIndex) {
     return valueOf(TermIndex.valueOf(currentTerm, transactionIndex));
+  }
+
+  public static TransactionInfo valueOf(long currentTerm, long transactionIndex, Long index) {
+    return valueOf(TermIndex.valueOf(currentTerm, transactionIndex), index);
+  }
+
+  public static TransactionInfo valueOf(TermIndex termIndex, Long index) {
+    return new TransactionInfo(termIndex, index);
   }
 
   public static TransactionInfo valueOf(TermIndex termIndex) {
@@ -98,9 +110,19 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
   private final SnapshotInfo snapshotInfo;
   /** The string need to be persisted in OM DB. */
   private final String transactionInfoString;
+  private final Long index;
 
   private TransactionInfo(TermIndex termIndex) {
-    this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex();
+    this(termIndex, null);
+  }
+  private TransactionInfo(TermIndex termIndex, Long index) {
+    this.index = index;
+    if (null == index) {
+      this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex();
+    } else {
+      this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex()
+          + TRANSACTION_INFO_SPLIT_KEY + index;
+    }
     this.snapshotInfo = new SnapshotInfo() {
       @Override
       public TermIndex getTermIndex() {
@@ -136,6 +158,10 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
     return snapshotInfo.getTermIndex();
   }
 
+  public Long getIndex() {
+    return index;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -145,12 +171,12 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
       return false;
     }
     TransactionInfo that = (TransactionInfo) o;
-    return this.getTermIndex().equals(that.getTermIndex());
+    return this.getTermIndex().equals(that.getTermIndex()) && Objects.equals(that.getIndex(), getIndex());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getTerm(), getTransactionIndex());
+    return Objects.hash(getTerm(), getTransactionIndex(), getIndex());
   }
 
   @Override
