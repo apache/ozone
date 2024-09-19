@@ -631,6 +631,7 @@ public class TestSnapshotDeletingService {
     directoryDeletingThread.start();
     Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
     GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
+    LOG.info("Swaminathan Snapshot deletion started {}", snapshotDeletionStarted.get());
     future.get();
     Mockito.reset(snapshotDeletingService);
     SnapshotInfo snap2 = SnapshotUtils.getSnapshotInfo(om, testBucket.getVolumeName(),
