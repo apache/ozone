@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import java.util.HashMap;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -35,6 +37,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import org.apache.ratis.server.RaftServer;
@@ -67,6 +71,71 @@ public class OMPrepareRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    if (ozoneManager.isLeaderExecutorEnabled()) {
+      return validateAndUpdateCacheNew(ozoneManager, termIndex);
+    }
+    return validateAndUpdateCacheOld(ozoneManager, termIndex);
+  }
+  public OMClientResponse validateAndUpdateCacheNew(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
+    LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
+
+    OMRequest omRequest = getOmRequest();
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
+    OMResponse.Builder responseBuilder = OmResponseUtil.getOMResponseBuilder(omRequest);
+    responseBuilder.setCmdType(Type.Prepare);
+    OMClientResponse response = null;
+    Exception exception = null;
+
+    try {
+      PrepareResponse omResponse = PrepareResponse.newBuilder().setTxnID(transactionLogIndex).build();
+      responseBuilder.setPrepareResponse(omResponse);
+      response = new DummyOMClientResponse(responseBuilder.build());
+
+      // update db and then take snapshot
+      ozoneManager.getMetadataManager().getTransactionInfoTable().put(
+          PREPARE_MARKER_KEY, TransactionInfo.valueOf(TransactionInfo.DEFAULT_VALUE.getTerm(), transactionLogIndex));
+      ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+          TransactionInfo.valueOf(termIndex));
+
+      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+      final RaftServer.Division division = omRatisServer.getServerDivision();
+      takeSnapshotAndPurgeLogs(transactionLogIndex, division);
+
+      // Save prepare index to a marker file, so if the OM restarts,
+      // it will remain in prepare mode as long as the file exists and its
+      // log indices are >= the one in the file.
+      ozoneManager.getPrepareState().finishPrepare(transactionLogIndex);
+
+      LOG.info("OM {} prepared at log index {}. Returning response {} with log index {}",
+          ozoneManager.getOMNodeId(), transactionLogIndex, omResponse, omResponse.getTxnID());
+    } catch (OMException e) {
+      exception = e;
+      LOG.error("Prepare Request Apply failed in {}. ", ozoneManager.getOMNodeId(), e);
+      response = new DummyOMClientResponse(createErrorOMResponse(responseBuilder, e));
+    } catch (IOException e) {
+      // Set error code so that prepare failure does not cause the OM to terminate.
+      exception = e;
+      LOG.error("Prepare Request Apply failed in {}. ", ozoneManager.getOMNodeId(), e);
+      response = new DummyOMClientResponse(createErrorOMResponse(responseBuilder,
+          new OMException(e, OMException.ResultCodes.PREPARE_FAILED)));
+
+      // Disable prepare gate and attempt to delete prepare marker file.
+      // Whether marker file delete fails or succeeds, we will return the
+      // above error response to the caller.
+      try {
+        ozoneManager.getPrepareState().cancelPrepare();
+      } catch (IOException ex) {
+        LOG.error("Failed to delete prepare marker file.", ex);
+      }
+    }
+
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_PREPARE, new HashMap<>(), exception, userInfo));
+    return response;
+  }
+
+  public OMClientResponse validateAndUpdateCacheOld(OzoneManager ozoneManager, TermIndex termIndex) {
     final long transactionLogIndex = termIndex.getIndex();
 
     LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
