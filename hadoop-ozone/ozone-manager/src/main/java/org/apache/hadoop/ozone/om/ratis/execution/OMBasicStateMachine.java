@@ -372,7 +372,8 @@ public class OMBasicStateMachine extends BaseStateMachine {
       try {
         TermIndex objectIndex = termIndex;
         // TODO temp fix for index sharing from leader to follower in follower execution
-        if (request.getCmdType() != OzoneManagerProtocolProtos.Type.PersistDb && request.hasPersistDbRequest()
+        if (request.getCmdType() != OzoneManagerProtocolProtos.Type.PersistDb
+            && request.getCmdType() != OzoneManagerProtocolProtos.Type.Prepare && request.hasPersistDbRequest()
             && request.getPersistDbRequest().getIndexCount() > 0) {
           objectIndex = TermIndex.valueOf(termIndex.getTerm(), request.getPersistDbRequest().getIndex(0));
         }
