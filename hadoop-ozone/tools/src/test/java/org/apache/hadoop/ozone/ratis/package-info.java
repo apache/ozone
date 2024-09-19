@@ -17,7 +17,6 @@
  */
 
 /**
- * Tests for Ratis Commands.
+ * Tests for Ozone Ratis.
  */
-package org.apache.hadoop.ozone.admin.ratis;
-
+package org.apache.hadoop.ozone.ratis;
