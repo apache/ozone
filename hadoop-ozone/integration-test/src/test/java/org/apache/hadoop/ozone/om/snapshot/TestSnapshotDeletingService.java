@@ -542,6 +542,9 @@ public class TestSnapshotDeletingService {
         100000);
     doAnswer(i -> {
       // KDS wait block reached in SDS.
+      LOG.info("KDS wait triggered {}", Arrays.asList(keyDeletionWaitStarted.get(),
+          keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
+          snapshotDeletionStarted.get()));
       GenericTestUtils.waitFor(() -> {
         LOG.info("Swaminathan Snapshot deletion started {}", Arrays.asList(keyDeletionWaitStarted.get(),
             keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
