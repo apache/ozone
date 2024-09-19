@@ -377,7 +377,7 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, getClusterId());
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         created = containerSet.addContainer(newContainer);
       } else {
         // The create container request for an already existing container can
@@ -408,7 +408,7 @@ public class KeyValueHandler extends Handler {
     volumeSet.readLock();
     try {
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-          hddsVolume, getClusterId());
+          hddsVolume, clusterId);
       container.populatePathFields(idDir, hddsVolume);
     } finally {
       volumeSet.readUnlock();

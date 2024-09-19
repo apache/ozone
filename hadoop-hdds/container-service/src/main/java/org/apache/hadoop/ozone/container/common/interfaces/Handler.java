@@ -21,9 +21,7 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -53,12 +51,10 @@ public abstract class Handler {
   protected final ConfigurationSource conf;
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
-  private String clusterId;
+  protected String clusterId;
   protected final ContainerMetrics metrics;
   protected String datanodeId;
   private IncrementalReportSender<Container> icrSender;
-
-  private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
   protected Handler(ConfigurationSource config, String datanodeId,
       ContainerSet contSet, VolumeSet volumeSet,
@@ -221,23 +217,8 @@ public abstract class Handler {
 
   public abstract boolean isFinalizedBlockExist(Container container, long localID);
 
-  public String getClusterId() {
-    lock.readLock().lock();
-    try {
-      return clusterId;
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
   public void setClusterID(String clusterID) {
-    Preconditions.checkNotNull(clusterID, "clusterId cannot be null");
-    lock.writeLock().lock();
-    try {
-      this.clusterId = clusterID;
-    } finally {
-      lock.writeLock().unlock();
-    }
+    this.clusterId = clusterID;
   }
 
 }
