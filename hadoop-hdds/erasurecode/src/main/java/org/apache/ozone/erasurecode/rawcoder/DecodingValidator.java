@@ -2,6 +2,7 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.erasurecode.ECChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+/**
+ * A utility class to validate decoding.
+ */
+@InterfaceAudience.Private
 public class DecodingValidator {
 
   private static final Logger LOG =

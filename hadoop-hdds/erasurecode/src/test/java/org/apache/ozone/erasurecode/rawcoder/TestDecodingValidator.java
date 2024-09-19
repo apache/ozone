@@ -182,7 +182,8 @@ public class TestDecodingValidator extends TestRawCoderBase {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateWithBadDecoding(Class<? extends RawErasureCoderFactory> factoryClass, int numDataUnits,
-                                          int numParityUnits, int[] erasedDataIndexes, int[] erasedParityIndexes) throws IOException {
+                                          int numParityUnits, int[] erasedDataIndexes,
+                                          int[] erasedParityIndexes) throws IOException {
     checkNative(factoryClass);
     this.encoderFactoryClass = factoryClass;
     this.decoderFactoryClass = factoryClass;
