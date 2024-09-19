@@ -16,12 +16,10 @@
  * limitations under the License.
  */
 
-import React, { Key, useCallback, useState } from 'react';
+import React, { useState } from 'react';
 
-import Tree, { DataNode, DirectoryTreeProps } from 'antd/es/tree';
 import { DUSubpath } from '@/v2/types/diskUsage.types';
-import { TreeProps } from 'antd/lib/tree';
-import { Breadcrumb, Button, Menu } from 'antd';
+import { Breadcrumb, Menu } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 
 
@@ -42,8 +40,10 @@ const FileNavBar: React.FC<File> = ({
   function generateBreadCrumbMenu() {
     // We are not at root path
     if (path !== '/') {
-      //Remove leading / and split to avoid empty string
-      //Without the substring this will produce ['', 'pathLoc'] for /pathLoc
+      /**
+       * Remove leading / and split to avoid empty string 
+       * Without the substring this will produce ['', 'pathLoc'] for /pathLoc
+       */
       const splitPath = path.substring(1).split('/');
       setCurrPath(
         ['/', ...splitPath]
@@ -72,6 +72,7 @@ const FileNavBar: React.FC<File> = ({
     }
     else {
       // Pass the string without the leading /
+      console.log(constructedPath.substring(1));
       updateHandler(constructedPath.substring(1));
     }
   }

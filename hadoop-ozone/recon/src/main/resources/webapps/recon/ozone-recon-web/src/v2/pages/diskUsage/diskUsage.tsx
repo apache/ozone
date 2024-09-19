@@ -19,7 +19,7 @@
 import React, { useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import {
-  Alert, Tree
+  Alert
 } from 'antd';
 import {
   InfoCircleFilled
@@ -30,13 +30,12 @@ import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
-import { DUResponse, DUState, DUSubpath, PlotData } from '@/v2/types/diskUsage.types';
+import { DUResponse, DUSubpath, PlotData } from '@/v2/types/diskUsage.types';
 
 import './diskUsage.less';
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
 import EChart from '@/v2/components/eChart/eChart';
 import FileNavBar from '@/v2/components/fileNavbar/fileNavbar';
-import { DataNode } from 'antd/es/tree';
 
 const OTHER_PATH_NAME = 'Other Objects';
 const MIN_BLOCK_SIZE = 0.05;
@@ -52,33 +51,100 @@ const LIMIT_OPTIONS: Option[] = [
 const DiskUsage: React.FC<{}> = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
-  const [state, setState] = useState<DUState>({
-    duResponse: {},
-    plotData: []
+  const [duResponse, setDUResponse] = useState<DUResponse>({
+    status: '',
+    path: '',
+    subPathCount: 0,
+    size: 0,
+    sizeWithReplica: 0,
+    subPaths: [],
+    sizeDirectKey: 0
   });
-  const [selectedPath, setSelectedPath] = useState<string>('/');
-  const [treeData, setTreeData] = useState<DataNode[]>([]);
+  const [plotData, setPlotData] = useState<PlotData[]>([]);
 
   const cancelPieSignal = useRef<AbortController>();
 
-  function generateTreeData(path: string, subpaths: DUSubpath[]) {
-    const splitPath = (path === '/') ? ['/'] : path.split('/');
-    let treeData = [{
-      title: splitPath[splitPath.length - 1],
-      key: path,
-      children: subpaths.map((subpath) => {
-        const splitSubpath = subpath.path.split('/');
-        return {
-          title: splitSubpath[splitSubpath.length - 1],
-          key: subpath.path,
-          isLeaf: subpath.isKey
-        }
+  function updatePieData(duResponse: DUResponse) {
+    /**
+     * We need to calculate the size of "Other objects" in two cases:
+     * 
+     *  1) If we have more subpaths listed, than the limit.
+     *  2) If the limit is set to the maximum limit (30) and we have any number of subpaths.
+     *     In this case we won't necessarily have "Other objects", but we check if the
+     *     other objects's size is more than zero (we will have other objects if there are more than 30 subpaths,
+     *     but we can't check on that, as the response will always have
+     *     30 subpaths, but from the total size and the subpaths size we can calculate it).
+     */
+    const dataSize = duResponse.size;
+    let subpaths: DUSubpath[] = duResponse.subPaths;
+
+    let pathLabels: string[] = [];
+    let percentage: string[] = [];
+    let sizeStr: string[];
+    let valuesWithMinBlockSize: number[] = [];
+
+    if (duResponse.subPathCount > Number.parseInt(limit.value)) {
+      // If the subpath count is greater than the provided limit
+      // Slice the subpath to the limit
+      subpaths = subpaths.slice(0, Number.parseInt(limit.value));
+      // Add the size of the subpath
+      const limitedSize = subpaths
+        .map((subpath) => subpath.size)
+        .reduce((acc, curr) => acc + curr, 0);
+      const remainingSize = dataSize - limitedSize;
+      subpaths.push({
+        path: OTHER_PATH_NAME,
+        size: remainingSize,
+        sizeWithReplica: (duResponse.sizeWithReplica === -1)
+          ? -1
+          : duResponse.sizeWithReplica - remainingSize,
+        isKey: false
       })
-    }];
-    return treeData;
+    }
+
+    if (duResponse.subPathCount === 0 || subpaths.length === 0) {
+      // No more subpaths available
+      pathLabels = [duResponse?.path.split('/').pop() ?? ''];
+      valuesWithMinBlockSize = [0.1];
+      percentage = ['100.00'];
+      sizeStr = [byteToSize(dataSize, 1)];
+    } else {
+      pathLabels = subpaths.map(subpath => {
+        const subpathName = subpath.path.split('/').pop() ?? '';
+        // Diferentiate keys by removing trailing slash
+        return (subpath.isKey || subpathName === OTHER_PATH_NAME)
+          ? subpathName
+          : subpathName + '/';
+      });
+
+      let values: number[] = [0];
+      if (dataSize > 0) {
+        values = subpaths.map(
+          subpath => (subpath.size / dataSize)
+        );
+      }
+      const valueClone = structuredClone(values);
+      valuesWithMinBlockSize = valueClone?.map(
+        (val: number) => (val > 0)
+          ? val + MIN_BLOCK_SIZE
+          : val
+      );
+
+      percentage = values.map(value => (value * 100).toFixed(2));
+      sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
+    }
+
+    setPlotData(valuesWithMinBlockSize.map((key, idx) => {
+      return {
+        value: key,
+        name: pathLabels[idx],
+        size: sizeStr[idx],
+        percentage: percentage[idx]
+      } as PlotData
+    }));
   }
 
-  function updatePieChart(path: string) {
+  function loadData(path: string) {
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
       `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`,
@@ -87,11 +153,6 @@ const DiskUsage: React.FC<{}> = () => {
     cancelPieSignal.current = controller;
 
     request.then(response => {
-      let pathLabels: string[] = [];
-      let percentage: string[] = [];
-      let sizeStr: string[];
-      let valuesWithMinBlockSize: number[] = [];
-
       const duResponse: DUResponse = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
@@ -100,80 +161,9 @@ const DiskUsage: React.FC<{}> = () => {
         return;
       }
 
-      const dataSize = duResponse.size;
-      let subpaths: DUSubpath[] = duResponse.subPaths;
-
-      // We need to calculate the size of "Other objects" in two cases:
-      // 1) If we have more subpaths listed, than the limit.
-      // 2) If the limit is set to the maximum limit (30) and we have any number of subpaths.
-      //    In this case we won't necessarily have "Other objects", but we check if the
-      //    other objects's size is more than zero (we will have other objects if there are more than 30 subpaths,
-      //    but we can't check on that, as the response will always have
-      //    30 subpaths, but from the total size and the subpaths size we can calculate it).
-
-      if (duResponse.subPathCount > Number.parseInt(limit.value)) {
-        // If the subpath count is greater than the provided limit
-        // Slice the subpath to the limit
-        subpaths = subpaths.slice(0, Number.parseInt(limit.value));
-        // Add the size of the subpath
-        const limitedSize = subpaths
-          .map((subpath) => subpath.size)
-          .reduce((acc, curr) => acc + curr, 0);
-        const remainingSize = dataSize - limitedSize;
-        subpaths.push({
-          path: OTHER_PATH_NAME,
-          size: remainingSize,
-          sizeWithReplica: (duResponse.sizeWithReplica === -1)
-            ? -1
-            : duResponse.sizeWithReplica - remainingSize,
-          isKey: false
-        })
-      }
-
-      if (duResponse.subPathCount === 0 || subpaths.length === 0) {
-        // No more subpaths available
-        pathLabels = [duResponse?.path.split('/').pop() ?? ''];
-        valuesWithMinBlockSize = [0.1];
-        percentage = ['100.00'];
-        sizeStr = [byteToSize(dataSize, 1)];
-      } else {
-        pathLabels = subpaths.map(subpath => {
-          const subpathName = subpath.path.split('/').pop() ?? '';
-          // Diferentiate keys by removing trailing slash
-          return (subpath.isKey || subpathName === OTHER_PATH_NAME)
-            ? subpathName
-            : subpathName + '/';
-        });
-
-        let values: number[] = [0];
-        if (dataSize > 0) {
-          values = subpaths.map(
-            subpath => (subpath.size / dataSize)
-          );
-        }
-        const valueClone = structuredClone(values);
-        valuesWithMinBlockSize = valueClone?.map(
-          (val: number) => (val > 0)
-            ? val + MIN_BLOCK_SIZE
-            : val
-        );
-
-        percentage = values.map(value => (value * 100).toFixed(2));
-        sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
-      }
+      setDUResponse(duResponse);
+      updatePieData(duResponse);
       setLoading(false);
-      setSelectedPath(duResponse.path);
-      setState({
-        duResponse: duResponse,
-        plotData: valuesWithMinBlockSize.map((key, idx) => {
-          return {
-            value: key,
-            name: pathLabels[idx],
-            size: sizeStr[idx],
-            percentage: percentage[idx]
-          } as PlotData
-        })
-      });
     }).catch(error => {
       setLoading(false);
       showDataFetchError((error as AxiosError).toString());
@@ -185,15 +175,18 @@ const DiskUsage: React.FC<{}> = () => {
   }
 
   React.useEffect(() => {
-    //Load root path by default
-    updatePieChart('/');
+    //On mount load default data
+    if (duResponse.path === ''){
+      loadData('/');
+    } else {
+      //data is loaded, only update the limit change
+      updatePieData(duResponse);
+    }
 
     return (() => {
-      cancelPieSignal.current && cancelPieSignal.current.abort();
-    });
+      cancelRequests([cancelPieSignal.current!]);
+    })
   }, [limit]);
-
-  const { plotData, duResponse } = state;
 
   const eChartsOptions = {
     tooltip: {
@@ -244,7 +237,7 @@ const DiskUsage: React.FC<{}> = () => {
           <FileNavBar
             path={duResponse.path}
             subPaths={duResponse.subPaths}
-            updateHandler={updatePieChart} />
+            updateHandler={loadData} />
           <div className='table-header-section'>
             <SingleSelect
               options={LIMIT_OPTIONS}
@@ -254,6 +247,7 @@ const DiskUsage: React.FC<{}> = () => {
           </div>
           <div className='du-content'>
             <EChart
+              loading={loading}
               option={eChartsOptions}
               style={{ width: '80vw', height: '60vh' }} />
             <DUMetadata path={duResponse.path} />

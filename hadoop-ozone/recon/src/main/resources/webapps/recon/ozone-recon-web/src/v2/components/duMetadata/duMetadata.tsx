@@ -108,16 +108,6 @@ type SummaryResponse = {
   type: string;
 }
 
-type KeySummaryResponse = {
-  status: string;
-  path: string;
-  size: number;
-  sizeWithReplica: number;
-  subPathCount: number;
-  subPaths: never[];
-  sizeDirectKey: number;
-}
-
 type MetadataProps = {
   path: string;
 };

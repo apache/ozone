@@ -39,8 +39,3 @@ export type PlotData = {
   size: string;
   percentage: string;
 }
-
-export type DUState = {
-  duResponse: DUResponse;
-  plotData: PlotData[];
-}
