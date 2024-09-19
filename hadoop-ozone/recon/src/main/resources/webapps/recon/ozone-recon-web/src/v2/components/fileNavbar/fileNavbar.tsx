@@ -21,6 +21,7 @@ import React, { useState } from 'react';
 import { DUSubpath } from '@/v2/types/diskUsage.types';
 import { Breadcrumb, Menu } from 'antd';
 import { MenuProps } from 'antd/es/menu';
+import { CaretDownOutlined, CaretRightOutlined, HomeFilled } from '@ant-design/icons';
 
 
 type File = {
@@ -64,7 +65,6 @@ const FileNavBar: React.FC<File> = ({
      * since the first element of the currPos is ['/']
      * we are joining that with / as well causing //
      */
-    console.log(idx, lastPath);
     const constructedPath = [...currPath.slice(0, idx), lastPath].join('/');
     if (idx === 0) {
       //Root path clicked
@@ -72,7 +72,6 @@ const FileNavBar: React.FC<File> = ({
     }
     else {
       // Pass the string without the leading /
-      console.log(constructedPath.substring(1));
       updateHandler(constructedPath.substring(1));
     }
   }
@@ -89,11 +88,14 @@ const FileNavBar: React.FC<File> = ({
     return (
       <Breadcrumb.Item key={lastPath}
         overlay={
-          <Menu onClick={handleMenuClick}>
+          <Menu
+            onClick={handleMenuClick}
+            mode='inline'
+            expandIcon={<CaretDownOutlined/>}>
             {menuItems}
           </Menu>
         }>
-        {lastPath}
+        {(lastPath === '/') ? <HomeFilled style={{fontSize: '16px'}}/> : lastPath}
       </Breadcrumb.Item>
     )
   }
@@ -108,9 +110,15 @@ const FileNavBar: React.FC<File> = ({
       breadCrumbs.push(
         <Breadcrumb.Item
           key={location}>
-          <button
-            className='breadcrumb-nav-item'
-            onClick={() => {handleBreadcrumbClick(idx, location)}}>{location}</button>
+          {(location === '/')
+            ? <HomeFilled
+                onClick={() => {handleBreadcrumbClick(idx, location)}}
+                style={{color: '#1aa57a'}} />
+            : (<button
+                className='breadcrumb-nav-item'
+                onClick={() => {handleBreadcrumbClick(idx, location)}}>
+                  {location}
+              </button>)}
         </Breadcrumb.Item>
       );
     });
@@ -124,7 +132,7 @@ const FileNavBar: React.FC<File> = ({
 
   return (
     <Breadcrumb
-      separator=">"
+      separator={<CaretRightOutlined style={{ fontSize: '12px'}}/>}
       className='breadcrumb-nav'>
       {generateBreadCrumbs()}
     </Breadcrumb>

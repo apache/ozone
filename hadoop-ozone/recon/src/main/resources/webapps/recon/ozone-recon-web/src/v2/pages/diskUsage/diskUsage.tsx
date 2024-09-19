@@ -189,6 +189,11 @@ const DiskUsage: React.FC<{}> = () => {
   }, [limit]);
 
   const eChartsOptions = {
+    title: {
+      text: `${byteToSize(duResponse.size, 1)} /  ${byteToSize(duResponse.size)}`,
+      left: 'center',
+      top: 'bottom'
+    },
     tooltip: {
       trigger: 'item',
       formatter: ({ dataIndex, name, color }) => {
@@ -197,6 +202,11 @@ const DiskUsage: React.FC<{}> = () => {
         const percentageEl = `Percentage: ${plotData[dataIndex]['percentage']} %`
         return `${nameEl}${dataEl}${percentageEl}`
       }
+    },
+    legend: {
+      top: '10%',
+      orient: 'vertical',
+      left: 'left'
     },
     series: [
       {
