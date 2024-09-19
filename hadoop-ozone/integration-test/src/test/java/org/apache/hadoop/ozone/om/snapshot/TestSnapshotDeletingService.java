@@ -542,7 +542,12 @@ public class TestSnapshotDeletingService {
         100000);
     doAnswer(i -> {
       // KDS wait block reached in SDS.
-      GenericTestUtils.waitFor(keyDeletingService::isRunningOnAOS, 1000, 100000);
+      GenericTestUtils.waitFor(() -> {
+        LOG.info("Swaminathan Snapshot deletion started {}", Arrays.asList(keyDeletionWaitStarted.get(),
+            keyDeletionStarted.get(), dirDeletionWaitStarted.get(), dirDeletionStarted.get(),
+            snapshotDeletionStarted.get()));
+        return keyDeletingService.isRunningOnAOS();
+      }, 1000, 100000);
       keyDeletionWaitStarted.set(true);
       return i.callRealMethod();
     }).when(snapshotDeletingService).waitForKeyDeletingService();
