@@ -2341,6 +2341,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (bucketUtilizationMetrics != null) {
         bucketUtilizationMetrics.unRegister();
       }
+      omGateway.stop();
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);

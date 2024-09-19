@@ -78,6 +78,10 @@ public class OMGateway {
       uniqueIndex.set(om.getLastTrxnIndexForNonRatis());
     }
   }
+  public void stop() {
+    leaderExecutor.stop();
+    followerExecutor.stop();
+  }
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
     if (!om.isLeaderReady()) {
       String peerId = om.isRatisEnabled() ? om.getOmRatisServer().getRaftPeerId().toString() : om.getOMNodeId();

@@ -60,6 +60,7 @@ public class LeaderRequestExecutor {
   private final AtomicLong uniqueIndex;
   private final int ratisByteLimit;
   private final OzoneManager ozoneManager;
+  private final PoolExecutor<RequestContext> ratisSubmitter;
   private final PoolExecutor<RequestContext> leaderExecutor;
   private final OzoneManagerRequestHandler handler;
   private final AtomicBoolean isEnabled = new AtomicBoolean(true);
@@ -67,7 +68,7 @@ public class LeaderRequestExecutor {
   public LeaderRequestExecutor(OzoneManager om, AtomicLong uniqueIndex) {
     this.ozoneManager = om;
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
-    PoolExecutor<RequestContext> ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE,
+    ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE,
         RATIS_TASK_QUEUE_SIZE, ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
     leaderExecutor = new PoolExecutor<>(REQUEST_EXECUTOR_POOL_SIZE, REQUEST_EXECUTOR_QUEUE_SIZE,
         ozoneManager.getThreadNamePrefix(), this::runExecuteCommand, ratisSubmitter);
@@ -79,7 +80,10 @@ public class LeaderRequestExecutor {
     this.ratisByteLimit = (int) (limit * 0.8);
     this.uniqueIndex = uniqueIndex;
   }
-
+  public void stop() {
+    leaderExecutor.stop();
+    ratisSubmitter.stop();
+  }
   public int batchSize() {
     return REQUEST_EXECUTOR_POOL_SIZE;
   }
