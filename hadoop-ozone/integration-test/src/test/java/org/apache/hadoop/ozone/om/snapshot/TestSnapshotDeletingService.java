@@ -585,10 +585,13 @@ public class TestSnapshotDeletingService {
     SnapshotDeletingService snapshotDeletingService = getMockedSnapshotDeletingService(keyDeletingService,
         directoryDeletingService, snapshotDeletionStarted, keyDeletionWaitStarted, dirDeletionWaitStarted,
         keyDeletionStarted, dirDeletionStarted);
+    Random random = new Random();
+    String bucketName = "bucket" + random.nextInt();
+    BucketArgs bucketArgs = new BucketArgs.Builder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
     OzoneBucket testBucket = TestDataUtil.createBucket(
-        client, VOLUME_NAME, new BucketArgs.Builder()
-            .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-            .build(), "bucket" + new Random().nextInt());
+        client, VOLUME_NAME, bucketArgs, bucketName);
     createSnapshotFSODataForBucket(testBucket);
     List<Table.KeyValue<String, String>> renamesKeyEntries;
     List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries;
