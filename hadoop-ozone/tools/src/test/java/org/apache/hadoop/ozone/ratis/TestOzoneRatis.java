@@ -38,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for OzoneRatis.
  */
 public class TestOzoneRatis {
-  private static final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-  private static final PrintStream printStream = new PrintStream(outputStream);
+  private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+  private final PrintStream printStream = new PrintStream(outputStream);
   private OzoneRatis ozoneRatis;
 
   @BeforeEach
