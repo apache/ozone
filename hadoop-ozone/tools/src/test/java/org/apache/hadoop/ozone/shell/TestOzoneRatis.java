@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.ratis;
+package org.apache.hadoop.ozone.shell;
 
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;

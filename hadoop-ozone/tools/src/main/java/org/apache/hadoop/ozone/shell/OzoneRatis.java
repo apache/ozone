@@ -15,11 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.ratis;
+package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.shell.Shell;
 import org.apache.ratis.shell.cli.sh.RatisShell;
 
 import picocli.CommandLine;
@@ -28,7 +27,7 @@ import picocli.CommandLine;
  * Ozone Ratis Command line tool.
  */
 @CommandLine.Command(name = "ozone ratis",
-        description = "Shell for Ozone Ratis Operations",
+        description = "Shell for running Ratis commands",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)
 public class OzoneRatis extends Shell {
@@ -51,6 +50,8 @@ public class OzoneRatis extends Shell {
     TracingUtil.initTracing("shell", createOzoneConfiguration());
     String spanName = "ozone ratis" + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName, () -> {
+      // TODO: When Ozone has RATIS-2155, update this line to use the RatisShell.Builder
+      //       in order to setup TLS and other confs.
       final RatisShell shell = new RatisShell(System.out);
       return shell.run(argv);
     });
