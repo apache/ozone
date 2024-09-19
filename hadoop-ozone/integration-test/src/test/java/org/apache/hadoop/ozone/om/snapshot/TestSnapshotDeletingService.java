@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdfs.server.balancer.Matcher;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -67,7 +66,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -522,6 +520,7 @@ public class TestSnapshotDeletingService {
     return keyDeletingService;
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   private SnapshotDeletingService getMockedSnapshotDeletingService(KeyDeletingService keyDeletingService,
                                                                    DirectoryDeletingService directoryDeletingService,
                                                                    AtomicBoolean snapshotDeletionStarted,
