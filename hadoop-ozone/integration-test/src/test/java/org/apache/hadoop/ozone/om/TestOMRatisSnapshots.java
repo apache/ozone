@@ -55,6 +55,7 @@ import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
+import org.jline.utils.Log;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -622,7 +623,8 @@ public class TestOMRatisSnapshots {
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
-
+    Log.info("Leader Node {}-{}, Follower Node {}", leaderOMNodeId, cluster.isOMActive(leaderOMNodeId),
+        followerNodeId, cluster.isOMActive(followerNodeId));
     // Wait the follower download the snapshot,but get stuck by injector
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmSnapshotProvider().getNumDownloaded() == 1;
