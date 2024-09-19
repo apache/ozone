@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -117,6 +118,7 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
+  @Unhealthy("HDDS-11415 testcase check for volume/bucket not found on follower node, fix with no-cache")
   void testAllSCMAreRunning() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();

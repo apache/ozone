@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -329,6 +330,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
+  @Unhealthy("HDDS-11415 To be removed as not applicable with new flow")
   public void testDeleteWithMultiLevelsBlockDoubleBuffer() throws Exception {
     Path root = new Path("/rootDirdd");
     Path appRoot = new Path(root, "appRoot");

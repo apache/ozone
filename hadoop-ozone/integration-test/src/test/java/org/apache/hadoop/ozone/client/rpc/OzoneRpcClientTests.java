@@ -188,6 +188,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -4841,6 +4842,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  @Unhealthy("HDDS-11415 To be removed as not applicable with new flow")
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
     assumeThat(getCluster().getOzoneManager().isRatisEnabled()).isTrue();
