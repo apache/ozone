@@ -75,13 +75,12 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     String bucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
 
-
     Set<String> keys = new HashSet<>();
     List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(moveTableKeysRequest.getDeletedKeysList().size());
 
     //validate deleted key starts with bucket prefix.[/<volName>/<bucketName>/]
     for (SnapshotMoveKeyInfos deletedKey : moveTableKeysRequest.getDeletedKeysList()) {
-      // Filter only deleted keys with atleast one keyInfo per key.
+      // Filter only deleted keys with at least one keyInfo per key.
       if (!deletedKey.getKeyInfosList().isEmpty()) {
         deletedKeys.add(deletedKey);
         if (!deletedKey.getKey().startsWith(bucketKeyPrefix)) {

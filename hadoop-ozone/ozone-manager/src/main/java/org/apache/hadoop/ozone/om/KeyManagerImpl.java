@@ -686,12 +686,25 @@ public class KeyManagerImpl implements KeyManager {
     return entries;
   }
 
+  private Optional<String> getBucketPrefix(String volumeName, String bucketName, boolean isFSO) throws IOException {
+    // Bucket prefix would be empty if both volume & bucket is empty i.e. either null or "".
+    if (StringUtils.isEmpty(volumeName) && StringUtils.isEmpty(bucketName)) {
+      return Optional.empty();
+    } else if (StringUtils.isEmpty(bucketName) || StringUtils.isEmpty(volumeName)) {
+      throw new IOException("One of volume : " + volumeName + ", bucket: " + bucketName + " is empty." +
+          " Either both should be empty or none of the arguments should be empty");
+    }
+    if (StringUtils.isEmpty(bucketName)) {
+      bucketName = "";
+    }
+    return isFSO ? Optional.of(metadataManager.getBucketKeyPrefixFSO(volumeName, bucketName)) :
+        Optional.of(metadataManager.getBucketKeyPrefix(volumeName, bucketName));
+  }
+
   @Override
   public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey, int size) throws IOException {
-    // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
-        .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
@@ -701,9 +714,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey, int size) throws IOException {
-    // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
-        .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, size);
@@ -2021,15 +2032,8 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException {
-
-    // Either both volume & bucket should be null or none of them should be null.
-    if (!StringUtils.isBlank(volume) && StringUtils.isBlank(bucket) ||
-        StringUtils.isBlank(volume) && !StringUtils.isBlank(bucket)) {
-      throw new IOException("One of volume : " + volume + ", bucket: " + bucket + " is empty. Either both should be " +
-          "empty or none of the arguments should be empty");
-    }
-    return StringUtils.isBlank(volume) ? metadataManager.getDeletedDirTable().iterator() :
-        metadataManager.getDeletedDirTable().iterator(metadataManager.getBucketKeyPrefixFSO(volume, bucket));
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, true);
+    return metadataManager.getDeletedDirTable().iterator(bucketPrefix.orElse(""));
   }
 
   @Override

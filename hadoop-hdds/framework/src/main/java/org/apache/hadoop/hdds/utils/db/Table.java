@@ -374,8 +374,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
         return Objects.hash(getKey(), getValue());
       }
     };
-
-
   }
 
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */

@@ -839,10 +839,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Given a volume and bucket, return the corresponding DB key prefix.
-   *
-   * @param volume - Volume name
-   * @param bucket - Bucket name
+   * {@inheritDoc}
    */
   @Override
   public String getBucketKeyPrefix(String volume, String bucket) {
@@ -850,10 +847,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Given a volume and bucket, return the corresponding DB key prefix for FSO buckets.
-   *
-   * @param volume - Volume name
-   * @param bucket - Bucket name
+   * {@inheritDoc}
    */
   @Override
   public String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException {

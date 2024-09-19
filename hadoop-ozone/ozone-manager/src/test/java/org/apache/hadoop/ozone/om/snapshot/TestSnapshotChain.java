@@ -170,6 +170,7 @@ public class TestSnapshotChain {
     }
 
     assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID1, chainManager.getOldestGlobalSnapshotId());
     assertEquals(snapshotID3, chainManager.getLatestPathSnapshotId(
         String.join("/", "vol1", "bucket1")));
 
@@ -287,6 +288,7 @@ public class TestSnapshotChain {
     assertFalse(chainManager.isSnapshotChainCorrupted());
     // check if snapshots loaded correctly from snapshotInfoTable
     assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID1, chainManager.getOldestGlobalSnapshotId());
     assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID1));
     assertEquals(snapshotID1, chainManager.previousPathSnapshot(String
         .join("/", "vol1", "bucket1"), snapshotID2));

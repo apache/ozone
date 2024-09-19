@@ -162,7 +162,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         Iterator<UUID> iterator = chainManager.iterator(true);
         List<String> snapshotsToBePurged = new ArrayList<>();
         long snapshotLimit = snapshotDeletionPerTask;
-        while (iterator.hasNext() && snapshotLimit > 0) {
+        while (iterator.hasNext() && snapshotLimit > 0 && remaining > 0) {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
@@ -176,8 +176,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
-          // nextSnapshot = null means entries would be moved to AOS, hence ensure that KeyDeletingService &
-          // DirectoryDeletingService is not running while the entries are moving.
+          // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
             waitForKeyDeletingService();
             waitForDirDeletingService();
