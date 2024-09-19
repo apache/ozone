@@ -235,7 +235,9 @@ public class OMGateway {
       Table table = om.getMetadataManager().getTable(tbl);
       if (table instanceof TypedTable) {
         ArrayList<Long> epochs = new ArrayList<>(((TypedTable<?, ?>) table).getCache().getEpochEntries().keySet());
-        table.cleanupCache(epochs);
+        if (!epochs.isEmpty()) {
+          table.cleanupCache(epochs);
+        }
       }
     }
     try {
