@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.ratis;
 
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,8 +29,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,14 +41,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for OzoneRatis.
  */
 public class TestOzoneRatis {
-  private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-  private final PrintStream printStream = new PrintStream(outputStream);
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
   private OzoneRatis ozoneRatis;
 
   @BeforeEach
-  public void setUp() {
-    System.setOut(printStream);
+  public void setUp() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     ozoneRatis = new OzoneRatis();
+  }
+
+  @AfterEach
+  public void tearDown() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   /**
@@ -54,13 +67,13 @@ public class TestOzoneRatis {
    * @param args command line arguments to pass
    * @return the output from OzoneRatis
    */
-  private String execute(String[] args) {
+  private String execute(String[] args) throws IOException {
     ozoneRatis.execute(args);
-    return outputStream.toString();
+    return outContent.toString(StandardCharsets.UTF_8.name());
   }
 
   @Test
-  public void testBasicOzoneRatisCommand() {
+  public void testBasicOzoneRatisCommand() throws IOException {
     String[] args = {""};
     String output = execute(args);
     assertTrue(output.contains("Usage: ratis sh [generic options]"));
@@ -116,42 +129,42 @@ public class TestOzoneRatis {
   }
 
   @Test
-  public void testMissingRequiredArguments() {
+  public void testMissingRequiredArguments() throws IOException {
     String[] args = {"local", "raftMetaConf"};
     String output = execute(args);
     assertTrue(output.contains("Failed to parse args for raftMetaConf: Missing required options: peers, path"));
   }
 
   @Test
-  public void testMissingPeerArgument() {
+  public void testMissingPeerArgument() throws IOException {
     String[] args = {"local", "raftMetaConf", "-path", "/path"};
     String output = execute(args);
     assertTrue(output.contains("Failed to parse args for raftMetaConf: Missing required option: peers"));
   }
 
   @Test
-  public void testMissingPathArgument() {
+  public void testMissingPathArgument() throws IOException {
     String[] args = {"local", "raftMetaConf", "-peers", "localhost:8080"};
     String output = execute(args);
     assertTrue(output.contains("Failed to parse args for raftMetaConf: Missing required option: path"));
   }
 
   @Test
-  public void testInvalidPeersFormat() {
+  public void testInvalidPeersFormat() throws IOException {
     String[] args = {"local", "raftMetaConf", "-peers", "localhost8080", "-path", "/path"};
     String output = execute(args);
     assertTrue(output.contains("Failed to parse the server address parameter \"localhost8080\"."));
   }
 
   @Test
-  public void testDuplicatePeersAddress() {
+  public void testDuplicatePeersAddress() throws IOException {
     String[] args = {"local", "raftMetaConf", "-peers", "localhost:8080,localhost:8080", "-path", "/path"};
     String output = execute(args);
     assertTrue(output.contains("Found duplicated address: localhost:8080."));
   }
 
   @Test
-  public void testDuplicatePeersId() {
+  public void testDuplicatePeersId() throws IOException {
     String[] args = {"local", "raftMetaConf", "-peers", "peer1|localhost:8080,peer1|localhost:8081", "-path", "/path"};
     String output = execute(args);
     assertTrue(output.contains("Found duplicated ID: peer1."));

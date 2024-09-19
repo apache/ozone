@@ -407,6 +407,7 @@ Apache License 2.0
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api
+   org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift
@@ -458,6 +459,7 @@ MIT
    org.kohsuke.metainf-services:metainf-services
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
+   org.slf4j:slf4j-simple
 
 
 Public Domain
