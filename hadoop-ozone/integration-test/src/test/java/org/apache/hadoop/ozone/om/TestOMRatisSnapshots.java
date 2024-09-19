@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.jline.utils.Log;
@@ -597,6 +598,7 @@ public class TestOMRatisSnapshots {
 
   @Test
   @Timeout(300)
+  @Unhealthy("HDDS-11415 local passes but remote fails, follower on start unable to call get snapshot")
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil

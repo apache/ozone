@@ -94,10 +94,11 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new DummyOMClientResponse(responseBuilder.build());
 
       // update db and then take snapshot
+      Long index = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager()).getIndex();
       ozoneManager.getMetadataManager().getTransactionInfoTable().put(
           PREPARE_MARKER_KEY, TransactionInfo.valueOf(TransactionInfo.DEFAULT_VALUE.getTerm(), transactionLogIndex));
       ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-          TransactionInfo.valueOf(termIndex));
+          TransactionInfo.valueOf(termIndex, index));
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       final RaftServer.Division division = omRatisServer.getServerDivision();

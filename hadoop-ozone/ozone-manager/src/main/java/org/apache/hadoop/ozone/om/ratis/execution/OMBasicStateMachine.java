@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -317,7 +318,8 @@ public class OMBasicStateMachine extends BaseStateMachine {
       throw new IOException("OzoneManager is already stopped: " + ozoneManager.getNodeDetails());
     }
     final TermIndex applied = getLastAppliedTermIndex();
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(applied);
+    Long index = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager()).getIndex();
+    final TransactionInfo transactionInfo = TransactionInfo.valueOf(applied, index);
     ozoneManager.setTransactionInfo(transactionInfo);
     ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
@@ -369,13 +371,19 @@ public class OMBasicStateMachine extends BaseStateMachine {
       OMRequest request, TermIndex termIndex, RequestHandler handler, OzoneManager om) {
     OMClientResponse omClientResponse = null;
     try {
+      Long index = TransactionInfo.readTransactionInfo(om.getMetadataManager()).getIndex();
+      if (null == index) {
+        index = 0L;
+      }
       try {
+        if (request.hasPersistDbRequest() && request.getPersistDbRequest().getIndexCount() > 0) {
+          index = Math.max(Collections.max(request.getPersistDbRequest().getIndexList()).longValue(), index);
+        }
         TermIndex objectIndex = termIndex;
         // TODO temp fix for index sharing from leader to follower in follower execution
         if (request.getCmdType() != OzoneManagerProtocolProtos.Type.PersistDb
-            && request.getCmdType() != OzoneManagerProtocolProtos.Type.Prepare && request.hasPersistDbRequest()
-            && request.getPersistDbRequest().getIndexCount() > 0) {
-          objectIndex = TermIndex.valueOf(termIndex.getTerm(), request.getPersistDbRequest().getIndex(0));
+            && request.getCmdType() != OzoneManagerProtocolProtos.Type.Prepare) {
+          objectIndex = TermIndex.valueOf(termIndex.getTerm(), index);
         }
         omClientResponse = handler.handleWriteRequestImpl(request, objectIndex);
         validateResponseError(omClientResponse.getOMResponse());
@@ -384,7 +392,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
         omClientResponse = new DummyOMClientResponse(createErrorResponse(request, e, termIndex));
         validateResponseError(omClientResponse.getOMResponse());
         om.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-            TransactionInfo.valueOf(termIndex));
+            TransactionInfo.valueOf(termIndex, index));
       }
 
       if (!(omClientResponse instanceof DummyOMClientResponse)) {
@@ -392,7 +400,7 @@ public class OMBasicStateMachine extends BaseStateMachine {
         try (BatchOperation batchOperation = om.getMetadataManager().getStore().initBatchOperation()) {
           omClientResponse.checkAndUpdateDB(om.getMetadataManager(), batchOperation);
           om.getMetadataManager().getTransactionInfoTable().putWithBatch(
-              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex));
+              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex, index));
           om.getMetadataManager().getStore().commitBatchOperation(batchOperation);
         }
       }
