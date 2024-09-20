@@ -17,24 +17,18 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.IOException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -43,6 +37,12 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.MANAGEMENT;
@@ -184,29 +184,33 @@ public class ReplicationServer {
    * Replication-related configuration.
    */
   @ConfigGroup(prefix = ReplicationConfig.PREFIX)
-  public static final class ReplicationConfig {
+  public static final class ReplicationConfig extends ReconfigurableConfig {
 
     public static final String PREFIX = "hdds.datanode.replication";
     public static final String STREAMS_LIMIT_KEY = "streams.limit";
-    public static final String QUEUE_LIMIT = "queue.limit";
-
     public static final String REPLICATION_STREAMS_LIMIT_KEY =
         PREFIX + "." + STREAMS_LIMIT_KEY;
-
     public static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
+
     private static final String OUTOFSERVICE_FACTOR_KEY =
         "outofservice.limit.factor";
     private static final double OUTOFSERVICE_FACTOR_MIN = 1;
     static final double OUTOFSERVICE_FACTOR_DEFAULT = 2;
     private static final String OUTOFSERVICE_FACTOR_DEFAULT_VALUE = "2.0";
     private static final double OUTOFSERVICE_FACTOR_MAX = 10;
-    static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
+    public static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
     public static final String ZEROCOPY_ENABLE_KEY = "zerocopy.enabled";
     private static final boolean ZEROCOPY_ENABLE_DEFAULT = true;
     private static final String ZEROCOPY_ENABLE_DEFAULT_VALUE =
         "true";
+    public static final String REPLICATION_ZEROCOPY_ENABLE_KEY =
+        PREFIX + "." + ZEROCOPY_ENABLE_KEY;
+
+    public static final String QUEUE_LIMIT_KEY = "queue.limit";
+    public static final String REPLICATION_QUEUE_LIMIT =
+        PREFIX + "." + QUEUE_LIMIT_KEY;
 
     /**
      * The maximum number of replication commands a single datanode can execute
@@ -224,9 +228,10 @@ public class ReplicationServer {
     /**
      * The maximum of replication request queue length.
      */
-    @Config(key = QUEUE_LIMIT,
+    @Config(key = QUEUE_LIMIT_KEY,
         type = ConfigType.INT,
         defaultValue = "4096",
+        reconfigurable = true,
         tags = {DATANODE},
         description = "The maximum number of queued requests for container " +
             "replication"
@@ -241,6 +246,7 @@ public class ReplicationServer {
     @Config(key = OUTOFSERVICE_FACTOR_KEY,
         type = ConfigType.DOUBLE,
         defaultValue = OUTOFSERVICE_FACTOR_DEFAULT_VALUE,
+        reconfigurable = true,
         tags = {DATANODE, SCM},
         description = "Decommissioning and maintenance nodes can handle more" +
             "replication commands than in-service nodes due to reduced load. " +
@@ -252,6 +258,7 @@ public class ReplicationServer {
     @Config(key = ZEROCOPY_ENABLE_KEY,
         type = ConfigType.BOOLEAN,
         defaultValue =  ZEROCOPY_ENABLE_DEFAULT_VALUE,
+        reconfigurable = true,
         tags = {DATANODE, SCM},
         description = "Specify if zero-copy should be enabled for " +
             "replication protocol."
