@@ -694,9 +694,6 @@ public class KeyManagerImpl implements KeyManager {
       throw new IOException("One of volume : " + volumeName + ", bucket: " + bucketName + " is empty." +
           " Either both should be empty or none of the arguments should be empty");
     }
-    if (StringUtils.isEmpty(bucketName)) {
-      bucketName = "";
-    }
     return isFSO ? Optional.of(metadataManager.getBucketKeyPrefixFSO(volumeName, bucketName)) :
         Optional.of(metadataManager.getBucketKeyPrefix(volumeName, bucketName));
   }
