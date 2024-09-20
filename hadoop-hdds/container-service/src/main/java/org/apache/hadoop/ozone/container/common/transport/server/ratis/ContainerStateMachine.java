@@ -233,7 +233,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // cache with FIFO eviction, and if element not found, this needs
     // to be obtained from disk for slow follower
     stateMachineDataCache = new ResourceCache<>(
-        (index, data) -> ((ByteString)data).size(),
+        (index, data) -> data.size(),
         pendingRequestsBytesLimit,
         (p) -> {
           if (p.wasEvicted()) {
@@ -581,7 +581,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     writeChunkFuture.thenApply(r -> {
       if (r.getResult() != ContainerProtos.Result.SUCCESS
           && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO) {
+          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+          // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
+          // that should not crash the pipeline.
+          && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
         StorageContainerException sce =
             new StorageContainerException(r.getMessage(), r.getResult());
         LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId" +
@@ -701,9 +704,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     return chunkExecutors.get(i);
   }
 
-  /*
-   * writeStateMachineData calls are not synchronized with each other
-   * and also with applyTransaction.
+  /**
+   * {@link #writeStateMachineData(ContainerCommandRequestProto, long, long, long)}
+   * calls are not synchronized with each other
+   * and also with {@link #applyTransaction(TransactionContext)}.
    */
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
@@ -821,7 +825,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * This method is used by the Leader to read state machine date for sending appendEntries to followers.
+   * This method is used by the Leader to read state machine data for sending appendEntries to followers.
    * It will first get the data from {@link #stateMachineDataCache}.
    * If the data is not in the cache, it will read from the file by dispatching a command
    *
@@ -1061,7 +1065,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         // unhealthy
         if (r.getResult() != ContainerProtos.Result.SUCCESS
             && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-            && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO) {
+            && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+            && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
           StorageContainerException sce =
               new StorageContainerException(r.getMessage(), r.getResult());
           LOG.error(
@@ -1193,7 +1198,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       try {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid,
-            "Ratis group removed");
+            "Ratis group removed. Group id: " + gid);
       } catch (IOException e) {
         LOG.debug("Failed to quasi-close container {}", cid);
       }

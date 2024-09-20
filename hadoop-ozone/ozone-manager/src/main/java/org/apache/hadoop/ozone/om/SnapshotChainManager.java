@@ -362,13 +362,16 @@ public class SnapshotChainManager {
   public synchronized boolean deleteSnapshot(SnapshotInfo snapshotInfo)
       throws IOException {
     validateSnapshotChain();
-    boolean status = deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
-        deleteSnapshotPath(snapshotInfo.getSnapshotPath(),
-            snapshotInfo.getSnapshotId());
-    if (status) {
-      snapshotIdToTableKey.remove(snapshotInfo.getSnapshotId());
-    }
-    return status;
+    return deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
+        deleteSnapshotPath(snapshotInfo.getSnapshotPath(), snapshotInfo.getSnapshotId());
+  }
+
+  /**
+   * Remove the snapshot from snapshotIdToSnapshotTableKey map.
+   */
+  public synchronized void removeFromSnapshotIdToTable(UUID snapshotId) throws IOException {
+    validateSnapshotChain();
+    snapshotIdToTableKey.remove(snapshotId);
   }
 
   /**

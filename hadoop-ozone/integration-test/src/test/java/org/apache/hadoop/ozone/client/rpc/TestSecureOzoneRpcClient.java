@@ -99,6 +99,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
+  private static String keyProviderUri = "kms://http@kms:9600/kms";
+
   @BeforeAll
   public static void init() throws Exception {
     File testDir = GenericTestUtils.getTestDir(
@@ -119,7 +121,11 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     // constructed.
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+        keyProviderUri);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setCertificateClient(certificateClientTest)
         .setSecretKeyClient(new SecretKeyTestClient());
@@ -431,6 +437,13 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   @Override
   // Restart DN doesn't work with security enabled.
   public void testZReadKeyWithUnhealthyContainerReplica() {
+  }
+
+  @Test
+  public void testGetServerDefaults() throws IOException {
+    assertNotNull(getClient().getProxy().getServerDefaults());
+    assertEquals(keyProviderUri,
+        getClient().getProxy().getServerDefaults().getKeyProviderUri());
   }
 
   @AfterAll

@@ -65,11 +65,11 @@ public class TestPipelineManagerMXBean {
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
-    Map<String, Integer> pipelineStateCount = cluster
-        .getStorageContainerManager().getPipelineManager().getPipelineInfo();
 
     GenericTestUtils.waitFor(() -> {
       try {
+        Map<String, Integer> pipelineStateCount = cluster
+            .getStorageContainerManager().getPipelineManager().getPipelineInfo();
         final TabularData data = (TabularData) mbs.getAttribute(
             bean, "PipelineInfo");
         for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {

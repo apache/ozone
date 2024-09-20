@@ -19,7 +19,9 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -54,5 +56,31 @@ class TestContainerBalancerStatusInfo {
       assertFalse(is.getSizeLeavingNodesGB().isEmpty());
     });
 
+  }
+
+  /**
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11350">HDDS-11350</a>
+   */
+  @Test
+  void testGetCurrentIterationsStatisticDoesNotThrowNullPointerExceptionWhenBalancingThreadIsSleeping() {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(10, OzoneConsts.GB));
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
+    ContainerBalancerConfiguration config = ozoneConfig.getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(2);
+    // the following config makes the balancing thread go to sleep while waiting for DU to be triggered in DNs and
+    // updated storage reports to arrive via DN heartbeats - of course, this is a unit test and NodeManager, DNs etc.
+    // are all mocked
+    config.setTriggerDuEnable(true);
+    mockedScm.init(config, ozoneConfig);
+
+    // run ContainerBalancerTask in a new thread and have the current thread call getCurrentIterationsStatistic
+    StorageContainerManager scm = mockedScm.getStorageContainerManager();
+    ContainerBalancer cb = new ContainerBalancer(scm);
+    ContainerBalancerTask task = new ContainerBalancerTask(scm, 0, cb, cb.getMetrics(), config, false);
+    Thread thread = new Thread(task);
+    thread.setDaemon(true);
+    thread.start();
+    Assertions.assertDoesNotThrow(task::getCurrentIterationsStatistic);
   }
 }
