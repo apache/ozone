@@ -431,17 +431,18 @@ public class TestHSync {
     final byte[] data = new byte[1024];
     final byte[] buffer = new byte[1024];
     ThreadLocalRandom.current().nextBytes(data);
+    final int WAL_HEADER_LEN = 83;
     try (FileSystem fs = FileSystem.get(CONF)) {
       // Create key1
       try (FSDataOutputStream os = fs.create(key1, true)) {
-        os.write(data, 0, 1);
+        os.write(data, 0, WAL_HEADER_LEN);
         // the first hsync will update the correct length in the key info at OM
         os.hsync();
         os.write(data, 0, data.length);
         os.hsync(); // the second hsync will not update the length at OM
         try (FSDataInputStream in = fs.open(key1)) {
           // the actual key length is 1025, but the length in OM is 1
-          in.seek(2);
+          in.seek(WAL_HEADER_LEN+1);
           final int n = in.read(buffer, 1, buffer.length-1);
           // expect to read 1023 bytes
           assertEquals(buffer.length - 1, n);
