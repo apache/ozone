@@ -332,7 +332,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           }
           Future<Void> future = threadPool.submit(
               new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
-                  withKey, schemaV3, fieldsFilter, filter));
+                  withKey, schemaV3, fieldsFilter));
           futures.add(future);
           batch = new ArrayList<>(batchSize);
           sequenceId++;
@@ -342,7 +342,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
-          batch, logWriter, sequenceId, withKey, schemaV3, fieldsFilter, filter));
+          batch, logWriter, sequenceId, withKey, schemaV3, fieldsFilter));
       futures.add(future);
     }
 
@@ -655,12 +655,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     private final boolean withKey;
     private final boolean schemaV3;
     private String valueFields;
-    private String valueFilter;
 
     @SuppressWarnings("checkstyle:parameternumber")
     Task(DBColumnFamilyDefinition dbColumnFamilyDefinition,
          ArrayList<ByteArrayKeyValue> batch, LogWriter logWriter,
-         long sequenceId, boolean withKey, boolean schemaV3, String valueFields, String filter) {
+         long sequenceId, boolean withKey, boolean schemaV3, String valueFields) {
       this.dbColumnFamilyDefinition = dbColumnFamilyDefinition;
       this.batch = batch;
       this.logWriter = logWriter;
@@ -668,7 +667,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       this.withKey = withKey;
       this.schemaV3 = schemaV3;
       this.valueFields = valueFields;
-      this.valueFilter = filter;
     }
 
     Map<String, Object> getFieldSplit(List<String> fields, Map<String, Object> fieldMap) {
