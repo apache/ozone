@@ -97,6 +97,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, String> snapshotSeekMap;
   private AtomicBoolean isRunningOnAOS;
   private final boolean deepCleanSnapshots;
+  private final SnapshotChainManager snapshotChainManager;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -119,6 +120,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.snapshotSeekMap = new HashMap<>();
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
+    this.snapshotChainManager = ((OmMetadataManagerImpl)manager.getMetadataManager()).getSnapshotChainManager();
   }
 
   /**
@@ -208,11 +210,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
-          // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+          // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
           // snapshotId since AOS could process multiple buckets in one iteration.
-          UUID expectedPreviousSnapshotId =
-              ((OmMetadataManagerImpl)manager.getMetadataManager()).getSnapshotChainManager()
-                  .getLatestGlobalSnapshotId();
+          UUID expectedPreviousSnapshotId = snapshotChainManager.getLatestGlobalSnapshotId();
           PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(getKeyLimitPerTask());
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
