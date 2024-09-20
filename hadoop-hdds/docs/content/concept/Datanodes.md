@@ -87,4 +87,4 @@ ozone.scm.datanode.id.dir | none | The path that datanodes will use to store the
 hdds.datanode.dir | none | Determines where on the local filesystem HDDS data will be stored.
 hdds.datanode.dir.du.reserved | none | Reserved space in bytes per volume. Always leave this much space free for non dfs use.
 ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).
-ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon.
+ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon. Use <host:port> to connect Recon.
