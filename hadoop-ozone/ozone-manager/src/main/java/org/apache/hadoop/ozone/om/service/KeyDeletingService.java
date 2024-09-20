@@ -95,6 +95,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
+  private AtomicBoolean isRunningOnAOS;
   private final boolean deepCleanSnapshots;
 
   public KeyDeletingService(OzoneManager ozoneManager,
@@ -116,6 +117,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
+    this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
   }
 
@@ -129,10 +131,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
+  public boolean isRunningOnAOS() {
+    return isRunningOnAOS.get();
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask());
+    queue.add(new KeyDeletingTask(this));
     return queue;
   }
 
@@ -175,7 +181,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements BackgroundTask {
+  private final class KeyDeletingTask implements BackgroundTask {
+    private final KeyDeletingService deletingService;
+
+    private KeyDeletingTask(KeyDeletingService service) {
+      this.deletingService = service;
+    }
 
     @Override
     public int getPriority() {
@@ -189,7 +200,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
-
+        isRunningOnAOS.set(true);
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -227,6 +238,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
+      isRunningOnAOS.set(false);
+      synchronized (deletingService) {
+        this.deletingService.notify();
+      }
+
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
     }

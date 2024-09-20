@@ -59,12 +59,22 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
 
       List<Pipeline> pipelineList = new ArrayList<>();
       Predicate<? super Pipeline> predicate = replicationFilter.orElse(null);
-      for (Pipeline pipeline : scmClient.listPipelines()) {
-        boolean filterPassed = (predicate != null) && predicate.test(pipeline);
-        if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED && filterPassed) {
-          pipelineList.add(pipeline);
+      List<Pipeline> pipelines = scmClient.listPipelines();
+      if (predicate == null) {
+        for (Pipeline pipeline : pipelines) {
+          if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED) {
+            pipelineList.add(pipeline);
+          }
+        }
+      } else {
+        for (Pipeline pipeline : pipelines) {
+          boolean filterPassed = predicate.test(pipeline);
+          if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED && filterPassed) {
+            pipelineList.add(pipeline);
+          }
         }
       }
+
       System.out.println("Sending close command for " + pipelineList.size() + " pipelines...");
       pipelineList.forEach(pipeline -> {
         try {

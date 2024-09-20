@@ -164,12 +164,8 @@ public final class OzoneManagerUtils {
        * buck-src has the actual BucketLayout that will be used by the
        * links.
        */
-      try {
-        return resolveBucketInfoLink(metadataManager,
-            buckInfo.getSourceVolume(), buckInfo.getSourceBucket(), visited);
-      } catch (IOException e) {
-        throw e;
-      }
+      return resolveBucketInfoLink(metadataManager, buckInfo.getSourceVolume(),
+          buckInfo.getSourceBucket(), visited);
     }
     return buckInfo;
   }
