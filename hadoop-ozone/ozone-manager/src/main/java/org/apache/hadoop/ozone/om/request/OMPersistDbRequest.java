@@ -86,8 +86,11 @@ public class OMPersistDbRequest extends OMClientRequest {
           }
         }
       }
-      Long txIndex = TransactionInfo.readTransactionInfo(metadataManager).getIndex();
-      txIndex = txIndex != null ? txIndex : 0;
+      long txIndex = 0;
+      TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
+      if (transactionInfo != null && transactionInfo.getIndex() != null) {
+        txIndex = transactionInfo.getIndex();
+      }
       txIndex = Math.max(Collections.max(getOmRequest().getPersistDbRequest().getIndexList()).longValue(), txIndex);
       metadataManager.getTransactionInfoTable().putWithBatch(
           batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex, txIndex));

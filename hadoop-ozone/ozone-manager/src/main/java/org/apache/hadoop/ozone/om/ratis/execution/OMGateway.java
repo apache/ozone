@@ -182,7 +182,10 @@ public class OMGateway {
   private void resetUniqueIndex() {
     Long index = null;
     try {
-      index = TransactionInfo.readTransactionInfo(om.getMetadataManager()).getIndex();
+      TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(om.getMetadataManager());
+      if (null != transactionInfo) {
+        index = transactionInfo.getIndex();
+      }
     } catch (IOException e) {
       throw new IllegalStateException("Unable to initialized index from TransactionInfoTable");
     }
