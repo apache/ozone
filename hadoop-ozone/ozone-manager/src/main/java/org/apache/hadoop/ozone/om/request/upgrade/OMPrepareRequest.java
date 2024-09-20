@@ -95,7 +95,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
       // update db and then take snapshot
       Long index = null;
-          TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager());
+      TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager());
       if (null != transactionInfo) {
         index = transactionInfo.getIndex();
       }
