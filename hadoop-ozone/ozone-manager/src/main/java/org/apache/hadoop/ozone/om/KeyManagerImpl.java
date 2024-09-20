@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -86,6 +87,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -189,7 +191,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
-  private BackgroundService dirDeletingService;
+  private DirectoryDeletingService dirDeletingService;
   private final OMPerformanceMetrics metrics;
 
   private BackgroundService openKeyCleanupService;
@@ -305,7 +307,7 @@ public class KeyManagerImpl implements KeyManager {
       try {
         snapshotDeletingService = new SnapshotDeletingService(
             snapshotServiceInterval, snapshotServiceTimeout,
-            ozoneManager, scmClient.getBlockClient());
+            ozoneManager);
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
@@ -662,6 +664,60 @@ public class KeyManagerImpl implements KeyManager {
         .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
   }
 
+  private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
+          TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
+          Function<V, R> valueFunction, int size) throws IOException {
+    List<Table.KeyValue<String, R>> entries = new ArrayList<>();
+    /* Seek to the start key if it not null. The next key in queue is ensured to start with the bucket
+         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
+    */
+    if (startKey != null) {
+      tableIterator.seek(startKey);
+      tableIterator.seekToFirst();
+    }
+    int currentCount = 0;
+    while (tableIterator.hasNext() && currentCount < size) {
+      Table.KeyValue<String, V> kv = tableIterator.next();
+      if (kv != null) {
+        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
+        currentCount++;
+      }
+    }
+    return entries;
+  }
+
+  private Optional<String> getBucketPrefix(String volumeName, String bucketName, boolean isFSO) throws IOException {
+    // Bucket prefix would be empty if both volume & bucket is empty i.e. either null or "".
+    if (StringUtils.isEmpty(volumeName) && StringUtils.isEmpty(bucketName)) {
+      return Optional.empty();
+    } else if (StringUtils.isEmpty(bucketName) || StringUtils.isEmpty(volumeName)) {
+      throw new IOException("One of volume : " + volumeName + ", bucket: " + bucketName + " is empty." +
+          " Either both should be empty or none of the arguments should be empty");
+    }
+    return isFSO ? Optional.of(metadataManager.getBucketKeyPrefixFSO(volumeName, bucketName)) :
+        Optional.of(metadataManager.getBucketKeyPrefix(volumeName, bucketName));
+  }
+
+  @Override
+  public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
+      String volume, String bucket, String startKey, int size) throws IOException {
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+             renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
+    }
+  }
+
+  @Override
+  public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
+      String volume, String bucket, String startKey, int size) throws IOException {
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+             delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, size);
+    }
+  }
+
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout, Duration leaseThreshold) throws IOException {
@@ -688,7 +744,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public BackgroundService getDirDeletingService() {
+  public DirectoryDeletingService getDirDeletingService() {
     return dirDeletingService;
   }
 
@@ -723,8 +779,7 @@ public class KeyManagerImpl implements KeyManager {
             TimeUnit.MILLISECONDS);
     return serviceInterval != DISABLE_VALUE;
   }
-
-
+  
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException {
@@ -1325,7 +1380,6 @@ public class KeyManagerImpl implements KeyManager {
     return null;
   }
 
-
   private OzoneFileStatus getOzoneFileStatusFSO(OmKeyArgs args,
       String clientAddress, boolean skipFileNotFoundError) throws IOException {
     final String volumeName = args.getVolumeName();
@@ -1784,17 +1838,13 @@ public class KeyManagerImpl implements KeyManager {
       }
       fileStatusFinalList.add(fileStatus);
     }
-
     return sortPipelineInfo(fileStatusFinalList, keyInfoList,
         omKeyArgs, clientAddress);
   }
 
-
   private List<OzoneFileStatus> sortPipelineInfo(
       List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
       OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
-
-
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
@@ -1974,6 +2024,13 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
     return null;
+  }
+
+  @Override
+  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+      String volume, String bucket) throws IOException {
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, true);
+    return metadataManager.getDeletedDirTable().iterator(bucketPrefix.orElse(""));
   }
 
   @Override

@@ -82,7 +82,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       // Check the snapshot exists.
       SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
 
-      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, ozoneManager);
+      nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
       // Get next non-deleted snapshot.
       List<SnapshotMoveKeyInfos> nextDBKeysList = moveDeletedKeysRequest.getNextDBKeysList();
