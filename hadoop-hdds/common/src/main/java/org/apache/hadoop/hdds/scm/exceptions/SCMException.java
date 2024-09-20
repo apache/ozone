@@ -112,6 +112,9 @@ public class SCMException extends IOException {
     FAILED_TO_FIND_CONTAINER,
     FAILED_TO_FIND_CONTAINER_WITH_SPACE,
     BLOCK_EXISTS,
+    //OM can send a deleteBlockRequest for key delete more than once. Thus, it shouldn't
+    // fail the request since SCM already deleted the block in the previous run. We should never use this enum.
+    @Deprecated
     FAILED_TO_FIND_BLOCK,
     IO_EXCEPTION,
     UNEXPECTED_CONTAINER_STATE,

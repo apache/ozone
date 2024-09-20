@@ -724,6 +724,14 @@ public final class OMFileRequest {
     return null;
   }
 
+  public static OmKeyInfo getOmKeyInfo(OmKeyInfo parentInfo, OmDirectoryInfo directoryInfo) {
+    String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
+        directoryInfo.getName());
+    return OMFileRequest.getOmKeyInfo(
+        parentInfo.getVolumeName(), parentInfo.getBucketName(), directoryInfo,
+        dirName);
+  }
+
   /**
    * Prepare OmKeyInfo from OmDirectoryInfo.
    *
@@ -771,6 +779,13 @@ public final class OMFileRequest {
     }
     prefixName = OzoneFSUtils.addTrailingSlashIfNeeded(prefixName);
     return prefixName.concat(fileName);
+  }
+
+  public static void setKeyNameAndFileName(OmKeyInfo parentInfo, OmKeyInfo omKeyInfo) {
+    omKeyInfo.setFileName(omKeyInfo.getKeyName());
+    String fullKeyPath = OMFileRequest.getAbsolutePath(
+        parentInfo.getKeyName(), omKeyInfo.getKeyName());
+    omKeyInfo.setKeyName(fullKeyPath);
   }
 
   /**

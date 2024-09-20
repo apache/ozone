@@ -48,15 +48,18 @@ import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeleted
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
+  private List<String> renamedList;
   private SnapshotInfo fromSnapshot;
   private List<SnapshotMoveKeyInfos> keysToUpdateList;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> keyList,
+      @Nonnull List<String> renamedList,
       SnapshotInfo fromSnapshot,
       List<SnapshotMoveKeyInfos> keysToUpdate) {
     super(omResponse);
     this.purgeKeyList = keyList;
+    this.renamedList = renamedList;
     this.fromSnapshot = fromSnapshot;
     this.keysToUpdateList = keysToUpdate;
   }
@@ -106,8 +109,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
 
     for (SnapshotMoveKeyInfos keyToUpdate : keysToUpdateList) {
       List<KeyInfo> keyInfosList = keyToUpdate.getKeyInfosList();
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          createRepeatedOmKeyInfo(keyInfosList);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = createRepeatedOmKeyInfo(keyInfosList);
       metadataManager.getDeletedTable().putWithBatch(batchOp,
           keyToUpdate.getKey(), repeatedOmKeyInfo);
     }
@@ -118,6 +120,10 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
     for (String key : purgeKeyList) {
       metadataManager.getDeletedTable().deleteWithBatch(batchOp,
           key);
+    }
+    // Delete rename entries.
+    for (String key : renamedList) {
+      metadataManager.getSnapshotRenamedTable().deleteWithBatch(batchOp, key);
     }
   }
 

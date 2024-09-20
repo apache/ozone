@@ -153,6 +153,7 @@ enum Type {
   GetServerDefaults = 134;
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
 }
 
 enum SafeMode {
@@ -273,7 +274,7 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
-  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116 [deprecated = true];
 
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
@@ -295,6 +296,8 @@ message OMRequest {
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests     = 135;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 136;
 }
 
 message OMResponse {
@@ -1379,6 +1382,10 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 4;
+  repeated string renamedKeys = 5;
+
 }
 
 message PurgeKeysResponse {
@@ -1401,6 +1408,12 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 3;
+}
+
+message NullableUUID {
+  optional hadoop.hdds.UUID uuid = 1;
 }
 
 message PurgeDirectoriesResponse {
@@ -1981,6 +1994,13 @@ message SnapshotMoveDeletedKeysRequest {
   repeated string deletedDirsToMove = 5;
 }
 
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+}
+
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
@@ -1997,6 +2017,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotDirSize = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
@@ -2009,6 +2030,7 @@ message SnapshotProperty {
 message SnapshotSize {
   optional uint64 exclusiveSize = 1;
   optional uint64 exclusiveReplicatedSize = 2;
+  optional bool addSize = 3;
 }
 
 message DeleteTenantRequest {

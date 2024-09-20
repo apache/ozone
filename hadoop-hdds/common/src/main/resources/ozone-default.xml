@@ -3744,6 +3744,15 @@
   </property>
 
   <property>
+    <name>ozone.snapshot.deep.cleaning.enabled</name>
+    <value>true</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Flag to enable/disable snapshot deep cleaning.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
     <value>10</value>
     <tag>OZONE, SCM</tag>
