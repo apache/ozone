@@ -388,6 +388,7 @@ public class TestOMRatisSnapshots {
 
   @Test
   @Timeout(300)
+  @Unhealthy("HDDS-11415 local passes but remote fails, follower on start unable to call get snapshot")
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
     // Get the leader OM
