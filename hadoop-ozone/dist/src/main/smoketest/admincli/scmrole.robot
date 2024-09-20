@@ -34,4 +34,4 @@ List scm roles as JSON
 
 List scm roles as TABLE
     ${output} =         Execute          ozone admin scm roles --table
-                        Should contain   ${output}   LEADER
+                        Should Match Regexp   ${output}  \\|.*LEADER.*

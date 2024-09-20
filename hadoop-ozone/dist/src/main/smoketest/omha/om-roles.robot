@@ -30,7 +30,7 @@ Assert Leader Present in JSON
                                      Should Not Be Equal            ${leader}       ${EMPTY}
 Assert Leader Present in TABLE
      [Arguments]                     ${output}
-     Should Match Regexp             ${output}                     \|\s+om\d+\s+\|\s+LEADER\s+\|
+     Should Match Regexp             ${output}                      \\|.*LEADER.*
 
 *** Test Cases ***
 List om roles with OM service ID passed
