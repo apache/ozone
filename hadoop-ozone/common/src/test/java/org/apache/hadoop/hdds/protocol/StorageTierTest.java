@@ -59,7 +59,8 @@ class StorageTierTest {
       }
       for (ReplicationConfig replicationConfig : Arrays.asList(ratisOne, ratisThree,
           standaloneOne, standaloneThree)) {
-        List<StorageType> storageTypes = tier.getStorageTypes(replicationConfig.getRequiredNodes());
+        List<StorageType> storageTypes = tier.getStorageTypes(
+            replicationConfig.getRequiredNodes());
         if (tier.equals(StorageTier.EMPTY)) {
           assertEquals(0, storageTypes.size());
         } else {

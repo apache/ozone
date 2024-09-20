@@ -63,10 +63,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -161,6 +163,18 @@ public class TestPipelineManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
+  }
+
+  private PipelineManagerImpl createPipelineManager(NodeManager manager, boolean isLeader)
+      throws IOException {
+    return PipelineManagerImpl.newPipelineManager(conf,
+        SCMHAManagerStub.getInstance(isLeader),
+        manager,
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(),
+        scmContext,
+        serviceManager,
+        testClock);
   }
 
   private PipelineManagerImpl createPipelineManager(boolean isLeader)
@@ -377,7 +391,7 @@ public class TestPipelineManagerImpl {
       // get pipeline report from each dn in the pipeline
       PipelineReportHandler pipelineReportHandler =
           new PipelineReportHandler(scmSafeModeManager, pipelineManager,
-              SCMContext.emptyContext(), conf);
+              scmContext, conf);
       nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
           pipelineReportHandler, false));
       sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
@@ -403,6 +417,68 @@ public class TestPipelineManagerImpl {
       assertThrows(PipelineNotFoundException.class,
           () -> pipelineManager.getPipeline(pipeline.getId()));
     }
+  }
+
+  @Test
+  public void testPipelineReportUpdateSupportedStorageTier() throws Exception {
+    // Set Env
+    int nodeCount = 3;
+    MockNodeManager localNodeManager = new MockNodeManager(true, nodeCount, StorageType.DISK);
+    SCMContext localScmContext = spy(SCMContext.emptyContext());
+    StorageContainerManager localScm = mock(StorageContainerManager.class);
+    when(localScm.getScmNodeManager()).thenReturn(localNodeManager);
+    when(localScmContext.getScm()).thenReturn(localScm);
+
+    PipelineManagerImpl pipelineManager = createPipelineManager(localNodeManager, true);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(conf,
+        localNodeManager, pipelineManager, mock(ContainerManager.class),
+        serviceManager, new EventQueue(), scmContext);
+    List<DatanodeDetails> nodes = localNodeManager.getNodes(NodeStatus.inServiceHealthy());
+    assertEquals(nodeCount, nodes.size());
+    Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE));
+    assertTrue(pipeline.getSupportedStorageTier().contains(StorageTier.DISK));
+
+    assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+    PipelineReportHandler pipelineReportHandler = new PipelineReportHandler(
+        scmSafeModeManager, pipelineManager, localScmContext, conf);
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true);
+
+    // All the Datanode Volume StorageType is DISK so the Pipeline StorageTier will be StorageTier.DISK
+    assertTrue(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+    assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
+    assertEquals(1, pipeline.getSupportedStorageTier().size());
+    assertTrue(pipeline.getSupportedStorageTier().contains(StorageTier.DISK));
+
+    // Only the first Datanode updated its NodeReport to SSD,
+    // Pipeline's Datanode StorageType [SSD, DISK, DISK] is not a valid StorageTier
+    localNodeManager.setStorageTypeForNode(nodes.get(0).getID(), StorageType.SSD);
+    sendPipelineReport(nodes.get(0), pipeline, pipelineReportHandler, false);
+    assertEquals(0,
+        pipelineManager.getPipeline(pipeline.getId()).getSupportedStorageTier().size());
+
+    // The first and second Datanode updated its NodeReport to SSD
+    // Pipeline's Datanode StorageType [SSD, SSD, DISK] is not a valid StorageTier
+    localNodeManager.setStorageTypeForNode(nodes.get(1).getID(), StorageType.SSD);
+    sendPipelineReport(nodes.get(1), pipeline, pipelineReportHandler, false);
+    assertEquals(0,
+        pipelineManager.getPipeline(pipeline.getId()).getSupportedStorageTier().size());
+
+    // The first and second Datanode updated its NodeReport to SSD
+    // Pipeline's Datanode StorageType [SSD, SSD, SSD] is StorageTier.SSD
+    localNodeManager.setStorageTypeForNode(nodes.get(2).getID(), StorageType.SSD);
+    sendPipelineReport(nodes.get(2), pipeline, pipelineReportHandler, true);
+    assertEquals(1,
+        pipelineManager.getPipeline(pipeline.getId()).getSupportedStorageTier().size());
+    assertTrue(pipelineManager.getPipeline(pipeline.getId())
+        .getSupportedStorageTier().contains(StorageTier.SSD));
+
+    // close the pipeline and clean up
+    pipelineManager.closePipeline(pipeline.getId());
+    pipelineManager.close();
   }
 
   @Test
@@ -478,7 +554,7 @@ public class TestPipelineManagerImpl {
         serviceManager, new EventQueue(), scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
-            SCMContext.emptyContext(), conf);
+            scmContext, conf);
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();
@@ -855,7 +931,7 @@ public class TestPipelineManagerImpl {
         = new HealthyPipelineChoosePolicy();
     ContainerManager containerManager
         = mock(ContainerManager.class);
-    
+
     WritableContainerProvider<ReplicationConfig> provider;
     String owner = "TEST";
     Pipeline allocatedPipeline;
@@ -876,7 +952,7 @@ public class TestPipelineManagerImpl {
     ContainerInfo container = HddsTestUtils.
             getContainer(HddsProtos.LifeCycleState.OPEN,
                 allocatedPipeline.getId());
-    
+
     pipelineManager.addContainerToPipeline(
         allocatedPipeline.getId(), container.containerID());
     doReturn(container).when(containerManager).getMatchingContainer(anyLong(),
@@ -902,7 +978,7 @@ public class TestPipelineManagerImpl {
       return call.callRealMethod();
     }).when(pipelineManagerSpy).waitOnePipelineReady(any(), anyLong());
 
-    
+
     ContainerInfo c = provider.getContainer(1, repConfig,
         owner, new ExcludeList());
     assertEquals(c, container, "Expected container was returned");

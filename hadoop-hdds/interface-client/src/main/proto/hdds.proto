@@ -143,6 +143,7 @@ message Pipeline {
 
     optional DatanodeIDProto leaderDatanodeID = 101;
     optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
+    repeated StorageTierProto supportedStorageTier = 103;
 }
 
 message KeyValue {

@@ -132,31 +132,6 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return fsAvailable;
   }
 
-  public static StorageType getStorageType(StorageTypeProto proto) throws
-      IllegalArgumentException {
-    StorageType storageType;
-    switch (proto) {
-    case SSD:
-      storageType = StorageType.SSD;
-      break;
-    case DISK:
-      storageType = StorageType.DISK;
-      break;
-    case ARCHIVE:
-      storageType = StorageType.ARCHIVE;
-      break;
-    case PROVIDED:
-      storageType = StorageType.PROVIDED;
-      break;
-    case RAM_DISK:
-      storageType = StorageType.RAM_DISK;
-      break;
-    default:
-      throw new IllegalArgumentException("Illegal Storage Type specified: " + proto);
-    }
-    return storageType;
-  }
-
   /**
    * Returns the StorageReportProto protoBuf message for the Storage Location
    * report.

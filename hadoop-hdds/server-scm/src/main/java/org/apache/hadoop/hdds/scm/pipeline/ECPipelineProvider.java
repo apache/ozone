@@ -28,15 +28,16 @@ import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
-import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.NodeUtils;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,10 +91,16 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       StorageTier storageTier)
       throws IOException {
-    StorageType storageType = StorageTierUtil.getStorageTypeForUniformStorageTier(storageTier, replicationConfig);
+    StorageType storageType = storageTier.getUniformStorageType();
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
             replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes, storageType);
+    List<StorageTier> storageTiers =
+        NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
+    if (!storageTiers.contains(storageTier)) {
+      throw new SCMException(String.format("Cannot create pipeline for StorageTier %s replicationConfig: %s",
+          storageTier, replicationConfig), SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
     return create(replicationConfig, dns);
   }
 
@@ -140,12 +147,15 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   private Pipeline createPipelineInternal(ECReplicationConfig repConfig,
       List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes) {
+    List<StorageTier> storageTiers =
+        NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.ALLOCATED)
         .setReplicationConfig(repConfig)
         .setNodes(dns)
         .setReplicaIndexes(indexes)
+        .setSupportedStorageTier(storageTiers)
         .build();
   }
 

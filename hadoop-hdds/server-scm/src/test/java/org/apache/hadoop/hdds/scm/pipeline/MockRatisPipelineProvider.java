@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
@@ -71,6 +72,8 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       return super.create(replicationConfig, storageTier);
     } else {
       Pipeline initialPipeline = super.create(replicationConfig, storageTier);
+      List<StorageTier> storageTiers =
+          NodeUtils.getDatanodesStorageTypes(initialPipeline.getNodes(), getNodeManager());
       Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED
@@ -79,6 +82,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
               .fromProtoTypeAndFactor(initialPipeline.getType(),
                   replicationConfig.getReplicationFactor()))
           .setNodes(initialPipeline.getNodes())
+          .setSupportedStorageTier(storageTiers)
           .build();
       return pipeline;
     }
@@ -95,11 +99,14 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   @Override
   public Pipeline create(RatisReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
+    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.OPEN)
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
+        .setSupportedStorageTier(storageTiers)
         .build();
   }
+
 }
