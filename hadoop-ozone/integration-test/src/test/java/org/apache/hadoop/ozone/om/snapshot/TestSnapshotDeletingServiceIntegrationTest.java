@@ -508,7 +508,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     KeyDeletingService keyDeletingService = Mockito.spy(new KeyDeletingService(ozoneManager,
         ozoneManager.getScmClient().getBlockClient(), keyManager, 10000,
-        100000, cluster.getConf()));
+        100000, cluster.getConf(), false));
     keyDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
         100000);
