@@ -200,7 +200,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager())
             .getSnapshotChainManager();
-        // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
+        // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
         // snapshotId since AOS could process multiple buckets in one iteration. While using path previous snapshot
         // Id for a snapshot since it would process only one bucket.
         UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
@@ -232,6 +232,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
+            // Validating if the previous snapshot is still the same before purging the blocks.
+            SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
+                expectedPreviousSnapshotId);
             Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, getOzoneManager().getKeyManager(),
                  pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
                  expectedPreviousSnapshotId);

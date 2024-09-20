@@ -494,7 +494,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>>  optimizeDirDeletesAndSubmitRequest(
+  public Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> optimizeDirDeletesAndSubmitRequest(
       long remainNum, long dirNum, long subDirNum, long subFileNum, List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList, String snapTableKey, long startTime, int remainingBufLimit,
       KeyManager keyManager,
