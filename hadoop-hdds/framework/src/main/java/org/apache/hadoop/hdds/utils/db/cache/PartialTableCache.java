@@ -137,7 +137,6 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
       }
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
-      // Also, if higher epoch is present indicates all previous epoch is received
       if (epochs.contains(currentEpoch)) {
         for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
              iterator.hasNext();) {
@@ -148,7 +147,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
             if (v.getEpoch() == currentEpoch) {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                    k.getCacheKey(), currentEpoch);
+                        k.getCacheKey(), currentEpoch);
               }
               return null;
             }
