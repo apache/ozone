@@ -371,9 +371,10 @@ public class OMBasicStateMachine extends BaseStateMachine {
       OMRequest request, TermIndex termIndex, RequestHandler handler, OzoneManager om) {
     OMClientResponse omClientResponse = null;
     try {
-      Long index = TransactionInfo.readTransactionInfo(om.getMetadataManager()).getIndex();
-      if (null == index) {
-        index = 0L;
+      long index = 0;
+      TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(om.getMetadataManager());
+      if (null != transactionInfo && null != transactionInfo.getIndex()) {
+        index = transactionInfo.getIndex();
       }
       try {
         if (request.hasPersistDbRequest() && request.getPersistDbRequest().getIndexCount() > 0) {

@@ -94,7 +94,11 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new DummyOMClientResponse(responseBuilder.build());
 
       // update db and then take snapshot
-      Long index = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager()).getIndex();
+      Long index = null;
+          TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager());
+      if (null != transactionInfo) {
+        index = transactionInfo.getIndex();
+      }
       ozoneManager.getMetadataManager().getTransactionInfoTable().put(
           PREPARE_MARKER_KEY, TransactionInfo.valueOf(TransactionInfo.DEFAULT_VALUE.getTerm(), transactionLogIndex));
       ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
