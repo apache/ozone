@@ -92,6 +92,8 @@ public class TestOzoneRepairShell {
     CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair());
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
+    // create a volume to ensure transactionInfo is updated if its new environment
+    cluster.newClient().getObjectStore().createVolume("vol");
     cluster.getOzoneManager().stop();
 
     String cmdOut = scanTransactionInfoTable(dbPath);

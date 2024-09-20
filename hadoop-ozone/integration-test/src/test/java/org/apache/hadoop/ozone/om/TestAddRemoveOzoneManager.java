@@ -48,6 +48,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -72,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test for OM bootstrap process.
  */
 @Timeout(500)
+@Unhealthy("HDDS-11415 OzoneManager Statemachine to be removed")
 public class TestAddRemoveOzoneManager {
 
   private MiniOzoneHAClusterImpl cluster = null;

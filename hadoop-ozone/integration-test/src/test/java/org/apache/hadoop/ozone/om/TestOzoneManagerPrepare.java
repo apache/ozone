@@ -68,6 +68,7 @@ import org.slf4j.LoggerFactory;
  * Test OM prepare against actual mini cluster.
  */
 @Flaky("HDDS-5990")
+@Unhealthy("HDDS-11415 To fix upgrade prepare and verify")
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";

@@ -16,13 +16,17 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,6 +37,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -57,6 +62,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -251,7 +257,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    */
   private OMResponse submitRequestToRatis(OMRequest request)
       throws ServiceException {
-    return omRatisServer.submitRequest(request);
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(ProtobufRpcEngine.Server.getClientId() != DUMMY_CLIENT_ID);
+      Preconditions.checkArgument(ProtobufRpcEngine.Server.getCallId() != INVALID_CALL_ID);
+    }
+    return OzoneManagerRatisUtils.submitRequest(ozoneManager, request,
+        ClientId.valueOf(UUID.nameUUIDFromBytes(ProtobufRpcEngine.Server.getClientId())),
+        ProtobufRpcEngine.Server.getCallId());
   }
 
   private OMResponse submitReadRequestToOM(OMRequest request)

@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.execution.OMBasicStateMachine;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -89,6 +90,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.SizeInBytes;
@@ -119,6 +121,7 @@ public final class OzoneManagerRatisServer {
 
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
+  private final OMBasicStateMachine omBasicStateMachine;
   private final String ratisStorageDir;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -169,7 +172,17 @@ public final class OzoneManagerRatisServer {
       LOG.info("Instantiating OM Ratis server with groupID: {} and peers: {}",
           raftGroupIdStr, raftPeersStr.substring(2));
     }
-    this.omStateMachine = getStateMachine(conf);
+    BaseStateMachine sm = null;
+    if (ozoneManager.isLeaderExecutorEnabled()) {
+      this.omBasicStateMachine = new OMBasicStateMachine(this,
+          TracingUtil.isTracingEnabled(conf));
+      sm = this.omBasicStateMachine;
+      this.omStateMachine = null;
+    } else {
+      this.omStateMachine = getStateMachine(conf);
+      sm = this.omStateMachine;
+      this.omBasicStateMachine = null;
+    }
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
@@ -177,7 +190,7 @@ public final class OzoneManagerRatisServer {
         .setGroup(this.raftGroup)
         .setProperties(serverProperties)
         .setParameters(parameters)
-        .setStateMachine(omStateMachine)
+        .setStateMachine(sm)
         .setOption(RaftStorage.StartupOption.RECOVER)
         .build();
     this.serverDivision = MemoizedSupplier.valueOf(() -> {
@@ -591,6 +604,10 @@ public final class OzoneManagerRatisServer {
     return omStateMachine;
   }
 
+  public OMBasicStateMachine getOmBasicStateMachine() {
+    return omBasicStateMachine;
+  }
+
   public OzoneManager getOzoneManager() {
     return ozoneManager;
   }
@@ -855,6 +872,9 @@ public final class OzoneManagerRatisServer {
   }
 
   public TermIndex getLastAppliedTermIndex() {
+    if (ozoneManager.isLeaderExecutorEnabled()) {
+      return omBasicStateMachine.getLastAppliedTermIndex();
+    }
     return omStateMachine.getLastAppliedTermIndex();
   }
 

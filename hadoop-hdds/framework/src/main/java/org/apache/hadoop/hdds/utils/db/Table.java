@@ -328,6 +328,10 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void loadFromFile(File externalFile) throws IOException;
 
+  default Table getRawTable() {
+    return this;
+  }
+
   /**
    * Class used to represent the key and value pair of a db entry.
    */

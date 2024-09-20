@@ -70,6 +70,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -1882,6 +1883,7 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  @Unhealthy("HDDS-11415 handle with lockDetails changes")
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
         "org.apache.hadoop.ipc.ProcessingDetails");

@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.ratis.execution.OMGateway;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -336,6 +337,7 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
@@ -427,6 +429,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isRatisEnabled;
   private OzoneManagerRatisServer omRatisServer;
   private OmRatisSnapshotProvider omRatisSnapshotProvider;
+  private OMGateway omGateway;
   private OMNodeDetails omNodeDetails;
   private final Map<String, OMNodeDetails> peerNodesMap;
   private File omRatisSnapshotDir;
@@ -1272,6 +1275,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     BlockingService omInterService =
         OzoneManagerInterService.newReflectiveBlockingService(
             omInterServerProtocol);
+    this.omGateway = new OMGateway(this);
 
     OMAdminProtocolServerSideImpl omMetadataServerProtocol =
         new OMAdminProtocolServerSideImpl(this);
@@ -1565,6 +1569,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public OzoneManagerRatisServer getOmRatisServer() {
     return omRatisServer;
+  }
+
+  public OMGateway getOMGateway() {
+    return omGateway;
   }
 
   @VisibleForTesting
@@ -2213,7 +2221,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  long getLastTrxnIndexForNonRatis() throws IOException {
+  public long getLastTrxnIndexForNonRatis() throws IOException {
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(metadataManager);
     // If the OMTransactionInfo does not exist in DB, return 0 so that new incoming
@@ -2333,6 +2341,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (bucketUtilizationMetrics != null) {
         bucketUtilizationMetrics.unRegister();
       }
+      omGateway.stop();
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3890,7 +3899,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
       // pending transactions in the buffer, they are discarded.
-      omRatisServer.getOmStateMachine().pause();
+      BaseStateMachine sm = isLeaderExecutorEnabled() ? omRatisServer.getOmBasicStateMachine()
+          : omRatisServer.getOmStateMachine();
+      sm.pause();
     } catch (Exception e) {
       LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
           "installing the new checkpoint.");
@@ -3970,7 +3981,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         time = Time.monotonicNow();
         reloadOMState();
         setTransactionInfo(TransactionInfo.valueOf(termIndex));
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        unpauseStateMachine(term, lastAppliedIndex);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
             term, lastAppliedIndex, Time.monotonicNow() - time);
@@ -3979,7 +3990,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         keyManager.start(configuration);
         startSecretManagerIfNecessary();
         startTrashEmptier(configuration);
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        unpauseStateMachine(term, lastAppliedIndex);
         LOG.info("OM DB is not stopped. Started services with Term: {} and " +
             "Index: {}", term, lastAppliedIndex);
       }
@@ -3995,8 +4006,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcServer = getRpcServer(configuration);
         omRpcServer.start();
         isOmRpcServerRunning = true;
-        LOG.info("RPC server is re-started. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("RPC server is re-started. Spend " + (Time.monotonicNow() - time) + " ms.");
       } catch (Exception e) {
         String errorMsg = "Failed to start RPC Server.";
         exitManager.exitSystem(1, errorMsg, e, LOG);
@@ -4026,6 +4036,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
+  }
+
+  private void unpauseStateMachine(long term, long lastAppliedIndex) {
+    if (isLeaderExecutorEnabled()) {
+      omRatisServer.getOmBasicStateMachine().unpause(lastAppliedIndex, term);
+    } else {
+      omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+    }
   }
 
   private void stopTrashEmptier() {
@@ -5019,7 +5037,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     if (isRatisEnabled()) {
-      getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      if (!isLeaderExecutorEnabled()) {
+        getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      }
     } else {
       getOmServerProtocol().awaitDoubleBufferFlush();
     }
@@ -5030,5 +5050,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (disabledFeatures.contains(feature.name())) {
       throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
+  }
+
+  public boolean isLeaderExecutorEnabled() {
+    return configuration.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
   }
 }
