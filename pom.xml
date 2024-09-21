@@ -205,7 +205,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <javax.inject.version>1</javax.inject.version>
-    <joda.time.version>2.12.7</joda.time.version>
+    <joda.time.version>2.13.0</joda.time.version>
 
     <aopalliance.version>1.0</aopalliance.version>
     <compile-testing.version>0.21.0</compile-testing.version>
