@@ -42,8 +42,18 @@ public class InfoSubcommand implements Callable<Void> {
       description = "Container Id")
   private long containerId;
 
+  @CommandLine.Option(names = {"--path", "-p"},
+      description = "Specifies the absolute path to the DataNode storage directory " +
+          "that contains container data and metadata. When this option is provided, " +
+          "the specified path will be used instead of the default directory defined " +
+          "in the configuration. Example: --path=/data/hdds")
+  private String dataPath;
+
   @Override
   public Void call() throws Exception {
+    if (dataPath != null) {
+      parent.setDataPath(dataPath);  // Set path in parent class
+    }
     parent.loadContainersFromVolumes();
 
     Container container = parent.getController().getContainer(containerId);

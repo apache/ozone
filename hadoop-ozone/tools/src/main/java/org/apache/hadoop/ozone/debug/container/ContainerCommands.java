@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
@@ -93,6 +94,8 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @Spec
   private CommandSpec spec;
 
+  private String dataPath;
+
   private MutableVolumeSet volumeSet;
 
   private ContainerController controller;
@@ -119,7 +122,8 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
-    String firstStorageDir = getFirstStorageDir(conf);
+    // Use the user provided path or fall back to the configuration
+    String firstStorageDir = (dataPath != null) ? dataPath : getFirstStorageDir(conf);
 
     String datanodeUuid = getDatanodeUUID(firstStorageDir, conf);
 
@@ -223,5 +227,9 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
   public static void outputContainer(ContainerData data) throws IOException {
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(data));
+  }
+
+  public void setDataPath(String dataPath) {
+    this.dataPath = dataPath;
   }
 }
