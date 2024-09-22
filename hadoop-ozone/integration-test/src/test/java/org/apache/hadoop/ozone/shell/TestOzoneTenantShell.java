@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
@@ -357,7 +356,6 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  @Unhealthy("HDDS-11415 follower cache issue validation fail")
   public void testAssignAdmin() throws IOException {
 
     final String tenantName = "devaa";
@@ -413,7 +411,6 @@ public class TestOzoneTenantShell {
    * and revoke user flow.
    */
   @Test
-  @Unhealthy("HDDS-11415 follower cache issue validation fail")
   @SuppressWarnings("methodlength")
   public void testOzoneTenantBasicOperations() throws IOException {
 
@@ -688,7 +685,6 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  @Unhealthy("HDDS-11415 follower cache issue validation fail")
   public void testListTenantUsers() throws IOException {
     executeHA(tenantShell, new String[] {"--verbose", "create", "tenant1"});
     checkOutput(out, "{\n" +
@@ -769,7 +765,6 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  @Unhealthy("HDDS-11415 follower cache issue validation fail")
   public void testTenantSetSecret() throws IOException, InterruptedException {
 
     final String tenantName = "tenant-test-set-secret";

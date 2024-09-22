@@ -154,7 +154,10 @@ public class OMBasicStateMachine extends BaseStateMachine {
 
   @Override
   protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
-    return super.updateLastAppliedTermIndex(newTermIndex);
+    if (getLastAppliedTermIndex().getIndex() < newTermIndex.getIndex()) {
+      return super.updateLastAppliedTermIndex(newTermIndex);
+    }
+    return true;
   }
 
   /**
@@ -239,6 +242,14 @@ public class OMBasicStateMachine extends BaseStateMachine {
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
+      // Prepare have special handling for execution, as snapshot is taken during this operation
+      // and its required that applyTransaction should be finished for this to handle
+      // And from leader, its guranteed that no other execution is allowed
+      if (request.getCmdType() == OzoneManagerProtocolProtos.Type.Prepare) {
+        return CompletableFuture.supplyAsync(() ->
+            OMRatisHelper.convertResponseToMessage(runCommand(request, termIndex, handler, ozoneManager)),
+            installSnapshotExecutor);
+      }
       OMResponse response = runCommand(request, termIndex, handler, ozoneManager);
       CompletableFuture<Message> future = new CompletableFuture<>();
       future.complete(OMRatisHelper.convertResponseToMessage(response));
@@ -377,11 +388,12 @@ public class OMBasicStateMachine extends BaseStateMachine {
         index = transactionInfo.getIndex();
       }
       try {
+        // leader index shared to follower for follower execution
         if (request.hasPersistDbRequest() && request.getPersistDbRequest().getIndexCount() > 0) {
           index = Math.max(Collections.max(request.getPersistDbRequest().getIndexList()).longValue(), index);
         }
+        // TODO temp way to pass index used for object ID creation for certain follower execution
         TermIndex objectIndex = termIndex;
-        // TODO temp fix for index sharing from leader to follower in follower execution
         if (request.getCmdType() != OzoneManagerProtocolProtos.Type.PersistDb
             && request.getCmdType() != OzoneManagerProtocolProtos.Type.Prepare) {
           objectIndex = TermIndex.valueOf(termIndex.getTerm(), index);

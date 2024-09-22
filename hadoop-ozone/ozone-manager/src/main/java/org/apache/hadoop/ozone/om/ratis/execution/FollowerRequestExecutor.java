@@ -38,7 +38,7 @@ public class FollowerRequestExecutor {
   private final AtomicLong callId = new AtomicLong(0);
   private final OzoneManager ozoneManager;
   private AtomicLong uniqueIndex;
-  private final PoolExecutor<RequestContext> ratisSubmitter;
+  private final PoolExecutor<RequestContext, Void> ratisSubmitter;
   private final OzoneManagerRequestHandler handler;
 
   public FollowerRequestExecutor(OzoneManager om, AtomicLong uniqueIndex) {
@@ -50,7 +50,7 @@ public class FollowerRequestExecutor {
       this.handler = null;
     }
     ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE, RATIS_TASK_QUEUE_SIZE,
-        ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
+        ozoneManager.getThreadNamePrefix() + "-FollowerExecutor", this::ratisSubmitCommand, null);
   }
   public void stop() {
     ratisSubmitter.stop();
@@ -63,7 +63,7 @@ public class FollowerRequestExecutor {
     ratisSubmitter.submit(idx, ctx);
   }
 
-  private void ratisSubmitCommand(Collection<RequestContext> ctxs, PoolExecutor<RequestContext> nxtPool) {
+  private void ratisSubmitCommand(Collection<RequestContext> ctxs, PoolExecutor.CheckedConsumer<Void> nxtPool) {
     for (RequestContext ctx : ctxs) {
       sendDbUpdateRequest(ctx);
     }
@@ -71,12 +71,6 @@ public class FollowerRequestExecutor {
 
   private void sendDbUpdateRequest(RequestContext ctx) {
     try {
-      if (!ozoneManager.isRatisEnabled()) {
-        OzoneManagerProtocolProtos.OMResponse response = OMBasicStateMachine.runCommand(ctx.getRequest(),
-            TermIndex.valueOf(-1, uniqueIndex.incrementAndGet()), handler, ozoneManager);
-        ctx.getFuture().complete(response);
-        return;
-      }
       // TODO hack way of transferring Leader index to follower nodes to use this index
       // need check proper way of index
       OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder
@@ -84,6 +78,13 @@ public class FollowerRequestExecutor {
       reqBuilder.addIndex(uniqueIndex.incrementAndGet());
       OzoneManagerProtocolProtos.OMRequest req = ctx.getRequest().toBuilder()
           .setPersistDbRequest(reqBuilder.build()).build();
+
+      if (!ozoneManager.isRatisEnabled()) {
+        OzoneManagerProtocolProtos.OMResponse response = OMBasicStateMachine.runCommand(req,
+            TermIndex.valueOf(-1, uniqueIndex.incrementAndGet()), handler, ozoneManager);
+        ctx.getFuture().complete(response);
+        return;
+      }
       OzoneManagerProtocolProtos.OMResponse response = ozoneManager.getOmRatisServer().submitRequest(req,
           ClientId.randomId(), callId.incrementAndGet());
       ctx.getFuture().complete(response);

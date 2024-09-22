@@ -2235,6 +2235,7 @@ message BucketQuotaCount {
     required int64 diffUsedBytes = 3;
     required int64 diffUsedNamespace = 4;
     required bool supportOldQuota = 5 [default=false];
+    optional uint64 bucketObjectId = 6;
 }
 
 message QuotaRepairResponse {
@@ -2264,6 +2265,7 @@ message OMLockDetailsProto {
 message PersistDbRequest {
     repeated DBTableUpdate tableUpdates = 1;
     repeated int64 index = 2;
+    repeated BucketQuotaCount bucketQuotaCount = 3;
 }
 message DBTableUpdate {
     required string tableName = 1;

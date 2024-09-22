@@ -116,7 +116,8 @@ public interface TableCache<KEY, VALUE> {
   enum CacheType {
     FULL_CACHE, //  This mean's the table maintains full cache. Cache and DB
     // state are same.
-    PARTIAL_CACHE // This is partial table cache, cache state is partial state
+    PARTIAL_CACHE, // This is partial table cache, cache state is partial state
+    NO_CACHE
     // compared to DB state.
   }
 }
