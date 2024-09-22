@@ -26,11 +26,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -54,24 +56,30 @@ public class LeaderRequestExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(LeaderRequestExecutor.class);
   private static final int REQUEST_EXECUTOR_POOL_SIZE = 1;
   private static final int REQUEST_EXECUTOR_QUEUE_SIZE = 1000;
-  private static final int RATIS_TASK_POOL_SIZE = 1;
+  private static final int MERGE_TASK_POOL_SIZE = 1;
+  private static final int MERGE_TASK_QUEUE_SIZE = 1000;
+  private static final int RATIS_TASK_POOL_SIZE = 10;
   private static final int RATIS_TASK_QUEUE_SIZE = 1000;
   private static final long DUMMY_TERM = -1;
   private final AtomicLong uniqueIndex;
   private final int ratisByteLimit;
   private final OzoneManager ozoneManager;
-  private final PoolExecutor<RequestContext> ratisSubmitter;
-  private final PoolExecutor<RequestContext> leaderExecutor;
+  private final PoolExecutor<RatisContext, Void> ratisSubmitter;
+  private final PoolExecutor<RequestContext, RatisContext> requestMerger;
+  private final PoolExecutor<RequestContext, RequestContext> leaderExecutor;
   private final OzoneManagerRequestHandler handler;
   private final AtomicBoolean isEnabled = new AtomicBoolean(true);
+  private final AtomicInteger ratisCurrentPool = new AtomicInteger(0);
 
   public LeaderRequestExecutor(OzoneManager om, AtomicLong uniqueIndex) {
     this.ozoneManager = om;
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
-    ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE,
-        RATIS_TASK_QUEUE_SIZE, ozoneManager.getThreadNamePrefix(), this::ratisSubmitCommand, null);
+    ratisSubmitter = new PoolExecutor<>(RATIS_TASK_POOL_SIZE, RATIS_TASK_QUEUE_SIZE,
+        ozoneManager.getThreadNamePrefix() + "-LeaderRatis", this::ratisCommand, null);
+    requestMerger = new PoolExecutor<>(MERGE_TASK_POOL_SIZE, MERGE_TASK_QUEUE_SIZE,
+        ozoneManager.getThreadNamePrefix() + "-LeaderMerger", this::requestMergeCommand, this::ratisSubmit);
     leaderExecutor = new PoolExecutor<>(REQUEST_EXECUTOR_POOL_SIZE, REQUEST_EXECUTOR_QUEUE_SIZE,
-        ozoneManager.getThreadNamePrefix(), this::runExecuteCommand, ratisSubmitter);
+        ozoneManager.getThreadNamePrefix() + "-LeaderExecutor", this::runExecuteCommand, this::mergeSubmit);
     int limit = (int) ozoneManager.getConfiguration().getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -82,6 +90,7 @@ public class LeaderRequestExecutor {
   }
   public void stop() {
     leaderExecutor.stop();
+    requestMerger.stop();
     ratisSubmitter.stop();
   }
   public int batchSize() {
@@ -99,39 +108,45 @@ public class LeaderRequestExecutor {
 
   public void submit(int idx, RequestContext ctx) throws InterruptedException {
     if (!isEnabled.get()) {
-      rejectRequest(ctx);
+      rejectRequest(Collections.singletonList(ctx));
       return;
     }
-    leaderExecutor.submit(idx, ctx);
+    executeRequest(ctx, this::mergeSubmit);
+    //leaderExecutor.submit(idx, ctx);
   }
 
-  private void rejectRequest(RequestContext ctx) {
+  private void rejectRequest(Collection<RequestContext> ctxs) {
+    Throwable th;
     if (!ozoneManager.isLeaderReady()) {
       String peerId = ozoneManager.isRatisEnabled() ? ozoneManager.getOmRatisServer().getRaftPeerId().toString()
           : ozoneManager.getOMNodeId();
-      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(peerId
-          + " is not ready to process request yet.");
-      ctx.getFuture().completeExceptionally(leaderNotReadyException);
+      th = new OMLeaderNotReadyException(peerId + " is not ready to process request yet.");
     } else {
-      ctx.getFuture().completeExceptionally(new OMException("Request processing is disabled due to error",
-          OMException.ResultCodes.INTERNAL_ERROR));
+      th = new OMException("Request processing is disabled due to error", OMException.ResultCodes.INTERNAL_ERROR);
     }
-  }
-  private void rejectRequest(Collection<RequestContext> ctxs) {
-    ctxs.forEach(ctx -> rejectRequest(ctx));
+    handleBatchUpdateComplete(ctxs, th, null);
   }
 
-  private void runExecuteCommand(Collection<RequestContext> ctxs, PoolExecutor<RequestContext> nxtPool) {
+  private void runExecuteCommand(
+      Collection<RequestContext> ctxs, PoolExecutor.CheckedConsumer<RequestContext> nxtPool) {
+    if (!isEnabled.get()) {
+      rejectRequest(ctxs);
+      return;
+    }
     for (RequestContext ctx : ctxs) {
       if (!isEnabled.get()) {
-        rejectRequest(ctx);
-        return;
+        rejectRequest(Collections.singletonList(ctx));
+        continue;
       }
       executeRequest(ctx, nxtPool);
     }
   }
 
-  private void executeRequest(RequestContext ctx, PoolExecutor<RequestContext> nxtPool) {
+  private void mergeSubmit(RequestContext ctx) throws InterruptedException {
+    requestMerger.submit(0, ctx);
+  }
+
+  private void executeRequest(RequestContext ctx, PoolExecutor.CheckedConsumer<RequestContext> nxtPool) {
     OMRequest request = ctx.getRequest();
     TermIndex termIndex = TermIndex.valueOf(DUMMY_TERM, uniqueIndex.incrementAndGet());
     ctx.setIndex(termIndex);
@@ -146,7 +161,7 @@ public class LeaderRequestExecutor {
     } finally {
       if (ctx.getNextRequest() != null) {
         try {
-          nxtPool.submit(0, ctx);
+          nxtPool.accept(ctx);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
@@ -164,7 +179,8 @@ public class LeaderRequestExecutor {
       if (!omClientResponse.getOMResponse().getSuccess()) {
         OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
       } else {
-        OzoneManagerProtocolProtos.PersistDbRequest.Builder nxtRequest = retrieveDbChanges(termIndex, omClientResponse);
+        OzoneManagerProtocolProtos.PersistDbRequest.Builder nxtRequest
+            = retrieveDbChanges(ctx, termIndex, omClientResponse);
         if (nxtRequest != null) {
           OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(nxtRequest.build())
               .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb);
@@ -181,16 +197,25 @@ public class LeaderRequestExecutor {
   }
 
   private OzoneManagerProtocolProtos.PersistDbRequest.Builder retrieveDbChanges(
-      TermIndex termIndex, OMClientResponse omClientResponse) throws IOException {
-    try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore()
+      RequestContext ctx, TermIndex termIndex, OMClientResponse omClientResponse) throws IOException {
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String name = metadataManager.getBucketTable().getName();
+    boolean isDbChanged = false;
+    try (BatchOperation batchOperation = metadataManager.getStore()
         .initBatchOperation()) {
-      omClientResponse.checkAndUpdateDB(ozoneManager.getMetadataManager(), batchOperation);
-      // get db update and raise request to flush
+      omClientResponse.checkAndUpdateDB(metadataManager, batchOperation);
+      // get db update and create request to flush
       OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder
           = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
       Map<String, Map<ByteBuffer, ByteBuffer>> cachedDbTxs
           = ((RDBBatchOperation) batchOperation).getCachedTransaction();
       for (Map.Entry<String, Map<ByteBuffer, ByteBuffer>> tblEntry : cachedDbTxs.entrySet()) {
+        isDbChanged = true;
+        if (tblEntry.getKey().equals(name)) {
+          if (ctx.getClientRequest().getWrappedBucketInfo() instanceof OmBucketInfoQuotaTracker) {
+            continue;
+          }
+        }
         OzoneManagerProtocolProtos.DBTableUpdate.Builder tblBuilder
             = OzoneManagerProtocolProtos.DBTableUpdate.newBuilder();
         tblBuilder.setTableName(tblEntry.getKey());
@@ -205,7 +230,7 @@ public class LeaderRequestExecutor {
         }
         reqBuilder.addTableUpdates(tblBuilder.build());
       }
-      if (reqBuilder.getTableUpdatesCount() == 0) {
+      if (!isDbChanged) {
         return null;
       }
       reqBuilder.addIndex(termIndex.getIndex());
@@ -213,11 +238,13 @@ public class LeaderRequestExecutor {
     }
   }
 
-  private void ratisSubmitCommand(Collection<RequestContext> ctxs, PoolExecutor<RequestContext> nxtPool) {
+  private void requestMergeCommand(
+      Collection<RequestContext> ctxs, PoolExecutor.CheckedConsumer<RatisContext> nxtPool) {
     if (!isEnabled.get()) {
       rejectRequest(ctxs);
       return;
     }
+    Map<Long, OzoneManagerProtocolProtos.BucketQuotaCount.Builder> bucketChangeMap = new HashMap<>();
     List<RequestContext> sendList = new ArrayList<>();
     OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder
         = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
@@ -230,16 +257,19 @@ public class LeaderRequestExecutor {
       }
       if ((tmpSize + size) > ratisByteLimit) {
         // send current batched request
-        prepareAndSendRequest(sendList, reqBuilder);
+        appendBucketQuotaChanges(reqBuilder, bucketChangeMap);
+        prepareAndSendRequest(sendList, reqBuilder, nxtPool);
 
         // reinit and continue
         reqBuilder = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
         size = 0;
         sendList.clear();
+        bucketChangeMap.clear();
       }
 
       // keep adding to batch list
       size += tmpSize;
+      addBucketQuotaChanges(ctx, bucketChangeMap);
       for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdates : tblList) {
         OzoneManagerProtocolProtos.DBTableUpdate.Builder tblBuilder
             = OzoneManagerProtocolProtos.DBTableUpdate.newBuilder();
@@ -251,30 +281,81 @@ public class LeaderRequestExecutor {
       sendList.add(ctx);
     }
     if (sendList.size() > 0) {
-      prepareAndSendRequest(sendList, reqBuilder);
+      appendBucketQuotaChanges(reqBuilder, bucketChangeMap);
+      prepareAndSendRequest(sendList, reqBuilder, nxtPool);
+    }
+  }
+
+  private void ratisSubmit(RatisContext ctx) throws InterruptedException {
+    // follow simple strategy to submit to ratis for next set of merge request
+    int nxtIndex = Math.abs(ratisCurrentPool.getAndIncrement() % RATIS_TASK_POOL_SIZE);
+    ratisSubmitter.submit(nxtIndex, ctx);
+  }
+
+  private void addBucketQuotaChanges(
+      RequestContext ctx, Map<Long, OzoneManagerProtocolProtos.BucketQuotaCount.Builder> quotaMap) {
+    if (ctx.getClientRequest().getWrappedBucketInfo() instanceof OmBucketInfoQuotaTracker) {
+      OmBucketInfoQuotaTracker info = (OmBucketInfoQuotaTracker) ctx.getClientRequest().getWrappedBucketInfo();
+      OzoneManagerProtocolProtos.BucketQuotaCount.Builder quotaBuilder = quotaMap.computeIfAbsent(
+          info.getObjectID(), k -> OzoneManagerProtocolProtos.BucketQuotaCount.newBuilder()
+              .setVolName(info.getVolumeName()).setBucketName(info.getBucketName())
+              .setBucketObjectId(info.getObjectID()).setSupportOldQuota(false));
+      quotaBuilder.setDiffUsedBytes(quotaBuilder.getDiffUsedBytes() + info.getIncUsedBytes());
+      quotaBuilder.setDiffUsedNamespace(quotaBuilder.getDiffUsedNamespace() + info.getIncUsedNamespace());
+    }
+  }
+
+  private void appendBucketQuotaChanges(
+      OzoneManagerProtocolProtos.PersistDbRequest.Builder req,
+      Map<Long, OzoneManagerProtocolProtos.BucketQuotaCount.Builder> quotaMap) {
+    for (Map.Entry<Long, OzoneManagerProtocolProtos.BucketQuotaCount.Builder> entry : quotaMap.entrySet()) {
+      if (entry.getValue().getDiffUsedBytes() == 0 && entry.getValue().getDiffUsedNamespace() == 0) {
+        continue;
+      }
+      req.addBucketQuotaCount(entry.getValue().build());
     }
   }
 
   private void prepareAndSendRequest(
-      List<RequestContext> sendList, OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder) {
+      List<RequestContext> sendList, OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder,
+      PoolExecutor.CheckedConsumer<RatisContext> nxtPool) {
     RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
     OMRequest.Builder omReqBuilder = OMRequest.newBuilder().setPersistDbRequest(reqBuilder.build())
         .setCmdType(OzoneManagerProtocolProtos.Type.PersistDb)
         .setClientId(lastReqCtx.getRequest().getClientId());
+    OMRequest reqBatch = omReqBuilder.build();
     try {
-      OMRequest reqBatch = omReqBuilder.build();
-      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getIndex());
-      if (!dbUpdateRsp.getSuccess()) {
-        throw new OMException(dbUpdateRsp.getMessage(),
-            OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
-      }
-      handleBatchUpdateComplete(sendList, null, dbUpdateRsp.getLeaderOMNodeId());
-    } catch (Throwable e) {
-      LOG.warn("Failed to write, Exception occurred ", e);
+      nxtPool.accept(new RatisContext(sendList, reqBatch));
+    } catch (InterruptedException e) {
       handleBatchUpdateComplete(sendList, e, null);
+      Thread.currentThread().interrupt();
     }
   }
 
+  private void ratisCommand(Collection<RatisContext> ctxs, PoolExecutor.CheckedConsumer<Void> nxtPool) {
+    if (!isEnabled.get()) {
+      for (RatisContext ctx : ctxs) {
+        rejectRequest(ctx.getRequestContexts());
+      }
+      return;
+    }
+    for (RatisContext ctx : ctxs) {
+      List<RequestContext> sendList = ctx.getRequestContexts();
+      RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
+      OMRequest reqBatch = ctx.getRequest();
+      try {
+        OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getIndex());
+        if (!dbUpdateRsp.getSuccess()) {
+          throw new OMException(dbUpdateRsp.getMessage(),
+              OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
+        }
+        handleBatchUpdateComplete(sendList, null, dbUpdateRsp.getLeaderOMNodeId());
+      } catch (Throwable e) {
+        LOG.warn("Failed to write, Exception occurred ", e);
+        handleBatchUpdateComplete(sendList, e, null);
+      }
+    }
+  }
   private OMResponse sendDbUpdateRequest(OMRequest nextRequest, TermIndex termIndex) throws Exception {
     try {
       if (!ozoneManager.isRatisEnabled()) {
@@ -300,28 +381,9 @@ public class LeaderRequestExecutor {
     return omResponse;
   }
   private void handleBatchUpdateComplete(Collection<RequestContext> ctxs, Throwable th, String leaderOMNodeId) {
+    // TODO: no-cache switch, no need cleanup cache
     Map<String, List<Long>> cleanupMap = new HashMap<>();
     for (RequestContext ctx : ctxs) {
-      if (th != null) {
-        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getClientRequest(), ozoneManager,
-            ctx.getIndex(), th);
-        if (th instanceof IOException) {
-          ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
-        } else {
-          ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
-        }
-
-        // TODO: no-cache, remove disable processing, let every request deal with ratis failure
-        disableProcessing();
-      } else {
-        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getIndex());
-        OMResponse newRsp = ctx.getResponse();
-        if (leaderOMNodeId != null) {
-          newRsp = OMResponse.newBuilder(newRsp).setLeaderOMNodeId(leaderOMNodeId).build();
-        }
-        ctx.getFuture().complete(newRsp);
-      }
-
       // cache cleanup
       if (null != ctx.getNextRequest()) {
         List<OzoneManagerProtocolProtos.DBTableUpdate> tblList = ctx.getNextRequest().getTableUpdatesList();
@@ -330,10 +392,50 @@ public class LeaderRequestExecutor {
           epochs.add(ctx.getIndex().getIndex());
         }
       }
+      for (Map.Entry<String, List<Long>> entry : cleanupMap.entrySet()) {
+        ozoneManager.getMetadataManager().getTable(entry.getKey()).cleanupCache(entry.getValue());
+      }
     }
-    // TODO: no-cache, no need cleanup cache
-    for (Map.Entry<String, List<Long>> entry : cleanupMap.entrySet()) {
-      ozoneManager.getMetadataManager().getTable(entry.getKey()).cleanupCache(entry.getValue());
+
+    for (RequestContext ctx : ctxs) {
+      if (ctx.getClientRequest().getWrappedBucketInfo() instanceof OmBucketInfoQuotaTracker) {
+        // reset to be done to update resource quota for both success and failure
+        // for success also, its added here as it's difficult to ensure its execution at nodes
+        ((OmBucketInfoQuotaTracker) ctx.getClientRequest().getWrappedBucketInfo()).reset();
+      }
+
+      if (th != null) {
+        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getClientRequest(), ozoneManager,
+            ctx.getIndex(), th);
+        if (th instanceof IOException) {
+          ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
+        } else {
+          ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
+        }
+      } else {
+        OMAuditLogger.log(ctx.getClientRequest().getAuditBuilder(), ctx.getIndex());
+        OMResponse newRsp = ctx.getResponse();
+        if (leaderOMNodeId != null) {
+          newRsp = OMResponse.newBuilder(newRsp).setLeaderOMNodeId(leaderOMNodeId).build();
+        }
+        ctx.getFuture().complete(newRsp);
+      }
+    }
+  }
+
+  static class RatisContext {
+    private List<RequestContext> ctxs;
+    private OMRequest req;
+    RatisContext(List<RequestContext> ctxs, OMRequest req) {
+      this.ctxs = ctxs;
+      this.req = req;
+    }
+    public List<RequestContext> getRequestContexts() {
+      return ctxs;
+    }
+
+    public OMRequest getRequest() {
+      return req;
     }
   }
 }

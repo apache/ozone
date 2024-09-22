@@ -28,29 +28,29 @@ import java.util.function.BiConsumer;
 /**
  * Pool executor.
  */
-public class PoolExecutor <T> {
+public class PoolExecutor <T, Q> {
   private Thread[] threadPool;
   private List<BlockingQueue<T>> queues;
-  private BiConsumer<Collection<T>, PoolExecutor<T>> handler = null;
-  private PoolExecutor<T> nxtPool;
+  private BiConsumer<Collection<T>, CheckedConsumer<Q>> handler = null;
+  private CheckedConsumer<Q> submitter;
   private AtomicBoolean isRunning = new AtomicBoolean(true);
 
   private PoolExecutor(int poolSize, int queueSize, String threadPrefix) {
     threadPool = new Thread[poolSize];
     queues = new ArrayList<>(poolSize);
     for (int i = 0; i < poolSize; ++i) {
-      LinkedBlockingQueue<T> queue = new LinkedBlockingQueue<>(1000);
+      LinkedBlockingQueue<T> queue = new LinkedBlockingQueue<>(queueSize);
       queues.add(queue);
-      threadPool[i] = new Thread(() -> execute(queue), threadPrefix + "OMExecutor-" + i);
+      threadPool[i] = new Thread(() -> execute(queue), threadPrefix + "-" + i);
       threadPool[i].start();
     }
   }
   public PoolExecutor(
-      int poolSize, int queueSize, String threadPrefix, BiConsumer<Collection<T>, PoolExecutor<T>> handler,
-      PoolExecutor<T> nxtPool) {
+      int poolSize, int queueSize, String threadPrefix, BiConsumer<Collection<T>, CheckedConsumer<Q>> handler,
+      CheckedConsumer<Q> submitter) {
     this(poolSize, queueSize, threadPrefix);
     this.handler = handler;
-    this.nxtPool = nxtPool;
+    this.submitter = submitter;
   }
   public void submit(int idx, T task) throws InterruptedException {
     if (idx < 0 || idx >= threadPool.length) {
@@ -66,7 +66,7 @@ public class PoolExecutor <T> {
         T task = q.take();
         entries.add(task);
         q.drainTo(entries);
-        handler.accept(entries, nxtPool);
+        handler.accept(entries, submitter);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
@@ -83,5 +83,13 @@ public class PoolExecutor <T> {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  /**
+   * checked functional interface.
+   */
+  @FunctionalInterface
+  public interface CheckedConsumer<S> {
+    void accept(S s) throws InterruptedException;
   }
 }

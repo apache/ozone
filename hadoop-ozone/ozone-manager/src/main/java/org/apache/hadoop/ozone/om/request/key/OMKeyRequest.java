@@ -60,6 +60,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
+import org.apache.hadoop.ozone.om.ratis.execution.BucketQuotaResource;
+import org.apache.hadoop.ozone.om.ratis.execution.OmBucketInfoQuotaTracker;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
@@ -113,6 +115,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+  private OmBucketInfo wrappedBucketInfo = null;
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
@@ -707,8 +710,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     CacheValue<OmBucketInfo> value = omMetadataManager.getBucketTable()
         .getCacheValue(new CacheKey<>(bucketKey));
+    OmBucketInfo cachedBucketInfo = value != null ? value.getCacheValue() : null;
+    if (null != cachedBucketInfo && BucketQuotaResource.instance().isEnabledTrack()) {
+      wrappedBucketInfo = OmBucketInfoQuotaTracker.convert(cachedBucketInfo);
+      return wrappedBucketInfo;
+    }
+    return cachedBucketInfo;
+  }
 
-    return value != null ? value.getCacheValue() : null;
+  @Override
+  public OmBucketInfo getWrappedBucketInfo() {
+    return wrappedBucketInfo;
   }
 
   /**

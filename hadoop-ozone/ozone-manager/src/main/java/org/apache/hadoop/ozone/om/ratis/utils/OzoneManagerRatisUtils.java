@@ -514,12 +514,11 @@ public final class OzoneManagerRatisUtils {
 
   public static OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
+    if (om.isLeaderExecutorEnabled()) {
+      return om.getOMGateway().submit(omRequest);
+    }
     if (om.isRatisEnabled()) {
-      if (om.isLeaderExecutorEnabled()) {
-        return om.getOMGateway().submit(omRequest);
-      } else {
-        return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
-      }
+      return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
     } else {
       return om.getOmServerProtocol().submitRequest(NULL_RPC_CONTROLLER, omRequest);
     }

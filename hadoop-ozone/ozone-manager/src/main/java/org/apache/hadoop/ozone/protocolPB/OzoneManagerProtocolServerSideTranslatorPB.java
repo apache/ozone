@@ -302,7 +302,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws ServiceException {
     final OMClientResponse omClientResponse;
     try {
       if (OmUtils.isReadOnly(request)) {
@@ -316,6 +316,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           // log only when audit build is complete as required
           OMAuditLogger.log(omClientRequest.getAuditBuilder());
           throw ex;
+        }
+        if (ozoneManager.isLeaderExecutorEnabled()) {
+          return submitRequestToRatis(request);
         }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
         omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);

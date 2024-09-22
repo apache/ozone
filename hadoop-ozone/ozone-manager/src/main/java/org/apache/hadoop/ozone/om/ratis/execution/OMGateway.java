@@ -18,26 +18,20 @@ package org.apache.hadoop.ozone.om.ratis.execution;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ipc.ProcessingDetails;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
+import org.apache.hadoop.ozone.om.lock.OmRequestLockUtils;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -46,7 +40,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +52,7 @@ public class OMGateway {
   private final FollowerRequestExecutor followerExecutor;
   private final OzoneManager om;
   private final AtomicLong requestInProgress = new AtomicLong(0);
+  private final AtomicInteger leaderExecCurrIdx = new AtomicInteger(0);
   /**
    * uniqueIndex is used to generate index used in objectId creation uniquely accross OM nodes.
    * This makes use of termIndex for init shifted within 54 bits.
@@ -67,6 +61,8 @@ public class OMGateway {
 
   public OMGateway(OzoneManager om) throws IOException {
     this.om = om;
+    OmLockOpr.init(om.getThreadNamePrefix());
+    OmRequestLockUtils.init();
     this.leaderExecutor = new LeaderRequestExecutor(om, uniqueIndex);
     this.followerExecutor = new FollowerRequestExecutor(om, uniqueIndex);
     if (om.isLeaderExecutorEnabled() && om.isRatisEnabled()) {
@@ -84,17 +80,22 @@ public class OMGateway {
       // for non-ratis flow, init with last index
       uniqueIndex.set(om.getLastTrxnIndexForNonRatis());
     }
+    if (om.isLeaderExecutorEnabled()) {
+      BucketQuotaResource.instance().enableTrack();
+    }
   }
   public void stop() {
     leaderExecutor.stop();
     followerExecutor.stop();
+    OmLockOpr.stop();
   }
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
     if (!om.isLeaderReady()) {
-      String peerId = om.isRatisEnabled() ? om.getOmRatisServer().getRaftPeerId().toString() : om.getOMNodeId();
-      OMLeaderNotReadyException leaderNotReadyException = new OMLeaderNotReadyException(peerId
-          + " is not ready to process request yet.");
-      throw new ServiceException(leaderNotReadyException);
+      try {
+        om.checkLeaderStatus();
+      } catch (IOException e) {
+        throw new ServiceException(e);
+      }
     }
     executorEnable();
     RequestContext requestContext = new RequestContext();
@@ -103,40 +104,73 @@ public class OMGateway {
     requestContext.setFuture(new CompletableFuture<>());
     CompletableFuture<OMResponse> f = requestContext.getFuture()
         .whenComplete((r, th) -> handleAfterExecution(requestContext, th));
+    OmLockOpr lockOperation = OmRequestLockUtils.getLockOperation(om, omRequest);
     try {
-      // TODO gateway locking: take lock with OMLockDetails
       // TODO scheduling of request to pool
-      om.checkLeaderStatus();
-      validate(omRequest);
       OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, om);
+      lockOperation.lock(om);
       requestContext.setClientRequest(omClientRequest);
+
+      validate(omRequest);
+      ensurePreviousRequestCompletionForPrepare(omRequest);
 
       // submit request
       ExecutorType executorType = executorSelector(omRequest);
       if (executorType == ExecutorType.LEADER_COMPATIBLE) {
-        leaderExecutor.submit(0, requestContext);
+        int idx = Math.abs(leaderExecCurrIdx.getAndIncrement() % leaderExecutor.batchSize());
+        leaderExecutor.submit(idx, requestContext);
       } else if (executorType == ExecutorType.FOLLOWER) {
         followerExecutor.submit(0, requestContext);
       } else {
         leaderExecutor.submit(0, requestContext);
       }
+
+      try {
+        return f.get();
+      } catch (ExecutionException ex) {
+        if (ex.getCause() != null) {
+          throw new ServiceException(ex.getMessage(), ex.getCause());
+        } else {
+          throw new ServiceException(ex.getMessage(), ex);
+        }
+      }
     } catch (InterruptedException e) {
-      requestContext.getFuture().completeExceptionally(e);
+      LOG.error("Interrupted while handling request", e);
       Thread.currentThread().interrupt();
+      throw new ServiceException(e.getMessage(), e);
+    } catch (ServiceException e) {
+      throw e;
     } catch (Throwable e) {
-      requestContext.getFuture().completeExceptionally(e);
-    }
-    try {
-      return f.get();
-    } catch (ExecutionException ex) {
-      throw new ServiceException(ex.getMessage(), ex);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new ServiceException(ex.getMessage(), ex);
+      LOG.error("Exception occurred while handling request", e);
+      throw new ServiceException(e.getMessage(), e);
+    } finally {
+      lockOperation.unlock();
+      Server.Call call = Server.getCurCall().get();
+      if (null != call) {
+        OMLockDetails lockDetails = lockOperation.getLockDetails();
+        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKWAIT,
+            lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKSHARED,
+            lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKEXCLUSIVE,
+            lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+      }
     }
   }
 
-  private void validate(OMRequest omRequest) throws IOException {
+  private void ensurePreviousRequestCompletionForPrepare(OMRequest omRequest) throws InterruptedException {
+    // if a prepare request, other request will be discarded before calling this
+    if (omRequest.getCmdType() == OzoneManagerProtocolProtos.Type.Prepare) {
+      for (int cnt = 0; cnt < 60 && requestInProgress.get() > 1; ++cnt) {
+        Thread.sleep(1000);
+      }
+      if (requestInProgress.get() > 1) {
+        LOG.warn("Still few requests {} are in progress, continuing with prepare", (requestInProgress.get() - 1));
+      }
+    }
+  }
+
+  private synchronized void validate(OMRequest omRequest) throws IOException {
     OzoneManagerRequestHandler.requestParamValidation(omRequest);
     // validate prepare state
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
@@ -165,14 +199,12 @@ public class OMGateway {
     }
   }
   private void handleAfterExecution(RequestContext ctx, Throwable th) {
-    // TODO: gateway locking: release lock and OMLockDetails update
     requestInProgress.decrementAndGet();
   }
 
   public void leaderChangeNotifier(String newLeaderId) {
     boolean isLeader = om.getOMNodeId().equals(newLeaderId);
     if (isLeader) {
-      cleanupCache();
       resetUniqueIndex();
     } else {
       leaderExecutor.disableProcessing();
@@ -194,77 +226,11 @@ public class OMGateway {
     }
   }
 
-  private void rebuildBucketVolumeCache() throws IOException {
-    LOG.info("Rebuild of bucket and volume cache");
-    Table<String, OmBucketInfo> bucketTable = om.getMetadataManager().getBucketTable();
-    Set<String> cachedBucketKeySet = new HashSet<>();
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> cacheItr = bucketTable.cacheIterator();
-    while (cacheItr.hasNext()) {
-      cachedBucketKeySet.add(cacheItr.next().getKey().getCacheKey());
-    }
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucItr = bucketTable.iterator()) {
-      while (bucItr.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> next = bucItr.next();
-        bucketTable.addCacheEntry(next.getKey(), next.getValue(), -1);
-        cachedBucketKeySet.remove(next.getKey());
-      }
-    }
-
-    // removing extra cache entry
-    for (String key : cachedBucketKeySet) {
-      bucketTable.addCacheEntry(key, -1);
-    }
-
-    Set<String> cachedVolumeKeySet = new HashSet<>();
-    Table<String, OmVolumeArgs> volumeTable = om.getMetadataManager().getVolumeTable();
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> volCacheItr = volumeTable.cacheIterator();
-    while (volCacheItr.hasNext()) {
-      cachedVolumeKeySet.add(volCacheItr.next().getKey().getCacheKey());
-    }
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>> volItr = volumeTable.iterator()) {
-      while (volItr.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> next = volItr.next();
-        volumeTable.addCacheEntry(next.getKey(), next.getValue(), -1);
-        cachedVolumeKeySet.remove(next.getKey());
-      }
-    }
-
-    // removing extra cache entry
-    for (String key : cachedVolumeKeySet) {
-      volumeTable.addCacheEntry(key, -1);
-    }
-  }
-
-  public void cleanupCache() {
-    // TODO no-cache case, no need re-build bucket/volume cache and cleanup of cache
-    LOG.debug("clean all table cache and update bucket/volume with db");
-    for (String tbl : om.getMetadataManager().listTableNames()) {
-      Table table = om.getMetadataManager().getTable(tbl);
-      if (table instanceof TypedTable) {
-        ArrayList<Long> epochs = new ArrayList<>(((TypedTable<?, ?>) table).getCache().getEpochEntries().keySet());
-        if (!epochs.isEmpty()) {
-          table.cleanupCache(epochs);
-        }
-      }
-    }
-    try {
-      rebuildBucketVolumeCache();
-    } catch (IOException e) {
-      // retry once, else om down
-      try {
-        rebuildBucketVolumeCache();
-      } catch (IOException ex) {
-        String errorMessage = "OM unable to access rocksdb, terminating OM. Error " + ex.getMessage();
-        ExitUtils.terminate(1, errorMessage, ex, LOG);
-      }
-    }
-  }
   public void executorEnable() throws ServiceException {
     if (leaderExecutor.isProcessing()) {
       return;
     }
     if (requestInProgress.get() == 0) {
-      cleanupCache();
       leaderExecutor.enableProcessing();
     } else {
       LOG.warn("Executor is not enabled, previous request {} is still not cleaned", requestInProgress.get());
