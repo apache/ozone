@@ -3206,7 +3206,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "{__name__=\"jvm_metrics_threads_new\", context=\"jvm\", hostname=\"{hostname}\", instance=\"{hostname}:9876\", job=\"ozone\", processname=\"StorageContainerManager\", sessionid=\"null\"}"
+                  "{__name__=\"jvm_metrics_threads_new\", context=\"jvm\", hostname=\"{{hostname}}\", instance=\"{{hostname}}:9876\", job=\"ozone\", processname=\"StorageContainerManager\", sessionid=\"null\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -3733,7 +3733,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "{__name__=\"jvm_metrics_threads_new\", context=\"jvm\", hostname=\"ccycloud-1.renkoike.root.comops.site\", instance=\"ccycloud-1.renkoike.root.comops.site:9876\", job=\"ozone\", processname=\"StorageContainerManager\", sessionid=\"null\"}"
+                  "{__name__=\"jvm_metrics_threads_new\", context=\"jvm\", hostname=\"{{hostname}}\", instance=\"{{hostname}}:9876\", job=\"ozone\", processname=\"StorageContainerManager\", sessionid=\"null\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
