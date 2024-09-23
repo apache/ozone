@@ -243,7 +243,7 @@ public class ContainerController {
    * @return number of containers.
    */
   public long getContainerCount(HddsVolume volume) {
-    return containerSet.getContainerCount(volume);
+    return containerSet.containerCount(volume);
   }
 
   void updateDataScanTimestamp(long containerId, Instant timestamp)
