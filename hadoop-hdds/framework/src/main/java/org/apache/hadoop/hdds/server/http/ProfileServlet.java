@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * curl "http://localhost:10002/prof"
  * - To collect 1 minute CPU profile of current process and output in tree
  * format (html)
- * curl "http://localhost:10002/prof?output=tree&duration=60"
+ * curl {@literal "http://localhost:10002/prof?output=tree&duration=60"}
  * - To collect 30 second heap allocation profile of current process (returns
  * FlameGraph svg)
  * curl "http://localhost:10002/prof?event=alloc"

@@ -308,7 +308,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * as part of a batch operation.
    * @param batch
    * @param prefix
-   * @return
    */
   void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException;

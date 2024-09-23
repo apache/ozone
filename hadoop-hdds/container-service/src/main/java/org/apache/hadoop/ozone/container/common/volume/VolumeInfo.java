@@ -46,15 +46,15 @@ import org.slf4j.LoggerFactory;
  * - fsCapacity: reported total capacity from local fs.
  * - minVolumeFreeSpace (mvfs) : determines the free space for closing
      containers.This is like adding a few reserved bytes to reserved space.
-     Dn's will send close container action to SCM at this limit & it is
+     Dn's will send close container action to SCM at this limit &amp; it is
      configurable.
 
  *
  *
  * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
- * |<-     capacity                  ->|
+ * |&lt;-     capacity                  -&gt;|
  *              |     fsAvail      |-------other-----------|
- * |<-                   fsCapacity                      ->|
+ * |&lt;-                   fsCapacity                      -&gt;|
  *
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
@@ -80,7 +80,7 @@ import org.slf4j.LoggerFactory;
  * Then it is much simpler, since we don't care about other usage:
  *
  *  |----used----|             (avail)/fsAvail              |
- *  |<-              capacity/fsCapacity                  ->|
+ *  |&lt;-              capacity/fsCapacity                  -&gt;|
  *
  *  We have avail == fsAvail.
  */
@@ -155,7 +155,7 @@ public final class VolumeInfo {
   /**
    * Calculate available space use method A.
    * |----used----|   (avail)   |++++++++reserved++++++++|
-   * |<-     capacity         ->|
+   * |&lt;-     capacity         -&gt;|
    *
    * A) avail = capacity - used
    */

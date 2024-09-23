@@ -68,7 +68,6 @@ public final class ECBlockInputStreamFactoryImpl implements
    *                        know are bad and should not be used.
    * @param repConfig The replication Config
    * @param blockInfo The blockInfo representing the block.
-   * @param verifyChecksum Whether to verify checksums or not.
    * @param xceiverFactory Factory to create the xceiver in the client
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
