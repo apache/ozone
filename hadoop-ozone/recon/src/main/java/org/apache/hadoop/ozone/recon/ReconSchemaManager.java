@@ -41,10 +41,10 @@ import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
  *    - No tables, including `schemaVersionTable`, exist.
  *    - All tables are created with the latest schema version.
  *
- * 2. Upgrade from Older Version:
- *    - All Existing tables (e.g., `UNHEALTHY_CONTAINERS`) are present, but `schemaVersionTable` is missing.
- *    - Indicates an upgrade from a version without schema tracking which was introduced in version 2.0.
- *    - The `schemaVersionTable` is created and all tables are upgraded to the latest version.
+ * 2. Upgrade from Version 0 (pre-versioning):
+ *    - Existing tables (e.g., `UNHEALTHY_CONTAINERS`) are present, but `schemaVersionTable` is missing.
+ *    - Indicates an upgrade from version 0.
+ *    - The `schemaVersionTable` is created, and all tables are upgraded to the latest version.
  *
  * 3. Upgrade with SchemaVersionTable:
  *    - `schemaVersionTable` exists but is outdated.
@@ -68,34 +68,37 @@ public class ReconSchemaManager {
   }
 
   @VisibleForTesting
-  public void createAndUpgradeReconSchema() {
-
-    boolean isUpgrade = areOtherTablesExisting();
-
-    // Initialize all tables
-    initializeAllSchemas();
+  public void createAndUpgradeReconSchema() throws SQLException {
 
     // Fetch current version from the SchemaVersionTable
     String currentVersion = schemaVersionTableManager.getCurrentSchemaVersion();
     String latestVersion = ReconConstants.LATEST_SCHEMA_VERSION;
 
-    // Handle cases where currentVersion is null, indicating schemaVersionTable just got created
+    // Handle cases where schemaVersionTable is missing
     if (currentVersion == null) {
-      if (isUpgrade) {
-        // Case 1: Upgrade from older version where schemaVersionTable was not present
-        LOG.info("Upgrade from older version detected. Setting current schema version to 1.0.");
-        currentVersion = "1.0"; // Set current version to the previous version before schemaVersionTable was introduced
-      } else {
-        // Case 2: Fresh install
-        LOG.info("Fresh installation detected. Setting schema version to latest.");
-        currentVersion = latestVersion;
-      }
+      currentVersion = handleMissingVersion();
+      // Initialize the schema if this is a fresh install or an upgrade from version 0
+      initializeAllSchemas();
     }
 
     // Upgrade schema if necessary
     if (!currentVersion.equals(latestVersion)) {
-      upgradeAllSchemas(currentVersion, latestVersion);
-      // Update the schema version in the version table after migration
+      switch (currentVersion) {
+      case "0":
+        LOG.info("Upgrading from version 0 to version {}", latestVersion);
+        upgradeAllSchemas(currentVersion, latestVersion);
+        break;
+      case "1.0":
+        LOG.info("Upgrading from version 1.0 to version {}", latestVersion);
+        upgradeAllSchemas(currentVersion, latestVersion);
+        break;
+      // Additional cases can be added here as we introduce new versions
+      default:
+        LOG.warn("Unsupported schema version: {}", currentVersion);
+        break;
+      }
+
+      // After migration, update the schemaVersionTable to reflect the latest version
       schemaVersionTableManager.updateSchemaVersion(latestVersion);
     } else {
       LOG.info("Recon Derby Schema is already up to date.");
@@ -111,6 +114,7 @@ public class ReconSchemaManager {
         reconSchemaDefinition.initializeSchema();
       } catch (SQLException e) {
         LOG.error("Error initializing schema: {}", reconSchemaDefinition.getClass().getSimpleName(), e);
+        return;
       }
     }
     LOG.info("All Derby table schemas initialized.");
@@ -126,28 +130,44 @@ public class ReconSchemaManager {
         schemaDefinition.upgradeSchema(currentVersion, latestVersion);
       } catch (SQLException e) {
         LOG.error("Error upgrading schema: {}", schemaDefinition.getClass().getSimpleName(), e);
+        return;
       }
     }
     LOG.info("All schemas upgraded to the latest version: {}", latestVersion);
   }
 
   /**
-   * Checks whether essential tables (other than schemaVersionTable) already exist in the database.
+   * Handle the case where the current schema version is missing from the `schemaVersionTable`.
    *
-   * This method is used to distinguish between an upgrade and a fresh installation scenario.
+   * @param isUpgrade whether or not this is an upgrade from an older version.
+   * @return the assumed current version.
+   */
+  private String handleMissingVersion() {
+    boolean isUpgrade = areOtherTablesExisting();
+    if (isUpgrade) {
+      // Case: Upgrade from version 0 (pre-schema versioning)
+      LOG.info("Detected upgrade from version 0 (pre-versioning). Setting current schema version to 0");
+      return "0";
+    } else {
+      // Case: Fresh install
+      LOG.info("Fresh installation detected. Setting schema version to the latest.");
+      return ReconConstants.LATEST_SCHEMA_VERSION;
+    }
+  }
+
+  /**
+   * Check if essential tables (other than schemaVersionTable) already exist in the database.
    *
-   * - If essential tables (like UNHEALTHY_CONTAINERS) exist but the schemaVersionTable does not
-   *   have any records, it indicates an upgrade from an older version where schemaVersionTable
-   *   was not present.
-   * - If none of the essential tables exist, it indicates a fresh installation, where all tables
-   *   will be created for the first time, including the schemaVersionTable.
+   * This method distinguishes between an upgrade and a fresh install.
+   * - If essential tables (like UNHEALTHY_CONTAINERS) exist but schemaVersionTable does not,
+   *   it indicates an upgrade from version 0 (pre-versioning).
+   * - If none of the essential tables exist, it indicates a fresh installation.
    *
-   * @return true if essential tables already exist (indicating an upgrade), false if not
-   *         (indicating a fresh installation)
+   * @return true if essential tables already exist (indicating an upgrade), false if not (indicating a fresh installation)
    */
   private boolean areOtherTablesExisting() {
     try (Connection conn = schemaVersionTableManager.getDataSource().getConnection()) {
-      // Check if some essential tables, like UNHEALTHY_CONTAINERS, already exist
+      // Check if essential tables, like UNHEALTHY_CONTAINERS, already exist
       return TABLE_EXISTS_CHECK.test(conn, "UNHEALTHY_CONTAINERS");
     } catch (SQLException e) {
       LOG.error("Error checking table existence for upgrade detection", e);

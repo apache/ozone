@@ -6,8 +6,10 @@ import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.name;
 
 public class ReconSchemaVersionTableManager {
@@ -16,12 +18,14 @@ public class ReconSchemaVersionTableManager {
   public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DSLContext dslContext;
   private final DataSource dataSource;
+  private final Connection conn;
 
   @Inject
   public ReconSchemaVersionTableManager(DataSource src) throws
       SQLException {
     this.dataSource = src;
     this.dslContext = DSL.using(dataSource.getConnection());
+    this.conn = dataSource.getConnection();
   }
 
   /**
@@ -31,6 +35,9 @@ public class ReconSchemaVersionTableManager {
    * @throws SQLException if any SQL error occurs.
    */
   public String getCurrentSchemaVersion() {
+    if (!TABLE_EXISTS_CHECK.test(conn, RECON_SCHEMA_VERSION_TABLE_NAME)) {
+      return null;
+    }
     return dslContext.select(DSL.field(name("version_number")))
         .from(RECON_SCHEMA_VERSION_TABLE_NAME)
         .fetchOneInto(String.class);  // Return the version number or null if no entry exists

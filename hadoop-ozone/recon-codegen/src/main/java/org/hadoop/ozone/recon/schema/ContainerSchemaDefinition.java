@@ -73,32 +73,39 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   @Override
   public void initializeSchema() throws SQLException {
-    Connection conn = dataSource.getConnection();
-    dslContext = DSL.using(conn);
-
-    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      createUnhealthyContainersTable();
+    try (Connection conn = dataSource.getConnection()) {
+      dslContext = DSL.using(conn);
+      if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        createUnhealthyContainersTable();
+      }
+    } catch (SQLException e) {
+      LOG.error("Error initializing schema", e);
+      throw e;
     }
   }
 
   @Override
-  public void upgradeSchema(String fromVersion, String toVersion)
-      throws SQLException {
-    Connection conn = dataSource.getConnection();
-    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      return;
-    }
-    // Example upgrade script
-    if (fromVersion.equals("1.0") && toVersion.equals("2.0")) {
-      runMigrationToVersion2(conn);
-      LOG.info("Upgraded schema from version 1.0 to 2.0.");
+  public void upgradeSchema(String fromVersion, String toVersion) throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+      if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        return;
+      }
+      if (fromVersion.equals("0") && toVersion.equals("1.0")) {
+        runMigrationToVersion1(conn);
+        LOG.info("Upgraded schema from version 0 to 1.0.");
+      }
+      // Add more upgrade paths here as needed
+    } catch (SQLException e) {
+      LOG.error("Error upgrading schema", e);
+      throw e;
     }
   }
 
+
   /**
-   * Run the upgrade to version 2.0.
+   * Run the upgrade to version 1.0.
    */
-  private void runMigrationToVersion2(Connection conn) throws SQLException {
+  private void runMigrationToVersion1(Connection conn) throws SQLException {
     // Drop the existing constraint if it exists
     String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
     dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
