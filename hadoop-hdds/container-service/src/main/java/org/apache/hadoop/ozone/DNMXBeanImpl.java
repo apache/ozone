@@ -27,8 +27,9 @@ import org.apache.hadoop.hdds.utils.VersionInfo;
 public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
 
   private String hostName;
-  private String rpcPort;
+  private String clientRpcPort;
   private String httpPort;
+  private String httpsPort;
 
   public DNMXBeanImpl(VersionInfo versionInfo) {
     super(versionInfo);
@@ -40,13 +41,18 @@ public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
   }
 
   @Override
-  public String getRpcPort() {
-    return rpcPort;
+  public String getClientRpcPort() {
+    return clientRpcPort;
   }
 
   @Override
   public String getHttpPort() {
     return httpPort;
+  }
+
+  @Override
+  public String getHttpsPort() {
+    return httpsPort;
   }
 
   public void setHttpPort(String httpPort) {
@@ -57,7 +63,15 @@ public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
     this.hostName = hostName;
   }
 
-  public void setRpcPort(String rpcPort) {
-    this.rpcPort = rpcPort;
+  public void setClientRpcPort(String rpcPort) {
+    this.clientRpcPort = rpcPort;
+  }
+
+  public String getHostName() {
+    return hostName;
+  }
+
+  public void setHttpsPort(String httpsPort) {
+    this.httpsPort = httpsPort;
   }
 }

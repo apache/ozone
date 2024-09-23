@@ -296,15 +296,19 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                  httpServer.getHttpAddress().getPort()));
+          int httpPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP, httpPort));
+          serviceRuntimeInfo.setHttpPort(String.valueOf(httpPort));
         }
+
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                  httpServer.getHttpsAddress().getPort()));
+          int httpsPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
+          serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
-        serviceRuntimeInfo.setHttpPort(String.valueOf(httpServer.getHttpAddress().getPort()));
+
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
@@ -313,7 +317,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
 
-      serviceRuntimeInfo.setRpcPort(String.valueOf(clientProtocolServer.getClientRpcAddress().getPort()));
+      int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
+      serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
 
       // Get admin list
       String starterUser =

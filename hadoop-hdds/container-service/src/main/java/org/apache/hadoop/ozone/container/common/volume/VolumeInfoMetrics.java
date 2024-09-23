@@ -159,10 +159,6 @@ public class VolumeInfoMetrics {
    */
   @Metric("Returns the Container Count of the Volume")
   public long getContainers() {
-    return this.containers;
-  }
-
-  public void setContainers(long count) {
-    this.containers = count;
+    return volume.getContainers();
   }
 }

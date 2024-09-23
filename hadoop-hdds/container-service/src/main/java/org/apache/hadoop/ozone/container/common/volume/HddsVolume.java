@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
@@ -81,6 +82,8 @@ public class HddsVolume extends StorageVolume {
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
+
+  private ContainerController controller;
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
 
@@ -384,6 +387,17 @@ public class HddsVolume extends StorageVolume {
     dbLoaded.set(true);
     LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
         getStorageID());
+  }
+
+  public void setController(ContainerController controller) {
+    this.controller = controller;
+  }
+
+  public long getContainers() {
+    if (controller != null) {
+      return controller.getContainerCount(this);
+    }
+    return 0;
   }
 
   /**
