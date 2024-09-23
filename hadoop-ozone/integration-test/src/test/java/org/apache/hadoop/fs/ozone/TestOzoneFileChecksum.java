@@ -68,9 +68,15 @@ public class TestOzoneFileChecksum {
       true, false
   };
 
-  private static final int[] DATA_SIZES = DoubleStream.of(0.5, 1, 1.5, 2, 7, 8)
-      .mapToInt(mb -> (int) (1024 * 1024 * mb))
+  private static final int[] DATA_SIZES_1 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9)
+      .mapToInt(mb -> (int) (1024 * 1024 * mb) + 510000)
       .toArray();
+
+  private static final int[] DATA_SIZES_2 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9)
+      .mapToInt(mb -> (int) (1024 * 1024 * mb) + 820000)
+      .toArray();
+
+  private int[] dataSizes = new int[DATA_SIZES_1.length + DATA_SIZES_2.length];
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster = null;
@@ -98,6 +104,8 @@ public class TestOzoneFileChecksum {
     fs = FileSystem.get(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    System.arraycopy(DATA_SIZES_1, 0, dataSizes, 0, DATA_SIZES_1.length);
+    System.arraycopy(DATA_SIZES_2, 0, dataSizes, DATA_SIZES_1.length, DATA_SIZES_2.length);
   }
 
   @AfterEach
@@ -139,7 +147,7 @@ public class TestOzoneFileChecksum {
 
     Map<Integer, String> replicatedChecksums = new HashMap<>();
 
-    for (int dataLen : DATA_SIZES) {
+    for (int dataLen : dataSizes) {
       byte[] data = randomAlphabetic(dataLen).getBytes(UTF_8);
 
       try (OutputStream file = adapter.createFile(volumeName + "/"
@@ -170,7 +178,7 @@ public class TestOzoneFileChecksum {
       clientConf.setBoolean(OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
           topologyAware);
       try (FileSystem fsForRead = FileSystem.get(clientConf)) {
-        for (int dataLen : DATA_SIZES) {
+        for (int dataLen : dataSizes) {
           // Compute checksum after failed DNs
           Path parent = new Path("/" + volumeName + "/" + ecBucketName + "/");
           Path ecKey = new Path(parent, "test" + dataLen);
