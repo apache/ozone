@@ -55,10 +55,6 @@ public class BackgroundContainerMetadataScanner extends
     return controller.getContainers().iterator();
   }
 
-  @Override
-  public void recordContainersMetric() {
-  }
-
   @VisibleForTesting
   @Override
   public void scanContainer(Container<?> container)
