@@ -647,7 +647,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   long getBucketId(String volume, String bucket) throws IOException;
 
   /**
-   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * Returns List&lt;{@link BlockGroup}&gt; for a key in the deletedTable.
    * @param deletedKey - key to be purged from the deletedTable
    * @return {@link BlockGroup}
    */

@@ -623,7 +623,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
-   * @paran metadataManager
+   * @param metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException

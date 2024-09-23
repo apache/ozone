@@ -121,7 +121,7 @@ public class RootCARotationManager extends StatefulService {
    *                         (1)   (3)(4)
    *                   --------------------------->
    *                         (2)                        scm2(Follower)
-   *    (1) (3)(4)     <---------------------------
+   *    (1) (3)(4)     &lt;---------------------------
    *     -------      |
    *    |        \   |
    *     ----->  scm1(Leader)
@@ -129,7 +129,7 @@ public class RootCARotationManager extends StatefulService {
    *     ------->      \      (1)  (3)(4)
    *                   --------------------------->
    *                          (2)                       scm3(Follower)
-   *                   <---------------------------
+   *                   &lt;---------------------------
    *
    *
    *   (1) Rotation Prepare
