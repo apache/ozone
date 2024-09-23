@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * ContainerManager is responsible for keeping track of all Containers and
  * managing all containers operations like creating, deleting etc.
  */
-public interface ContainerManager extends Closeable, ContainerManagerMXBean {
+public interface ContainerManager extends Closeable {
 
   /**
    * Reinitialize the containerManager with the updated container store.

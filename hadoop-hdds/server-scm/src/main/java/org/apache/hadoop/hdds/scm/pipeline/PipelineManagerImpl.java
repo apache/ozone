@@ -779,11 +779,11 @@ public class PipelineManagerImpl implements PipelineManager {
   public Map<String, Integer> getPipelineInfo() throws NotLeaderException {
     final Map<String, Integer> pipelineInfo = new HashMap<>();
     for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
-      pipelineInfo.put(state.toString().toLowerCase(), 0);
+      pipelineInfo.put(state.toString(), 0);
     }
     stateManager.getPipelines().forEach(pipeline ->
         pipelineInfo.computeIfPresent(
-            pipeline.getPipelineState().toString().toLowerCase(), (k, v) -> v + 1));
+            pipeline.getPipelineState().toString(), (k, v) -> v + 1));
     return pipelineInfo;
   }
 

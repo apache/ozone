@@ -67,7 +67,16 @@
                             closed : "N/A",
                             deleting : "N/A",
                             deleted : "N/A",
-                            recovering : "N/A"
+                            recovering : "N/A",
+                            under_replicated : "N/A",
+                            mis_replicated : "N/A",
+                            over_replicated : "N/A",
+                            missing : "N/A",
+                            unhealthy : "N/A",
+                            empty : "N/A",
+                            open_unhealthy : "N/A",
+                            quasi_closed_stuck : "N/A",
+                            open_without_pipeline : "N/A"
                         }
                     }
                 }
@@ -165,39 +174,38 @@
                     const URLScheme = location.protocol.replace(":" , "");
                     ctrl.scmpipelinemanager = result.data.beans[0];
                     ctrl.scmpipelinemanager.PipelineInfo.forEach(({key, value}) => {
-                        if(key == "closed") {
+                        if(key == "CLOSED") {
                             $scope.statistics.nodes.data.pipeline.closed = value;
-                        } else if(key == "allocated") {
+                        } else if(key == "ALLOCATED") {
                             $scope.statistics.nodes.data.pipeline.allocated = value;
-                        } else if(key == "open") {
+                        } else if(key == "OPEN") {
                             $scope.statistics.nodes.data.pipeline.open = value;
-                        } else if(key == "dormant") {
+                        } else if(key == "DORMANT") {
                             $scope.statistics.nodes.data.pipeline.dormant = value;
                         }
                     });
                 });
 
-            $http.get("jmx?qry=Hadoop:service=ContainerManager,name=SCMContainerManagerInfo")
+            $http.get("jmx?qry=Hadoop:service=StorageContainerManager,name=ReplicationManagerMetrics")
                 .then(function (result) {
                     const URLScheme = location.protocol.replace(":" , "");
                     ctrl.scmcontainermanager = result.data.beans[0];
-                    ctrl.scmcontainermanager.ContainerInfos.forEach(({key, value}) => {
-                        if(key == "open") {
-                            $scope.statistics.nodes.data.container.open = value;
-                        } else if(key == "closing") {
-                            $scope.statistics.nodes.data.container.closing = value;
-                        } else if(key == "quasi_closed") {
-                            $scope.statistics.nodes.data.container.quasi_closed = value;
-                        } else if(key == "closed") {
-                            $scope.statistics.nodes.data.container.closed = value;
-                        } else if(key == "deleting") {
-                            $scope.statistics.nodes.data.container.deleting = value;
-                        } else if(key == "deleted") {
-                            $scope.statistics.nodes.data.container.deleted = value;
-                        } else if(key == "recovering") {
-                            $scope.statistics.nodes.data.container.recovering = value;
-                        }
-                    });
+                    $scope.statistics.nodes.data.container.open = ctrl.scmcontainermanager.OpenContainers;
+                    $scope.statistics.nodes.data.container.closing = ctrl.scmcontainermanager.ClosingContainers;
+                    $scope.statistics.nodes.data.container.quasi_closed = ctrl.scmcontainermanager.QuasiClosedContainers;
+                    $scope.statistics.nodes.data.container.closed = ctrl.scmcontainermanager.ClosedContainers;
+                    $scope.statistics.nodes.data.container.deleting = ctrl.scmcontainermanager.DeletingContainers;
+                    $scope.statistics.nodes.data.container.deleted = ctrl.scmcontainermanager.DeletedContainers;
+                    $scope.statistics.nodes.data.container.recovering = ctrl.scmcontainermanager.RecoveringContainers;
+                    $scope.statistics.nodes.data.container.under_replicated = ctrl.scmcontainermanager.UnderReplicatedContainers;
+                    $scope.statistics.nodes.data.container.mis_replicated = ctrl.scmcontainermanager.MisReplicatedContainers;
+                    $scope.statistics.nodes.data.container.over_replicated = ctrl.scmcontainermanager.OverReplicatedContainers;
+                    $scope.statistics.nodes.data.container.missing = ctrl.scmcontainermanager.MissingContainers;
+                    $scope.statistics.nodes.data.container.unhealthy = ctrl.scmcontainermanager.UnhealthyContainers;
+                    $scope.statistics.nodes.data.container.empty = ctrl.scmcontainermanager.EmptyContainers;
+                    $scope.statistics.nodes.data.container.open_unhealthy = ctrl.scmcontainermanager.OpenUnhealthyContainers;
+                    $scope.statistics.nodes.data.container.quasi_closed_stuck = ctrl.scmcontainermanager.StuckQuasiClosedContainers;
+                    $scope.statistics.nodes.data.container.open_without_pipeline = ctrl.scmcontainermanager.OpenContainersWithoutPipeline;
                 });
 
             /*if option is 'All' display all records else display specified record on page*/
