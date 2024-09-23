@@ -363,7 +363,7 @@ public final class OzoneConsts {
    * contains illegal characters when creating/renaming key.
    *
    * Avoid the following characters in a key name:
-   * "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", Quotation
+   * {@literal "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]"}, Quotation
    * marks and Non-printable ASCII characters (128–255 decimal characters).
    * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
    */
