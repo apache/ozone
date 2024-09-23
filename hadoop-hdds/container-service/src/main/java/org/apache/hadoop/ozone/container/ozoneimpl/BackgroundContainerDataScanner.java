@@ -112,17 +112,7 @@ public class BackgroundContainerDataScanner extends
 
   @Override
   public Iterator<Container<?>> getContainerIterator() {
-    recordContainersMetric();
     return controller.getContainers(volume);
-  }
-
-  @Override
-  public void recordContainersMetric() {
-    long containerCount = controller.getContainerCount(volume);
-    VolumeInfoMetrics volumeInfoStats = volume.getVolumeInfoStats();
-    if (volumeInfoStats != null) {
-      volumeInfoStats.setContainers(containerCount);
-    }
   }
 
   private static void logScanStart(ContainerData containerData) {
