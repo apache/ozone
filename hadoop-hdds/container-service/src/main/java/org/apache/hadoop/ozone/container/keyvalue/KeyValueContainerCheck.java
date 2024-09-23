@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
