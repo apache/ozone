@@ -499,12 +499,4 @@ public class KeyValueContainerCheck {
     containerDataFromDisk.setVolume(volume);
     containerDataFromDisk.setDbFile(KeyValueContainerLocationUtil.getContainerDBFile(containerDataFromDisk));
   }
-
-  /**
-   * Injects a {@link KeyValueContainerData} object into the scan as if this was the data read from disk.
-   */
-  @VisibleForTesting
-  void injectContainerDataFromDisk(KeyValueContainerData containerData) {
-    containerDataFromDisk = containerData;
-  }
 }

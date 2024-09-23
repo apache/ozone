@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -135,80 +137,46 @@ public class TestKeyValueContainerCheck
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  void testKeyValueContainerCheckDeleted(ContainerTestVersionInfo versionInfo)
-      throws Exception {
+  void testKeyValueContainerCheckDeletedContainer(ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
 
-    long containerID = 103;
-    int deletedBlocks = 3;
-    int normalBlocks = 0;
-    OzoneConfiguration conf = getConf();
-    ContainerScannerConfiguration sc = conf.getObject(
-        ContainerScannerConfiguration.class);
-
-    // Create container with deleting blocks
-    KeyValueContainer container = createContainerWithBlocks(containerID,
-        normalBlocks, deletedBlocks, false);
+    KeyValueContainer container = createContainerWithBlocks(3,
+        3, 3, true);
     container.close();
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(getConf(), container);
+    // The full container should exist and pass a scan.
+    ScanResult result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
+    assertTrue(result.isHealthy());
+    assertFalse(result.isDeleted());
 
-    KeyValueContainerData containerData = container.getContainerData();
+    // When a container is not marked for deletion and it has peices missing, the scan should fail.
+    File metadataDir = new File(container.getContainerData().getChunksPath());
+    FileUtils.deleteDirectory(metadataDir);
+    assertFalse(metadataDir.exists());
+    result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
+    assertFalse(result.isHealthy());
+    assertFalse(result.isDeleted());
 
-    // Remove chunks directory to trigger a scanBlock exception
-    File chunksDir = new File(containerData.getChunksPath());
-    assertTrue(chunksDir.exists());
-    assertTrue(new File(containerData.getChunksPath()).delete());
+    // Once the container is marked for deletion, the scan should pass even if some of the internal pieces are missing.
+    // Here the metadata directory has been deleted.
+    container.markContainerForDelete();
+    result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
+    assertTrue(result.isHealthy());
+    assertTrue(result.isDeleted());
+
+    // Now the data directory is deleted.
+    File chunksDir = new File(container.getContainerData().getChunksPath());
+    FileUtils.deleteDirectory(chunksDir);
     assertFalse(chunksDir.exists());
+    result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
+    assertTrue(result.isHealthy());
+    assertTrue(result.isDeleted());
 
-    // Create mockContainerData to scan blocks that are
-    // just about to be deleted.
-    // Then fail because blocks and container has been deleted from disk.
-    KeyValueContainerData mockContainerData = mock(KeyValueContainerData.class);
-    when(mockContainerData.hasSchema(eq(OzoneConsts.SCHEMA_V3)))
-        .thenReturn(containerData.hasSchema(OzoneConsts.SCHEMA_V3));
-    when(mockContainerData.getVolume()).thenReturn(containerData.getVolume());
-    when(mockContainerData.getMetadataPath())
-        .thenReturn(containerData.getMetadataPath());
-    when(mockContainerData.getContainerID())
-        .thenReturn(containerData.getContainerID());
-
-    File mockdbFile = mock(File.class);
-    when(mockdbFile.getAbsolutePath()).thenReturn("");
-    // For Schema V2 mimic container DB deletion during Container Scan.
-    when(mockContainerData.getDbFile()).thenReturn(containerData.getDbFile(),
-        containerData.getDbFile(), mockdbFile);
-
-    when(mockContainerData.getContainerDBType())
-        .thenReturn(containerData.getContainerDBType());
-    when(mockContainerData.getSchemaVersion())
-        .thenReturn(containerData.getSchemaVersion());
-
-    // Mimic the scenario where scanning starts just before
-    // blocks are marked for deletion.
-    // That is, UnprefixedKeyFilter will return blocks
-    // that will soon be deleted.
-    when(mockContainerData.getUnprefixedKeyFilter())
-        .thenReturn(containerData.getDeletingBlockKeyFilter());
-    when(mockContainerData.getLayoutVersion())
-        .thenReturn(containerData.getLayoutVersion());
-    when(mockContainerData.getChunksPath())
-        .thenReturn(containerData.getChunksPath());
-    when(mockContainerData.getBlockKey(anyLong()))
-        .thenAnswer(invocationOnMock -> {
-          return containerData.getBlockKey(invocationOnMock.getArgument(0));
-        });
-    when(mockContainerData.containerPrefix())
-        .thenReturn(containerData.containerPrefix());
-    when(mockContainerData.getBcsIdKey())
-        .thenReturn(containerData.getBcsIdKey());
-
-    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
-    kvCheck.injectContainerDataFromDisk(mockContainerData);
-
-    DataTransferThrottler throttler = new DataTransferThrottler(
-        sc.getBandwidthPerVolume());
-    ScanResult result = kvCheck.fullCheck(throttler, null);
-
-    // A deleted container during a scan still counts as healthy.
+    // Now the whole container directory is gone.
+    File containerDir = new File(container.getContainerData().getContainerPath());
+    FileUtils.deleteDirectory(containerDir);
+    assertFalse(containerDir.exists());
+    result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
     assertTrue(result.isHealthy());
     assertTrue(result.isDeleted());
   }
