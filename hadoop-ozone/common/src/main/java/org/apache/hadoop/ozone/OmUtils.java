@@ -279,6 +279,8 @@ public final class OmUtils {
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
     case GetServerDefaults:
+    case GetQuotaRepairStatus:
+    case StartQuotaRepair:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -331,6 +333,7 @@ public final class OmUtils {
     case DeleteSnapshot:
     case RenameSnapshot:
     case SnapshotMoveDeletedKeys:
+    case SnapshotMoveTableKeys:
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:

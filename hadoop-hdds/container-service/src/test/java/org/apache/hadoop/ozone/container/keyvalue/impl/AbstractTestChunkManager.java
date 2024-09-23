@@ -34,8 +34,13 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.UUID;
@@ -53,6 +58,8 @@ import static org.mockito.Mockito.when;
  * Helpers for ChunkManager implementation tests.
  */
 public abstract class AbstractTestChunkManager {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractTestChunkManager.class);
 
   private HddsVolume hddsVolume;
   private KeyValueContainerData keyValueContainerData;
@@ -126,6 +133,55 @@ public abstract class AbstractTestChunkManager {
     File[] files = dir.listFiles();
     assertNotNull(files);
     assertEquals(expected, files.length);
+  }
+
+  /**
+   * Helper method to check if a file is in use.
+   */
+  public static boolean isFileNotInUse(String filePath) {
+    try {
+      Process process = new ProcessBuilder("fuser", filePath).start();
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), UTF_8))) {
+        String output = reader.readLine();  // If fuser returns no output, the file is not in use
+        if (output == null) {
+          return true;
+        }
+        LOG.debug("File is in use: {}", filePath);
+        return false;
+      } finally {
+        process.destroy();
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to check if file is in use: {}", filePath, e);
+      return false;  // On failure, assume the file is in use
+    }
+  }
+
+  protected boolean checkChunkFilesClosed() {
+    return checkChunkFilesClosed(keyValueContainerData.getChunksPath());
+  }
+
+  /**
+   * check that all files under chunk path are closed.
+  */
+  public static boolean checkChunkFilesClosed(String path) {
+    //As in Setup, we try to create container, these paths should exist.
+    assertNotNull(path);
+
+    File dir = new File(path);
+    assertTrue(dir.exists());
+
+    File[] files = dir.listFiles();
+    assertNotNull(files);
+    for (File file : files) {
+      assertTrue(file.exists());
+      assertTrue(file.isFile());
+      // check that the file is closed.
+      if (!isFileNotInUse(file.getAbsolutePath())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   protected void checkWriteIOStats(long length, long opCount) {

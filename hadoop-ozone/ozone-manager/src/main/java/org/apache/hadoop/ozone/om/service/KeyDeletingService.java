@@ -42,8 +42,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
@@ -67,8 +66,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,6 +92,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
+  private AtomicBoolean isRunningOnAOS;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -114,6 +112,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
+    this.isRunningOnAOS = new AtomicBoolean(false);
   }
 
   /**
@@ -126,10 +125,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
+  public boolean isRunningOnAOS() {
+    return isRunningOnAOS.get();
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask());
+    queue.add(new KeyDeletingTask(this));
     return queue;
   }
 
@@ -172,7 +175,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements BackgroundTask {
+  private final class KeyDeletingTask implements BackgroundTask {
+    private final KeyDeletingService deletingService;
+
+    private KeyDeletingTask(KeyDeletingService service) {
+      this.deletingService = service;
+    }
 
     @Override
     public int getPriority() {
@@ -186,7 +194,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
-
+        isRunningOnAOS.set(true);
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -220,6 +228,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
+      isRunningOnAOS.set(false);
+      synchronized (deletingService) {
+        this.deletingService.notify();
+      }
+
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
     }
@@ -481,24 +494,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     public void submitRequest(OMRequest omRequest, ClientId clientId) {
       try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(getRunCount().get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          getOzoneManager().getOmServerProtocol()
-              .submitRequest(null, omRequest);
-        }
+        OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
       } catch (ServiceException e) {
         LOG.error("Snapshot deep cleaning request failed. " +
             "Will retry at next run.", e);

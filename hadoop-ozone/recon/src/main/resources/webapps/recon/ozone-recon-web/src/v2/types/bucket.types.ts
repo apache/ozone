@@ -17,7 +17,6 @@
  */
 
 import { Acl } from "@/v2/types/acl.types";
-import { Option } from "@/v2/components/select/singleSelect";
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
@@ -68,4 +67,13 @@ export type BucketsState = {
   volumeBucketMap: Map<string, Set<Bucket>>;
   bucketsUnderVolume: Bucket[];
   volumeOptions: MultiOption[];
+}
+
+export type BucketsTableProps = {
+  loading: boolean;
+  data: Bucket[];
+  handleAclClick: (arg0: Bucket) => void;
+  selectedColumns: MultiOption[];
+  searchColumn: 'name' | 'volumeName';
+  searchTerm: string;
 }

@@ -19,12 +19,18 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +41,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -113,5 +120,45 @@ public class TestSnapshotInfo {
     info.setSstFiltered(true);
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
     assertTrue(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
+  }
+
+  @Test
+  public void testLastTransactionInfo() throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    SnapshotInfo info = createSnapshotInfo();
+    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
+    assertNull(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getLastTransactionInfo());
+    // checking if true value is returned when snapshot is null.
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, (SnapshotInfo)null));
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(0, 0));
+    // Checking if changes have been flushed when lastTransactionInfo is null
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, info));
+    TermIndex termIndex = TermIndex.valueOf(1, 1);
+    info.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+    // Checking if changes to snapshot object has been updated but not updated on cache or disk.
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+    snapshotInfo.addCacheEntry(new CacheKey<>(EXPECTED_SNAPSHOT_KEY), CacheValue.get(termIndex.getIndex(), info));
+
+    assertEquals(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getLastTransactionInfo(), info.getLastTransactionInfo());
+
+    // Checking if changes have not been flushed when snapshot last transaction info is behind OmTransactionTable value.
+    assertFalse(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+    omMetadataManager.getTransactionInfoTable().addCacheEntry(new CacheKey<>(OzoneConsts.TRANSACTION_INFO_KEY),
+        CacheValue.get(termIndex.getIndex(), TransactionInfo.valueOf(1, 1)));
+    assertFalse(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+
+    // Checking changes are flushed when transaction is equal.
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY,
+        TransactionInfo.valueOf(1, 1));
+
+
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+    // Checking changes are flushed when transactionIndex is greater .
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(1, 2));
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+    // Checking changes are flushed when both term & transactionIndex is greater.
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(2, 2));
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
   }
 }

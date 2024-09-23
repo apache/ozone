@@ -151,6 +151,9 @@ enum Type {
   ListOpenFiles = 132;
   QuotaRepair = 133;
   GetServerDefaults = 134;
+  GetQuotaRepairStatus = 135;
+  StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
 }
 
 enum SafeMode {
@@ -291,6 +294,9 @@ message OMRequest {
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
   optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
+  optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
+  optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
 }
 
 message OMResponse {
@@ -419,6 +425,8 @@ message OMResponse {
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
   optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
+  optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
+  optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
 
 enum Status {
@@ -880,6 +888,7 @@ message SnapshotInfo {
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
+  optional bytes lastTransactionInfo = 20;
 }
 
 message SnapshotDiffJobProto {
@@ -1974,6 +1983,13 @@ message SnapshotMoveDeletedKeysRequest {
   repeated string deletedDirsToMove = 5;
 }
 
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+}
+
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
@@ -2224,6 +2240,17 @@ message FsServerDefaultsProto {
 
 message ServerDefaultsResponse {
   required FsServerDefaultsProto serverDefaults = 1;
+}
+
+message GetQuotaRepairStatusRequest {
+}
+message GetQuotaRepairStatusResponse {
+    optional string status = 1;
+}
+message StartQuotaRepairRequest {
+    repeated string buckets = 1;
+}
+message StartQuotaRepairResponse {
 }
 
 message OMLockDetailsProto {

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -94,6 +95,9 @@ class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 4, StorageUnit.MB);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 3);
+
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
 
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);

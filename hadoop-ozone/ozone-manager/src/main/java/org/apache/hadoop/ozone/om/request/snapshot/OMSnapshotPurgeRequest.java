@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -104,15 +105,22 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         }
 
         SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, ozoneManager);
+            SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
         // Step 1: Update the deep clean flag for the next active snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
         // Step 2: Update the snapshot chain.
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
-        // Step 3: Purge the snapshot from SnapshotInfoTable cache.
+        // Step 3: Purge the snapshot from SnapshotInfoTable cache and also remove from the map.
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
+        updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
+      }
+
+      for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
+        snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), snapshotInfo));
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos);

@@ -2117,12 +2117,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setGetFileStatusRequest(req)
         .build();
 
-    final GetFileStatusResponse resp;
-    try {
-      resp = handleError(submitRequest(omRequest)).getGetFileStatusResponse();
-    } catch (IOException e) {
-      throw e;
-    }
+    final GetFileStatusResponse resp = handleError(submitRequest(omRequest))
+        .getGetFileStatusResponse();
     return OzoneFileStatus.getFromProtobuf(resp.getStatus());
   }
 
@@ -2577,6 +2573,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return OzoneFsServerDefaults.getFromProtobuf(
         serverDefaultsResponse.getServerDefaults());
+  }
+
+  @Override
+  public String getQuotaRepairStatus() throws IOException {
+    OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest quotaRepairStatusRequest =
+        OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest.newBuilder()
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.GetQuotaRepairStatus)
+        .setGetQuotaRepairStatusRequest(quotaRepairStatusRequest).build();
+
+    OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse quotaRepairStatusResponse
+        = handleError(submitRequest(omRequest)).getGetQuotaRepairStatusResponse();
+    return quotaRepairStatusResponse.getStatus();
+  }
+
+  @Override
+  public void startQuotaRepair(List<String> buckets) throws IOException {
+    OzoneManagerProtocolProtos.StartQuotaRepairRequest startQuotaRepairRequest =
+        OzoneManagerProtocolProtos.StartQuotaRepairRequest.newBuilder()
+            .build();
+    OMRequest omRequest = createOMRequest(Type.StartQuotaRepair)
+        .setStartQuotaRepairRequest(startQuotaRepairRequest).build();
+    handleError(submitRequest(omRequest));
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {
