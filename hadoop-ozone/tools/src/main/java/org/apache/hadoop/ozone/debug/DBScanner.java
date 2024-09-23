@@ -300,7 +300,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         } else {
           Filter filterValue = new Filter(fieldValue[1], fieldValue[2]);
           if (filterValue.getOperator() == null) {
-            err().println("Error: Invalid format for filter \"" + filterValue
+            err().println("Error: Invalid operator for filter \"" + filterValue
                 + "\". <operator> can be one of [EQUALS,LESSER,GREATER]. Ignoring filter passed");
           } else {
             String[] subfields = fieldValue[0].split("\\.");
@@ -380,8 +380,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
   }
 
-  private boolean checkFilteredObject(Object obj, Class<?> clazz, Map<String, Filter> fieldsSplitMap)
-      throws IOException {
+  private boolean checkFilteredObject(Object obj, Class<?> clazz, Map<String, Filter> fieldsSplitMap) {
     for (Map.Entry<String, Filter> field : fieldsSplitMap.entrySet()) {
       try {
         Field valueClassField = getRequiredFieldFromAllFields(clazz, field.getKey());
@@ -463,7 +462,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         exception = true;
         return false;
       } catch (IllegalAccessException e) {
-        err().println("ERROR: Cannot get field from object: " + field);
+        err().println("ERROR: Cannot get field \"" + field + "\" from record.");
         exception = true;
         return false;
       } catch (Exception ex) {
@@ -495,6 +494,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       }
     }
     if (classField == null) {
+      err().println("Error: Invalid field \"" + fieldName + "\" passed for filter");
       throw new NoSuchFieldException();
     }
     classField.setAccessible(true);
