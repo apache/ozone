@@ -61,4 +61,4 @@ ozone.scm.datanode.id.dir | none | 数据节点上用于存储数据节点 ID �
 hdds.datanode.dir | none | 此配置决定数据节点上的数据将存储在本地文件系统的哪个位置。
 hdds.datanode.dir.du.reserved | none | 每个卷保留的存储空间（以字节为单位）。始终为非DFS用途保留这么多空闲空间。
 ozone.metadata.dirs | none | 用于存储持久化数据（RocksDB）的目录。
-ozone.recon.address | 0.0.0.0:9891 | Recon的RPC地址. 使用 <host:port> 连接到Recon.
+ozone.recon.address | 0.0.0.0:9891 | Recon的RPC地址. 使用 <host:port> 连接到Recon。
