@@ -338,10 +338,11 @@ public abstract class TestContainerScannerIntegrationAbstract {
     /**
      * Check that the correct corruption type was written to the container log for the provided container.
      */
-    public void assertLogged(long containerID, LogCapturer logCapturer) {
+    public void assertLogged(long containerID, int numErrors, LogCapturer logCapturer) {
       // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
       // The log will have captured lines from all previous tests as well since we re-use the same cluster.
-      Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + expectedResult.toString());
+      Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Scan result has " + numErrors +
+          " error.*" + expectedResult.toString());
       assertThat(logCapturer.getOutput()).containsPattern(logLine);
     }
 
@@ -367,8 +368,9 @@ public abstract class TestContainerScannerIntegrationAbstract {
         Path path = file.toPath();
         final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
 
-        final byte[] corruptedBytes = new byte[length];
-        ThreadLocalRandom.current().nextBytes(corruptedBytes);
+        // Corrupt the last byte of the last chunk. This should map to a single error from the scanner.
+        final byte[] corruptedBytes = Arrays.copyOf(original, length);
+        corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
 
         Files.write(path, corruptedBytes,
             StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);

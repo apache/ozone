@@ -115,7 +115,7 @@ class TestBackgroundContainerMetadataScannerIntegration
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.
     waitForScmToCloseContainer(openContainerID);
-    corruption.assertLogged(openContainerID, logCapturer);
-    corruption.assertLogged(closedContainerID, logCapturer);
+    corruption.assertLogged(openContainerID, 1, logCapturer);
+    corruption.assertLogged(closedContainerID, 1, logCapturer);
   }
 }

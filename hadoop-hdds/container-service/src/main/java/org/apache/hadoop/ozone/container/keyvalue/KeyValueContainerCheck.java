@@ -435,7 +435,10 @@ public class KeyValueContainerCheck {
       if (layout == ContainerLayoutVersion.FILE_PER_BLOCK) {
         channel.position(chunk.getOffset());
       }
-      for (int i = 0; i < checksumCount; i++) {
+      // Only report one error per chunk. Reporting corruption at every "bytes per checksum" interval will lead to a
+      // large amount of errors when a full chunk is corrupted.
+      boolean chunkHealthy = true;
+      for (int i = 0; i < checksumCount && chunkHealthy; i++) {
         // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
         if (layout == ContainerLayoutVersion.FILE_PER_BLOCK &&
             i == checksumCount - 1 &&
@@ -469,9 +472,12 @@ public class KeyValueContainerCheck {
                   block.getBlockID());
           scanErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK, chunkFile,
               new OzoneChecksumException(message)));
+          chunkHealthy = false;
         }
       }
-      if (bytesRead != chunk.getLen()) {
+      // If all the checksums match, also check that the length stored in the metadata matches the number of bytes
+      // seen on the disk.
+      if (chunkHealthy && bytesRead != chunk.getLen()) {
         String message = String
             .format("Inconsistent read for chunk=%s expected length=%d"
                     + " actual length=%d for block %s",
