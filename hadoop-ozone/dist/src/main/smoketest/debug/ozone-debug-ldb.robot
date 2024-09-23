@@ -74,7 +74,7 @@ Test ozone debug ldb scan
                         Should not contain      ${output}       dataSize
                         Should not contain      ${output}       keyLocationVersions
 
-Test ozone debug ldb scan with filter option
+Test ozone debug ldb scan with filter option success
     # test filter option with one filter
     ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:equals:testfile2"
                         Should not contain      ${output}       testfile1
@@ -110,12 +110,17 @@ Test ozone debug ldb scan with filter option
                         Should not contain      ${output}       testfile1
                         Should not contain      ${output}       testfile2
                         Should not contain      ${output}       testfile3
+
+Test ozone debug ldb scan with filter option failure
     # test filter option with invalid operator
-    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:lesserthan:1200"
-                        Should contain          ${output}           Error: Invalid operator
+    ${output} =         Execute                         ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:lesserthan:1200"
+                        Should contain                  ${output}           Error: Invalid operator
     # test filter option with invalid format
     ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:1200"
                         Should contain                  ${output}           Error: Invalid format
     # test filter option with invalid field
     ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="size:equals:1200"
                         Should contain                  ${output}           Error: Invalid field
+    # test filter option for lesser/greater operator on non-numeric field
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:lesser:k1"
+                        Should contain                  ${output}           only on numeric values
