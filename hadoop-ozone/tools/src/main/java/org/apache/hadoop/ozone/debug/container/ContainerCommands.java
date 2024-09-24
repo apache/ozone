@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
@@ -90,10 +91,15 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @ParentCommand
   private OzoneDebug parent;
 
+  @CommandLine.Option(names = {"--path", "-p"},
+      description = "Specifies the absolute path to the DataNode storage directory " +
+          "that contains container data and metadata. When this option is provided, " +
+          "the specified path will be used instead of the default directory defined " +
+          "in the configuration. Example: --path=/data/hdds")
+  private String dataPath;
+
   @Spec
   private CommandSpec spec;
-
-  private String dataPath;
 
   private MutableVolumeSet volumeSet;
 
@@ -226,9 +232,5 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
   public static void outputContainer(ContainerData data) throws IOException {
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(data));
-  }
-
-  public void setDataPath(String dataPath) {
-    this.dataPath = dataPath;
   }
 }
