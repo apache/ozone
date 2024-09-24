@@ -1610,7 +1610,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
           String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
-          SnapshotInfo previousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
+          // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
+          SnapshotInfo previousSnapshotInfo = bucketInfo == null ? null :
+              SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
               bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
           // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
           // iteration.
@@ -1700,7 +1702,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
             List<OmKeyInfo> notReclaimableKeyInfoList =
                 notReclaimableKeyInfo.getOmKeyInfoList();
-            SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
+            // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
+            SnapshotInfo newPreviousSnapshotInfo = bucketInfo == null ? null :
+                SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
                 bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
             // Check if the previous snapshot in the chain hasn't changed.
             if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
