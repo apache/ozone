@@ -87,7 +87,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
             expectedPreviousSnapshotId);
       }
     } catch (IOException e) {
-      LOG.error("Error occured while performing OMDirectoriesPurge. ", e);
+      LOG.error("Error occurred while performing OmKeyPurge. ", e);
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
 
