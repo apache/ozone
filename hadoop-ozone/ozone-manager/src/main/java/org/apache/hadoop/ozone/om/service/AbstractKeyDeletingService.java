@@ -207,10 +207,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (expectedPreviousSnapshotId != null) {
       expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
     }
-
-    if (expectedPreviousSnapshotId != null) {
-      purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID);
-    }
+    purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
 
     // Add keys to PurgeKeysRequest bucket wise.
     for (Map.Entry<Pair<String, String>, List<String>> entry :
