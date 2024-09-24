@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -97,6 +96,7 @@ import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -249,7 +249,7 @@ public class TestOzoneContainerWithTLS {
              new DNContainerOperationClient(conf, caClient, keyClient)) {
       client = clientManager.acquireClient(pipeline);
       long containerId = createAndCloseContainer(client, containerTokenEnabled);
-      dnClient.getContainerMerkleTree(containerId, dn);
+      dnClient.getContainerChecksumInfo(containerId, dn);
     } finally {
       if (container != null) {
         container.stop();
@@ -275,16 +275,16 @@ public class TestOzoneContainerWithTLS {
       TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), keyClient);
       String containerToken = encode(tokenHelper.getContainerToken(
           ContainerID.valueOf(containerId)));
-      ContainerProtos.GetContainerMerkleTreeResponseProto response =
-          ContainerProtocolCalls.getContainerMerkleTree(client,
+      ContainerProtos.GetContainerChecksumInfoResponseProto response =
+          ContainerProtocolCalls.getContainerChecksumInfo(client,
               containerId, containerToken);
       // Getting container merkle tree with valid container token
-      assertEquals(response.getContainerMerkleTree(), ByteString.EMPTY);
+      assertFalse(response.getContainerChecksumInfo().isEmpty());
 
       // Getting container merkle tree with invalid container token
       XceiverClientSpi finalClient = client;
       StorageContainerException exception = assertThrows(StorageContainerException.class,
-          () -> ContainerProtocolCalls.getContainerMerkleTree(
+          () -> ContainerProtocolCalls.getContainerChecksumInfo(
           finalClient, containerId, "invalidContainerToken"));
       assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, exception.getResult());
     } finally {

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -25,18 +26,25 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -49,9 +57,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.containerChecksumFileExists;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to ensure a container can be closed and its replicas
@@ -65,6 +78,7 @@ public class TestCloseContainer {
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
   private OzoneClient client;
+  public static final Logger LOG = LoggerFactory.getLogger(TestCloseContainer.class);
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -116,7 +130,18 @@ public class TestCloseContainer {
     // Pick any container on the cluster, get its pipeline, close it and then
     // wait for the container to close
     ContainerInfo container = scm.getContainerManager().getContainers().get(0);
+    // Checksum file doesn't exist before container close
+    List<HddsDatanodeService> hddsDatanodes = cluster.getHddsDatanodes();
+    for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
+      assertFalse(containerChecksumFileExists(hddsDatanode, container));
+    }
     OzoneTestUtils.closeContainer(scm, container);
+
+    // Checksum file exists after container close
+    for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
+      assertTrue(containerChecksumFileExists(hddsDatanode, container));
+    }
 
     long originalSeq = container.getSequenceId();
 
@@ -159,11 +184,97 @@ public class TestCloseContainer {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     // Pick any container on the cluster and close it via client
     ContainerInfo container = scm.getContainerManager().getContainers().get(0);
+    // Checksum file doesn't exist before container close
+    List<HddsDatanodeService> hddsDatanodes = cluster.getHddsDatanodes();
+    for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
+      assertFalse(containerChecksumFileExists(hddsDatanode, container));
+    }
+    // Close container
     OzoneTestUtils.closeContainer(scm, container);
+
+    // Checksum file exists after container close
+    for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
+      assertTrue(containerChecksumFileExists(hddsDatanode, container));
+    }
+
     assertThrows(IOException.class,
         () -> cluster.getStorageContainerLocationClient()
             .closeContainer(container.getContainerID()),
         "Container " + container.getContainerID() + " already closed");
   }
 
+  @Test
+  public void testContainerChecksumForClosedContainer() throws Exception {
+    // Create some keys to write data into the open containers
+    TestDataUtil.createKey(bucket, "key1", ReplicationFactor.THREE,
+        ReplicationType.RATIS, "this is the content");
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+
+    ContainerInfo containerInfo1 = scm.getContainerManager().getContainers().get(0);
+    // Checksum file doesn't exist before container close
+    List<HddsDatanodeService> hddsDatanodes = cluster.getHddsDatanodes();
+    for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
+      assertFalse(containerChecksumFileExists(hddsDatanode, containerInfo1));
+    }
+    // Close container.
+    OzoneTestUtils.closeContainer(scm, containerInfo1);
+    ContainerProtos.ContainerChecksumInfo prevExpectedChecksumInfo1 = null;
+    // Checksum file exists after container close and matches the expected container
+    // merkle tree for all the datanodes
+    for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo1), 100, 5000);
+      assertTrue(containerChecksumFileExists(hddsDatanode, containerInfo1));
+      OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
+      Container<?> container1 = ozoneContainer.getController().getContainer(containerInfo1.getContainerID());
+      ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
+              container1.getContainerData());
+      assertNotNull(containerChecksumInfo);
+      if (prevExpectedChecksumInfo1 != null) {
+        ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch(prevExpectedChecksumInfo1.getContainerMerkleTree(),
+            containerChecksumInfo.getContainerMerkleTree());
+      }
+      prevExpectedChecksumInfo1 = containerChecksumInfo;
+    }
+
+    // Create 2nd container and check the checksum doesn't match with 1st container
+    TestDataUtil.createKey(bucket, "key2", ReplicationFactor.THREE,
+        ReplicationType.RATIS, "this is the different content");
+    ContainerInfo containerInfo2 = scm.getContainerManager().getContainers().get(1);
+    for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
+      assertFalse(containerChecksumFileExists(hddsDatanode, containerInfo2));
+    }
+
+    // Close container.
+    OzoneTestUtils.closeContainer(scm, containerInfo2);
+    ContainerProtos.ContainerChecksumInfo prevExpectedChecksumInfo2 = null;
+    // Checksum file exists after container close and matches the expected container
+    // merkle tree for all the datanodes
+    for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo2), 100, 5000);
+      assertTrue(containerChecksumFileExists(hddsDatanode, containerInfo2));
+      OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
+      Container<?> container2 = ozoneContainer.getController().getContainer(containerInfo2.getContainerID());
+      ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
+          container2.getContainerData());
+      assertNotNull(containerChecksumInfo);
+      if (prevExpectedChecksumInfo2 != null) {
+        ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch(prevExpectedChecksumInfo2.getContainerMerkleTree(),
+            containerChecksumInfo.getContainerMerkleTree());
+      }
+      prevExpectedChecksumInfo2 = containerChecksumInfo;
+    }
+
+    // Container merkle tree for different container should not match.
+    assertNotEquals(prevExpectedChecksumInfo1.getContainerID(), prevExpectedChecksumInfo2.getContainerID());
+    assertNotEquals(prevExpectedChecksumInfo1.getContainerMerkleTree().getDataChecksum(),
+        prevExpectedChecksumInfo2.getContainerMerkleTree().getDataChecksum());
+  }
+
+  private boolean checkContainerCloseInDatanode(HddsDatanodeService hddsDatanode,
+                                                ContainerInfo containerInfo) {
+    Container container = hddsDatanode.getDatanodeStateMachine().getContainer().getController()
+            .getContainer(containerInfo.getContainerID());
+    return container.getContainerState() == ContainerProtos.ContainerDataProto.State.CLOSED;
+  }
 }

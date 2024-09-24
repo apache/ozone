@@ -424,6 +424,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case GetContainerChecksumInfo:
       return true;
     case CloseContainer:
     case WriteChunk:

@@ -107,7 +107,7 @@ enum Type {
   StreamWrite = 20;
   FinalizeBlock = 21;
   Echo = 22;
-  GetContainerMerkleTree = 23;
+  GetContainerChecksumInfo = 23;
 }
 
 
@@ -216,7 +216,7 @@ message ContainerCommandRequestProto {
   optional   uint32 version = 24;
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
-  optional   GetContainerMerkleTreeRequestProto getContainerMerkleTree = 27;
+  optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
 }
 
 message ContainerCommandResponseProto {
@@ -248,7 +248,7 @@ message ContainerCommandResponseProto {
   optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
-  optional   GetContainerMerkleTreeResponseProto getContainerMerkleTree = 24;
+  optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
 }
 
 message ContainerDataProto {
@@ -403,13 +403,13 @@ message  EchoResponseProto {
   optional bytes payload = 1;
 }
 
-message GetContainerMerkleTreeRequestProto {
+message GetContainerChecksumInfoRequestProto {
   optional int64 containerID = 1;
 }
 
-message GetContainerMerkleTreeResponseProto {
+message GetContainerChecksumInfoResponseProto {
   optional int64 containerID = 1;
-  optional bytes containerMerkleTree = 2;
+  optional bytes containerChecksumInfo = 2;
 }
 // Chunk Operations
 

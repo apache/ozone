@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -40,6 +41,7 @@ import jakarta.annotation.Nonnull;
 import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,16 +91,33 @@ public class DNContainerOperationClient implements AutoCloseable {
     return xceiverClientManager;
   }
 
-  public ByteString getContainerMerkleTree(long containerId, DatanodeDetails dn)
+  /**
+   * Reads {@link ContainerProtos.ContainerChecksumInfo} for a specified container for the specified datanode.
+   *
+   * @throws IOException For errors communicating with the datanode.
+   * @throws StorageContainerException For errors obtaining the checksum info, including the file being missing or
+   * empty on the datanode, or the datanode not having a replica of the container.
+   * @throws InvalidProtocolBufferException If the file received from the datanode cannot be deserialized.
+   */
+  public ContainerProtos.ContainerChecksumInfo getContainerChecksumInfo(long containerId, DatanodeDetails dn)
       throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(createSingleNodePipeline(dn));
     try {
       String containerToken = encode(tokenHelper.getContainerToken(
           ContainerID.valueOf(containerId)));
-      ContainerProtos.GetContainerMerkleTreeResponseProto response =
-          ContainerProtocolCalls.getContainerMerkleTree(xceiverClient,
+      ContainerProtos.GetContainerChecksumInfoResponseProto response =
+          ContainerProtocolCalls.getContainerChecksumInfo(xceiverClient,
               containerId, containerToken);
-      return response.getContainerMerkleTree();
+      ByteString serializedChecksumInfo = response.getContainerChecksumInfo();
+      // Protobuf will convert an empty ByteString into a default value object. Treat this as an error instead, since
+      // the default value will not represent the state of the container.
+      // The server does not deserialize the file before sending it, so we must check the length on the client.
+      if (serializedChecksumInfo.isEmpty()) {
+        throw new StorageContainerException("Empty Container checksum file for container " + containerId + " received",
+            ContainerProtos.Result.IO_EXCEPTION);
+      } else {
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(serializedChecksumInfo);
+      }
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }
