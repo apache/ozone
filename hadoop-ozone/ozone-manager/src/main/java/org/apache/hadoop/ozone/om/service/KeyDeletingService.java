@@ -265,11 +265,19 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           List<BlockGroup> keysToPurge = new ArrayList<>();
           HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
           SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
-
           // Deep clean only on active snapshot. Deleted Snapshots will be
           // cleaned up by SnapshotDeletingService.
           if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepClean()) {
+            continue;
+          }
+
+          SnapshotInfo prevSnapInfo = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
+              currSnapInfo);
+          if (prevSnapInfo != null &&
+              (prevSnapInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+                  !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
+                  prevSnapInfo))) {
             continue;
           }
 
