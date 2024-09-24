@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -528,11 +526,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     OzoneManager ozoneManager = Mockito.spy(cluster.getOzoneManager());
     OmSnapshotManager omSnapshotManager = Mockito.spy(ozoneManager.getOmSnapshotManager());
-    KeyManager km = Mockito.spy(new KeyManagerImpl(ozoneManager, ozoneManager.getScmClient(), cluster.getConf(),
-        ozoneManager.getPerfMetrics()));
-    when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> {
-      return omSnapshotManager;
-    });
+    when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
         ozoneManager,
         cluster.getConf()));

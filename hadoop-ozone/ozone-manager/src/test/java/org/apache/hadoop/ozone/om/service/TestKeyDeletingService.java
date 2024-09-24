@@ -314,8 +314,6 @@ class TestKeyDeletingService extends OzoneTestBase {
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
           om.getMetadataManager().getDeletedTable();
-      Table<String, OmKeyInfo> keyTable =
-          om.getMetadataManager().getKeyTable(BucketLayout.DEFAULT);
       Table<String, String> renameTable = om.getMetadataManager().getSnapshotRenamedTable();
 
       // Suspend KeyDeletingService
