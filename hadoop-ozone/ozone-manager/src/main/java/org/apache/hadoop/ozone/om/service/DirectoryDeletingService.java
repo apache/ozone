@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -54,7 +53,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -254,12 +252,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           getOzoneManager().getMetadataManager();
       SnapshotInfo previousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
           deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
+      if (previousSnapshotInfo == null) {
+        return false;
+      }
       // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
       // iteration.
-      if (previousSnapshotInfo != null &&
-          (previousSnapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+      if (previousSnapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
               !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
-                  previousSnapshotInfo))) {
+                  previousSnapshotInfo)) {
         return true;
       }
       try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
@@ -290,9 +290,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           //Check the snapshot chain hasn't changed while the checking the previous snapshot.
           SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
-          return Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
-              Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId)) && prevDirInfo != null &&
-              prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
+          return (!Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
+              Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) || (prevDirInfo != null &&
+              prevDirInfo.getObjectID() == deletedDirInfo.getObjectID());
         }
       }
 

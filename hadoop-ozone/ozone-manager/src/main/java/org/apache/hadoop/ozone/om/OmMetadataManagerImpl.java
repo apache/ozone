@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -113,7 +112,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
@@ -1702,25 +1700,22 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
             List<OmKeyInfo> notReclaimableKeyInfoList =
                 notReclaimableKeyInfo.getOmKeyInfoList();
-
-            // If all the versions are not reclaimable, then do nothing.
-            if (notReclaimableKeyInfoList.size() > 0 &&
-                notReclaimableKeyInfoList.size() !=
-                    infoList.getOmKeyInfoList().size()) {
-              keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
-            }
-
-            if (notReclaimableKeyInfoList.size() !=
-                infoList.getOmKeyInfoList().size()) {
-              keyBlocksList.addAll(blockGroupList);
-            }
             SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
                 bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
-            if (!Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
+            // Check if the previous snapshot in the chain hasn't changed.
+            if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
                 Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) {
-              throw new OMException("Snapshot chain has changed while checking for key reference " +
-                  "Previous snapshot in chain : " + previousSnapshotInfo + " new snapshot in chain : " +
-                  newPreviousSnapshotInfo, INTERNAL_ERROR);
+              // If all the versions are not reclaimable, then do nothing.
+              if (notReclaimableKeyInfoList.size() > 0 &&
+                  notReclaimableKeyInfoList.size() !=
+                      infoList.getOmKeyInfoList().size()) {
+                keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
+              }
+
+              if (notReclaimableKeyInfoList.size() !=
+                  infoList.getOmKeyInfoList().size()) {
+                keyBlocksList.addAll(blockGroupList);
+              }
             }
           }
         }

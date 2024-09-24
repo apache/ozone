@@ -144,11 +144,11 @@ public class SnapshotDirectoryCleaningService
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         while (iterator.hasNext()) {
-          SnapshotInfo currSnapInfo = iterator.next().getValue();
+          SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
 
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
-          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
+          if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepCleanedDeletedDir()) {
             continue;
           }

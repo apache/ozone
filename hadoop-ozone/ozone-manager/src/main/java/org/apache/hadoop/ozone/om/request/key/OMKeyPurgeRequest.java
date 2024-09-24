@@ -96,7 +96,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     List<String> keysToBePurgedList = new ArrayList<>();
 
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
-        keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
+      keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
     }
 
     if (keysToBePurgedList.isEmpty()) {

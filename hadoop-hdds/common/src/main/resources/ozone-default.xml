@@ -3745,7 +3745,7 @@
 
   <property>
     <name>ozone.snapshot.deep.cleaning.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
       Flag to enable/disable snapshot deep cleaning.
