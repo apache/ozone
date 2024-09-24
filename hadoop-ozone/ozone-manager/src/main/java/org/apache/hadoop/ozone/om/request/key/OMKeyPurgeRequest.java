@@ -79,10 +79,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       // Checking if this request is an old request or new one.
       if (purgeKeysRequest.hasExpectedPreviousSnapshotID()) {
         // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
-        // directory request invalid on AOS since the deletedDirectory would be in the newly created snapshot. Adding
-        // subdirectories could lead to not being able to reclaim sub-files and subdirectories since the
-        // file/directory would be present in the newly created snapshot.
-        // Validating previous snapshot can ensure the chain hasn't changed.
+        // key request invalid on AOS since the deletedKey would be in the newly created snapshot. This would add an
+        // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
         UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
         validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),

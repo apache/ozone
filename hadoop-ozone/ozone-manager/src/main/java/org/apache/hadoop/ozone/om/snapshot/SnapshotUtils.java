@@ -163,7 +163,8 @@ public final class SnapshotUtils {
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
-      throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
+      throw new OMException("Provided Snapshot Info argument is null. Cannot get the next snapshot for a null value",
+          INVALID_SNAPSHOT_ERROR);
     }
     try {
       if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
@@ -180,7 +181,7 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Get the previous in the snapshot chain.
+   * Get the previous snapshot in the snapshot chain.
    */
   public static SnapshotInfo getPreviousSnapshot(OzoneManager ozoneManager,
                                                  SnapshotChainManager chainManager,
@@ -191,10 +192,9 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Get the previous in the snapshot chain.
+   * Get the previous snapshot in the snapshot chain.
    */
-  public static UUID getPreviousSnapshotId(SnapshotInfo snapInfo,
-                                           SnapshotChainManager chainManager)
+  private static UUID getPreviousSnapshotId(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
       throws IOException {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
@@ -208,10 +208,8 @@ public final class SnapshotUtils {
         return chainManager.previousPathSnapshot(snapInfo.getSnapshotPath(),
             snapInfo.getSnapshotId());
       }
-    } catch (NoSuchElementException ex) {
-      LOG.error("The snapshot {} is not longer in snapshot chain, It " +
-              "maybe removed in the previous Snapshot purge request.",
-          snapInfo.getTableKey());
+    } catch (NoSuchElementException ignored) {
+
     }
     return null;
   }
@@ -321,13 +319,6 @@ public final class SnapshotUtils {
     return false;
   }
 
-  public static SnapshotInfo getLatestGlobalSnapshotInfo(OzoneManager ozoneManager,
-                                                         SnapshotChainManager snapshotChainManager) throws IOException {
-    Optional<UUID> latestGlobalSnapshot  = Optional.ofNullable(snapshotChainManager.getLatestGlobalSnapshotId());
-    return latestGlobalSnapshot.isPresent() ? getSnapshotInfo(ozoneManager, snapshotChainManager,
-        latestGlobalSnapshot.get()) : null;
-  }
-
   public static SnapshotInfo getLatestSnapshotInfo(String volumeName, String bucketName,
                                                    OzoneManager ozoneManager,
                                                    SnapshotChainManager snapshotChainManager) throws IOException {
@@ -349,18 +340,12 @@ public final class SnapshotUtils {
   public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
-    try {
-      UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
-          SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
-      if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
-        throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
-                expectedPreviousSnapshotId + " but was " + previousSnapshotId,
-                OMException.ResultCodes.INVALID_REQUEST);
-      }
-    } catch (IOException e) {
-      LOG.error("Error while validating previous snapshot for snapshot: {}",
-          snapshotInfo == null ? null : snapshotInfo.getName(), e);
-      throw e;
+    UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
+        SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
+    if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
+      throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+          expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+          OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 }
