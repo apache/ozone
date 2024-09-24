@@ -38,7 +38,7 @@ public class ListSubcommand implements Callable<Void> {
   private ContainerCommands parent;
 
   @CommandLine.Option(names = {"--path", "-p"},
-      description = "Specifies the absolute path to the DataNode storage directory " +
+      description = "Show container info of all container replicas on datanode on a given storage directory " +
           "that contains container data and metadata. When this option is provided, " +
           "the specified path override the default path defined " +
           "in the configuration. Example: --path=/data/hdds")
