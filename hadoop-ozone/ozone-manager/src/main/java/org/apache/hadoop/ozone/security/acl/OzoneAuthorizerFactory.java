@@ -42,6 +42,9 @@ public final class OzoneAuthorizerFactory {
    * @return authorizer instance for {@link OzoneManager}
    */
   public static IAccessAuthorizer forOM(OzoneManager om) {
+    if (null != om.getAccessAuthorizer()) {
+      om.setAccessAuthorizer(null);
+    }
     return create(om, om.getKeyManager(), om.getPrefixManager());
   }
 
