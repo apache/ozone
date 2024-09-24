@@ -287,8 +287,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           String prevDbKey = prevDirTableDBKey == null ?
               metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
           OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
-          //Check the snapshot chain hasn't changed while the checking the previous snapshot for the presence of the
-          // deleted directory in the previous snapshot.
+          //Checking if the previous snapshot in the chain hasn't changed while checking if the deleted directory is
+          // present in the previous snapshot. If the chain has changed, the deleted directory could have been moved
+          // to the newly created snapshot.
           SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
           return (!Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),

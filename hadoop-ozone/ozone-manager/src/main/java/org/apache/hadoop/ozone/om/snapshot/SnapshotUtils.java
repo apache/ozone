@@ -200,7 +200,8 @@ public final class SnapshotUtils {
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
-      throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
+      throw new OMException("Provided Snapshot Info argument is null. Cannot get the previous snapshot for a null " +
+          "value", INVALID_SNAPSHOT_ERROR);
     }
     try {
       if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
@@ -334,9 +335,9 @@ public final class SnapshotUtils {
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
 
-  // Validates previous snapshotId given a snapshotInfo or volumeName & bucketName. Incase snapshotInfo is null, this
-  // would be considered as AOS and previous snapshot becomes the latest snapshot in the global snapshot chain.
-  // Would throw OMException if validation fails otherwise function would pass.
+  // Validates the previous path snapshotId for given a snapshotInfo. In case snapshotInfo is
+  // null, the snapshotInfo would be considered as AOS and previous snapshot becomes the latest snapshot in the global
+  // snapshot chain. Would throw OMException if validation fails otherwise function would pass.
   public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
