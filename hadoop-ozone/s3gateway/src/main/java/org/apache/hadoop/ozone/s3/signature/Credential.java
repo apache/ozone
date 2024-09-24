@@ -53,7 +53,7 @@ public class Credential {
    * Sample credential value:
    * Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request
    *
-   * @throws OS3Exception
+   * @throws MalformedResourceException
    */
   @SuppressWarnings("StringSplitter")
   public void parseCredential() throws MalformedResourceException {

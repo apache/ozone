@@ -421,7 +421,7 @@ public class ReconContainerMetadataManagerImpl
    * only for the given limit from the given start key. The start containerID
    * is skipped from the result.
    *
-   * Return all the containers if limit < 0.
+   * Return all the containers if limit &lt; 0.
    *
    * @param limit No of containers to get.
    * @param prevContainer containerID after which the

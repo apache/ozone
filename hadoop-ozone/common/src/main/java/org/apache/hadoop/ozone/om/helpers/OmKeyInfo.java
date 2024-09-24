@@ -360,7 +360,6 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param updateTime if true, updates modification time.
    * @param keepOldVersions if false, old blocks won't be kept
    *                        and the new block versions will always be 0
-   * @throws IOException
    */
   public synchronized long addNewVersion(
       List<OmKeyLocationInfo> newLocationList, boolean updateTime,
