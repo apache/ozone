@@ -324,13 +324,13 @@ public final class SnapshotUtils {
                                                    OzoneManager ozoneManager,
                                                    SnapshotChainManager snapshotChainManager) throws IOException {
     Optional<UUID> latestPathSnapshot = Optional.ofNullable(
-        getLatestSnapshotId(volumeName, bucketName, snapshotChainManager));
+        getLatestPathSnapshotId(volumeName, bucketName, snapshotChainManager));
     return latestPathSnapshot.isPresent() ?
         getSnapshotInfo(ozoneManager, snapshotChainManager, latestPathSnapshot.get()) : null;
   }
 
-  public static UUID getLatestSnapshotId(String volumeName, String bucketName,
-                                         SnapshotChainManager snapshotChainManager) throws IOException {
+  public static UUID getLatestPathSnapshotId(String volumeName, String bucketName,
+                                             SnapshotChainManager snapshotChainManager) throws IOException {
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
