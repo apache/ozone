@@ -252,6 +252,7 @@ share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar
 share/ozone/lib/ratis-server.jar
+share/ozone/lib/ratis-shell.jar
 share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar
@@ -264,6 +265,7 @@ share/ozone/lib/simpleclient_dropwizard.jar
 share/ozone/lib/simpleclient.jar
 share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-reload4j.jar
+share/ozone/lib/slf4j-simple.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
 share/ozone/lib/spring-beans.jar

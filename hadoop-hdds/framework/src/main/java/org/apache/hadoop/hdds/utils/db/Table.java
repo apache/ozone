@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -353,6 +354,24 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       @Override
       public String toString() {
         return "(key=" + key + ", value=" + value + ")";
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (!(obj instanceof KeyValue)) {
+          return false;
+        }
+        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
+        try {
+          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(getKey(), getValue());
       }
     };
   }

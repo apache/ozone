@@ -217,8 +217,8 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   public OzoneManagerDoubleBuffer start() {
-    daemon.start();
     isRunning.set(true);
+    daemon.start();
     return this;
   }
 

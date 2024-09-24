@@ -146,6 +146,8 @@ public class SCMNodeManager implements NodeManager {
   private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
   private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
   private static final String TOTALCAPACITY = "CAPACITY";
+  private static final String DNUUID = "UUID";
+  private static final String VERSION = "VERSION";
   /**
    * Constructs SCM machine Manager.
    */
@@ -447,6 +449,11 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+        } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          LOG.info("Update the version for registered datanode = {}, " +
+              "oldVersion = {}, newVersion = {}.",
+              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -506,6 +513,18 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return ipChanged || hostNameChanged;
+  }
+
+  /**
+   * Check if the version has been updated.
+   *
+   * @param oldVersion datanode oldVersion
+   * @param newVersion datanode newVersion
+   * @return true means replacement is needed, while false means replacement is not needed.
+   */
+  private boolean isVersionChange(String oldVersion, String newVersion) {
+    final boolean versionChanged = !Objects.equals(oldVersion, newVersion);
+    return versionChanged;
   }
 
   /**
@@ -1136,6 +1155,8 @@ public class SCMNodeManager implements NodeManager {
       String nonScmUsedPerc = storagePercentage[1];
       map.put(USEDSPACEPERCENT,
           "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      map.put(DNUUID, dni.getUuidString());
+      map.put(VERSION, dni.getVersion());
       nodes.put(hostName, map);
     }
     return nodes;

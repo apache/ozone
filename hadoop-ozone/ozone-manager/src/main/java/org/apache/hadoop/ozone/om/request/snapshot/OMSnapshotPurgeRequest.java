@@ -105,7 +105,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         }
 
         SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, ozoneManager);
+            SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
         // Step 1: Update the deep clean flag for the next active snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);

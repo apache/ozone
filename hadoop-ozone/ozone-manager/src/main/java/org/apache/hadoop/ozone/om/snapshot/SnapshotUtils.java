@@ -24,8 +24,11 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -33,6 +36,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.HashMap;
 import java.util.Map;
@@ -84,6 +89,13 @@ public final class SnapshotUtils {
           KEY_NOT_FOUND);
     }
     return snapshotInfo;
+  }
+
+  public static SnapshotInfo getSnapshotInfo(OzoneManager ozoneManager,
+                                             SnapshotChainManager chainManager,
+                                             UUID snapshotId) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
   public static void dropColumnFamilyHandle(
@@ -138,37 +150,25 @@ public final class SnapshotUtils {
     }
   }
 
-  /**
-   * Get the next non deleted snapshot in the snapshot chain.
-   */
-  public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OzoneManager ozoneManager)
-      throws IOException {
 
+  /**
+   * Get the next snapshot in the snapshot chain.
+   */
+  public static SnapshotInfo getNextSnapshot(OzoneManager ozoneManager,
+                                             SnapshotChainManager chainManager,
+                                             SnapshotInfo snapInfo)
+      throws IOException {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
       throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
     }
-
     try {
-      while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
+      if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
           snapInfo.getSnapshotId())) {
-
-        UUID nextPathSnapshot =
-            chainManager.nextPathSnapshot(
-                snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
-
-        String tableKey = chainManager.getTableKey(nextPathSnapshot);
-        SnapshotInfo nextSnapshotInfo = getSnapshotInfo(ozoneManager, tableKey);
-
-        if (nextSnapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-          return nextSnapshotInfo;
-        }
-
-        snapInfo = nextSnapshotInfo;
+        UUID nextPathSnapshot = chainManager.nextPathSnapshot(snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+        return getSnapshotInfo(ozoneManager, chainManager, nextPathSnapshot);
       }
     } catch (NoSuchElementException ex) {
       LOG.error("The snapshot {} is not longer in snapshot chain, It " +
@@ -241,5 +241,45 @@ public final class SnapshotUtils {
     final long volumeId = metadataManager.getVolumeId(volumeName);
     final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
+
+  /**
+   * Returns merged repeatedKeyInfo entry with the existing deleted entry in the table.
+   * @param snapshotMoveKeyInfos keyInfos to be added.
+   * @param metadataManager metadataManager for a store.
+   * @return
+   * @throws IOException
+   */
+  public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
+      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws
+      IOException {
+    String dbKey = snapshotMoveKeyInfos.getKey();
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.KeyInfo info : snapshotMoveKeyInfos.getKeyInfosList()) {
+      OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(info);
+      keyInfoList.add(fromProtobuf);
+    }
+    // When older version of keys are moved to the next snapshot's deletedTable
+    // The newer version might also be in the next snapshot's deletedTable and
+    // it might overwrite the existing value which inturn could lead to orphan block in the system.
+    // Checking the keyInfoList with the last n versions of the omKeyInfo versions would ensure all versions are
+    // present in the list and would also avoid redundant additions to the list if the last n versions match, which
+    // can happen on om transaction replay on snapshotted rocksdb.
+    RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
+    if (result == null) {
+      result = new RepeatedOmKeyInfo(keyInfoList);
+    } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
+      keyInfoList.forEach(result::addOmKeyInfo);
+    }
+    return result;
+  }
+
+  private static boolean isSameAsLatestOmKeyInfo(List<OmKeyInfo> omKeyInfos,
+                                                 RepeatedOmKeyInfo result) {
+    int size = result.getOmKeyInfoList().size();
+    if (size >= omKeyInfos.size()) {
+      return omKeyInfos.equals(result.getOmKeyInfoList().subList(size - omKeyInfos.size(), size));
+    }
+    return false;
   }
 }
