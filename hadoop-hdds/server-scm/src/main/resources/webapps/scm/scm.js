@@ -52,32 +52,34 @@
                         scmused : "N/A",
                         remaining : "N/A",
                         nonscmused : "N/A"
+                    }
+                },
+                pipelines : {
+                    closed : "N/A",
+                    allocated : "N/A",
+                    open : "N/A",
+                    dormant : "N/A"
+                },
+                containers : {
+                    lifecycle : {
+                        open : "N/A",
+                        closing : "N/A",
+                        quasi_closed : "N/A",
+                        closed : "N/A",
+                        deleting : "N/A",
+                        deleted : "N/A",
+                        recovering : "N/A"
                     },
-                    data : {
-                        pipeline : {
-                            closed : "N/A",
-                            allocated : "N/A",
-                            open : "N/A",
-                            dormant : "N/A"
-                        },
-                        container : {
-                            open : "N/A",
-                            closing : "N/A",
-                            quasi_closed : "N/A",
-                            closed : "N/A",
-                            deleting : "N/A",
-                            deleted : "N/A",
-                            recovering : "N/A",
-                            under_replicated : "N/A",
-                            mis_replicated : "N/A",
-                            over_replicated : "N/A",
-                            missing : "N/A",
-                            unhealthy : "N/A",
-                            empty : "N/A",
-                            open_unhealthy : "N/A",
-                            quasi_closed_stuck : "N/A",
-                            open_without_pipeline : "N/A"
-                        }
+                    health : {
+                        under_replicated : "N/A",
+                        mis_replicated : "N/A",
+                        over_replicated : "N/A",
+                        missing : "N/A",
+                        unhealthy : "N/A",
+                        empty : "N/A",
+                        open_unhealthy : "N/A",
+                        quasi_closed_stuck : "N/A",
+                        open_without_pipeline : "N/A"
                     }
                 }
             }
@@ -175,13 +177,13 @@
                     ctrl.scmpipelinemanager = result.data.beans[0];
                     ctrl.scmpipelinemanager.PipelineInfo.forEach(({key, value}) => {
                         if(key == "CLOSED") {
-                            $scope.statistics.nodes.data.pipeline.closed = value;
+                            $scope.statistics.pipelines.closed = value;
                         } else if(key == "ALLOCATED") {
-                            $scope.statistics.nodes.data.pipeline.allocated = value;
+                            $scope.statistics.pipelines.allocated = value;
                         } else if(key == "OPEN") {
-                            $scope.statistics.nodes.data.pipeline.open = value;
+                            $scope.statistics.pipelines.open = value;
                         } else if(key == "DORMANT") {
-                            $scope.statistics.nodes.data.pipeline.dormant = value;
+                            $scope.statistics.pipelines.dormant = value;
                         }
                     });
                 });
@@ -190,22 +192,22 @@
                 .then(function (result) {
                     const URLScheme = location.protocol.replace(":" , "");
                     ctrl.scmcontainermanager = result.data.beans[0];
-                    $scope.statistics.nodes.data.container.open = ctrl.scmcontainermanager.OpenContainers;
-                    $scope.statistics.nodes.data.container.closing = ctrl.scmcontainermanager.ClosingContainers;
-                    $scope.statistics.nodes.data.container.quasi_closed = ctrl.scmcontainermanager.QuasiClosedContainers;
-                    $scope.statistics.nodes.data.container.closed = ctrl.scmcontainermanager.ClosedContainers;
-                    $scope.statistics.nodes.data.container.deleting = ctrl.scmcontainermanager.DeletingContainers;
-                    $scope.statistics.nodes.data.container.deleted = ctrl.scmcontainermanager.DeletedContainers;
-                    $scope.statistics.nodes.data.container.recovering = ctrl.scmcontainermanager.RecoveringContainers;
-                    $scope.statistics.nodes.data.container.under_replicated = ctrl.scmcontainermanager.UnderReplicatedContainers;
-                    $scope.statistics.nodes.data.container.mis_replicated = ctrl.scmcontainermanager.MisReplicatedContainers;
-                    $scope.statistics.nodes.data.container.over_replicated = ctrl.scmcontainermanager.OverReplicatedContainers;
-                    $scope.statistics.nodes.data.container.missing = ctrl.scmcontainermanager.MissingContainers;
-                    $scope.statistics.nodes.data.container.unhealthy = ctrl.scmcontainermanager.UnhealthyContainers;
-                    $scope.statistics.nodes.data.container.empty = ctrl.scmcontainermanager.EmptyContainers;
-                    $scope.statistics.nodes.data.container.open_unhealthy = ctrl.scmcontainermanager.OpenUnhealthyContainers;
-                    $scope.statistics.nodes.data.container.quasi_closed_stuck = ctrl.scmcontainermanager.StuckQuasiClosedContainers;
-                    $scope.statistics.nodes.data.container.open_without_pipeline = ctrl.scmcontainermanager.OpenContainersWithoutPipeline;
+                    $scope.statistics.containers.lifecycle.open = ctrl.scmcontainermanager.OpenContainers;
+                    $scope.statistics.containers.lifecycle.closing = ctrl.scmcontainermanager.ClosingContainers;
+                    $scope.statistics.containers.lifecycle.quasi_closed = ctrl.scmcontainermanager.QuasiClosedContainers;
+                    $scope.statistics.containers.lifecycle.closed = ctrl.scmcontainermanager.ClosedContainers;
+                    $scope.statistics.containers.lifecycle.deleting = ctrl.scmcontainermanager.DeletingContainers;
+                    $scope.statistics.containers.lifecycle.deleted = ctrl.scmcontainermanager.DeletedContainers;
+                    $scope.statistics.containers.lifecycle.recovering = ctrl.scmcontainermanager.RecoveringContainers;
+                    $scope.statistics.containers.health.under_replicated = ctrl.scmcontainermanager.UnderReplicatedContainers;
+                    $scope.statistics.containers.health.mis_replicated = ctrl.scmcontainermanager.MisReplicatedContainers;
+                    $scope.statistics.containers.health.over_replicated = ctrl.scmcontainermanager.OverReplicatedContainers;
+                    $scope.statistics.containers.health.missing = ctrl.scmcontainermanager.MissingContainers;
+                    $scope.statistics.containers.health.unhealthy = ctrl.scmcontainermanager.UnhealthyContainers;
+                    $scope.statistics.containers.health.empty = ctrl.scmcontainermanager.EmptyContainers;
+                    $scope.statistics.containers.health.open_unhealthy = ctrl.scmcontainermanager.OpenUnhealthyContainers;
+                    $scope.statistics.containers.health.quasi_closed_stuck = ctrl.scmcontainermanager.StuckQuasiClosedContainers;
+                    $scope.statistics.containers.health.open_without_pipeline = ctrl.scmcontainermanager.OpenContainersWithoutPipeline;
                 });
 
             /*if option is 'All' display all records else display specified record on page*/
