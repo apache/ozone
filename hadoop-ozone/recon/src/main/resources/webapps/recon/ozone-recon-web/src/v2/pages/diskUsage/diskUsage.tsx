@@ -26,19 +26,16 @@ import {
 } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
+import DUMetadata from '@/v2/components/duMetadata/duMetadata';
+import DUPieChart from '@/v2/components/duPieChart/duPieChart';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { byteToSize, showDataFetchError } from '@/utils/common';
+import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
+import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
-import { DUResponse, DUSubpath, PlotData } from '@/v2/types/diskUsage.types';
+import { DUResponse } from '@/v2/types/diskUsage.types';
 
 import './diskUsage.less';
-import DUMetadata from '@/v2/components/duMetadata/duMetadata';
-import EChart from '@/v2/components/eChart/eChart';
-import FileNavBar from '@/v2/components/fileNavbar/fileNavbar';
-
-const OTHER_PATH_NAME = 'Other Objects';
-const MIN_BLOCK_SIZE = 0.05;
 
 const LIMIT_OPTIONS: Option[] = [
   { label: '5', value: '5' },
@@ -60,89 +57,8 @@ const DiskUsage: React.FC<{}> = () => {
     subPaths: [],
     sizeDirectKey: 0
   });
-  const [plotData, setPlotData] = useState<PlotData[]>([]);
 
   const cancelPieSignal = useRef<AbortController>();
-
-  function updatePieData(duResponse: DUResponse) {
-    /**
-     * We need to calculate the size of "Other objects" in two cases:
-     * 
-     *  1) If we have more subpaths listed, than the limit.
-     *  2) If the limit is set to the maximum limit (30) and we have any number of subpaths.
-     *     In this case we won't necessarily have "Other objects", but we check if the
-     *     other objects's size is more than zero (we will have other objects if there are more than 30 subpaths,
-     *     but we can't check on that, as the response will always have
-     *     30 subpaths, but from the total size and the subpaths size we can calculate it).
-     */
-    const dataSize = duResponse.size;
-    let subpaths: DUSubpath[] = duResponse.subPaths;
-
-    let pathLabels: string[] = [];
-    let percentage: string[] = [];
-    let sizeStr: string[];
-    let valuesWithMinBlockSize: number[] = [];
-
-    if (duResponse.subPathCount > Number.parseInt(limit.value)) {
-      // If the subpath count is greater than the provided limit
-      // Slice the subpath to the limit
-      subpaths = subpaths.slice(0, Number.parseInt(limit.value));
-      // Add the size of the subpath
-      const limitedSize = subpaths
-        .map((subpath) => subpath.size)
-        .reduce((acc, curr) => acc + curr, 0);
-      const remainingSize = dataSize - limitedSize;
-      subpaths.push({
-        path: OTHER_PATH_NAME,
-        size: remainingSize,
-        sizeWithReplica: (duResponse.sizeWithReplica === -1)
-          ? -1
-          : duResponse.sizeWithReplica - remainingSize,
-        isKey: false
-      })
-    }
-
-    if (duResponse.subPathCount === 0 || subpaths.length === 0) {
-      // No more subpaths available
-      pathLabels = [duResponse?.path.split('/').pop() ?? ''];
-      valuesWithMinBlockSize = [0.1];
-      percentage = ['100.00'];
-      sizeStr = [byteToSize(dataSize, 1)];
-    } else {
-      pathLabels = subpaths.map(subpath => {
-        const subpathName = subpath.path.split('/').pop() ?? '';
-        // Diferentiate keys by removing trailing slash
-        return (subpath.isKey || subpathName === OTHER_PATH_NAME)
-          ? subpathName
-          : subpathName + '/';
-      });
-
-      let values: number[] = [0];
-      if (dataSize > 0) {
-        values = subpaths.map(
-          subpath => (subpath.size / dataSize)
-        );
-      }
-      const valueClone = structuredClone(values);
-      valuesWithMinBlockSize = valueClone?.map(
-        (val: number) => (val > 0)
-          ? val + MIN_BLOCK_SIZE
-          : val
-      );
-
-      percentage = values.map(value => (value * 100).toFixed(2));
-      sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
-    }
-
-    setPlotData(valuesWithMinBlockSize.map((key, idx) => {
-      return {
-        value: key,
-        name: pathLabels[idx],
-        size: sizeStr[idx],
-        percentage: percentage[idx]
-      } as PlotData
-    }));
-  }
 
   function loadData(path: string) {
     setLoading(true);
@@ -162,7 +78,6 @@ const DiskUsage: React.FC<{}> = () => {
       }
 
       setDUResponse(duResponse);
-      updatePieData(duResponse);
       setLoading(false);
     }).catch(error => {
       setLoading(false);
@@ -178,56 +93,12 @@ const DiskUsage: React.FC<{}> = () => {
     //On mount load default data
     if (duResponse.path === ''){
       loadData('/');
-    } else {
-      //data is loaded, only update the limit change
-      updatePieData(duResponse);
     }
 
     return (() => {
       cancelRequests([cancelPieSignal.current!]);
     })
   }, [limit]);
-
-  const eChartsOptions = {
-    title: {
-      text: `${byteToSize(duResponse.size, 1)} /  ${byteToSize(duResponse.size)}`,
-      left: 'center',
-      top: 'bottom'
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: ({ dataIndex, name, color }) => {
-        const nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
-        const dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>`
-        const percentageEl = `Percentage: ${plotData[dataIndex]['percentage']} %`
-        return `${nameEl}${dataEl}${percentageEl}`
-      }
-    },
-    legend: {
-      top: '10%',
-      orient: 'vertical',
-      left: 'left'
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: '70%',
-        data: plotData.map((value) => {
-          return {
-            value: value.value,
-            name: value.name
-          }
-        }),
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
-      }
-    ]
-  };
 
   return (
     <>
@@ -244,7 +115,7 @@ const DiskUsage: React.FC<{}> = () => {
           showIcon={true}
           closable={false} />
         <div className='content-div'>
-          <FileNavBar
+          <DUBreadcrumbNav
             path={duResponse.path}
             subPaths={duResponse.subPaths}
             updateHandler={loadData} />
@@ -256,10 +127,14 @@ const DiskUsage: React.FC<{}> = () => {
               onChange={handleLimitChange} />
           </div>
           <div className='du-content'>
-            <EChart
+            <DUPieChart
               loading={loading}
-              option={eChartsOptions}
-              style={{ width: '80vw', height: '60vh' }} />
+              limit={Number.parseInt(limit.value)}
+              path={duResponse.path}
+              subPathCount={duResponse.subPathCount}
+              subPaths={duResponse.subPaths}
+              sizeWithReplica={duResponse.sizeWithReplica}
+              size={duResponse.size} />
             <DUMetadata path={duResponse.path} />
           </div>
         </div>

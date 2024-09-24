@@ -31,14 +31,14 @@ type File = {
 };
 
 
-const FileNavBar: React.FC<File> = ({
+const DUBreadcrumbNav: React.FC<File> = ({
   path = '/',
   subPaths = [],
   updateHandler
 }) => {
   const [currPath, setCurrPath] = useState<string[]>([]);
 
-  function generateBreadCrumbMenu() {
+  function generateCurrentPathState() {
     // We are not at root path
     if (path !== '/') {
       /**
@@ -78,12 +78,17 @@ const FileNavBar: React.FC<File> = ({
 
   function generateSubMenu(lastPath: string) {
     const menuItems = subPaths.map((subpath) => {
-      const splitSubpath = subpath.path.split('/');
-      return (
-        <Menu.Item key={subpath.path}>
-          {splitSubpath[splitSubpath.length - 1]}
-        </Menu.Item>
-      )
+      // Do not add any menu item for keys i.e keys cannot be drilled down
+      // further
+      if (!subpath.isKey) {
+        const splitSubpath = subpath.path.split('/');
+        return (
+          <Menu.Item key={subpath.path}>
+            {splitSubpath[splitSubpath.length - 1]}
+          </Menu.Item>
+        );
+      }
+      
     });
     return (
       <Breadcrumb.Item key={lastPath}
@@ -101,7 +106,7 @@ const FileNavBar: React.FC<File> = ({
   }
 
   React.useEffect(() => {
-    generateBreadCrumbMenu()
+    generateCurrentPathState()
   }, [path]); //Anytime the path changes we need to generate the state
 
   function generateBreadCrumbs(){
@@ -139,4 +144,4 @@ const FileNavBar: React.FC<File> = ({
   )
 }
 
-export default FileNavBar;
+export default DUBreadcrumbNav;
