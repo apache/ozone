@@ -273,6 +273,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
+          SnapshotInfo prevSnapInfo = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
+              currSnapInfo);
+          if (prevSnapInfo != null &&
+              (prevSnapInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
+                  !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
+                      prevSnapInfo))) {
+            continue;
+          }
+
           try (ReferenceCounted<OmSnapshot>
               rcCurrOmSnapshot = omSnapshotManager.getSnapshot(
                   currSnapInfo.getVolumeName(),
