@@ -37,7 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Generic factory which stores different instances of Type 'T' sharded by
- * a key &amp; version. A single key can be associated with different versions
+ * a key and version. A single key can be associated with different versions
  * of 'T'.
  * Why does this class exist?
  * A typical use case during upgrade is to have multiple versions of a class
@@ -139,7 +139,7 @@ public class LayoutVersionInstanceFactory<T> {
    * From the list of versioned instances for a given "key", this
    * returns the "floor" value corresponding to the given version.
    * For example, if we have key = "CreateKey",  entry -> [(1, CreateKeyV1),
-   * (3, CreateKeyV2), and if the passed in key = CreateKey &amp; version = 2, we
+   * (3, CreateKeyV2), and if the passed in key = CreateKey and version = 2, we
    * return CreateKeyV1.
    * Since this is a priority queue based implementation, we use a O(1) peek()
    * lookup to get the current valid version.
