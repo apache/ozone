@@ -879,30 +879,27 @@ public final class ContainerProtocolCalls  {
   /**
    * Calls the container protocol to read a chunk.
    *
-   * @param chunk          information about chunk to read
    * @param xceiverClient  client to perform call
    * @param blockID        ID of the block
    * @param validators     functions to validate the response
    * @param token          a token for this block (may be null)
-   * @param verifyChecksum
    * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static ContainerProtos.StreamDataResponseProto readBlock(
-      XceiverClientSpi xceiverClient, long offset, long len, DatanodeBlockID blockID,
+      XceiverClientSpi xceiverClient, long offset, long len, BlockID blockID,
       List<Validator> validators, Token<? extends TokenIdentifier> token,
-      boolean verifyChecksum) throws IOException {
-    ReadBlockRequestProto.Builder readBlockRequest =
+      Map<DatanodeDetails, Integer> replicaIndexes, boolean verifyChecksum) throws IOException {
+    final ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
-            .setBlockID(blockID)
             .setOffset(offset)
             .setVerifyChecksum(verifyChecksum)
             .setLen(len)
             .setVersion(ContainerProtos.ReadChunkVersion.V1);
-    ContainerCommandRequestProto.Builder builder =
+    final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
-            .setContainerID(blockID.getContainerID())
-            .setReadBlock(readBlockRequest);
+            .setContainerID(blockID.getContainerID());
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
@@ -910,16 +907,25 @@ public final class ContainerProtocolCalls  {
 
     return tryEachDatanode(xceiverClient.getPipeline(),
         d -> readBlock(xceiverClient,
-            validators, builder, d),
-        d -> toErrorMessage(BlockID.getFromProtobuf(blockID), d));
+            validators, blockID, builder, readBlockRequest, d, replicaIndexes),
+        d -> toErrorMessage(blockID, d));
   }
 
   private static StreamDataResponseProto readBlock(XceiverClientSpi xceiverClient,
-                                                   List<Validator> validators,
+                                                   List<Validator> validators, BlockID blockID,
                                                    ContainerCommandRequestProto.Builder builder,
-                                                   DatanodeDetails datanode) throws IOException {
+                                                   ReadBlockRequestProto.Builder readBlockBuilder,
+                                                   DatanodeDetails datanode,
+                                                   Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+    final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
+    int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
+    if (replicaIndex > 0) {
+      datanodeBlockID.setReplicaIndex(replicaIndex);
+    }
+    readBlockBuilder.setBlockID(datanodeBlockID);
     final ContainerCommandRequestProto request = builder
-        .setDatanodeUuid(datanode.getUuidString()).build();
+        .setDatanodeUuid(datanode.getUuidString())
+        .setReadBlock(readBlockBuilder).build();
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, validators);
     return response.getStreamData();

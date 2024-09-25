@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -38,6 +39,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static org.apache.hadoop.hdds.DatanodeVersion.STEAM_BLOCK_SUPPORT;
 
 /**
  * Factory class to create various BlockStream instances.
@@ -72,7 +75,6 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
    * @param blockInfo The blockInfo representing the block.
    * @param pipeline The pipeline to be used for reading the block
    * @param token The block Access Token
-   * @param verifyChecksum Whether to verify checksums or not.
    * @param xceiverFactory Factory to create the xceiver in the client
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
@@ -87,7 +89,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
-    } else if (config.isStreamReadBlock()) {
+    } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
       return new StreamBlockInput(
           blockInfo.getBlockID(), blockInfo.getLength(),
           pipeline, token, xceiverFactory, refreshFunction, config);
@@ -96,6 +98,18 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           pipeline, token, xceiverFactory, refreshFunction,
           config);
     }
+  }
+
+  private boolean allDataNodesSupportStreamBlock(Pipeline pipeline) {
+    // return true only if all DataNodes in the pipeline are on a version
+    // that supports for reading a block by streaming chunks..
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (dn.getCurrentVersion() <
+          STEAM_BLOCK_SUPPORT.toProtoValue()) {
+        return false;
+      }
+    }
+    return true;
   }
 
 }

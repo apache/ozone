@@ -44,10 +44,15 @@ abstract class TestInputStreamBase {
 
   protected static MiniOzoneCluster newCluster(
       ContainerLayoutVersion containerLayout) throws Exception {
+    return newCluster(containerLayout, false);
+  }
+  protected static MiniOzoneCluster newCluster(
+      ContainerLayoutVersion containerLayout, boolean streamReadBlock) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
+    config.setStreamReadBlock(streamReadBlock);
     conf.setFromObject(config);
 
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);

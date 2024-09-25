@@ -1352,6 +1352,9 @@ public class KeyValueHandler extends Handler {
 
       BlockID blockID = BlockID.getFromProtobuf(
           readBlock.getBlockID());
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
       BlockData blockData = blockManager.getBlock(kvContainer, blockID);
       List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
       long blockOffset = 0;

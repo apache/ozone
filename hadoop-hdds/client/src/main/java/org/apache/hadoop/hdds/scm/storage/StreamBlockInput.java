@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -53,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -99,7 +99,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
     this.length = length;
     setPipeline(pipeline);
@@ -380,9 +380,15 @@ public class StreamBlockInput extends BlockExtendedInputStream
     releaseBuffers();
   }
 
-  private void setPipeline(Pipeline pipeline) {
+  private void setPipeline(Pipeline pipeline) throws IOException {
     if (pipeline == null) {
       return;
+    }
+    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
+
+    if (replicaIndexes > 1) {
+      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
+          pipeline));
     }
 
     // irrespective of the container state, we will always read via Standalone
@@ -405,8 +411,14 @@ public class StreamBlockInput extends BlockExtendedInputStream
 
   protected synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
-      xceiverClient = xceiverClientFactory.acquireClientForReadData(
-          pipelineRef.get());
+      final Pipeline pipeline = pipelineRef.get();
+      try {
+        xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+      } catch (IOException ioe) {
+        LOG.warn("Failed to acquire client for pipeline {}, block {}",
+            pipeline, blockID);
+        throw ioe;
+      }
     }
   }
 
@@ -547,19 +559,11 @@ public class StreamBlockInput extends BlockExtendedInputStream
   @VisibleForTesting
   protected long readData(long startByteIndex, long len)
       throws IOException {
-    Pipeline pipeline = xceiverClient.getPipeline();
+    Pipeline pipeline = pipelineRef.get();
     buffers = new ArrayList<>();
-    DatanodeBlockID.Builder blockBuilder = DatanodeBlockID
-        .newBuilder().setContainerID(blockID.getContainerID())
-        .setLocalID(blockID.getLocalID())
-        .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    if (replicaIndex > 0) {
-      blockBuilder.setReplicaIndex(replicaIndex);
-    }
     StreamDataResponseProto response =
         ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
-        len, blockBuilder.build(), validators, tokenRef.get(), verifyChecksum);
+        len, blockID, validators, tokenRef.get(), pipeline.getReplicaIndexes(), verifyChecksum);
     List<ReadBlockResponseProto> readBlocks = response.getReadBlockList();
 
     for (ReadBlockResponseProto readBlock : readBlocks) {
@@ -747,18 +751,25 @@ public class StreamBlockInput extends BlockExtendedInputStream
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Unable to read information for block {} from pipeline {}: {}",
+    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
         blockID, pipelineRef.get().getId(), cause.getMessage());
     if (refreshFunction != null) {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
       BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
       if (blockLocationInfo == null) {
-        LOG.debug("No new block location info for block {}", blockID);
+        LOG.warn("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
         setPipeline(blockLocationInfo.getPipeline());
+        LOG.info("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+
         tokenRef.set(blockLocationInfo.getToken());
+        if (blockLocationInfo.getToken() != null) {
+          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
+          LOG.info("A new token is added for block {}. Expiry: {}",
+              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
+        }
       }
     } else {
       throw cause;

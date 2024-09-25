@@ -133,7 +133,7 @@ public class OzoneClientConfig {
       type = ConfigType.BOOLEAN,
       description = "Allow ReadBlock to stream all the readChunk in one request.",
       tags = ConfigTag.CLIENT)
-  private boolean streamReadBlock = false;
+  private boolean streamReadBlock = true;
 
   @Config(key = "max.retries",
       defaultValue = "5",
