@@ -320,8 +320,7 @@ public class ObjectEndpoint extends EndpointBase {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          int bufferLength = length < bufferSize ? (int) length : bufferSize;
-          putLength = IOUtils.copy(digestInputStream, output, bufferLength);
+          putLength = IOUtils.copy(digestInputStream, output, getIOBufferSize(length));
           eTag = DatatypeConverter.printHexBinary(
                   digestInputStream.getMessageDigest().digest())
               .toLowerCase();
@@ -444,8 +443,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
         StreamingOutput output = dest -> {
           try (OzoneInputStream key = keyDetails.getContent()) {
-            int bufferLength = keyDetails.getDataSize() < bufferSize ? (int) keyDetails.getDataSize() : bufferSize;
-            long readLength = IOUtils.copy(key, dest, bufferLength);
+            long readLength = IOUtils.copy(key, dest, getIOBufferSize(keyDetails.getDataSize()));
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }
@@ -468,9 +466,8 @@ public class ObjectEndpoint extends EndpointBase {
         StreamingOutput output = dest -> {
           try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
             ozoneInputStream.seek(startOffset);
-            int bufferLength = copyLength < bufferSize ? (int) copyLength : bufferSize;
             long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
-                copyLength, new byte[bufferLength]);
+                copyLength, new byte[getIOBufferSize(copyLength)]);
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }
@@ -999,9 +996,8 @@ public class ObjectEndpoint extends EndpointBase {
                     partNumber, uploadID)) {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
-              int bufferLength = length < bufferSize ? (int) length : bufferSize;
               copyLength = IOUtils.copyLarge(
-                  sourceObject, ozoneOutputStream, 0, length, new byte[bufferLength]);
+                  sourceObject, ozoneOutputStream, 0, length, new byte[getIOBufferSize(length)]);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
               outputStream = ozoneOutputStream;
@@ -1012,8 +1008,7 @@ public class ObjectEndpoint extends EndpointBase {
                     partNumber, uploadID)) {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
-              int bufferLength = length < bufferSize ? (int) length : bufferSize;
-              copyLength = IOUtils.copy(sourceObject, ozoneOutputStream, bufferLength);
+              copyLength = IOUtils.copy(sourceObject, ozoneOutputStream, getIOBufferSize(length));
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
               outputStream = ozoneOutputStream;
@@ -1029,8 +1024,7 @@ public class ObjectEndpoint extends EndpointBase {
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          int bufferLength = length < bufferSize ? (int) length : bufferSize;
-          putLength = IOUtils.copy(digestInputStream, ozoneOutputStream, bufferLength);
+          putLength = IOUtils.copy(digestInputStream, ozoneOutputStream, getIOBufferSize(length));
           byte[] digest = digestInputStream.getMessageDigest().digest();
           ozoneOutputStream.getMetadata()
               .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
@@ -1184,8 +1178,7 @@ public class ObjectEndpoint extends EndpointBase {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
-        int bufferLength = srcKeyLen < bufferSize ? (int) srcKeyLen : bufferSize;
-        copyLength = IOUtils.copy(src, dest, bufferLength);
+        copyLength = IOUtils.copy(src, dest, getIOBufferSize(srcKeyLen));
         String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(ETAG, eTag);
       }
@@ -1414,5 +1407,19 @@ public class ObjectEndpoint extends EndpointBase {
       return lastPart.matches("\\d+") ? lastPart : null;
     }
     return null;
+  }
+
+  private int getIOBufferSize(long fileLength) {
+    if (bufferSize == 0) {
+      // this is mainly for unit tests as init() will not be called in the unit tests
+      LOG.warn("buffer size is set to {}", IOUtils.DEFAULT_BUFFER_SIZE);
+      bufferSize = IOUtils.DEFAULT_BUFFER_SIZE;
+    }
+    if (fileLength == 0) {
+      // for empty file
+      return bufferSize;
+    } else {
+      return fileLength < bufferSize ? (int) fileLength : bufferSize;
+    }
   }
 }
