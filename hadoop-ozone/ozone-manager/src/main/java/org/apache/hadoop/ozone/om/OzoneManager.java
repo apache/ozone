@@ -874,9 +874,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
-    setAccessAuthorizer(OzoneAuthorizerFactory.forOM(this));
+    accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
-        this, LOG, AUDIT, metrics, this.accessAuthorizer);
+        this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
     rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
@@ -1607,10 +1607,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public IAccessAuthorizer getAccessAuthorizer() {
     return accessAuthorizer;
-  }
-
-  public void setAccessAuthorizer(IAccessAuthorizer accessAuthorizer) {
-    this.accessAuthorizer = accessAuthorizer;
   }
 
   /**
