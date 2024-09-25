@@ -44,11 +44,7 @@ public final class OzoneAuthorizerFactory {
    * @return authorizer instance for {@link OzoneManager}
    */
   public static IAccessAuthorizer forOM(OzoneManager om) {
-    if (null != accessAuthorizer){
-      return accessAuthorizer;
-    }
-    accessAuthorizer = create(om, om.getKeyManager(), om.getPrefixManager());
-    return accessAuthorizer;
+    return create(om, om.getKeyManager(), om.getPrefixManager());
   }
 
   /**
@@ -58,14 +54,9 @@ public final class OzoneAuthorizerFactory {
   public static IAccessAuthorizer forSnapshot(
       OzoneManager om, KeyManager keyManager, PrefixManager prefixManager
   ) {
-    if(om.getAccessAuthorizer().isNative()){
-      if (null != accessAuthorizer) {
-        return accessAuthorizer;
-      }
-      accessAuthorizer = create(om, keyManager, prefixManager);
-      return accessAuthorizer;
-    }
-    return om.getAccessAuthorizer();
+    return om.getAccessAuthorizer().isNative()
+      ? create(om, keyManager, prefixManager)
+      : om.getAccessAuthorizer();
   }
 
   /**
