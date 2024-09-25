@@ -31,7 +31,9 @@ import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputCo
  */
 @Command(
     name = "list",
-    description = "Show container info of all container replicas on datanode")
+    description = "Show container info of all container replicas on datanode on a given DN storage directory. " +
+        "If no datanode storage directory is provided, it will consider the first DN storage dir from " +
+        "configuration hdds.datanode.dir")
 public class ListSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
