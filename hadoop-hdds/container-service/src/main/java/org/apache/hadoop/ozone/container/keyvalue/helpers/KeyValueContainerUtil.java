@@ -439,7 +439,7 @@ public final class KeyValueContainerUtil {
 
   /**
    * Moves container directory to a new location
-   * under "&lt;volume&gt;/hdds/&lt;cluster-id&gt;/tmp/deleted-containers"
+   * under "volume/hdds/cluster-id/tmp/deleted-containers"
    * and updates metadata and chunks path.
    * Containers will be moved under it before getting deleted
    * to avoid, in case of failure, having artifact leftovers
