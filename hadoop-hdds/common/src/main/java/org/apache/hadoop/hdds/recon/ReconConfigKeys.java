@@ -24,7 +24,8 @@ package org.apache.hadoop.hdds.recon;
  */
 public final class ReconConfigKeys {
 
-  /**This class contains constants for Recon related configuration keys used in
+  /**
+   * This class contains constants for Recon related configuration keys used in
    * SCM &amp; Datanode.
    * Never constructed.
    */

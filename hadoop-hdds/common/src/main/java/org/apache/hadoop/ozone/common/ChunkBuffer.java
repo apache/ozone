@@ -39,7 +39,8 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     return allocate(capacity, 0);
   }
 
-  /** Similar to {@link ByteBuffer#allocate(int)}
+  /**
+   * Similar to {@link ByteBuffer#allocate(int)}
    * except that it can specify the increment.
    *
    * @param increment

@@ -199,7 +199,7 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * Delete all files under
-   * &lt;volume&gt;/hdds/&lt;cluster-id&gt;/tmp/deleted-containers.
+   * volume/hdds/cluster-id/tmp/deleted-containers.
    * This is the directory where containers are moved when they are deleted
    * from the system, but before being removed from the filesystem. This
    * makes the deletion atomic.

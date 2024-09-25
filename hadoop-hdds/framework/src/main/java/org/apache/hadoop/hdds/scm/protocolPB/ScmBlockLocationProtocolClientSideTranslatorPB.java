@@ -307,7 +307,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   }
   /**
    * Sort the datanodes based on distance from client.
-   * @return List&lt;DatanodeDetails&gt;
+   * @return list of datanodes;
    * @throws IOException
    */
   @Override
