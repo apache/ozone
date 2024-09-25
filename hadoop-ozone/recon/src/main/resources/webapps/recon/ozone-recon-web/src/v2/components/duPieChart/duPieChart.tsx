@@ -50,9 +50,11 @@ const DUPieChart: React.FC<PieChartProps> = ({
 }) => {
 
   function getSubpathSize(subpaths: DUSubpath[]): number {
-    return subpaths
+    const subpathSize = subpaths
       .map((subpath) => subpath.size)
       .reduce((acc, curr) => acc + curr, 0);
+    // If there is no subpaths, then the size will be total size of path
+    return (subPaths.length === 0) ? size : subpathSize;
   }
 
   function updatePieData() {
@@ -132,13 +134,13 @@ const DUPieChart: React.FC<PieChartProps> = ({
     });
   }
 
-  const pieData = React.useMemo(() => updatePieData(), [path, limit]);
+  const pieData = React.useMemo(() => updatePieData(), [path, subPaths, limit]);
 
   const eChartsOptions = {
     title: {
       text: `${byteToSize(getSubpathSize(subPaths), 1)} /  ${byteToSize(size, 1)}`,
       left: 'center',
-      top: 'bottom'
+      top: '95%'
     },
     tooltip: {
       trigger: 'item',
@@ -152,7 +154,11 @@ const DUPieChart: React.FC<PieChartProps> = ({
     legend: {
       top: '10%',
       orient: 'vertical',
-      left: 'left'
+      left: '0%',
+      width: '80%'
+    },
+    grid: {
+
     },
     series: [
       {
@@ -179,7 +185,7 @@ const DUPieChart: React.FC<PieChartProps> = ({
     <EChart
       loading={loading}
       option={eChartsOptions}
-      style={{ width: '80vw', height: '60vh' }} />
+      style={{ flex: '0 1 90%', height: '50vh' }} />
   );
 }
 

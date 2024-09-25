@@ -364,9 +364,10 @@ const DUMetadata: React.FC<MetadataProps> = ({
       size='small'
       loading={loading}
       dataSource={content}
+      bordered={true}
       style={{
-        width: '90%',
-        margin: 'auto' }}
+        flex: '0 1 45%',
+        margin: '10px auto' }}
       locale={{ filterTitle: '' }}>
       <Table.Column title='Property' dataIndex='key' />
       <Table.Column title='Value' dataIndex='value' />

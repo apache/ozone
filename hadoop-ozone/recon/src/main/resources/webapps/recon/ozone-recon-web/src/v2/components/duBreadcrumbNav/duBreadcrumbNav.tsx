@@ -19,7 +19,7 @@
 import React, { useState } from 'react';
 
 import { DUSubpath } from '@/v2/types/diskUsage.types';
-import { Breadcrumb, Menu } from 'antd';
+import { Breadcrumb, Menu, Input } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import { CaretDownOutlined, CaretRightOutlined, HomeFilled } from '@ant-design/icons';
 
@@ -56,7 +56,20 @@ const DUBreadcrumbNav: React.FC<File> = ({
   }
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
-    updateHandler(key as string);
+    //If click is not on search panel
+    if (!(key as string).includes('-search')){
+      updateHandler(key as string);
+    }
+  }
+
+  function handleSearch(value: string) {
+    /**
+     * The following will generate  path like //vol1/buck1/dir1/key...
+     * since the first element of the currPos is ['/']
+     * we are joining that with / as well causing //
+     * Hence we substring from 1st index to remove one / from path
+     */
+    updateHandler([...currPath, value].join('/').substring(1));
   }
 
   function handleBreadcrumbClick(idx: number, lastPath: string) {
@@ -90,6 +103,20 @@ const DUBreadcrumbNav: React.FC<File> = ({
       }
       
     });
+    //Push a new input to allow passing a path
+    menuItems.push(
+      <Menu.Item
+        key={`${lastPath}-search`}>
+        <Input.Search
+          placeholder='Enter Path'
+          onSearch={handleSearch}
+          onClick={(e) => {
+            //Prevent menu close on click
+            e.stopPropagation();
+          }}
+          style={{ width: 160}}/>
+      </Menu.Item>
+    )
     return (
       <Breadcrumb.Item key={lastPath}
         overlay={
@@ -99,7 +126,10 @@ const DUBreadcrumbNav: React.FC<File> = ({
             expandIcon={<CaretDownOutlined/>}>
             {menuItems}
           </Menu>
-        }>
+        }
+        dropdownProps={{
+          trigger: ['click'] 
+        }}>
         {(lastPath === '/') ? <HomeFilled style={{fontSize: '16px'}}/> : lastPath}
       </Breadcrumb.Item>
     )
@@ -127,11 +157,7 @@ const DUBreadcrumbNav: React.FC<File> = ({
         </Breadcrumb.Item>
       );
     });
-    //If current path has subpaths
-    if(subPaths.length !== 0) {
-      //create a submenu for the last path
-      breadCrumbs[breadCrumbs.length - 1] = generateSubMenu(currPath[currPath.length - 1]);
-    }
+    breadCrumbs[breadCrumbs.length - 1] = generateSubMenu(currPath[currPath.length - 1]);
     return breadCrumbs;
   }
 

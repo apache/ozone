@@ -50,7 +50,7 @@ const DiskUsage: React.FC<{}> = () => {
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
   const [duResponse, setDUResponse] = useState<DUResponse>({
     status: '',
-    path: '',
+    path: '/',
     subPathCount: 0,
     size: 0,
     sizeWithReplica: 0,
@@ -91,14 +91,12 @@ const DiskUsage: React.FC<{}> = () => {
 
   React.useEffect(() => {
     //On mount load default data
-    if (duResponse.path === ''){
-      loadData('/');
-    }
+    loadData(duResponse.path)
 
     return (() => {
       cancelRequests([cancelPieSignal.current!]);
     })
-  }, [limit]);
+  }, []);
 
   return (
     <>
@@ -119,7 +117,7 @@ const DiskUsage: React.FC<{}> = () => {
             path={duResponse.path}
             subPaths={duResponse.subPaths}
             updateHandler={loadData} />
-          <div className='table-header-section'>
+          <div className='du-table-header-section'>
             <SingleSelect
               options={LIMIT_OPTIONS}
               defaultValue={limit}
