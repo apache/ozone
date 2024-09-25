@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * - fsCapacity: reported total capacity from local fs.
  * - minVolumeFreeSpace (mvfs) : determines the free space for closing
      containers.This is like adding a few reserved bytes to reserved space.
-     Dn's will send close container action to SCM at this limit &amp; it is
+     Dn's will send close container action to SCM at this limit, and it is
      configurable.
 
  *

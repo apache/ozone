@@ -46,7 +46,7 @@ import com.google.common.annotations.VisibleForTesting;
  * needed, and after finalize, a newer version is needed. This class serves
  * this purpose in a generic way.
  * For example, we can create a Factory to create multiple versions of
- * OMRequests sharded by Request Type &amp; Layout Version Supported.
+ * OMRequests sharded by Request Type and Layout Version Supported.
  */
 public class LayoutVersionInstanceFactory<T> {
 
