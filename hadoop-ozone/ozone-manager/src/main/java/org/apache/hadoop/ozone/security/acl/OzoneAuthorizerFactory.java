@@ -34,8 +34,6 @@ import static org.apache.hadoop.util.ReflectionUtils.newInstance;
  */
 public final class OzoneAuthorizerFactory {
 
-  private static IAccessAuthorizer accessAuthorizer;
-
   private OzoneAuthorizerFactory() {
     // no instances
   }
@@ -55,8 +53,8 @@ public final class OzoneAuthorizerFactory {
       OzoneManager om, KeyManager keyManager, PrefixManager prefixManager
   ) {
     return om.getAccessAuthorizer().isNative()
-      ? create(om, keyManager, prefixManager)
-      : om.getAccessAuthorizer();
+        ? create(om, keyManager, prefixManager)
+        : om.getAccessAuthorizer();
   }
 
   /**
