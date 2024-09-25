@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
