@@ -51,11 +51,13 @@ import org.slf4j.LoggerFactory;
 
  *
  * <pre>
+ * {@code
  * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
  * |<-     capacity                  ->|
  *              |     fsAvail      |-------other-----------|
  * |<-                   fsCapacity                      ->|
- * </pre>
+ * }</pre>
+ *
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
  * We could get from config:
@@ -79,8 +81,10 @@ import org.slf4j.LoggerFactory;
  * `hdds.datanode.du.factory.classname`,
  * Then it is much simpler, since we don't care about other usage:
  * <pre>
+ * {@code
  *  |----used----|             (avail)/fsAvail              |
  *  |<-              capacity/fsCapacity                  ->|
+ *  }
  * </pre>
  *  We have avail == fsAvail.
  */
@@ -155,8 +159,10 @@ public final class VolumeInfo {
   /**
    * Calculate available space use method A.
    * <pre>
+   * {@code
    * |----used----|   (avail)   |++++++++reserved++++++++|
    * |<-     capacity         ->|
+   * }
    *</pre>
    * A) avail = capacity - used
    */
