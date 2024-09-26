@@ -791,8 +791,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @param conf OzoneConfiguration
    * @return OM instance
-   * @throws IOException, AuthenticationException in case OM instance
-   *                      creation fails.
+   * @throws IOException AuthenticationException in case OM instance
+   *                      creation fails,
+   * @throws AuthenticationException
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {

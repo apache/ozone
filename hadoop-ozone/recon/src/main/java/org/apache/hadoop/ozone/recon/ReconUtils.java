@@ -352,7 +352,8 @@ public class ReconUtils {
    * @param url               url to call
    * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
-   * @throws IOException, AuthenticationException While reading the response.
+   * @throws IOException While reading the response,
+   * @throws AuthenticationException
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                         String url, boolean isSpnego)
@@ -569,7 +570,6 @@ public class ReconUtils {
    * @param dateFormat
    * @param timeZone
    * @return the epoch milliseconds representation of the date.
-   * @throws ParseException
    */
   public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
     String localDateFormat = dateFormat;

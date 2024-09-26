@@ -52,7 +52,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Each snapshot created has an associated SnapshotInfo entry
  * containing the snapshotId, snapshot path,
  * snapshot checkpoint directory, previous snapshotId
- * for the snapshot path & global amongst other necessary fields.
+ * for the snapshot path and global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(

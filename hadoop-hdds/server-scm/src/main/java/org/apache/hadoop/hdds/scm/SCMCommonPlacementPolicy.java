@@ -582,7 +582,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * replication is computed.
    * The algorithm starts with creating a replicaIdMap which contains the
    * replicas grouped by replica Index. A placementGroup Map is created which
-   * groups replicas based on their rack & the replicas within the rack
+   * groups replicas based on their rack and the replicas within the rack
    * are further grouped based on the replica Index.
    * A placement Group Count Map is created which keeps
    * track of the count of replicas in each rack.
@@ -590,9 +590,9 @@ public abstract class SCMCommonPlacementPolicy implements
    * order based on their current replication factor in a descending factor.
    * For each replica Index the replica is removed from the rack which contains
    * the most replicas, in order to achieve this the racks are put
-   * into priority queue & are based on the number of replicas they have.
-   * The replica is removed from the rack with maximum replicas & the replica
-   * to be removed is also removed from the maps created above &
+   * into priority queue and are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas and the replica
+   * to be removed is also removed from the maps created above and
    * the count for rack is reduced.
    * The set of replicas computed are then returned by the function.
    * @param replicas: Set of existing replicas of the container

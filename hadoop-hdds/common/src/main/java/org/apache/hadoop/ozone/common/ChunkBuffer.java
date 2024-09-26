@@ -45,7 +45,7 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
    *
    * @param increment
    *   the increment size so that this buffer is allocated incrementally.
-   *   When increment <= 0, entire buffer is allocated in the beginning.
+   *   When increment {@literal <= 0}, entire buffer is allocated in the beginning.
    */
   static ChunkBuffer allocate(int capacity, int increment) {
     if (increment > 0 && increment < capacity) {
