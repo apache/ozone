@@ -207,7 +207,7 @@ public final class SnapshotUtils {
    * <p>
    * Note: Currently, this is only intended to be a special use case in
    * Snapshot. If this is used elsewhere, consider moving this to
-   * @link OMMetadataManager}.
+   * {@link OMMetadataManager}.
    *
    * @param volumeName volume name
    * @param bucketName bucket name

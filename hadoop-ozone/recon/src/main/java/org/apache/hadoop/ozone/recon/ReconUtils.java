@@ -352,7 +352,8 @@ public class ReconUtils {
    * @param url               url to call
    * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
-   * @throws IOException, AuthenticationException While reading the response.
+   * @throws IOException ioException,
+   * @throws AuthenticationException While reading the response.
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                         String url, boolean isSpnego)
