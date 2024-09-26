@@ -975,9 +975,9 @@ public class KeyValueHandler extends Handler {
    * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
    *
    */
-  private void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
-                                            ChunkBuffer data, KeyValueContainer kvContainer,
-                                            BlockData blockData) {
+  public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
+                                           ChunkBuffer data, KeyValueContainer kvContainer)
+      throws IOException {
 
     try {
       Preconditions.checkNotNull(chunkInfo);
@@ -994,6 +994,7 @@ public class KeyValueHandler extends Handler {
       metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
     } catch (IOException ex) {
       LOG.error("Write Chunk failed for closed container", ex);
+      throw new IOException(ex);
     }
   }
 
@@ -1001,24 +1002,29 @@ public class KeyValueHandler extends Handler {
    * Handle Put Block operation for closed container. Calls BlockManager to process the request.
    *
    */
-  private void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
-                                          BlockData blockData, long blockCommitSequenceId) throws IOException {
-    if (blockData == null) {
-      return;
+  public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
+                                          BlockData blockData, long blockCommitSequenceId)
+      throws IOException {
+
+    try {
+      Preconditions.checkNotNull(blockData);
+      long startTime = Time.monotonicNowNanos();
+
+      checkContainerClose(kvContainer);
+      blockData.setChunks(chunkInfos);
+      // To be set from the Replica's BCSId
+      blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+
+      blockManager.putBlock(kvContainer, blockData, false);
+      ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+      final long numBytes = blockDataProto.getSerializedSize();
+      // Increment write stats for PutBlock after write.
+      metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+      metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
+    } catch (IOException ex) {
+      LOG.error("Put Block failed for closed container", ex);
+      throw new IOException(ex);
     }
-    long startTime = Time.monotonicNowNanos();
-
-    checkContainerClose(kvContainer);
-    blockData.setChunks(chunkInfos);
-    // To be set from the Replica's BCSId
-    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
-
-    blockManager.putBlock(kvContainer, blockData, false);
-    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
-    final long numBytes = blockDataProto.getSerializedSize();
-    // Increment write stats for PutBlock after write.
-    metrics.incContainerBytesStats(Type.PutBlock, numBytes);
-    metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
   }
 
   /**
