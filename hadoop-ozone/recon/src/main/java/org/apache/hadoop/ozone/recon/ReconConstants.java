@@ -90,4 +90,14 @@ public final class ReconConstants {
       (double) MAX_CONTAINER_SIZE_UPPER_BOUND /
           MIN_CONTAINER_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
+
+  // Log API constants
+  public static final String RECON_LOG_OFFSET = "offset";
+  public static final String DEFAULT_RECON_LOG_OFFSET = "0";
+
+  public static final String RECON_LOG_LINES = "num";
+  public static final String DEFAULT_RECON_LOG_LINES = "100";
+
+  public static final String RECON_LOG_DIRECTION = "direction";
+  public static final String DEFAULT_RECON_LOG_DIRECTION = "1";
 }
