@@ -335,11 +335,11 @@ public abstract class GenericTestUtils {
    * </pre>
    * <p>
    * TODO: Add lambda support once Java 8 is common.
-   * <pre>
+   * {@code
    *   SystemErrCapturer.withCapture(capture -> {
    *     ...
    *   })
-   * </pre>
+   * }
    */
   public static class SystemErrCapturer implements AutoCloseable {
     private final ByteArrayOutputStream bytes;
@@ -376,11 +376,11 @@ public abstract class GenericTestUtils {
    * </pre>
    * <p>
    * TODO: Add lambda support once Java 8 is common.
-   * <pre>
+   * {@code
    *   SystemOutCapturer.withCapture(capture -> {
    *     ...
    *   })
-   * </pre>
+   * }
    */
   public static class SystemOutCapturer implements AutoCloseable {
     private final ByteArrayOutputStream bytes;
