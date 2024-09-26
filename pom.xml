@@ -1421,7 +1421,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <additionalJOption>-Xdoclint:none</additionalJOption>
+            <additionalJOption>-Xdoclint:accessibility,reference,syntax</additionalJOption>
+            <failOnWarnings>true</failOnWarnings>
           </configuration>
         </plugin>
         <plugin>
@@ -1883,8 +1884,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </plugins>
   </build>
 
-
-
   <profiles>
     <profile>
       <id>dist</id>
@@ -1893,6 +1892,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
+            <configuration>
+              <additionalJOption>-Xdoclint:syntax</additionalJOption>
+              <failOnWarnings>true</failOnWarnings>
+            </configuration>
             <executions>
               <execution>
                 <!-- build javadoc jars per jar for publishing to maven -->
