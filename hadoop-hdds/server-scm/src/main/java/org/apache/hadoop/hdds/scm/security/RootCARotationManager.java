@@ -117,11 +117,12 @@ public class RootCARotationManager extends StatefulService {
    * Constructs RootCARotationManager with the specified arguments.
    *
    * @param scm the storage container manager
-   *
+   * <pre>
+   * {@code
    *                         (1)   (3)(4)
    *                   --------------------------->
    *                         (2)                        scm2(Follower)
-   *    (1) (3)(4)     &lt;---------------------------
+   *    (1) (3)(4)     <---------------------------
    *     -------      |
    *    |        \   |
    *     ----->  scm1(Leader)
@@ -129,8 +130,9 @@ public class RootCARotationManager extends StatefulService {
    *     ------->      \      (1)  (3)(4)
    *                   --------------------------->
    *                          (2)                       scm3(Follower)
-   *                   &lt;---------------------------
-   *
+   *                   <---------------------------
+   * }
+   * </pre>
    *
    *   (1) Rotation Prepare
    *   (2) Rotation Prepare Ack

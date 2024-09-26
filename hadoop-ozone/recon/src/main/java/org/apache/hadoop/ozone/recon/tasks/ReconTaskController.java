@@ -53,7 +53,7 @@ public interface ReconTaskController {
 
   /**
    * Get set of registered tasks.
-   * @return Map of Task name -> Task.
+   * @return Map of Task name -&gt; Task.
    */
   Map<String, ReconOmTask> getRegisteredTasks();
 

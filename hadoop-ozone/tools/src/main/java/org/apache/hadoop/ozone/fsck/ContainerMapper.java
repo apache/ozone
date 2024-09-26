@@ -68,7 +68,7 @@ public class ContainerMapper {
    * Generates Container Id to Blocks and BlockDetails mapping.
    * @param configuration @{@link OzoneConfiguration}
    * @return {@code Map<Long, List<Map<Long, @BlockDetails>>>}
-   *   Map of ContainerId -> (Block, Block info)
+   *   Map of ContainerId -&gt; (Block, Block info)
    * @throws IOException
    */
   public Map<Long, List<Map<Long, BlockIdDetails>>>

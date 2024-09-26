@@ -346,7 +346,7 @@ public class DatanodeInfo extends DatanodeDetails {
    * Retrieve the number of queued commands of the given type, as reported by
    * the datanode at the last heartbeat.
    * @param cmd The command for which to receive the queued command count
-   * @return -1 if we have no information about the count, or an integer >= 0
+   * @return -1 if we have no information about the count, or an integer &gt;= 0
    *         indicating the command count at the last heartbeat.
    */
   public int getCommandCount(SCMCommandProto.Type cmd) {

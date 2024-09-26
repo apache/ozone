@@ -29,7 +29,7 @@ public interface StreamingSource {
    *
    * @param id: custom identifier
    *
-   * @return map of files which should be copied (logical name -> real path)
+   * @return map of files which should be copied (logical name -&gt; real path)
    */
   Map<String, Path> getFilesToStream(String id) throws InterruptedException;
 

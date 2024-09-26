@@ -668,6 +668,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *    certificate.
    *
    * Truth table:
+   * <pre>
+   * {@code
    *  +--------------+---------------+--------------+---------------------+
    *  | Private Key  | Public Keys   | Certificate  |   Result            |
    *  +--------------+---------------+--------------+---------------------+
@@ -680,7 +682,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *  | True   (1)   | True    (1)   | False  (0)   |   GETCERT->SUCCESS  |
    *  | True   (1)   | True    (1)   | True   (1)   |   SUCCESS           |
    *  +--------------+-----------------+--------------+----------------+
-   *
+   * }
+   * </pre>
    * Success in following cases:
    * 1. If keypair as well certificate is available.
    * 2. If private key and certificate is available and public key is
