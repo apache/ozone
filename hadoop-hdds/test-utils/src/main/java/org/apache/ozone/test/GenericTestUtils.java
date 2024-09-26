@@ -475,8 +475,8 @@ public abstract class GenericTestUtils {
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
      * @return modifiers field
-     * @throws IllegalAccessException
-     * @throws NoSuchFieldException
+     * @throws IllegalAccessException illegalAccessException,
+     * @throws NoSuchFieldException noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;
