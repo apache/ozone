@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   });
  * }
  * }
+ * </pre>
  * <pre>
  *   {@code @Override
  *   public void close() {
