@@ -90,9 +90,7 @@
           <property name="allowMissingParamTags" value="true"/>
           <property name="allowUnknownTags" value="false"/>
         </module>
-        <module name="JavadocStyle">
-            <property name="checkFirstSentence" value="true"/>
-        </module>
+        <module name="JavadocStyle"/>
         <module name="MissingJavadocPackage"/>
         <module name="MissingJavadocType"/>
 
