@@ -371,14 +371,14 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(
-      ContainerCommandRequestProto request, ByteString checksumTree) {
+      ContainerCommandRequestProto request, ByteString checksumInfo) {
 
-    ContainerProtos.GetContainerMerkleTreeResponseProto.Builder containerMerkleTree =
-        ContainerProtos.GetContainerMerkleTreeResponseProto.newBuilder()
+    ContainerProtos.GetContainerChecksumInfoResponseProto.Builder containerMerkleTree =
+        ContainerProtos.GetContainerChecksumInfoResponseProto.newBuilder()
             .setContainerID(request.getContainerID())
-            .setContainerMerkleTree(checksumTree);
+            .setContainerChecksumInfo(checksumInfo);
     return getSuccessResponseBuilder(request)
-        .setGetContainerMerkleTree(containerMerkleTree).build();
+        .setGetContainerChecksumInfo(containerMerkleTree).build();
   }
 
   private ContainerCommandResponseBuilders() {

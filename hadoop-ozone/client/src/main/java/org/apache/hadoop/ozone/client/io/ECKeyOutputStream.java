@@ -315,7 +315,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private void writeDataCells(ECChunkBuffers stripe) throws IOException {
     final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
-    blockOutputStreamEntryPool.allocateBlockIfNeeded();
+    blockOutputStreamEntryPool.allocateBlockIfNeeded(false);
     ByteBuffer[] dataCells = stripe.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       if (dataCells[i].limit() > 0) {
