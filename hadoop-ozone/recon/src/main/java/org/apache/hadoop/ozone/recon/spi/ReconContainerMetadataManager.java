@@ -177,7 +177,7 @@ public interface ReconContainerMetadataManager {
 
   /**
    * Get a Map of containerID, containerMetadata of Containers only for the
-   * given limit. If the limit is -1 or any integer <0, then return all
+   * given limit. If the limit is -1 or any integer &lt; 0, then return all
    * the containers without any limit.
    *
    * @param limit the no. of containers to fetch.

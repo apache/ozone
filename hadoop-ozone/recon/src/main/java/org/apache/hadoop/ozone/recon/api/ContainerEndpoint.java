@@ -157,7 +157,7 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Return @{@link org.apache.hadoop.hdds.scm.container}
+   * Return {@linkplain org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
    *

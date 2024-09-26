@@ -164,7 +164,6 @@ public interface ContainerManager extends Closeable {
    *
    * @param containerID Container ID
    * @param replica ContainerReplica
-   * @return True of dataNode is removed successfully else false.
    */
   void removeContainerReplica(ContainerID containerID, ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException;

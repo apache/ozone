@@ -42,8 +42,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param capacity  in bytes
    * @param used      in bytes
    * @param remaining in bytes
-   * @param committed
-   * @paaram committed in bytes
+   * @param committed in bytes
    */
   @VisibleForTesting
   public SCMNodeMetric(long capacity, long used, long remaining,
