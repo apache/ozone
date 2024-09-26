@@ -54,6 +54,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -206,9 +207,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
+      OzoneStoragePolicy storagePolicy = null;
+      if (storagePolicy == null) {
+        storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
+      }
+      // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+              excludeList, clientMachine, storagePolicy, true);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
@@ -224,7 +230,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline());
+          .setPipeline(allocatedBlock.getPipeline())
+          .setStorageTier(allocatedBlock.getStorageTier())
+          .setIsFallBack(allocatedBlock.isFallBack());
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager.generateToken(remoteUser, blockID,
             EnumSet.of(READ, WRITE), scmBlockSize));

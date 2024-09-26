@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StorageTier;
@@ -717,6 +718,10 @@ public final class OzoneConfigKeys {
       "ozone.default.storageTier";
   public static final String OZONE_DEFAULT_STORAGE_TIER_DEFAULT =
       StorageTier.DISK.toString();
+
+  public static final String OZONE_DEFAULT_STORAGE_POLICY_KEY = "ozone.default.storagepolicy";
+  public static final String OZONE_DEFAULT_STORAGE_POLICY_DEFAULT =
+      OzoneStoragePolicy.WARM.name();
 
   /**
    * There is no need to instantiate this class.

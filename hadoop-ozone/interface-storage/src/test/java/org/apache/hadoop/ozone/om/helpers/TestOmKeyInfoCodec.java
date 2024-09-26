@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -61,7 +62,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
   }
 
-  private OmKeyInfo getKeyInfo(int chunkNum) {
+  private OmKeyInfo getKeyInfo(int chunkNum, StorageTier storageTier, boolean isFallback) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     Pipeline pipeline = HddsTestUtils.getRandomPipeline();
     for (int i = 0; i < chunkNum; i++) {
@@ -69,6 +70,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
       OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setPipeline(pipeline)
+          .setStorageTier(storageTier)
+          .setIsFallBack(isFallback)
           .build();
       omKeyLocationInfoList.add(keyLocationInfo);
     }
@@ -94,16 +97,21 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void test() throws IOException {
-    testOmKeyInfoCodecWithoutPipeline(1);
-    testOmKeyInfoCodecWithoutPipeline(2);
-    testOmKeyInfoCodecCompatibility(1);
-    testOmKeyInfoCodecCompatibility(2);
+    testOmKeyInfoCodecWithoutPipeline(1, StorageTier.SSD, true);
+    testOmKeyInfoCodecWithoutPipeline(2, StorageTier.ARCHIVE, false);
+    testOmKeyInfoCodecWithoutPipeline(2, StorageTier.DISK, false);
+    testOmKeyInfoCodecWithoutPipeline(2, null, false);
+    testOmKeyInfoCodecCompatibility(1, StorageTier.SSD, true);
+    testOmKeyInfoCodecCompatibility(2, StorageTier.ARCHIVE, false);
+    testOmKeyInfoCodecCompatibility(2, StorageTier.DISK, false);
+    testOmKeyInfoCodecCompatibility(2, null, false);
   }
 
-  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
+  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum, StorageTier storageTier,
+      boolean isFallback)
       throws IOException {
     final Codec<OmKeyInfo> codec = OmKeyInfo.getCodec(true);
-    OmKeyInfo originKey = getKeyInfo(chunkNum);
+    OmKeyInfo originKey = getKeyInfo(chunkNum, storageTier, isFallback);
     byte[] rawData = codec.toPersistedFormat(originKey);
     OmKeyInfo key = codec.fromPersistedFormat(rawData);
     System.out.println("Chunk number = " + chunkNum +
@@ -114,14 +122,19 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(key.getFileChecksum(), checksum);
   }
 
-  public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
+  public void testOmKeyInfoCodecCompatibility(int chunkNum, StorageTier storageTier,
+      boolean isFallback) throws IOException {
     final Codec<OmKeyInfo> codecWithoutPipeline = OmKeyInfo.getCodec(true);
     final Codec<OmKeyInfo> codecWithPipeline = OmKeyInfo.getCodec(false);
-    OmKeyInfo originKey = getKeyInfo(chunkNum);
+    OmKeyInfo originKey = getKeyInfo(chunkNum, storageTier, isFallback);
     byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
     OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
     System.out.println("Chunk number = " + chunkNum +
         ", Serialized key size with pipeline = " + rawData.length);
+    OmKeyLocationInfo keyLocation = key.getLatestVersionLocations().getLocationList().get(0);
+    assertNotNull(keyLocation.getPipeline());
+    assertEquals(storageTier, keyLocation.getStorageTier());
+    assertEquals(isFallback, keyLocation.getIsFallBack());
     assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
         .getPipeline());
   }

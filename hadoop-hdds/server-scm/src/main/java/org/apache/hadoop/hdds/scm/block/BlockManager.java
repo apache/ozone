@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -38,12 +39,14 @@ public interface BlockManager extends Closeable {
    * @param replicationConfig configuration of the replication method
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
+   * @param storagePolicy The storage policy to be used for block allocation.
+   * @param allowFallbackStoragePolicy If true, allows fallback to a default storage policy.
    * @return AllocatedBlock
    * @throws IOException
    */
   AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
-      String owner,
-      ExcludeList excludeList) throws IOException, TimeoutException;
+      String owner, ExcludeList excludeList, StoragePolicy storagePolicy,
+      boolean allowFallbackStoragePolicy) throws IOException, TimeoutException;
 
   /**
    * Deletes a list of blocks in an atomic operation. Internally, SCM
