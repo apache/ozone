@@ -357,12 +357,14 @@ public class HddsVolume extends StorageVolume {
 
     File storageIdDir = new File(clusterIdDir, getStorageID());
     if (!storageIdDir.exists()) {
+      dbLoadFailure.set(true);
       throw new IOException("Db parent dir " + storageIdDir.getAbsolutePath() +
           " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
     }
 
     File containerDBFile = new File(storageIdDir, CONTAINER_DB_NAME);
     if (!containerDBFile.exists()) {
+      dbLoadFailure.set(true);
       throw new IOException("Db dir " + storageIdDir.getAbsolutePath() +
           " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
     }
