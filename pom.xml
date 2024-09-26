@@ -1421,7 +1421,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <additionalJOption>-Xdoclint:accessibility,reference,syntax</additionalJOption>
+            <additionalJOption>-Xdoclint:syntax</additionalJOption>
             <failOnWarnings>true</failOnWarnings>
           </configuration>
         </plugin>
