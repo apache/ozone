@@ -45,12 +45,14 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
   private final List<ContainerProtos.ChunkInfo> chunkInfoList;
   private final OmKeyInfo keyInfo;
+  private final long blockLength;
 
 
   public ECBlockChecksumComputer(
-      List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo) {
+      List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo, long blockLength) {
     this.chunkInfoList = chunkInfoList;
     this.keyInfo = keyInfo;
+    this.blockLength = blockLength;
   }
 
   @Override
@@ -119,7 +121,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
     // Bytes required to create a CRC
     long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-    long keySize = keyInfo.getDataSize();
+    long blockSize = blockLength;
 
     CrcComposer blockCrcComposer =
         CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
@@ -144,15 +146,15 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
         // Here Math.min in mainly required for last stripe's last chunk. The last chunk of the last stripe can be
         // less than the chunkSize, chunkSize is only calculated from each stripe's first chunk. This would be fine
         // for rest of the stripe because all the chunks are of the same size. But for the last stripe we don't know
-        // the exact size of the last chunk. So we calculate it with the of keySize. If the key size is smaller
+        // the exact size of the last chunk. So we calculate it with the of blockSize. If the block size is smaller
         // than the chunk size, then we know it is the last stripe' last chunk.
-        long remainingChunkSize = Math.min(keySize, chunkSize);
+        long remainingChunkSize = Math.min(blockSize, chunkSize);
         while (byteWrap.hasRemaining() && remainingChunkSize > 0) {
           final int checksumData = byteWrap.getInt();
           blockCrcComposer.update(checksumData, Math.min(bytesPerCrc, remainingChunkSize));
           remainingChunkSize -= bytesPerCrc;
         }
-        keySize -= chunkSize;
+        blockSize -= chunkSize;
       }
     }
 

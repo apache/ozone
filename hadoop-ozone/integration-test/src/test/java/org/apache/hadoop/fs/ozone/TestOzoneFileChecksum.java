@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
@@ -53,7 +54,9 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.TestDataUtil.createBucket;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -68,11 +71,11 @@ public class TestOzoneFileChecksum {
       true, false
   };
 
-  private static final int[] DATA_SIZES_1 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9)
+  private static final int[] DATA_SIZES_1 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10)
       .mapToInt(mb -> (int) (1024 * 1024 * mb) + 510000)
       .toArray();
 
-  private static final int[] DATA_SIZES_2 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9)
+  private static final int[] DATA_SIZES_2 = DoubleStream.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10)
       .mapToInt(mb -> (int) (1024 * 1024 * mb) + 820000)
       .toArray();
 
@@ -90,6 +93,8 @@ public class TestOzoneFileChecksum {
   void setup() throws IOException,
       InterruptedException, TimeoutException {
     conf = new OzoneConfiguration();
+    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
+    conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 2 * 1024 * 1024, StorageUnit.BYTES);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .build();
