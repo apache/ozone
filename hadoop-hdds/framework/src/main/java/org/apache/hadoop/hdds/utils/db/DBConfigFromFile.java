@@ -20,10 +20,13 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -33,19 +36,25 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 /**
  * A Class that controls the standard config options of RocksDB.
  * <p>
- * Important : Some of the functions in this file are magic functions designed
- * for the use of OZONE developers only. Due to that this information is
- * documented in this files only and is *not* intended for end user consumption.
- * Please do not use this information to tune your production environments.
- * Please remember the SpiderMan principal; with great power comes great
- * responsibility.
+ * Instructions:
+ * <p>
+ * You can use different ini files to customize the rocksDB configuration
+ * of corresponding services (such as OM, SCM, DN). For example, you can create a file
+ * such as om.db.ini to configure OM's rocksDB,
+ * scm.db.ini to configure SCM's rocksDB, and container.db.ini to configure DN's rocksDB
+ *
  */
 public final class DBConfigFromFile {
   private static final Logger LOG =
@@ -87,60 +96,71 @@ public final class DBConfigFromFile {
   }
 
   /**
-   * One of the Magic functions designed for the use of Ozone Developers *ONLY*.
-   * This function takes the name of DB file and looks up the a .ini file that
-   * follows the ROCKSDB config format and uses that file for DBOptions and
-   * Column family Options. The Format for this file is specified by RockDB.
+   * This function takes the name of DB file and looks up the a .ini file
+   * that follows the ROCKSDB config format and uses that file for DBOptions
+   * and Column family Options. The Format for this file is specified by RockDB.
+   * We allow user tuning of all parameters freely.
    * <p>
    * Here is a sample config from RocksDB sample Repo.
    * <p>
    * https://github.com/facebook/rocksdb/blob/master/examples
    * /rocksdb_option_file_example.ini
    * <p>
-   * We look for a specific pattern, say OzoneManager.db will have its configs
-   * specified in OzoneManager.db.ini. This option is used only by the
-   * performance testing group to allow tuning of all parameters freely.
-   * <p>
-   * For the end users we offer a set of Predefined options that is easy to use
-   * and the user does not need to become an expert in RockDB config.
-   * <p>
-   * This code assumes the .ini file is placed in the same directory as normal
-   * config files. That is in $OZONE_DIR/etc/hadoop. For example, if we want to
-   * control OzoneManager.db configs from a file, we need to create a file
-   * called OzoneManager.db.ini and place that file in $OZONE_DIR/etc/hadoop.
+   * This code assumes the .ini file is placed in the same directory as normal config files.
+   * That is in $OZONE_DIR/etc/hadoop. For example, if we want to control OzoneManager.db
+   * configs from a file,we need to create a file called om.db.ini and place that file
+   * in $OZONE_DIR/etc/hadoop.
    *
    * @param dbFileName - The DB File Name, for example, OzoneManager.db.
-   * @param cfDescs - ColumnFamily Handles.
-   * @return DBOptions, Options to be used for opening/creating the DB.
+   * @return Pair<ManagedDBOptions, Map<String, ManagedColumnFamilyOptions>>
+   * where the first element is the DBOptions and the second element is the map of CFOptions
+   * ,to be used for opening/creating the DB.
    * @throws IOException
    */
-  public static ManagedDBOptions readFromFile(String dbFileName,
-      List<ColumnFamilyDescriptor> cfDescs) throws IOException {
+  private static Pair<ManagedDBOptions, Map<String, ManagedColumnFamilyOptions>> readOptionsFromFile(String dbFileName)
+      throws IOException {
+    List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
-    Preconditions.checkArgument(cfDescs.size() > 0);
 
-    //TODO: Add Documentation on how to support RocksDB Mem Env.
-    Env env = Env.getDefault();
     ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
     if (configLocation != null &&
         StringUtil.isNotBlank(configLocation.toString())) {
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
-
       if (optionsFile.toFile().exists()) {
         options = new ManagedDBOptions();
         try {
-          OptionsUtil.loadOptionsFromFile(optionsFile.toString(),
-              env, options, cfDescs, true);
-
+          OptionsUtil.loadOptionsFromFile(new ManagedConfigOptions(), optionsFile.toString(),
+              options, cfDescs);
         } catch (RocksDBException rdEx) {
           throw toIOException("Unable to find/open Options file.", rdEx);
         }
       }
     }
-    return options;
+    return Pair.of(options, cfDescs.stream().collect(Collectors.toMap(
+        cfDesc -> StringUtils.bytes2String(cfDesc.getName()),
+        cfDesc -> new ManagedColumnFamilyOptions(cfDesc.getOptions())))
+    );
   }
+
+  public static ManagedDBOptions readDBOptionsFromFile(String dbFileName) throws IOException {
+    return readOptionsFromFile(dbFileName).getLeft();
+  }
+
+  public static Map<String, ManagedColumnFamilyOptions> readCFOptionsFromFile(String dbFileName) throws IOException {
+    return readOptionsFromFile(dbFileName).getRight();
+  }
+
+  public static ManagedColumnFamilyOptions readCFOptionsFromFile(String dbFileName, String cfName) throws IOException {
+    Map<String, ManagedColumnFamilyOptions> columnFamilyOptionsMap = readCFOptionsFromFile(dbFileName);
+    if (Objects.isNull(cfName)) {
+      cfName = StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
+    }
+    return columnFamilyOptionsMap.get(cfName);
+  }
+
+
 
 }

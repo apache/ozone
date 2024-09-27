@@ -116,7 +116,7 @@ public final class RocksDatabase implements Closeable {
         .stream()
         .map(TableConfig::toName)
         .filter(familyName -> !existingFamilyNames.contains(familyName))
-        .map(TableConfig::newTableConfig)
+        .map(familyName -> TableConfig.newTableConfig(file.getName(), familyName))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);

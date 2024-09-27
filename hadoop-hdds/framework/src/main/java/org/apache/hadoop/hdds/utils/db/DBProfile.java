@@ -19,15 +19,27 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.eclipse.jetty.util.StringUtil;
+import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.CompactionStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.Map;
+
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
+
 
 /**
  * User visible configs based RocksDB tuning page. Documentation for Options.
@@ -45,55 +57,116 @@ public enum DBProfile {
     public String toString() {
       return "SSD";
     }
+    @Override
+    public ManagedDBOptions getDBOptions(String dbName) {
+      ManagedDBOptions option = null;
+      if (StringUtil.isNotBlank(dbName)) {
+        try {
+          option = DBConfigFromFile.readDBOptionsFromFile(dbName);
+          if (option != null) {
+            LOG.info("Using RocksDB DBOptions from {}.ini file", dbName);
+          } else {
+            final int maxBackgroundCompactions = 4;
+            final int maxBackgroundFlushes = 2;
+            final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
+            final boolean createIfMissing = true;
+            final boolean createMissingColumnFamilies = true;
+            ManagedDBOptions dbOptions = new ManagedDBOptions();
+            dbOptions
+                .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
+                .setMaxBackgroundCompactions(maxBackgroundCompactions)
+                .setMaxBackgroundFlushes(maxBackgroundFlushes)
+                .setBytesPerSync(bytesPerSync)
+                .setCreateIfMissing(createIfMissing)
+                .setCreateMissingColumnFamilies(createMissingColumnFamilies);
+            return dbOptions;
+          }
+        } catch (IOException ex) {
+          LOG.error("Unable to read RocksDB DBOptions from {}, exception {}", dbName, ex);
+        }
+      }
+      return option;
+    }
+    @Override
+    public Map<String, ManagedColumnFamilyOptions> getColumnFamilyOptions(String dbName) {
+      Map<String, ManagedColumnFamilyOptions> options = null;
+      if (StringUtil.isNotBlank(dbName)) {
+        try {
+          options = DBConfigFromFile.readCFOptionsFromFile(dbName);
+          if (MapUtils.isNotEmpty(options)) {
+            LOG.info("Using RocksDB CFOptions from {}.ini file", dbName);
+          } else {
+            final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
+            ManagedColumnFamilyOptions managedColumnFamilyOptions =
+                new ManagedColumnFamilyOptions();
+            managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
+                .setWriteBufferSize(writeBufferSize)
+                .setTableFormatConfig(createDefaultBlockBasedTableConfig());
+            return Collections.singletonMap(StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
+                managedColumnFamilyOptions);
+          }
+        } catch (IOException ex) {
+          LOG.error("Unable to read RocksDB CFOptions from {}, exception {}", dbName, ex);
+        }
+      }
+      return options;
+    }
+
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
-      // Write Buffer Size -- set to 128 MB
-      final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
-
-      ManagedColumnFamilyOptions managedColumnFamilyOptions =
-          new ManagedColumnFamilyOptions();
-
-      managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
-          .setWriteBufferSize(writeBufferSize)
-          .setTableFormatConfig(getBlockBasedTableConfig());
-
-      return managedColumnFamilyOptions;
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(String dbName, String cfName) {
+      ManagedColumnFamilyOptions option = null;
+      if (StringUtil.isNotBlank(dbName)) {
+        try {
+          option = DBConfigFromFile.readCFOptionsFromFile(dbName, cfName);
+          if (option != null) {
+            LOG.info("Using RocksDB CFOptions from {}.ini file", dbName);
+          } else {
+            final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
+            ManagedColumnFamilyOptions managedColumnFamilyOptions =
+                new ManagedColumnFamilyOptions();
+            managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
+                .setWriteBufferSize(writeBufferSize)
+                .setTableFormatConfig(createDefaultBlockBasedTableConfig());
+            return managedColumnFamilyOptions;
+          }
+        } catch (IOException ex) {
+          LOG.error("Unable to read RocksDB CFOptions from {}, exception {}", dbName, ex);
+        }
+      }
+      return option;
     }
 
     @Override
-    public ManagedDBOptions getDBOptions() {
-      final int maxBackgroundCompactions = 4;
-      final int maxBackgroundFlushes = 2;
-      final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
-      final boolean createIfMissing = true;
-      final boolean createMissingColumnFamilies = true;
-      ManagedDBOptions dbOptions = new ManagedDBOptions();
-      dbOptions
-          .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
-          .setMaxBackgroundCompactions(maxBackgroundCompactions)
-          .setMaxBackgroundFlushes(maxBackgroundFlushes)
-          .setBytesPerSync(bytesPerSync)
-          .setCreateIfMissing(createIfMissing)
-          .setCreateMissingColumnFamilies(createMissingColumnFamilies);
-      return dbOptions;
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(String dbName, String cfName) {
+      ManagedBlockBasedTableConfig option = new ManagedBlockBasedTableConfig();
+      if (StringUtil.isNotBlank(dbName) && StringUtil.isNotBlank(cfName)) {
+        try {
+          ManagedColumnFamilyOptions cfOption = DBConfigFromFile.readCFOptionsFromFile(dbName, cfName);
+          if (cfOption != null) {
+            option.setAllProperties((BlockBasedTableConfig) cfOption.tableFormatConfig());
+            LOG.info("Using RocksDB BlockBasedTableConfig from {}.ini file", dbName);
+            return option;
+          }
+        } catch (IOException ex) {
+          LOG.error("Unable to read RocksDB BlockBasedTableConfig from {}, exception {}", dbName, ex);
+        }
+      }
+      return createDefaultBlockBasedTableConfig();
     }
 
-    @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
-      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
+    private ManagedBlockBasedTableConfig createDefaultBlockBasedTableConfig() {
       final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
-
-      // Set the Default block size to 16KB
       final long blockSize = toLong(StorageUnit.KB.toBytes(16));
 
       ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
-            .setBlockSize(blockSize)
-            .setPinL0FilterAndIndexBlocksInCache(true)
-            .setFilterPolicy(new ManagedBloomFilter());
+          .setBlockSize(blockSize)
+          .setPinL0FilterAndIndexBlocksInCache(true)
+          .setFilterPolicy(new ManagedBloomFilter());
       return config;
     }
+
 
   },
   DISK {
@@ -103,23 +176,28 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions(String dbName) {
       final long readAheadSize = toLong(StorageUnit.MB.toBytes(4.00));
-      ManagedDBOptions dbOptions = SSD.getDBOptions();
+      ManagedDBOptions dbOptions = SSD.getDBOptions(dbName);
       dbOptions.setCompactionReadaheadSize(readAheadSize);
       return dbOptions;
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+    public Map<String, ManagedColumnFamilyOptions> getColumnFamilyOptions(String dbName) {
+      return SSD.getColumnFamilyOptions(dbName);
+    }
+
+    @Override
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(String dbName, String cfName) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(dbName, cfName);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       return cfOptions;
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
-      return SSD.getBlockBasedTableConfig();
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(String dbName, String cfName) {
+      return SSD.getBlockBasedTableConfig(dbName, cfName);
     }
   },
   TEST {
@@ -129,22 +207,26 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions() {
-      ManagedDBOptions dbOptions = SSD.getDBOptions();
-      return dbOptions;
+    public ManagedDBOptions getDBOptions(String dbName) {
+      return SSD.getDBOptions(dbName);
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+    public Map<String, ManagedColumnFamilyOptions> getColumnFamilyOptions(String dbName) {
+      return SSD.getColumnFamilyOptions(dbName);
+    }
+
+    @Override
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(String dbName, String cfName) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(dbName, cfName);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       cfOptions.setDisableAutoCompactions(true);
       return cfOptions;
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
-      return SSD.getBlockBasedTableConfig();
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(String dbName, String cfName) {
+      return SSD.getBlockBasedTableConfig(dbName, cfName);
     }
   };
 
@@ -153,9 +235,13 @@ public enum DBProfile {
     return temp.longValue();
   }
 
-  public abstract ManagedDBOptions getDBOptions();
+  private static final Logger LOG = LoggerFactory.getLogger(DBProfile.class);
 
-  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions();
+  public abstract ManagedDBOptions getDBOptions(String dbName);
 
-  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig();
+  public abstract Map<String, ManagedColumnFamilyOptions> getColumnFamilyOptions(String dbName);
+
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(String dbName, String cfName);
+
+  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig(String dbName, String cfName);
 }

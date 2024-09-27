@@ -34,6 +34,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
 /**
  * This class defines the RocksDB structure for datanode following schema
@@ -121,17 +122,24 @@ public class DatanodeSchemaThreeDBDefinition
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
-    ManagedColumnFamilyOptions cfOptions =
-        dbProfile.getColumnFamilyOptions(config);
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    BLOCK_DATA.setCfOptions((ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(CONTAINER_DB_NAME, "block_data")
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength()));
+    METADATA.setCfOptions((ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(CONTAINER_DB_NAME, "metadata")
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength()));
+    DELETE_TRANSACTION.setCfOptions((ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(CONTAINER_DB_NAME, "delete_txns")
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength()));
+    FINALIZE_BLOCKS.setCfOptions((ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(CONTAINER_DB_NAME, "finalize_blocks")
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength()));
+    LAST_CHUNK_INFO.setCfOptions((ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(CONTAINER_DB_NAME, "last_chunk_info")
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength()));
 
-    BLOCK_DATA.setCfOptions(cfOptions);
-    METADATA.setCfOptions(cfOptions);
-    DELETE_TRANSACTION.setCfOptions(cfOptions);
-    FINALIZE_BLOCKS.setCfOptions(cfOptions);
-    LAST_CHUNK_INFO.setCfOptions(cfOptions);
   }
 
   @Override

@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
@@ -34,25 +34,24 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,7 +59,6 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -69,8 +67,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,6 +78,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
@@ -101,6 +100,7 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 /**
  * Class to test KeyValue Container operations.
@@ -703,24 +703,23 @@ public class TestKeyValueContainer {
 
   @Test
   public void testContainersShareColumnFamilyOptions() {
-    ConfigurationSource conf = new OzoneConfiguration();
-
+    final String cfName = StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
     // Make sure ColumnFamilyOptions are same for a particular db profile
     for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
         DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
       // ColumnFamilyOptions should be same across configurations
       ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(CONTAINER_DB_NAME, cfName);
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(CONTAINER_DB_NAME, cfName);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
       // for a particulat configuration
       columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
+          .getColumnFamilyOptions(CONTAINER_DB_NAME, cfName);
       columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
+          .getColumnFamilyOptions(CONTAINER_DB_NAME, cfName);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
     }
 
@@ -728,10 +727,10 @@ public class TestKeyValueContainer {
     DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
     DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
     assertNotEquals(
-        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
-        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
-    assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
-        ssdProfile.getColumnFamilyOptions(conf));
+        diskProfile.getColumnFamilyOptions(CONTAINER_DB_NAME, cfName),
+        ssdProfile.getColumnFamilyOptions(CONTAINER_DB_NAME, cfName));
+    assertNotEquals(diskProfile.getColumnFamilyOptions(CONTAINER_DB_NAME, cfName),
+        ssdProfile.getColumnFamilyOptions(CONTAINER_DB_NAME, cfName));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -773,12 +772,12 @@ public class TestKeyValueContainer {
     // DBOtions should be different, except SCHEMA-V3
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(CONTAINER_DB_NAME).compactionReadaheadSize(),
+          outProfile2.getDBOptions(CONTAINER_DB_NAME).compactionReadaheadSize());
     } else {
       assertNotEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(CONTAINER_DB_NAME).compactionReadaheadSize(),
+          outProfile2.getDBOptions(CONTAINER_DB_NAME).compactionReadaheadSize());
     }
   }
 

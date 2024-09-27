@@ -19,10 +19,9 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.StringUtils;
-
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 
@@ -30,9 +29,9 @@ import org.rocksdb.ColumnFamilyDescriptor;
  * Class that maintains Table Configuration.
  */
 public class TableConfig implements AutoCloseable {
-  static TableConfig newTableConfig(String name) {
-    return new TableConfig(name,
-        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions());
+  static TableConfig newTableConfig(String dbName, String cfName) {
+    return new TableConfig(cfName,
+        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbName, cfName));
   }
 
   private final String name;

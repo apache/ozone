@@ -20,25 +20,20 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
-import org.rocksdb.RocksDB;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import org.apache.hadoop.hdds.StringUtils;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNameFromDB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,50 +62,43 @@ public class TestDBConfigFromFile {
   }
 
   @Test
-  public void readFromFile() throws IOException {
-    final List<String> families =
-        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-            "First", "Second", "Third",
-            "Fourth", "Fifth",
-            "Sixth");
-    final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        new ArrayList<>();
-    for (String family : families) {
-      columnFamilyDescriptors.add(
-          new ColumnFamilyDescriptor(family.getBytes(StandardCharsets.UTF_8),
-              new ColumnFamilyOptions()));
-    }
-
-    final DBOptions options = DBConfigFromFile.readFromFile(DB_FILE,
-        columnFamilyDescriptors);
-
+  public void readDBOptionsFromFile() throws IOException {
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(DB_FILE);
     // Some Random Values Defined in the test.db.ini, we verify that we are
     // able to get values that are defined in the test.db.ini.
     assertNotNull(options);
-    assertEquals(551615L, options.maxManifestFileSize());
+    assertEquals(1073741824L, options.maxManifestFileSize());
     assertEquals(1000L, options.keepLogFileNum());
     assertEquals(1048576, options.writableFileMaxBufferSize());
   }
 
   @Test
-  public void readFromFileInvalidConfig() throws IOException {
-    final List<String> families =
-        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-            "First", "Second", "Third",
-            "Fourth", "Fifth",
-            "Sixth");
-    final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        new ArrayList<>();
-    for (String family : families) {
-      columnFamilyDescriptors.add(
-          new ColumnFamilyDescriptor(family.getBytes(StandardCharsets.UTF_8),
-              new ColumnFamilyOptions()));
-    }
-
-    final DBOptions options = DBConfigFromFile.readFromFile("badfile.db.ini",
-        columnFamilyDescriptors);
-
+  public void readDBOptionsFromFileInvalidConfig() throws IOException {
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile("badfile.db.ini");
     // This has to return a Null, since we have config defined for badfile.db
     assertNull(options);
   }
+
+
+  @Test
+  public void readColumnFamilyOptionsFromFile() throws IOException {
+    Map<String, ManagedColumnFamilyOptions> columnFamilyOptionsMap =
+        DBConfigFromFile.readCFOptionsFromFile(DB_FILE);
+    for (Map.Entry<String, ManagedColumnFamilyOptions> columnFamilyOptions : columnFamilyOptionsMap.entrySet()) {
+      String cfName = columnFamilyOptions.getKey();
+      assertEquals("default", cfName);
+      ManagedColumnFamilyOptions columnFamilyOption = columnFamilyOptions.getValue();
+      assertNotNull(columnFamilyOption);
+      assertEquals(536870912, columnFamilyOption.writeBufferSize());
+      assertEquals(7, columnFamilyOption.numLevels());
+      assertEquals(268435456, columnFamilyOption.blobFileSize());
+      assertEquals("SkipListFactory", columnFamilyOption.memTableFactoryName());
+      assertEquals(CompactionStyle.LEVEL, columnFamilyOption.compactionStyle());
+      assertEquals(1048576, columnFamilyOption.arenaBlockSize());
+      BlockBasedTableConfig blockBasedTableConfig = (BlockBasedTableConfig) columnFamilyOption.tableFormatConfig();
+      assertNotNull(blockBasedTableConfig);
+      assertEquals(24576, blockBasedTableConfig.blockSize());
+    }
+  }
+
 }

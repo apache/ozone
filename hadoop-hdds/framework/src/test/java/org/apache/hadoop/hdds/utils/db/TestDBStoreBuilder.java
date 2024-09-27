@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -34,9 +35,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNameFromDB;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -48,10 +51,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests RDBStore creation.
  */
 public class TestDBStoreBuilder {
+  private static final String DB_FILE = "test.db";
+  private static final String INI_FILE = getOptionsFileNameFromDB(DB_FILE);
 
   @BeforeEach
   public void setUp(@TempDir Path tempDir) throws Exception {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, tempDir.toString());
+    ClassLoader classLoader = getClass().getClassLoader();
+    File testData = new File(classLoader.getResource(INI_FILE).getFile());
+    File dest = Paths.get(
+        System.getProperty(DBConfigFromFile.CONFIG_DIR), INI_FILE).toFile();
+    FileUtils.copyFile(testData, dest);
   }
 
   @Test
@@ -65,7 +75,7 @@ public class TestDBStoreBuilder {
   public void builderWithOneParamV1() {
     OzoneConfiguration conf = new OzoneConfiguration();
     assertThrows(IOException.class,
-        () -> DBStoreBuilder.newBuilder(conf).setName("Test.db").build());
+        () -> DBStoreBuilder.newBuilder(conf).setName(DB_FILE).build());
   }
 
   @Test
@@ -79,7 +89,7 @@ public class TestDBStoreBuilder {
   public void builderWithOpenClose(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DBStore dbStore = DBStoreBuilder.newBuilder(conf)
-        .setName("Test.db")
+        .setName("test.db")
         .setPath(tempDir)
         .build();
     // Nothing to do just open and Close.
@@ -93,7 +103,7 @@ public class TestDBStoreBuilder {
     // Registering a new table with the same name should replace the previous
     // one.
     DBStore dbStore = DBStoreBuilder.newBuilder(conf)
-        .setName("Test.db")
+        .setName(DB_FILE)
         .setPath(tempDir)
         .addTable("FIRST")
         .addTable("FIRST", new ManagedColumnFamilyOptions())
@@ -117,7 +127,7 @@ public class TestDBStoreBuilder {
   public void builderWithDataWrites(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
-        .setName("Test.db")
+        .setName(DB_FILE)
         .setPath(tempDir)
         .addTable("First")
         .addTable("Second")
@@ -143,7 +153,7 @@ public class TestDBStoreBuilder {
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
-        .setName("Test.db")
+        .setName(DB_FILE)
         .setPath(tempDir)
         .addTable("First")
         .addTable("Second")
@@ -207,7 +217,7 @@ public class TestDBStoreBuilder {
     };
 
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-        .setName("SampleStore").setPath(newFolder.toPath()).build()) {
+        .setName(DB_FILE).setPath(newFolder.toPath()).build()) {
       assertInstanceOf(RDBStore.class, dbStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
@@ -256,7 +266,7 @@ public class TestDBStoreBuilder {
         DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
       public String getName() {
-        return "sampleDB";
+        return DB_FILE;
       }
 
       @Override
@@ -271,7 +281,7 @@ public class TestDBStoreBuilder {
     };
 
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-            .setName("SampleStore")
+            .setName(DB_FILE)
             .disableDefaultCFAutoCompaction(disableAutoCompaction)
             .setPath(newFolder.toPath()).build()) {
       assertInstanceOf(RDBStore.class, dbStore);
