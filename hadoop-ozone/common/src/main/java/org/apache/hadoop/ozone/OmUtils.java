@@ -278,7 +278,6 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
-    case GetServerDefaults:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
       return true;
