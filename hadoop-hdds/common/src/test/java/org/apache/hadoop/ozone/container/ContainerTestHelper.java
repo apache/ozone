@@ -39,7 +39,9 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -572,14 +574,17 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID) {
-    return getTestBlockID(containerID, null);
+    return getTestBlockID(containerID, null, null);
   }
 
-  public static BlockID getTestBlockID(long containerID, Integer replicaIndex) {
+  public static BlockID getTestBlockID(long containerID, Integer replicaIndex, StorageType storageType) {
     DatanodeBlockID.Builder datanodeBlockID = DatanodeBlockID.newBuilder().setContainerID(containerID)
         .setLocalID(UniqueId.next());
     if (replicaIndex != null) {
       datanodeBlockID.setReplicaIndex(replicaIndex);
+    }
+    if (storageType != null) {
+      datanodeBlockID.setStorageTypeID(StorageTypeUtils.getID(storageType));
     }
     return BlockID.getFromProtobuf(datanodeBlockID.build());
   }

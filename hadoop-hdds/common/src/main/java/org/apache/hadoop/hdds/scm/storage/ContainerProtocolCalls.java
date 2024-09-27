@@ -636,6 +636,7 @@ public final class ContainerProtocolCalls  {
   public static void createRecoveringContainer(XceiverClientSpi client,
       long containerID, String encodedToken, int replicaIndex)
       throws IOException {
+    // TODO StoragePolicy Support EC
     createContainer(client, containerID, encodedToken,
         ContainerProtos.ContainerDataProto.State.RECOVERING, replicaIndex);
   }

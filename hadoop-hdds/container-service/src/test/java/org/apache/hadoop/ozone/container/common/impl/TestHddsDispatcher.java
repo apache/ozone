@@ -58,6 +58,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -532,15 +533,20 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testCreateContainerRejectsInvalidStorageType() throws IOException {
+  public void testInvalidStorageTypeDoesNotMarkContainerUnhealthy() throws IOException {
     File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, diskVolume.getAbsolutePath());
     DatanodeDetails dd = randomDatanodeDetails();
     HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
 
-    ContainerCommandRequestProto writeChunkRequest =
+    ContainerCommandRequestProto validWriteChunkRequest =
         getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        dispatcher.dispatch(validWriteChunkRequest, null).getResult());
+
+    ContainerCommandRequestProto writeChunkRequest =
+        getWriteChunkRequest(dd.getUuidString(), 1L, 2L, null);
     WriteChunkRequestProto writeChunk = writeChunkRequest.getWriteChunk();
     ContainerCommandRequestProto requestWithInvalidStorageType =
         writeChunkRequest.toBuilder()
@@ -552,6 +558,8 @@ public class TestHddsDispatcher {
     ContainerCommandResponseProto response =
         dispatcher.dispatch(requestWithInvalidStorageType, null);
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, response.getResult());
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        dispatcher.getContainer(1L).getContainerData().getState());
   }
 
   private void assertContainerDoNotExist(HddsDispatcher hddsDispatcher,
@@ -870,7 +878,7 @@ public class TestHddsDispatcher {
         new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder();
     // TODO: Pass the real storage type from the write path once that BlockID support StorageType
     if (storageType != null) {
-      blockID.setStorageTypeID(storageType.getNumber());
+      blockID.setStorageTypeID(StorageTypeUtils.getIDFromProtobuf(storageType));
     }
 
     WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto

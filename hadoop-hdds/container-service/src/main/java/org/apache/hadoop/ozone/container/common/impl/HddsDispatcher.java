@@ -177,6 +177,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case DELETE_ON_OPEN_CONTAINER:
     case UNSUPPORTED_REQUEST:// Blame client for sending unsupported request.
     case MALFORMED_REQUEST:// Blame client for sending malformed request.
+    case INVALID_ARGUMENT:
     case CONTAINER_MISSING:
     case CONTAINER_ALREADY_EXISTS:
       return true;
@@ -194,6 +195,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public ContainerCommandResponseProto dispatch(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
+    try {
+      HddsUtils.getBlockID(msg);
+    } catch (IllegalArgumentException e) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(e.getMessage(), e, Result.INVALID_ARGUMENT), msg);
+    }
     try {
       return dispatcher.processRequest(msg,
           req -> dispatchRequest(msg, dispatcherContext),
@@ -568,6 +575,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void validateContainerCommand(
       ContainerCommandRequestProto msg) throws StorageContainerException {
+    try {
+      HddsUtils.getBlockID(msg);
+    } catch (IllegalArgumentException e) {
+      throw new StorageContainerException(e.getMessage(), e, Result.INVALID_ARGUMENT);
+    }
     try {
       validateToken(msg);
     } catch (IOException ioe) {
