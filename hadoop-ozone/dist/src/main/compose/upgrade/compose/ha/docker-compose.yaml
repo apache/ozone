@@ -63,6 +63,7 @@ x-volumes:
     - &keytabs ../../../_keytabs:/etc/security/keytabs
     - &krb5conf ./krb5.conf:/etc/krb5.conf
     - &ozone-dir ../../../..:${OZONE_DIR}
+    - &envtoconf ../../../../libexec/envtoconf.py:/opt/envtoconf.py
     - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
@@ -95,6 +96,7 @@ services:
       - *krb5conf
       - ../../../..:/opt/ozone
       - *transformation
+      - *envtoconf
   om1:
     <<: *om
     hostname: om1
@@ -107,6 +109,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   om2:
     <<: *om
     hostname: om2
@@ -119,6 +122,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   om3:
     <<: *om
     hostname: om3
@@ -131,6 +135,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
 
   scm1:
     <<: *scm
@@ -147,6 +152,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   scm2:
     <<: *scm
     environment:
@@ -163,6 +169,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   scm3:
     <<: *scm
     environment:
@@ -179,7 +186,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
-
+      - *envtoconf
   dn1:
     <<: *datanode
     hostname: dn1
@@ -192,6 +199,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   dn2:
     <<: *datanode
     hostname: dn2
@@ -204,6 +212,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   dn3:
     <<: *datanode
     hostname: dn3
@@ -216,6 +225,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   dn4:
     <<: *datanode
     hostname: dn4
@@ -228,6 +238,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   dn5:
     <<: *datanode
     hostname: dn5
@@ -240,6 +251,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   recon:
     command: ["ozone","recon"]
     <<: *common-config
@@ -257,6 +269,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
+      - *envtoconf
   s3g:
     command: ["ozone","s3g"]
     <<: *common-config
@@ -274,7 +287,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
-
+      - *envtoconf
 networks:
   net:
     driver: bridge

@@ -21,6 +21,7 @@ services:
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     ports:
       - 8088:8088
     env_file:
@@ -36,6 +37,7 @@ services:
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     env_file:
       - docker-config
       - ../common/hadoop.conf

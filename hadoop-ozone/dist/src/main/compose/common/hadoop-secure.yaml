@@ -22,6 +22,7 @@ services:
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
@@ -41,6 +42,7 @@ services:
     volumes:
       - ../..:/opt/ozone
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     env_file:
@@ -63,6 +65,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     ports:
       - 8188:8188
     env_file:

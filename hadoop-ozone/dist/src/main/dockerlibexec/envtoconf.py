@@ -17,7 +17,7 @@
 #
 
 """convert environment variables to config"""
-
+import json
 import os
 import re
 
@@ -38,6 +38,7 @@ class Simple(object):
     self.output_dir = self.args.destination
     self.excluded_envs = ['HADOOP_CONF_DIR']
     self.configurables = {}
+    self.conf_container_prefix = 'OZONE_CONF_CONTAINER'
 
   def destination_file_path(self, name, extension):
     """destination file path"""
@@ -51,36 +52,48 @@ class Simple(object):
   def process_envs(self):
     """Process environment variables"""
     for key in os.environ.keys():
-      if key in self.excluded_envs:
-          continue
-      pattern = re.compile("[_\\.]")
-      parts = pattern.split(key)
-      extension = None
-      name = parts[0].lower()
-      if len(parts) > 1:
-        extension = parts[1].lower()
-        config_key = key[len(name) + len(extension) + 2:].strip()
-      if extension and "!" in extension:
-        splitted = extension.split("!")
-        extension = splitted[0]
-        fmt = splitted[1]
-        config_key = key[len(name) + len(extension) + len(fmt) + 3:].strip()
+      if key.startswith(self.conf_container_prefix):
+        conf_variables=json.loads(os.environ[key])
+        for conf_key in conf_variables:
+          self.process_env_var(conf_key, conf_variables[conf_key])
       else:
-        fmt = extension
+        self.process_env_var(key, os.environ[key])
 
-      if extension and extension in self.known_formats:
-        if name not in self.configurables.keys():
-          with open(self.destination_file_path(name, extension) + ".raw", "w") as myfile:
-            myfile.write("")
-        self.configurables[name] = (extension, fmt)
-        self.write_env_var(name, extension, config_key, os.environ[key])
-      else:
-        for configurable_name in self.configurables:
-          if key.lower().startswith(configurable_name.lower()):
-            self.write_env_var(configurable_name,
-                               self.configurables[configurable_name],
-                               key[len(configurable_name) + 1:],
-                               os.environ[key])
+  def process_env_var(self, env_key, env_value):
+    """Process environment variable"""
+    if env_key in self.excluded_envs:
+      return
+
+    pattern = re.compile("[_\\.]")
+    parts = pattern.split(env_key)
+    extension = None
+    name = parts[0].lower()
+    config_key = ''
+
+    if len(parts) > 1:
+      extension = parts[1].lower()
+      config_key = env_key[len(name) + len(extension) + 2:].strip()
+    if extension and "!" in extension:
+      splitted = extension.split("!")
+      extension = splitted[0]
+      fmt = splitted[1]
+      config_key = env_key[len(name) + len(extension) + len(fmt) + 3:].strip()
+    else:
+      fmt = extension
+
+    if extension and extension.lower() in self.known_formats:
+      if name not in self.configurables.keys():
+        with open(self.destination_file_path(name, extension) + ".raw", "w") as myfile:
+          myfile.write("")
+      self.configurables[name] = (extension, fmt)
+      self.write_env_var(name, extension, config_key, env_value)
+    else:
+      for configurable_name in self.configurables:
+        if env_key.lower().startswith(configurable_name.lower()):
+          self.write_env_var(configurable_name,
+                             self.configurables[configurable_name],
+                             env_key[len(configurable_name) + 1:],
+                             env_value)
 
   def transform(self):
     """transform"""

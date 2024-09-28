@@ -47,6 +47,7 @@ services:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
     volumes:
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     command: [ "hadoop", "kms" ]
   datanode:
     <<: *new-config

@@ -37,6 +37,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
     command: ["hadoop", "kms"]

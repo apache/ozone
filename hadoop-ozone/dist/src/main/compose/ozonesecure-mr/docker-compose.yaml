@@ -33,6 +33,7 @@ services:
     volumes:
       - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}

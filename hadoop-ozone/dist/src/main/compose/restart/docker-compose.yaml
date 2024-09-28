@@ -45,6 +45,7 @@ services:
       - ${OZONE_VOLUME}/dn1:/data
       - ../..:${OZONE_DIR}
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
   dn2:
     <<: *datanode
     networks:
@@ -54,6 +55,7 @@ services:
       - ${OZONE_VOLUME}/dn2:/data
       - ../..:${OZONE_DIR}
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
   dn3:
     <<: *datanode
     networks:
@@ -63,6 +65,7 @@ services:
       - ${OZONE_VOLUME}/dn3:/data
       - ../..:${OZONE_DIR}
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
   om:
     command: ["ozone","om"]
     <<: *common-config
@@ -79,6 +82,7 @@ services:
       - ${OZONE_VOLUME}/om:/data
       - ../..:${OZONE_DIR}
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
   recon:
     command: ["ozone","recon"]
     <<: *common-config
@@ -92,6 +96,7 @@ services:
     volumes:
       - ${OZONE_VOLUME}/recon:/data
       - ../..:${OZONE_DIR}
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
   s3g:
     command: ["ozone","s3g"]
@@ -106,6 +111,7 @@ services:
     volumes:
       - ${OZONE_VOLUME}/s3g:/data
       - ../..:${OZONE_DIR}
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
   scm:
     command: ["ozone","scm"]
@@ -122,6 +128,7 @@ services:
     volumes:
       - ${OZONE_VOLUME}/scm:/data
       - ../..:${OZONE_DIR}
+      - ../../libexec/envtoconf.py:/opt/envtoconf.py
       - ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 networks:

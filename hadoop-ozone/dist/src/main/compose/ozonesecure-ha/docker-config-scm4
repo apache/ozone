@@ -14,5 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3,scm4
-OZONE-SITE.XML_ozone.scm.address.scmservice.scm4=scm4.org
+OZONE_CONF_CONTAINER_SCM4='{
+"OZONE-SITE.XML_ozone.scm.nodes.scmservice": "scm1,scm2,scm3,scm4",
+"OZONE-SITE.XML_ozone.scm.address.scmservice.scm4": "scm4.org"
+}'
