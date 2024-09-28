@@ -114,7 +114,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
-    <commons-configuration2.version>2.10.1</commons-configuration2.version>
+    <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <zstd-jni.version>1.5.6-4</zstd-jni.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-io.version>2.16.1</commons-io.version>
