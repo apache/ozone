@@ -46,7 +46,7 @@ public final class ChunkManagerFactory {
    * @param conf     Configuration
    * @param manager  This parameter will be used only for read data of
    *                 FILE_PER_CHUNK layout file. Can be null for other cases.
-   * @return
+   * @return {@code ChunkManager}
    */
   public static ChunkManager createChunkManager(ConfigurationSource conf,
       BlockManager manager, VolumeSet volSet) {

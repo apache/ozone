@@ -707,7 +707,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   /**
    * {@link #writeStateMachineData(ContainerCommandRequestProto, long, long, long)}
    * calls are not synchronized with each other
-   * and also with {@link #applyTransaction(TransactionContext)}.
+   * and also with {@code applyTransaction(TransactionContext)}.
    */
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {

@@ -430,7 +430,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @param role          - node role: OM/SCM/DN.
    * @param startSerialId - start certificate serial id.
    * @param count         - max number of certificates returned in a batch.
-   * @return
+   * @return {@code List<String>}
    * @throws IOException
    */
   @Override

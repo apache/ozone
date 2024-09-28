@@ -125,7 +125,7 @@ public final class HddsServerUtil {
       HddsServerUtil.class);
 
   /**
-   * Add protobuf-based protocol to the {@link RPC.Server}.
+   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
    * @param conf configuration
    * @param protocol Protocol interface
    * @param service service that implements the protocol

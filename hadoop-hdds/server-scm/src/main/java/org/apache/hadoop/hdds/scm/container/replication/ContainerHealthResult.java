@@ -248,7 +248,7 @@ public class ContainerHealthResult {
     /**
      * Returns true if a container has under-replication caused by offline
      * indexes, but it is corrected by a pending add.
-     * @return
+     * @return {@code boolean}
      */
     public boolean offlineIndexesOkAfterPending() {
       return offlineIndexesOkAfterPending;

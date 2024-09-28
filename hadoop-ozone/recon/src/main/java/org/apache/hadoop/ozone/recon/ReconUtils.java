@@ -369,7 +369,7 @@ public class ReconUtils {
    *
    * @param reconDbDir
    * @param fileNamePrefix
-   * @return
+   * @return File
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;

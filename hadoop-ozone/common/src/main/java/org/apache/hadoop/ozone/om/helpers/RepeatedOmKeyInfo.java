@@ -111,8 +111,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
 
   /**
    *
-   * @param compact, true for persistence, false for network transmit
-   * @return
+   * @param compact  true for persistence, false for network transmit
+   * @return RepeatedKeyInfo
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();

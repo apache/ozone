@@ -27,7 +27,7 @@ public interface StreamingSource {
 
   /**
    *
-   * @param id: custom identifier
+   * @param id custom identifier
    *
    * @return map of files which should be copied (logical name -&gt; real path)
    */

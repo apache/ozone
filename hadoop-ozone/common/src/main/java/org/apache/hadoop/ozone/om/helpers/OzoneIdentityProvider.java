@@ -43,7 +43,7 @@ public class OzoneIdentityProvider implements IdentityProvider {
   }
 
   /**
-   * If schedulable isn't instance of {@link Server.Call},
+   * If schedulable isn't instance of {@link org.apache.hadoop.ipc.Server.Call},
    * then trying to access getCallerContext() method, will
    * result in an exception.
    *

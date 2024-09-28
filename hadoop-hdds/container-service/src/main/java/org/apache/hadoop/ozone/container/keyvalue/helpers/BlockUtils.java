@@ -99,7 +99,7 @@ public final class BlockUtils {
    * opened by this thread, the other thread will get a RocksDB exception.
    * @param containerData The container data
    * @param conf Configuration
-   * @return
+   * @return {@code DatanodeStore}
    * @throws IOException
    */
   public static DatanodeStore getUncachedDatanodeStore(

@@ -49,7 +49,7 @@ public interface HealthCheck {
    * returns false. This allows handlers to be chained together, and each will
    * be tried in turn until one succeeds.
    * @param handler
-   * @return
+   * @return {@code HealthCheck}
    */
   HealthCheck addNext(HealthCheck handler);
 

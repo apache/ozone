@@ -118,7 +118,7 @@ public interface SCMSecurityProtocol {
 
   /**
    * Get Root CA certificate.
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   String getRootCACertificate() throws IOException;
