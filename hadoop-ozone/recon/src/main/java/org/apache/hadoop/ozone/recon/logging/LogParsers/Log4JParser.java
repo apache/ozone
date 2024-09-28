@@ -21,7 +21,8 @@ public class Log4JParser implements LogParser {
 
   public Log4JParser() {
     final String date_regex = "(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})";
-    final String time_regex = "(?<hour>\\d{2}):(?<minute>\\d{2}):(?<second>\\d{2})[,.](?<ms>\\d{3})";
+    // We might have a second part to the string or not based on the log4j properties
+    final String time_regex = "(?<hour>\\d{2}):(?<minute>\\d{2}):(?<second>\\d{2})[,.]?(?<ms>\\d{3})?";
     final String log_level_regex = "\\w+";
     // Match any non-whitespace character but exclude trailing colon
     final String source_regex = "\\S*[^ \\t\\n\\r\\f\\v:]";
@@ -45,9 +46,9 @@ public class Log4JParser implements LogParser {
    * @throws ParseException in case something goes wrong while parsing the time string as Date
    */
   public LogEvent parseEvent(String line)
-    throws IllegalStateException, ParseException {
+    throws ParseException {
     Matcher m = this.log4jpattern.matcher(line);
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ENGLISH);
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
     Date dt;
     if (m.matches()) {
       String time = m.group("year") + "-"
@@ -62,8 +63,8 @@ public class Log4JParser implements LogParser {
     }
     else {
       // We were not able to handle the string matching
-      // Raise exception to handle further up during response building
-      throw new IllegalStateException("Failed to find match log line for " + line);
+      // Might be at the middle of a line
+      return null;
     }
   }
 }

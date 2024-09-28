@@ -2,6 +2,7 @@ package org.apache.hadoop.ozone.recon.logging.LogReaders;
 
 
 import com.google.common.primitives.Bytes;
+import org.apache.hadoop.ozone.recon.logging.LogFileEmptyException;
 import org.apache.hadoop.ozone.recon.logging.LogModels.BlockData;
 
 import java.io.*;
@@ -38,22 +39,30 @@ public class LogReader {
   // The direction in which the line and blocks were last read
   private Direction lineDirection;
   private Direction blockDirection;
-  private final RandomAccessFile raf;
+  private static RandomAccessFile raf;
 
-  private String filePath;
-
-  /**
-   * see {@link RandomAccessFile#RandomAccessFile(File,String)}
-   * @param file  Stores the File to read
-   * @param mode  Stores the mode in which we want to access the file
-   */
-  public LogReader(File file, String mode)
-      throws FileNotFoundException {
-    raf = new RandomAccessFile(file, mode);
+  public LogReader() {
     lineDirection = Direction.NEUTRAL;
     blockDirection = Direction.NEUTRAL;
     lines = new ArrayList<>();
   }
+
+  public void initializeReader(File file, String mode)
+      throws IOException, LogFileEmptyException {
+    try {
+      raf = new RandomAccessFile(file, mode);
+      if (0 == raf.length()) {
+        raf.close();
+        raf = null;
+        throw new LogFileEmptyException();
+      }
+    } catch (FileNotFoundException fe) {
+      if(null != raf)
+        raf.close();
+      raf = null;
+    }
+  }
+
   /**
    * Method to reset all buffer related data
    */
@@ -70,7 +79,7 @@ public class LogReader {
    * @return An array of bytes storing the data till newline or null if there is no data
    * @throws IOException in case of I/O errors
    */
-  public byte[] readTillPrevLF() throws IOException {
+  private byte[] readTillPrevLF() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     // Adjusted buffer size, this will change based on if we reached file start
     long buffSize = NEWLINE_BUFFER_SIZE;
@@ -105,9 +114,10 @@ public class LogReader {
         // Go back more beyond the read data
         raf.seek(raf.getFilePointer() - numOfBytesRead - buffSize);
       } else {
+        // we have data available
         // Write the data till newline
         for (int i = 0; i < newLineIdx; i++) {
-          baos.write(data[i]);
+          baos.write(currData[i]);
         }
         data = Bytes.concat(baos.toByteArray(), data);
         baos.reset();
@@ -123,7 +133,7 @@ public class LogReader {
    * @return An array of bytes storing the data till the newline or null if there is no data
    * @throws IOException in case of I/O errors
    */
-  public byte[] readTillNextLF() throws IOException {
+  private byte[] readTillNextLF() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     for(;;) {
       byte[] data = new byte[NEWLINE_BUFFER_SIZE];
@@ -155,11 +165,11 @@ public class LogReader {
    * @return {@link BlockData} with byte array of the data and offset position of the block
    * @throws IOException if I/O operation error occurs
    */
-  public BlockData readPreviousBlock() throws IOException {
-    // If the last block was read in the forwards direction we need
-    // to adjust position to beginning of the block
-    if (Direction.FORWARD == blockDirection) {
-      raf.seek(raf.getFilePointer() - lastBlockSize);
+  private BlockData readPreviousBlock() throws IOException {
+
+    // Some error caused raf to not be initialized
+    if (null == raf) {
+      return null;
     }
 
     // If we are at the beginning of the file, there is nothing more to go back
@@ -168,27 +178,36 @@ public class LogReader {
       return null;
     }
 
+    // If the last block was read in the forwards direction we need
+    // to adjust position to beginning of the block
+    if (Direction.FORWARD == blockDirection) {
+      raf.seek(raf.getFilePointer() - lastBlockSize);
+    }
+
     // Seek to the start of the block to read
     long blockSize = Math.min(raf.getFilePointer(), BLOCK_SIZE);
     raf.seek(raf.getFilePointer() - blockSize);
     long offset = raf.getFilePointer();
     byte[] blockData = new byte[(int) blockSize];
     int numOfBytesRead = raf.read(blockData);
-    if (numOfBytesRead > 0) {
-      // Go back to block start position
-      raf.seek(raf.getFilePointer() - blockSize);
-      // Fetch the previous new line before this block
-      byte[] dataTillLF = readTillPrevLF();
-      if (null == dataTillLF) {
-        return null;
-      }
-      // Prepend the previous data till new line
-      blockData = Bytes.concat(dataTillLF, blockData);
-      // The offset should go back by the extra new line data size
-      offset -= dataTillLF.length;
-      lastBlockSize = blockData.length;
-      blockDirection = Direction.REVERSE;
+
+    // Nothing was read
+    if (numOfBytesRead < 0) {
+      return null;
     }
+    // Go back to block start position
+    raf.seek(raf.getFilePointer() - blockSize);
+    // Fetch the previous new line before this block
+    byte[] dataTillLF = readTillPrevLF();
+    if (null == dataTillLF) {
+      return null;
+    }
+    // Prepend the previous data till new line
+    blockData = Bytes.concat(dataTillLF, blockData);
+    // The offset should go back by the extra new line data size
+    offset -= dataTillLF.length;
+    lastBlockSize = blockData.length;
+    blockDirection = Direction.REVERSE;
     return new BlockData(blockData, offset);
   }
 
@@ -197,24 +216,36 @@ public class LogReader {
    * @return {@link BlockData} with the byte array of data and offset position for the block
    * @throws IOException if I/O operation error occurs
    */
-  public BlockData readNextBlock() throws IOException {
-    // If the last block was read in the reverse direction we need
-    // to adjust the position to the end of the block
-    if (Direction.REVERSE == blockDirection) {
-      raf.seek((raf.getFilePointer() + lastBlockSize));
-    }
+  private BlockData readNextBlock() throws IOException {
 
-    // If we are at the end of the file there is nothing more to be read
-    if (raf.getFilePointer() == getFileSize()) {
-      resetBuffers();
+    // Some error caused raf to not be initialized
+    if (null == raf) {
       return null;
     }
 
     long offset = raf.getFilePointer();
+
+    // If the last block was read in the reverse direction we need
+    // to adjust the position to the end of the block
+    if (Direction.REVERSE == blockDirection) {
+      raf.seek(offset + lastBlockSize);
+    }
+
+    // If we are at the end of the file there is nothing more to be read
+    if (offset == getFileSize()) {
+      resetBuffers();
+      return null;
+    }
+
     byte[] blockData = new byte[BLOCK_SIZE];
     int numBytesRead = raf.read(blockData);
+
+    //Nothing was read
+    if (numBytesRead < 0) {
+      return null;
+    }
     //Check if the last byte is newline or not
-    if (numBytesRead > 0 && ('\n' != (char) blockData[blockData.length - 1])) {
+    if ('\n' != (char) blockData[blockData.length - 1]) {
       byte[] dataTillLF = readTillNextLF();
       if (null == dataTillLF) {
         return null;
@@ -223,7 +254,6 @@ public class LogReader {
     }
     lastBlockSize = blockData.length;
     blockDirection = Direction.FORWARD;
-
     return new BlockData(blockData, offset);
   }
 
@@ -247,6 +277,7 @@ public class LogReader {
     }
     currLinePos -= 1;
     String line = lines.get(currLinePos);
+
     lineDirection = Direction.REVERSE;
     return line;
   }
@@ -269,6 +300,7 @@ public class LogReader {
       lines = nextBlockData.getLinesFromBlock();
       currLinePos = 0;
     }
+
     String line = lines.get(currLinePos);
     currLinePos += 1;
     lineDirection = Direction.FORWARD;
@@ -280,20 +312,29 @@ public class LogReader {
    * @throws IOException if something goes wrong during I/O operation
    */
   public void goToFileStart() throws IOException {
-    raf.seek(0);
+    if (null != raf)
+      raf.seek(0);
     resetBuffers();
   }
 
   public void goToFileEnd() throws IOException {
-    raf.seek(getFileSize());
+    if (null != raf)
+      raf.seek(getFileSize());
+
     resetBuffers();
   }
 
   public void goToPosition(long pos) throws IOException {
+
     // position cannot be before the file start and after file end
     if (pos < 0 || pos > getFileSize()) {
       throw new IOException("File Pointer out of bounds");
     }
+    // Something might have gone wrong while initializing
+    if (null == raf) {
+      throw new IOException("File was not opened for read");
+    }
+
     raf.seek(pos);
     resetBuffers();
     // Position might be in the middle of a line so go to the beginning of line
@@ -303,18 +344,19 @@ public class LogReader {
   /**
    * Get the current pointer position in the file
    * @return The offset value representing the pointer
+   *         else -1 if the file is not open
    * @throws IOException in case of any I/O related error
    */
   public long getCurrentOffset() throws IOException{
-    return raf.getFilePointer();
+    return (null == raf) ? -1 : raf.getFilePointer();
   }
 
   /**
    * Get the file size of the file being read
-   * @return the file size
+   * @return the file size else -1 if file is not open
    */
   public long getFileSize() throws IOException{
-    return raf.length();
+    return (null == raf) ? -1 : raf.length();
   }
 
   /**
@@ -322,7 +364,7 @@ public class LogReader {
    * @throws IOException in case something goes wrong while closing
    */
   public void close() throws IOException {
-    raf.close();
+    if (null != raf)
+      raf.close();
   }
-
 }

@@ -25,7 +25,8 @@ public interface LogFetcher {
    * @throws IOException in case something goes wrong during file I/O operations
    * @throws ParseException in case of error during parsing of event timestamp
    */
-  LoggerResponse.Builder getLogs(long offset, Direction direction, int events) throws IOException, ParseException;
+  LoggerResponse.Builder getLogs(long offset, Direction direction, int events)
+    throws IOException, ParseException, LogFileEmptyException;
 
   /**
    * TODO:

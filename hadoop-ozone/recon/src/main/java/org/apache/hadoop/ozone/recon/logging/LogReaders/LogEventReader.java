@@ -1,11 +1,12 @@
 package org.apache.hadoop.ozone.recon.logging.LogReaders;
 
+import org.apache.hadoop.ozone.recon.logging.LogFileEmptyException;
 import org.apache.hadoop.ozone.recon.logging.LogModels.LogEvent;
 import org.apache.hadoop.ozone.recon.logging.LogParsers.Log4JParser;
 import org.apache.hadoop.ozone.recon.logging.LogParsers.LogParser;
+import org.jooq.meta.derby.sys.Sys;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -30,9 +31,13 @@ public class LogEventReader {
   // Stores the next event in the log that is available
   private LogEvent nextEvent = null;
 
-  public LogEventReader(String path) throws FileNotFoundException {
+  public LogEventReader() {
+    lr = new LogReader();
+  }
+
+  public void initializeReader(String path) throws IOException, LogFileEmptyException {
     File file = new File(path);
-    lr = new LogReader(file, "r");
+    lr.initializeReader(file, "r");
   }
 
   /**
