@@ -1899,7 +1899,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <execution>
                 <!-- build javadoc jars per jar for publishing to maven -->
                 <id>module-javadocs</id>
-                <phase>package</phase>
+                <phase>install</phase>
                 <goals>
                   <goal>jar</goal>
                 </goals>
