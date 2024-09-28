@@ -232,15 +232,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -263,30 +254,9 @@ jobs:
           distribution: 'temurin'
           java-version: 11
       - name: Run a full build with javadocs generation
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdocs -Dmaven.javadoc.skip=false
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdocs -Dmaven.javadoc.skip=false -Dskip.npx -Dskip.installnpx
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Store binaries for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-bin
-          path: |
-            hadoop-ozone/dist/target/ozone-*.tar.gz
-            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store source tarball for compilation
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-src
-          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-          retention-days: 1
   basic:
     needs:
       - build-info
