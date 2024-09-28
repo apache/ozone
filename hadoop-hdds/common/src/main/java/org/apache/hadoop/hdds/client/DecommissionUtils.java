@@ -97,7 +97,7 @@ public final class DecommissionUtils {
    * Returns the number of decommissioning nodes.
    *
    * @param jsonNode
-   * @return
+   * @return {@code int}
    */
   public static int getNumDecomNodes(JsonNode jsonNode) {
     int numDecomNodes;
@@ -118,7 +118,7 @@ public final class DecommissionUtils {
    * @param numDecomNodes
    * @param countsMap
    * @param errMsg
-   * @return
+   * @return {@code Map<String, Object>}
    * @throws IOException
    */
   @Nullable
