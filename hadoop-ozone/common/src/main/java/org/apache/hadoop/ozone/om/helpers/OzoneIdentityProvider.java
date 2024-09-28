@@ -21,7 +21,6 @@ import io.netty.util.internal.StringUtil;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.IdentityProvider;
 import org.apache.hadoop.ipc.Schedulable;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
