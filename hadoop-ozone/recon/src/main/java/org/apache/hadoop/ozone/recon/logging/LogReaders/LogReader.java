@@ -1,8 +1,8 @@
-package org.apache.hadoop.ozone.recon.logs.LogReaders;
+package org.apache.hadoop.ozone.recon.logging.LogReaders;
 
 
 import com.google.common.primitives.Bytes;
-import org.apache.hadoop.ozone.recon.logs.LogModels.BlockData;
+import org.apache.hadoop.ozone.recon.logging.LogModels.BlockData;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -28,7 +28,6 @@ public class LogReader {
   private int lastBlockSize = 0;
   //This will be an ArrayList to act as the buffer for our strings
   private List<String> lines;
-  private final long fileSize;
 
   private enum Direction {
     FORWARD,
@@ -41,23 +40,20 @@ public class LogReader {
   private Direction blockDirection;
   private final RandomAccessFile raf;
 
+  private String filePath;
+
   /**
    * see {@link RandomAccessFile#RandomAccessFile(File,String)}
    * @param file  Stores the File to read
-   * @param mode  Stores the mode in which we open the file
-   * @throws IOException if the file is not present or error occurs during I/O
-   * @throws SecurityException if the file is not having proper permissions
+   * @param mode  Stores the mode in which we want to access the file
    */
   public LogReader(File file, String mode)
-    throws IOException, SecurityException {
+      throws FileNotFoundException {
     raf = new RandomAccessFile(file, mode);
     lineDirection = Direction.NEUTRAL;
     blockDirection = Direction.NEUTRAL;
-    lines = new ArrayList<String>();
-    fileSize = raf.length();
-
+    lines = new ArrayList<>();
   }
-
   /**
    * Method to reset all buffer related data
    */
@@ -209,7 +205,7 @@ public class LogReader {
     }
 
     // If we are at the end of the file there is nothing more to be read
-    if (raf.getFilePointer() == fileSize) {
+    if (raf.getFilePointer() == getFileSize()) {
       resetBuffers();
       return null;
     }
@@ -280,12 +276,45 @@ public class LogReader {
   }
 
   /**
+   * Set the file pointer to the beginning of the file
+   * @throws IOException if something goes wrong during I/O operation
+   */
+  public void goToFileStart() throws IOException {
+    raf.seek(0);
+    resetBuffers();
+  }
+
+  public void goToFileEnd() throws IOException {
+    raf.seek(getFileSize());
+    resetBuffers();
+  }
+
+  public void goToPosition(long pos) throws IOException {
+    // position cannot be before the file start and after file end
+    if (pos < 0 || pos > getFileSize()) {
+      throw new IOException("File Pointer out of bounds");
+    }
+    raf.seek(pos);
+    resetBuffers();
+    // Position might be in the middle of a line so go to the beginning of line
+    readTillPrevLF();
+  }
+
+  /**
    * Get the current pointer position in the file
    * @return The offset value representing the pointer
    * @throws IOException in case of any I/O related error
    */
   public long getCurrentOffset() throws IOException{
     return raf.getFilePointer();
+  }
+
+  /**
+   * Get the file size of the file being read
+   * @return the file size
+   */
+  public long getFileSize() throws IOException{
+    return raf.length();
   }
 
   /**

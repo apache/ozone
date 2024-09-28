@@ -1,4 +1,4 @@
-package org.apache.hadoop.ozone.recon.logs.LogModels;
+package org.apache.hadoop.ozone.recon.logging.LogModels;
 
 
 import java.io.BufferedReader;

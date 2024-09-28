@@ -1,9 +1,9 @@
-package org.apache.hadoop.ozone.recon.logs.LogParsers;
+package org.apache.hadoop.ozone.recon.logging.LogParsers;
 
 
-import org.apache.hadoop.ozone.recon.logs.LogModels.LogLine;
-import org.apache.hadoop.ozone.recon.logs.LogParsers.LogParser;
+import org.apache.hadoop.ozone.recon.logging.LogModels.LogEvent;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 public class Log4JParser implements LogParser {
   private final Pattern log4jpattern;
 
-  Log4JParser() {
+  public Log4JParser() {
     final String date_regex = "(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})";
     final String time_regex = "(?<hour>\\d{2}):(?<minute>\\d{2}):(?<second>\\d{2})[,.](?<ms>\\d{3})";
     final String log_level_regex = "\\w+";
@@ -37,8 +37,15 @@ public class Log4JParser implements LogParser {
     this.log4jpattern = Pattern.compile(log4j_regex);
   }
 
-  public LogLine ParseEvent(String line)
-    throws Exception{
+  /**
+   * Parse a line representing a log line as a log event
+   * @param line  Stores the log line
+   * @return Instance of LogEvent
+   * @throws IllegalStateException in case no match could be found
+   * @throws ParseException in case something goes wrong while parsing the time string as Date
+   */
+  public LogEvent parseEvent(String line)
+    throws IllegalStateException, ParseException {
     Matcher m = this.log4jpattern.matcher(line);
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ENGLISH);
     Date dt;
@@ -51,12 +58,12 @@ public class Log4JParser implements LogParser {
         + m.group("second") + "."
         + m.group("ms");
       dt = sdf.parse(time);
-      return new LogLine(dt, m.group("level"), m.group("source"), m.group("message"));
+      return new LogEvent(dt, m.group("level"), m.group("source"), m.group("message"));
     }
     else {
       // We were not able to handle the string matching
       // Raise exception to handle further up during response building
-      throw new Exception("Failed to match log line for " + line);
+      throw new IllegalStateException("Failed to find match log line for " + line);
     }
   }
 }

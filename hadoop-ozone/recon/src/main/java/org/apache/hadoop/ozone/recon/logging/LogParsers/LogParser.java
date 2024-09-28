@@ -1,6 +1,8 @@
-package org.apache.hadoop.ozone.recon.logs.LogParsers;
+package org.apache.hadoop.ozone.recon.logging.LogParsers;
 
-import org.apache.hadoop.ozone.recon.logs.LogModels.LogLine;
+import org.apache.hadoop.ozone.recon.logging.LogModels.LogEvent;
+
+import java.text.ParseException;
 
 
 /**
@@ -13,5 +15,5 @@ public interface LogParser {
    * @param line Stores the line from the log file to parse
    * @return The event type
    */
-  LogLine ParseEvent(String line) throws Exception;
+  LogEvent parseEvent(String line) throws IllegalStateException, ParseException;
 }

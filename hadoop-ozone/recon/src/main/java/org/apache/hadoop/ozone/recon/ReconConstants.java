@@ -99,5 +99,5 @@ public final class ReconConstants {
   public static final String DEFAULT_RECON_LOG_LINES = "100";
 
   public static final String RECON_LOG_DIRECTION = "direction";
-  public static final String DEFAULT_RECON_LOG_DIRECTION = "1";
+  public static final String DEFAULT_RECON_LOG_DIRECTION = "NEUTRAL";
 }
