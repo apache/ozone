@@ -437,7 +437,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
 
   private KeyProviderCryptoExtension kmsProvider;
-  private OzoneFsServerDefaults serverDefaults;
   private final OMLayoutVersionManager versionManager;
 
   private final ReplicationConfigValidator replicationConfigValidator;
@@ -655,14 +654,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       kmsProvider = null;
       LOG.error("Fail to create Key Provider");
     }
-    Configuration hadoopConfig =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
-    URI keyProviderUri = KMSUtil.getKeyProviderUri(
-            hadoopConfig,
-            CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
-    String keyProviderUriStr =
-        (keyProviderUri != null) ? keyProviderUri.toString() : null;
-    serverDefaults = new OzoneFsServerDefaults(keyProviderUriStr);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -3140,6 +3131,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
             .build());
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
+    URI keyProviderUri = KMSUtil.getKeyProviderUri(
+        hadoopConfig,
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
+    String keyProviderUriStr =
+        (keyProviderUri != null) ? keyProviderUri.toString() : null;
+    omServiceInfoBuilder.setServerDefaults(
+        new OzoneFsServerDefaults(keyProviderUriStr));
     if (httpServer != null
         && httpServer.getHttpAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
@@ -4747,11 +4747,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Unsupported safe mode action " + action,
           INTERNAL_ERROR);
     }
-  }
-
-  @Override
-  public OzoneFsServerDefaults getServerDefaults() {
-    return serverDefaults;
   }
 
   @Override
