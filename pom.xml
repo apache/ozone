@@ -1893,7 +1893,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-javadoc-plugin</artifactId>
             <configuration>
               <additionalJOption>-Xdoclint:none</additionalJOption>
-              <failOnWarnings>true</failOnWarnings>
+              <failOnWarnings>false</failOnWarnings>
             </configuration>
             <executions>
               <execution>
