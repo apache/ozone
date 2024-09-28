@@ -19,7 +19,7 @@ version: "3.8"
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-old-config:
   &old-config
-  image: apache/ozone:${OZONE_VERSION}
+  image: apache/ozone:${OZONE_VERSION}-rocky
   env_file:
     - docker-config
   volumes:
