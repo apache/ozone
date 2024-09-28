@@ -189,12 +189,12 @@ public class BaseFreonGenerator {
           completed.set(true);
           break;
         }
-      } else {
-        //in case of an other failed test, we shouldn't execute more tasks.
-        if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
-          completed.set(true);
-          break;
-        }
+      }
+
+      //in case of an other failed test, we shouldn't execute more tasks.
+      if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
+        completed.set(true);
+        break;
       }
 
       tryNextTask(provider, counter % testNo);
