@@ -407,7 +407,7 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Convert exception result to {@link OzoneManagerProtocolProtos.Status}.
+   * Convert exception result to {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status}.
    * @param exception
    * @return Status
    */

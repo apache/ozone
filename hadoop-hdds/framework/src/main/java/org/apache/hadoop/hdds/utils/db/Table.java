@@ -246,7 +246,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
   /**
    * Returns a certain range of key value pairs as a list based on a
-   * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter}
+   * startKey or count. Further a {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}
    * can be added to * filter keys if necessary.
    * To prevent race conditions while listing
    * entries, this implementation takes a snapshot and lists the entries from

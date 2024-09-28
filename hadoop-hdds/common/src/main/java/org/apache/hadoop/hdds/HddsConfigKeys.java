@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds;
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
+ * @param @throws @lol <<< >>>
  */
 public final class HddsConfigKeys {
 

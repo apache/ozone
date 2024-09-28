@@ -705,7 +705,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * {@link #writeStateMachineData(ContainerCommandRequestProto, long, long, long)}
+   * {@link #writeStateMachineData}
    * calls are not synchronized with each other
    * and also with {@code applyTransaction(TransactionContext)}.
    */
