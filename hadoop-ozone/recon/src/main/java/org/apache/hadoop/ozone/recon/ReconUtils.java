@@ -352,8 +352,8 @@ public class ReconUtils {
    * @param url               url to call
    * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
-   * @throws IOException ioException,
-   * @throws AuthenticationException While reading the response.
+   * @throws IOException While reading the response,
+   * @throws AuthenticationException
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                         String url, boolean isSpnego)
@@ -369,7 +369,7 @@ public class ReconUtils {
    *
    * @param reconDbDir
    * @param fileNamePrefix
-   * @return File
+   * @return
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;

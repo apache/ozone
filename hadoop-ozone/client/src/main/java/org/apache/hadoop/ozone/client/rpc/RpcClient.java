@@ -2590,17 +2590,27 @@ public class RpcClient implements ClientProtocol {
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
         (now - serverDefaultsLastUpdate > serverDefaultsValidityPeriod)) {
-      serverDefaults = ozoneManagerClient.getServerDefaults();
-      serverDefaultsLastUpdate = now;
+      try {
+        for (ServiceInfo si : ozoneManagerClient.getServiceInfo()
+            .getServiceInfoList()) {
+          if (si.getServerDefaults() != null) {
+            serverDefaults = si.getServerDefaults();
+            serverDefaultsLastUpdate = now;
+            break;
+          }
+        }
+      } catch (Exception e) {
+        LOG.warn("Could not get server defaults from OM.", e);
+      }
     }
-    assert serverDefaults != null;
     return serverDefaults;
   }
 
   @Override
   public URI getKeyProviderUri() throws IOException {
-    return OzoneKMSUtil.getKeyProviderUri(ugi,
-        null, getServerDefaults().getKeyProviderUri(), conf);
+    String keyProviderUri = (getServerDefaults() != null) ?
+        serverDefaults.getKeyProviderUri() : null;
+    return OzoneKMSUtil.getKeyProviderUri(ugi, null, keyProviderUri, conf);
   }
 
   @Override

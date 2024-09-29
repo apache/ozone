@@ -24,8 +24,9 @@ package org.apache.hadoop.hdds.recon;
  */
 public final class ReconConfigKeys {
 
-
-  /** Never constructed. **/
+  /**
+   * Never constructed.
+   */
   private ReconConfigKeys() {
   }
 

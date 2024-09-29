@@ -45,7 +45,7 @@ public interface PipelineStateManager {
 
   /**
    * Removing pipeline would be replicated to Ratis.
-   * @param pipelineIDProto Pipeline
+   * @param pipelineIDProto
    * @throws IOException
    */
   @Replicate
