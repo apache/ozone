@@ -570,7 +570,6 @@ public class ReconUtils {
    * @param dateFormat
    * @param timeZone
    * @return the epoch milliseconds representation of the date.
-   * @throws ParseException
    */
   public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
     String localDateFormat = dateFormat;
