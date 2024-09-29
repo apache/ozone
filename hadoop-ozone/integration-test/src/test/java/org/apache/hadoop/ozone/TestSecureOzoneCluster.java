@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -375,7 +376,7 @@ final class TestSecureOzoneCluster {
       try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
           getScmSecurityClient(conf, ugi)) {
         assertNotNull(securityClient);
-        String caCert = securityClient.getCACertificate();
+        CertPath caCert = securityClient.getCACertificate();
         assertNotNull(caCert);
         // Get some random certificate, used serial id 100 which will be
         // unavailable as our serial id is time stamp. Serial id 1 is root CA,
@@ -927,10 +928,8 @@ final class TestSecureOzoneCluster {
           .contains("Successfully stored OM signed certificate");
       X509Certificate certificate = om.getCertificateClient().getCertificate();
       validateCertificate(certificate);
-      String pemEncodedCACert =
-          scm.getSecurityProtocolServer().getCACertificate();
-      X509Certificate caCert =
-          CertificateCodec.getX509Certificate(pemEncodedCACert);
+      CertPath pemEncodedCACert = scm.getSecurityProtocolServer().getCACertificate();
+      X509Certificate caCert = (X509Certificate) pemEncodedCACert.getCertificates().get(0);
       X509Certificate caCertStored = om.getCertificateClient()
           .getCertificate(caCert.getSerialNumber().toString());
       assertEquals(caCert, caCertStored);

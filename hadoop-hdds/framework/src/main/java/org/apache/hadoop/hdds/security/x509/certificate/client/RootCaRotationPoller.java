@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,12 +81,8 @@ public class RootCaRotationPoller implements Runnable, Closeable {
    */
   void pollRootCas() {
     try {
-      List<String> pemEncodedRootCaList =
-          scmSecureClient.getAllRootCaCertificates();
-      List<X509Certificate> rootCAsFromSCM =
-          OzoneSecurityUtil.convertToX509(pemEncodedRootCaList);
-      List<X509Certificate> scmCertsWithoutKnownCerts
-          = new ArrayList<>(rootCAsFromSCM);
+      List<X509Certificate> rootCAsFromSCM = scmSecureClient.getAllRootCaCertificates();
+      List<X509Certificate> scmCertsWithoutKnownCerts = new ArrayList<>(rootCAsFromSCM);
       scmCertsWithoutKnownCerts.removeAll(knownRootCerts);
       if (scmCertsWithoutKnownCerts.isEmpty()) {
         return;

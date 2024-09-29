@@ -373,14 +373,15 @@ public final class HAUtils {
 
   /**
    * Retry forever until CA list matches expected count.
+   *
    * @param task - task to get CA list.
    * @return CA list.
    */
-  private static List<String> getCAListWithRetry(Callable<List<String>> task,
+  private static List<X509Certificate> getCAListWithRetry(Callable<List<X509Certificate>> task,
       long waitDuration) throws IOException {
     RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
         waitDuration, TimeUnit.SECONDS);
-    RetriableTask<List<String>> retriableTask =
+    RetriableTask<List<X509Certificate>> retriableTask =
         new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
@@ -390,14 +391,14 @@ public final class HAUtils {
     }
   }
 
-  private static List<String> waitForCACerts(
-      final CheckedSupplier<List<String>, IOException> caCertListSupplier,
+  private static List<X509Certificate> waitForCACerts(
+      final CheckedSupplier<List<X509Certificate>, IOException> caCertListSupplier,
       int expectedCount) throws IOException {
     // TODO: If SCMs are bootstrapped later, then listCA need to be
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
-    List<String> caCertPemList = caCertListSupplier.get();
+    List<X509Certificate> caCertPemList = caCertListSupplier.get();
     boolean caListUpToDate = caCertPemList.size() >= expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
@@ -436,11 +437,11 @@ public final class HAUtils {
     } else {
       int expectedCount = scmNodes.size() + 1;
       if (scmNodes.size() > 1) {
-        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
+        return getCAListWithRetry(() -> waitForCACerts(
             scmSecurityProtocolClient::listCACertificate,
-            expectedCount), waitDuration));
+            expectedCount), waitDuration);
       } else {
-        return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
+        return scmSecurityProtocolClient.listCACertificate();
       }
     }
   }

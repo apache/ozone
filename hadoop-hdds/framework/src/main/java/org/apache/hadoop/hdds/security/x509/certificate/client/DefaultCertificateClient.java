@@ -476,7 +476,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Getting certificate with certSerialId:{}.",
         certId);
     try {
-      String pemEncodedCert = getScmSecureClient().getCertificate(certId);
+      X509Certificate certFromScm = getScmSecureClient().getCertificate(certId);
+      String pemEncodedCert = CertificateCodec.getPEMEncodedString(certFromScm);
       this.storeCertificate(pemEncodedCert, CAType.NONE);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {
@@ -622,7 +623,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           rootCaCertificates.add(cert);
         }
       }
-    } catch (IOException | java.security.cert.CertificateException e) {
+    } catch (IOException e) {
       throw new CertificateException("Error while storing certificate.", e,
           CERTIFICATE_ERROR);
     }
@@ -1330,9 +1331,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   private void getAndStoreAllRootCAs(CertificateCodec certCodec, boolean renew)
       throws IOException {
-    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
-    for (String rootCAPem : rootCAPems) {
-      storeCertificate(rootCAPem, CAType.ROOT, certCodec,
+    List<X509Certificate> rootCaCerts = scmSecurityClient.getAllRootCaCertificates();
+    for (X509Certificate rootCAPem : rootCaCerts) {
+      storeCertificate(CertificateCodec.getPEMEncodedString(rootCAPem), CAType.ROOT, certCodec,
           false, !renew);
     }
   }

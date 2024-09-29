@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -83,7 +82,6 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 
 /**
@@ -181,7 +179,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String         - SCM signed pem encoded certificate.
    */
   @Override
-  public String getDataNodeCertificate(
+  public CertPath getDataNodeCertificate(
       DatanodeDetailsProto dnDetails, String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
@@ -195,7 +193,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getCertificate(
+  public CertPath getCertificate(
       NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for {} {}, UUID: {}",
@@ -255,17 +253,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public synchronized List<String> getAllRootCaCertificates()
-      throws IOException {
-    List<String> pemEncodedList = new ArrayList<>();
-    Set<X509Certificate> certList =
+  public synchronized List<X509Certificate> getAllRootCaCertificates() {
+    Set<X509Certificate> certSet =
         scmCertificateClient.getAllRootCaCerts().size() == 0 ?
             scmCertificateClient.getAllCaCerts() :
             scmCertificateClient.getAllRootCaCerts();
-    for (X509Certificate cert : certList) {
-      pemEncodedList.add(getPEMEncodedString(cert));
-    }
-    return pemEncodedList;
+    return new ArrayList<>(certSet);
   }
 
   /**
@@ -276,7 +269,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String         - SCM signed pem encoded certificate.
    */
   @Override
-  public String getOMCertificate(OzoneManagerDetailsProto omDetails,
+  public CertPath getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
@@ -292,12 +285,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   /**
    * Get signed certificate for SCM Node.
    *
-   * @param scmNodeDetails   - SCM Node Details.
-   * @param certSignReq      - Certificate signing request.
+   * @param scmNodeDetails - SCM Node Details.
+   * @param certSignReq    - Certificate signing request.
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
     return getSCMCertificate(scmNodeDetails, certSignReq, false);
   }
@@ -311,7 +304,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
-  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  public CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean isRenew) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
@@ -333,13 +326,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   /**
-   *  Request certificate for the specified role.
+   * Request certificate for the specified role.
+   *
    * @param certSignReq - Certificate signing request.
-   * @param nodeType - role OM/SCM/DATANODE
+   * @param nodeType    - role OM/SCM/DATANODE
    * @return String         - SCM signed pem encoded certificate.
    * @throws IOException
    */
-  private synchronized String getEncodedCertToString(String certSignReq,
+  private synchronized CertPath getEncodedCertToString(String certSignReq,
       NodeType nodeType) throws IOException {
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
@@ -351,7 +345,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           KERBEROS_TRUSTED, nodeType, getNextCertificateId());
     }
     try {
-      return getPEMEncodedString(future.get());
+      return future.get();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw generateException(e, nodeType);
@@ -391,14 +385,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return string         - pem encoded SCM signed certificate.
    */
   @Override
-  public String getCertificate(String certSerialId) throws IOException {
+  public X509Certificate getCertificate(String certSerialId) throws IOException {
     LOGGER.debug("Getting certificate with certificate serial id {}",
         certSerialId);
     try {
       X509Certificate certificate =
           scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
-        return getPEMEncodedString(certificate);
+        return certificate;
       }
     } catch (CertificateException e) {
       throw new SCMSecurityException("getCertificate operation failed. ", e,
@@ -415,11 +409,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return string         - Root certificate.
    */
   @Override
-  public String getCACertificate() throws IOException {
+  public CertPath getCACertificate() throws IOException {
     LOGGER.debug("Getting CA certificate.");
     try {
-      return getPEMEncodedString(
-          scmCertificateServer.getCaCertPath());
+      return scmCertificateServer.getCaCertPath();
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",
           e, GET_CA_CERT_FAILED);
@@ -434,54 +427,36 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @throws IOException
    */
   @Override
-  public List<String> listCertificate(NodeType role,
+  public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count) throws IOException {
-    List<X509Certificate> certificates = scmCertificateServer.listCertificate(role, startSerialId, count);
-    List<String> results = new ArrayList<>(certificates.size());
-    for (X509Certificate cert : certificates) {
-      try {
-        String certStr = getPEMEncodedString(cert);
-        results.add(certStr);
-      } catch (SCMSecurityException e) {
-        throw new SCMSecurityException("listCertificate operation failed.", e, e.getErrorCode());
-      }
-    }
-    return results;
+    return scmCertificateServer.listCertificate(role, startSerialId, count);
   }
 
   @Override
-  public List<String> listCACertificate() throws IOException {
-    List<String> caCerts =
+  public List<X509Certificate> listCACertificate() throws IOException {
+    List<X509Certificate> caCerts =
         listCertificate(NodeType.SCM, 0, 10);
     return caCerts;
   }
 
   @Override
-  public synchronized String getRootCACertificate() throws IOException {
+  public synchronized X509Certificate getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
     if (rootCertificateServer != null) {
       try {
-        return CertificateCodec.getPEMEncodedString(
-            rootCertificateServer.getCACertificate());
+        return rootCertificateServer.getCACertificate();
       } catch (CertificateException e) {
         LOGGER.error("Failed to get root CA certificate", e);
         throw new IOException("Failed to get root CA certificate", e);
       }
     }
-
-    return CertificateCodec.getPEMEncodedString(
-        scmCertificateClient.getCACertificate());
+    return scmCertificateClient.getCACertificate();
   }
 
   @Override
-  public List<String> removeExpiredCertificates() throws IOException {
+  public List<X509Certificate> removeExpiredCertificates() throws IOException {
     storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
-    List<String> pemEncodedCerts = new ArrayList<>();
-    for (X509Certificate cert : storageContainerManager.getCertificateStore()
-        .removeAllExpiredCertificates()) {
-      pemEncodedCerts.add(CertificateCodec.getPEMEncodedString(cert));
-    }
-    return pemEncodedCerts;
+    return storageContainerManager.getCertificateStore().removeAllExpiredCertificates();
   }
 
   private String getNextCertificateId() throws IOException {

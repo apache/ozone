@@ -17,6 +17,9 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
+import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -39,6 +42,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -191,15 +195,15 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMGetDataNodeCertRequestProto request)
       throws IOException {
 
-    String certificate = impl
+    CertPath certificate = impl
         .getDataNodeCertificate(request.getDatanodeDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
 
     return builder.build();
@@ -214,15 +218,15 @@ public class SCMSecurityProtocolServerSideTranslatorPB
    */
   public SCMGetCertResponseProto getCertificate(
       SCMGetCertRequestProto request) throws IOException {
-    String certificate = impl
+    CertPath certificate = impl
         .getCertificate(request.getNodeDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
 
     return builder.build();
@@ -242,15 +246,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     if (!scm.getScmStorageConfig().isSCMHAEnabled()) {
       throw createNotHAException();
     }
-    String certificate = impl.getSCMCertificate(request.getScmDetails(),
+    CertPath certificate = impl.getSCMCertificate(request.getScmDetails(),
         request.getCSR(), request.hasRenew() && request.getRenew());
+    String encodedRootCert = CertificateCodec.getPEMEncodedString(impl.getRootCACertificate());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getRootCACertificate())
-            .setX509RootCACertificate(impl.getRootCACertificate());
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(encodedRootCert)
+            .setX509RootCACertificate(encodedRootCert);
 
     return builder.build();
 
@@ -264,15 +269,15 @@ public class SCMSecurityProtocolServerSideTranslatorPB
    */
   public SCMGetCertResponseProto getOMCertificate(
       SCMGetOMCertRequestProto request) throws IOException {
-    String certificate = impl
+    CertPath certificate = impl
         .getOMCertificate(request.getOmDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(impl.getCACertificate());
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(impl.getCACertificate()));
     setRootCAIfNeeded(builder);
     return builder.build();
 
@@ -281,12 +286,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMGetCertResponseProto getCertificate(
       SCMGetCertificateRequestProto request) throws IOException {
 
-    String certificate = impl.getCertificate(request.getCertSerialId());
+    X509Certificate certificate = impl.getCertificate(request.getCertSerialId());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate);
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate));
     return builder.build();
 
   }
@@ -295,13 +300,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto request)
       throws IOException {
 
-    String certificate = impl.getCACertificate();
+    CertPath certificate = impl.getCACertificate();
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
             .setResponseCode(ResponseCode.success)
-            .setX509Certificate(certificate)
-            .setX509CACertificate(certificate);
+            .setX509Certificate(CertificateCodec.getPEMEncodedString(certificate))
+            .setX509CACertificate(CertificateCodec.getPEMEncodedString(certificate));
     setRootCAIfNeeded(builder);
     return builder.build();
 
@@ -309,15 +314,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   public SCMListCertificateResponseProto listCertificate(
       SCMListCertificateRequestProto request) throws IOException {
-    List<String> certs = impl.listCertificate(request.getRole(),
-        request.getStartCertId(), request.getCount());
-
+    List<X509Certificate> certs = impl.listCertificate(request.getRole(), request.getStartCertId(), request.getCount());
+    List<String> encodedCertList = convertCertListToEncodedList(certs);
     SCMListCertificateResponseProto.Builder builder =
         SCMListCertificateResponseProto
             .newBuilder()
-            .setResponseCode(SCMListCertificateResponseProto
-                .ResponseCode.success)
-            .addAllCertificates(certs);
+            .setResponseCode(SCMListCertificateResponseProto.ResponseCode.success)
+            .addAllCertificates(encodedCertList);
     return builder.build();
 
   }
@@ -326,7 +329,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
       throw createNotHAException();
     }
-    String rootCACertificate = impl.getRootCACertificate();
+    String rootCACertificate = CertificateCodec.getPEMEncodedString(impl.getRootCACertificate());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
@@ -339,16 +342,24 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMListCertificateResponseProto listCACertificate()
       throws IOException {
 
-    List<String> certs = impl.listCACertificate();
-
+    List<X509Certificate> certs = impl.listCACertificate();
+    List<String> encodedList = convertCertListToEncodedList(certs);
     SCMListCertificateResponseProto.Builder builder =
         SCMListCertificateResponseProto
             .newBuilder()
             .setResponseCode(SCMListCertificateResponseProto
                 .ResponseCode.success)
-            .addAllCertificates(certs);
+            .addAllCertificates(encodedList);
     return builder.build();
 
+  }
+
+  private List<String> convertCertListToEncodedList(List<X509Certificate> certs) throws SCMSecurityException {
+    List<String> encodedCertList = new ArrayList<>();
+    for (X509Certificate cert : certs) {
+      encodedCertList.add(CertificateCodec.getPEMEncodedString(cert));
+    }
+    return encodedCertList;
   }
 
   private SCMSecurityException createNotHAException() {
@@ -359,21 +370,21 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMGetAllRootCaCertificatesResponseProto getAllRootCa()
       throws IOException {
     return SCMGetAllRootCaCertificatesResponseProto.newBuilder()
-        .addAllAllX509RootCaCertificates(impl.getAllRootCaCertificates())
+        .addAllAllX509RootCaCertificates(convertCertListToEncodedList(impl.getAllRootCaCertificates()))
         .build();
   }
 
   private void setRootCAIfNeeded(SCMGetCertResponseProto.Builder builder)
       throws IOException {
     if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
-      builder.setX509RootCACertificate(impl.getRootCACertificate());
+      builder.setX509RootCACertificate(CertificateCodec.getPEMEncodedString(impl.getRootCACertificate()));
     }
   }
 
   public SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificates()
       throws IOException {
     return SCMRemoveExpiredCertificatesResponseProto.newBuilder()
-        .addAllRemovedExpiredCertificates(impl.removeExpiredCertificates())
+        .addAllRemovedExpiredCertificates(convertCertListToEncodedList(impl.removeExpiredCertificates()))
         .build();
   }
 }

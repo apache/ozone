@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIPro
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,14 +235,11 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         // In case root CA certificate is rotated during this SCM is offline
         // period, fetch the new root CA list from leader SCM and refresh ratis
         // server's tlsConfig.
-        List<String> rootCAPems = scmSecureClient.getAllRootCaCertificates();
-
+        List<X509Certificate> rootCAsFromLeaderSCM = scmSecureClient.getAllRootCaCertificates();
         // SCM certificate client currently sets root CA as CA cert
         Set<X509Certificate> certList = getAllRootCaCerts();
         certList = certList.isEmpty() ? getAllCaCerts() : certList;
 
-        List<X509Certificate> rootCAsFromLeaderSCM =
-            OzoneSecurityUtil.convertToX509(rootCAPems);
         rootCAsFromLeaderSCM.removeAll(certList);
 
         if (rootCAsFromLeaderSCM.isEmpty()) {

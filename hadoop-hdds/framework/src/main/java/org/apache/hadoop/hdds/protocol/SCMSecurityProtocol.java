@@ -17,6 +17,8 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
+import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -49,19 +51,19 @@ public interface SCMSecurityProtocol {
    * @param certSignReq     - Certificate signing request.
    * @return byte[]         - SCM signed certificate.
    */
-  String getDataNodeCertificate(
+  CertPath getDataNodeCertificate(
       DatanodeDetailsProto dataNodeDetails,
       String certSignReq) throws IOException;
 
   /**
    * Get SCM signed certificate for OM.
    *
-   * @param omDetails       - DataNode Details.
-   * @param certSignReq     - Certificate signing request.
+   * @param omDetails   - DataNode Details.
+   * @param certSignReq - Certificate signing request.
    * @return String         - pem encoded SCM signed
-   *                          certificate.
+   * certificate.
    */
-  String getOMCertificate(OzoneManagerDetailsProto omDetails,
+  CertPath getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException;
 
 
@@ -73,7 +75,7 @@ public interface SCMSecurityProtocol {
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
-  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException;
 
   /**
@@ -85,43 +87,44 @@ public interface SCMSecurityProtocol {
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
-  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+  CertPath getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean isRenew) throws IOException;
 
   /**
    * Get SCM signed certificate for given certificate serial id if it exists.
    * Throws exception if it's not found.
    *
-   * @param certSerialId    - Certificate serial id.
+   * @param certSerialId - Certificate serial id.
    * @return String         - pem encoded SCM signed
-   *                          certificate with given cert id if it
-   *                          exists.
+   * certificate with given cert id if it
+   * exists.
    */
-  String getCertificate(String certSerialId) throws IOException;
+  X509Certificate getCertificate(String certSerialId) throws IOException;
 
   /**
    * Get CA certificate.
    *
    * @return String         - pem encoded CA certificate.
    */
-  String getCACertificate() throws IOException;
+  CertPath getCACertificate() throws IOException;
 
   /**
    * Get list of certificates meet the query criteria.
    *
-   * @param type            - node type: OM/SCM/DN.
-   * @param startSerialId   - start certificate serial id.
-   * @param count           - max number of certificates returned in a batch.
+   * @param type          - node type: OM/SCM/DN.
+   * @param startSerialId - start certificate serial id.
+   * @param count         - max number of certificates returned in a batch.
    * @return list of PEM encoded certificate strings.
    */
-  List<String> listCertificate(HddsProtos.NodeType type, long startSerialId, int count) throws IOException;
+  List<X509Certificate> listCertificate(HddsProtos.NodeType type, long startSerialId, int count) throws IOException;
 
   /**
    * Get Root CA certificate.
+   *
    * @return
    * @throws IOException
    */
-  String getRootCACertificate() throws IOException;
+  X509Certificate getRootCACertificate() throws IOException;
 
   /**
    * Returns all the individual SCM CA's along with Root CA.
@@ -141,7 +144,7 @@ public interface SCMSecurityProtocol {
    *
    * @throws IOException
    */
-  List<String> listCACertificate() throws IOException;
+  List<X509Certificate> listCACertificate() throws IOException;
 
   /**
    * Get SCM signed certificate.
@@ -151,7 +154,7 @@ public interface SCMSecurityProtocol {
    * @return String      - pem encoded SCM signed
    * certificate.
    */
-  String getCertificate(NodeDetailsProto nodeDetails,
+  CertPath getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException;
 
   /**
@@ -159,7 +162,7 @@ public interface SCMSecurityProtocol {
    *
    * @return String     - pem encoded list of root CA certificates
    */
-  List<String> getAllRootCaCertificates() throws IOException;
+  List<X509Certificate> getAllRootCaCertificates() throws IOException;
 
   /**
    * Remove all expired certificates from the SCM metadata store.
@@ -167,5 +170,5 @@ public interface SCMSecurityProtocol {
    * @return list of the removed certificates
    * @throws IOException
    */
-  List<String> removeExpiredCertificates() throws IOException;
+  List<X509Certificate> removeExpiredCertificates() throws IOException;
 }
