@@ -189,12 +189,12 @@ public class BaseFreonGenerator {
           completed.set(true);
           break;
         }
-      }
-
-      //in case of an other failed test, we shouldn't execute more tasks.
-      if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
-        completed.set(true);
-        break;
+      } else {
+        //in case of an other failed test, we shouldn't execute more tasks.
+        if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
+          completed.set(true);
+          break;
+        }
       }
 
       tryNextTask(provider, counter % testNo);
@@ -290,7 +290,7 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    if (duration != null) {
+    if (duration != null && allowDuration()) {
       durationInSecond = TimeDurationUtil.getTimeDurationHelper(
           "--runtime", duration, TimeUnit.SECONDS);
       if (durationInSecond <= 0) {
@@ -327,7 +327,7 @@ public class BaseFreonGenerator {
     executor = Executors.newFixedThreadPool(threadNo);
     long maxValue;
     LongSupplier supplier;
-    if (duration != null) {
+    if (duration != null && allowDuration()) {
       maxValue = durationInSecond;
       supplier = () -> Duration.between(
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
@@ -552,6 +552,19 @@ public class BaseFreonGenerator {
 
   public String getPrefix() {
     return prefix;
+  }
+
+  /**
+   * Whether to enable Duration.
+   * If enabled, the command will load the --duration option.
+   * If not enabled, the command will not load the --duration option.
+   */
+  public boolean allowDuration() {
+    return true;
+  }
+
+  public String getDuration() {
+    return duration;
   }
 
   public MetricRegistry getMetrics() {

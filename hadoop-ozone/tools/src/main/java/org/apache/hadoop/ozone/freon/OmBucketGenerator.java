@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -40,6 +42,8 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class OmBucketGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OmBucketGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"
@@ -58,7 +62,15 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private Timer bucketCreationTimer;
 
   @Override
+  public boolean allowDuration() {
+    return false;
+  }
+
+  @Override
   public Void call() throws Exception {
+    if (getDuration() != null) {
+      LOG.warn("When running ombg, setting --duration has no effect.");
+    }
 
     init();
 
