@@ -63,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 /**
  * Tests {@link KeyInputStream}.
  */
-class fTestKeyInputStream extends TestInputStreamBase {
+class TestKeyInputStream extends TestInputStreamBase {
 
   /**
    * This method does random seeks and reads and validates the reads are
