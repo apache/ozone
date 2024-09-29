@@ -112,6 +112,7 @@ import org.slf4j.LoggerFactory;
  * The default output format of the newest async profiler is HTML.
  * If the user is using an older version such as 1.5, HTML is not supported.
  * Please specify the corresponding output format.
+ * </pre>
  */
 public class ProfileServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
