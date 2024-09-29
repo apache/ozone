@@ -18,69 +18,66 @@
  */
 
 package org.apache.hadoop.ozone.recon;
-import com.google.inject.Inject;
+
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 
-import static org.jooq.impl.DSL.name;
-
 /**
- * ReconSchemaVersionTableManager is responsible for managing the schema version of the Recon Metadata.
+ * Class for managing the schema of the SchemaVersion table.
  */
 public class ReconSchemaVersionTableManager {
-  private static final Logger LOG = LoggerFactory.getLogger(ReconSchemaVersionTableManager.class);
-  public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DSLContext dslContext;
   private final DataSource dataSource;
 
-  @Inject
-  public ReconSchemaVersionTableManager(DataSource src) throws
-      SQLException {
-    this.dataSource = src;
+  public ReconSchemaVersionTableManager(DataSource dataSource) throws SQLException {
+    this.dataSource = dataSource;
     this.dslContext = DSL.using(dataSource.getConnection());
   }
 
   /**
-   * Get the current schema version from the RECON_SCHEMA_VERSION_TABLE.
-   * @return The current schema version.
+   * Fetch the current schema version from the database.
+   * @return the current schema version
    */
   public int getCurrentSchemaVersion() {
-    return dslContext.select(DSL.field(name("version_number")))
-        .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-        .fetchOptional()
-        .map(record -> record.get(DSL.field(name("version_number"), Integer.class)))
-        .orElse(0);
+    // Fetch the current schema version from the database
+    try {
+      return dslContext.select(DSL.field("version_number"))
+          .from("RECON_SCHEMA_VERSION")
+          .fetchOneInto(Integer.class);
+    } catch (Exception e) {
+      System.err.println("Error fetching current schema version: " + e.getMessage());
+      return 0; // Assuming 0 if the table does not exist or no version is found
+    }
   }
 
   /**
-   * Update the schema version in the RECON_SCHEMA_VERSION_TABLE after all tables are upgraded.
-   *
-   * @param newVersion The new version to set.
-   * @throws SQLException if any SQL error occurs.
+   * Update the schema version in the database.
+   * @param newVersion the new schema version
    */
   public void updateSchemaVersion(int newVersion) {
-    boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
-        .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-    );
-    if (recordExists) {
-      dslContext.update(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-          .set(DSL.field(name("version_number")), newVersion)
-          .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
-          .execute();
-      LOG.info("Updated schema version to '{}'.", newVersion);
-    } else {
-      dslContext.insertInto(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-          .columns(DSL.field(name("version_number")), DSL.field(name("applied_on")))
-          .values(newVersion, DSL.currentTimestamp())
-          .execute();
-      LOG.info("Inserted new schema version '{}'.", newVersion);
+    try (Connection conn = dataSource.getConnection()) {
+      boolean recordExists = dslContext.fetchExists(
+          dslContext.selectOne().from("RECON_SCHEMA_VERSION")
+      );
+
+      if (recordExists) {
+        dslContext.update(DSL.table("RECON_SCHEMA_VERSION"))
+            .set(DSL.field("version_number"), newVersion)
+            .execute();
+        System.out.println("Schema version updated to " + newVersion);
+      } else {
+        dslContext.insertInto(DSL.table("RECON_SCHEMA_VERSION"))
+            .columns(DSL.field("version_number"))
+            .values(newVersion)
+            .execute();
+        System.out.println("Inserted new schema version: " + newVersion);
+      }
+    } catch (SQLException e) {
+      System.err.println("Error updating schema version: " + e.getMessage());
     }
-  }
-  public DataSource getDataSource() {
-    return dataSource;
   }
 }
