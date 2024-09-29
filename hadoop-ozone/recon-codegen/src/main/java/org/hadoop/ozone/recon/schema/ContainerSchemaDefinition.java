@@ -27,8 +27,6 @@ import com.google.inject.Singleton;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -40,9 +38,6 @@ import java.util.Arrays;
  */
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
@@ -73,45 +68,28 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   @Override
   public void initializeSchema() throws SQLException {
-    try (Connection conn = dataSource.getConnection()) {
-      dslContext = DSL.using(conn);
-      if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-        createUnhealthyContainersTable();
-      }
-    } catch (SQLException e) {
-      LOG.error("Error initializing schema", e);
-      throw e;
+    Connection conn = dataSource.getConnection();
+    dslContext = DSL.using(conn);
+
+    if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      // Drop the existing constraint if it exists
+      String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
+      dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+          .dropConstraint(constraintName)
+          .execute();
+
+      // Add the updated constraint with all enum states
+      addUpdatedConstraint();
+    } else {
+      // Create the table if it does not exist
+      createUnhealthyContainersTable();
     }
   }
-
-  @Override
-  public void upgradeSchema(String fromVersion, String toVersion) throws SQLException {
-    try (Connection conn = dataSource.getConnection()) {
-      if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-        return;
-      }
-      if (fromVersion.equals("0") && toVersion.equals("1.0")) {
-        runMigrationToVersion1(conn);
-        LOG.info("Upgraded schema from version 0 to 1.0.");
-      }
-      // Add more upgrade paths here as needed
-    } catch (SQLException e) {
-      LOG.error("Error upgrading schema", e);
-      throw e;
-    }
-  }
-
 
   /**
-   * Run the upgrade to version 1.0.
+   * Add the updated constraint to the table.
    */
-  private void runMigrationToVersion1(Connection conn) throws SQLException {
-    // Drop the existing constraint if it exists
-    String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
-    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
-        .dropConstraint(constraintName)
-        .execute();
-
+  private void addUpdatedConstraint() {
     // Get all enum values as a list of strings
     String[] enumStates = Arrays.stream(UnHealthyContainerStates.values())
         .map(Enum::name)

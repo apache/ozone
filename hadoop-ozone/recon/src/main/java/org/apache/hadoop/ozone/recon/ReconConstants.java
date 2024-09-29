@@ -35,36 +35,6 @@ public final class ReconConstants {
 
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
-  // Latest Schema Version for all Recon Derby Tables
-  // Bump it up whenever there is a schema change in Recon Derby Tables
-  public static final String LATEST_SCHEMA_VERSION = "2.0";
-
-  // Schema versions enum
-  public enum SchemaVersion {
-    V0("0"),
-    V1_0("1.0"),
-    LATEST("1.0");  // Update as necessary for future versions
-
-    private final String version;
-
-    SchemaVersion(String version) {
-      this.version = version;
-    }
-
-    public String getVersion() {
-      return version;
-    }
-
-    public static SchemaVersion from(String version) {
-      for (SchemaVersion schemaVersion : SchemaVersion.values()) {
-        if (schemaVersion.version.equals(version)) {
-          return schemaVersion;
-        }
-      }
-      throw new IllegalArgumentException("Unsupported schema version: " + version);
-    }
-  }
-
   // By default, limit the number of results returned
 
   /**

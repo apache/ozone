@@ -54,12 +54,6 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
     }
   }
 
-  @Override
-  public void upgradeSchema(String fromVersion, String toVersion)
-      throws SQLException {
-    // No schema upgrades needed for the stats table.
-  }
-
   /**
    * Create the Ozone Global Stats table.
    */
