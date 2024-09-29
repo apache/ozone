@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,65 +19,89 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import com.google.inject.Inject;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.SQLException;
 
+import static org.jooq.impl.DSL.name;
+
 /**
- * Class for managing the schema of the SchemaVersion table.
+ * Manager for handling the Recon Schema Version table.
+ * This class provides methods to get and update the current schema version.
  */
 public class ReconSchemaVersionTableManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReconSchemaVersionTableManager.class);
+  public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DSLContext dslContext;
   private final DataSource dataSource;
 
+  @Inject
   public ReconSchemaVersionTableManager(DataSource dataSource) throws SQLException {
     this.dataSource = dataSource;
     this.dslContext = DSL.using(dataSource.getConnection());
   }
 
   /**
-   * Fetch the current schema version from the database.
-   * @return the current schema version
+   * Get the current schema version from the RECON_SCHEMA_VERSION table.
+   * If the table is empty, or if it does not exist, it will return 0.
+   * @return The current schema version.
    */
   public int getCurrentSchemaVersion() {
-    // Fetch the current schema version from the database
     try {
-      return dslContext.select(DSL.field("version_number"))
-          .from("RECON_SCHEMA_VERSION")
-          .fetchOneInto(Integer.class);
+      return dslContext.select(DSL.field(name("version_number")))
+          .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+          .fetchOptional()
+          .map(record -> record.get(
+              DSL.field(name("version_number"), Integer.class)))
+          .orElse(0); // Return 0 if no version is found
     } catch (Exception e) {
-      System.err.println("Error fetching current schema version: " + e.getMessage());
-      return 0; // Assuming 0 if the table does not exist or no version is found
+      LOG.error("Failed to fetch the current schema version.", e);
+      return 0; // Return 0 if there is an exception
     }
   }
 
   /**
-   * Update the schema version in the database.
-   * @param newVersion the new schema version
+   * Update the schema version in the RECON_SCHEMA_VERSION table after all tables are upgraded.
+   *
+   * @param newVersion The new version to set.
    */
   public void updateSchemaVersion(int newVersion) {
-    try (Connection conn = dataSource.getConnection()) {
-      boolean recordExists = dslContext.fetchExists(
-          dslContext.selectOne().from("RECON_SCHEMA_VERSION")
-      );
+    try {
+      boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
+          .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));
 
       if (recordExists) {
-        dslContext.update(DSL.table("RECON_SCHEMA_VERSION"))
-            .set(DSL.field("version_number"), newVersion)
+        // Update the existing schema version record
+        dslContext.update(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+            .set(DSL.field(name("version_number")), newVersion)
+            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
             .execute();
-        System.out.println("Schema version updated to " + newVersion);
+        LOG.info("Updated schema version to '{}'.", newVersion);
       } else {
-        dslContext.insertInto(DSL.table("RECON_SCHEMA_VERSION"))
-            .columns(DSL.field("version_number"))
-            .values(newVersion)
+        // Insert a new schema version record
+        dslContext.insertInto(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+            .columns(DSL.field(name("version_number")),
+                DSL.field(name("applied_on")))
+            .values(newVersion, DSL.currentTimestamp())
             .execute();
-        System.out.println("Inserted new schema version: " + newVersion);
+        LOG.info("Inserted new schema version '{}'.", newVersion);
       }
-    } catch (SQLException e) {
-      System.err.println("Error updating schema version: " + e.getMessage());
+    } catch (Exception e) {
+      LOG.error("Failed to update schema version to '{}'.", newVersion, e);
     }
+  }
+
+  /**
+   * Provides the data source used by this manager.
+   * @return The DataSource instance.
+   */
+  public DataSource getDataSource() {
+    return dataSource;
   }
 }

@@ -128,8 +128,8 @@ public class ReconLayoutVersionManager {
   private void updateSchemaVersion(int newVersion) {
     // Logic to update the MLV in the database
     this.currentMLV = newVersion;
-    LOG.info("MLV updated to: " + newVersion);
     // Code to update the schema version in the database goes here.
     schemaVersionTableManager.updateSchemaVersion(newVersion);
+    LOG.info("MLV updated to: " + newVersion);
   }
 }

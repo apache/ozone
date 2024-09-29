@@ -139,6 +139,7 @@ public class ReconServer extends GenericCli {
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
+
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
