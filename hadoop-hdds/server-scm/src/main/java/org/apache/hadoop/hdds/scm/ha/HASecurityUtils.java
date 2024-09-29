@@ -150,7 +150,6 @@ public final class  HASecurityUtils {
    *
    * @param conf
    * @param certificateClient
-   * @return {@code GrpcTlsConfig}
    */
   public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
       CertificateClient certificateClient) throws IOException {
