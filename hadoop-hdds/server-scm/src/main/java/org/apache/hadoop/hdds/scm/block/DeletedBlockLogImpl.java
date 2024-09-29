@@ -200,20 +200,6 @@ public class DeletedBlockLogImpl
         .build();
   }
 
-  private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "Got block deletion ACK from datanode, TXIDs={}, " + "success={}",
-          result.getTxID(), result.getSuccess());
-    }
-    if (!result.getSuccess()) {
-      LOG.warn("Got failed ACK for TXID={}, prepare to resend the "
-          + "TX in next interval", result.getTxID());
-      return true;
-    }
-    return false;
-  }
-
   @Override
   public int getNumOfValidTransactions() throws IOException {
     lock.lock();
@@ -300,6 +286,25 @@ public class DeletedBlockLogImpl
             .setCount(transactionStatusManager.getOrDefaultRetryCount(
               tx.getTxID(), 0))
             .build();
+
+    // We have made an improvement here, and we expect that all replicas
+    // of the Container being sent will be included in the dnList.
+    // This change benefits ACK confirmation and improves deletion speed.
+    // The principle behind it is that DN can receive the command to delete a certain Container at the same time and provide
+    // feedback to SCM at roughly the same time.
+    // This avoids the issue of deletion blocking,
+    // where some replicas of a Container are deleted while others do not receive the delete command.
+    long containerId = tx.getContainerID();
+    for (ContainerReplica replica : replicas) {
+      DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
+      if (!dnList.contains(datanodeDetails)) {
+        DatanodeDetails dnDetail = replica.getDatanodeDetails();
+        LOG.debug("Skip Container = {}, because DN= {} is not in dnList.",
+            containerId, dnDetail.getUuid());
+        return;
+      }
+    }
+
     for (ContainerReplica replica : replicas) {
       DatanodeDetails details = replica.getDatanodeDetails();
       if (!dnList.contains(details)) {
@@ -358,8 +363,8 @@ public class DeletedBlockLogImpl
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
             if (containerManager.getContainer(id).isDeleted()) {
-              LOG.warn("Container: " + id + " was deleted for the " +
-                  "transaction: " + txn);
+              LOG.warn("Container: {} was deleted for the " +
+                  "transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
@@ -373,8 +378,7 @@ public class DeletedBlockLogImpl
                   txn, transactions, dnList, replicas, commandStatus);
             }
           } catch (ContainerNotFoundException ex) {
-            LOG.warn("Container: " + id + " was not found for the transaction: "
-                + txn);
+            LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
         }
