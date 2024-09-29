@@ -111,7 +111,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     setBytesPerCRC(bytesPerChecksum);
 
     ByteBuffer blockChecksumByteBuffer = getBlockChecksumFromChunkChecksums(
-        keyLocationInfo, chunkInfos);
+        chunkInfos);
     String blockChecksumForDebug =
         populateBlockChecksumBuf(blockChecksumByteBuffer);
 
@@ -166,7 +166,6 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
   // TODO: copy BlockChecksumHelper here
   ByteBuffer getBlockChecksumFromChunkChecksums(
-      OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
     AbstractBlockChecksumComputer blockChecksumComputer =
