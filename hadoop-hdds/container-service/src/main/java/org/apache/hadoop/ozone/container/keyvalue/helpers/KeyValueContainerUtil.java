@@ -460,7 +460,6 @@ public final class KeyValueContainerUtil {
    * 5. Container is deleted from tmp directory.
    *
    * @param keyValueContainerData
-   * @return true if renaming was successful
    */
   public static void moveToDeletedContainerDir(
       KeyValueContainerData keyValueContainerData,

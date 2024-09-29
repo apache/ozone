@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  *              |     fsAvail      |-------other-----------|
  * |<-                   fsCapacity                      ->|
  * }</pre>
- *
+ * <pre>
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
  * We could get from config:
@@ -85,6 +85,7 @@ import org.slf4j.LoggerFactory;
  *  |<-              capacity/fsCapacity                  ->|
  *
  *  We have avail == fsAvail.
+ *  </pre>
  */
 public final class VolumeInfo {
 
@@ -155,11 +156,13 @@ public final class VolumeInfo {
   }
 
   /**
+   * <pre>
    * Calculate available space use method A.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    * |<-     capacity         ->|
    *
    * A) avail = capacity - used
+   * </pre>
    */
   public long getAvailable() {
     return usage.getAvailable();
