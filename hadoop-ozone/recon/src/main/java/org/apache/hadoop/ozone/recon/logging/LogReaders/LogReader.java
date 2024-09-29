@@ -21,14 +21,12 @@ public class LogReader {
   private static final int BLOCK_SIZE = 4096;
   // The number of bytes to read at a time when searching for a newline
   private static final int NEWLINE_BUFFER_SIZE = 256;
-  // Store the position in the file
-  private long currPos = 0L;
-  // Store the position of the line
+  // Store the position in the line buffer
   private int currLinePos = 0;
 
   private int lastBlockSize = 0;
   //This will be an ArrayList to act as the buffer for our strings
-  private List<String> lines;
+  private List<String> lines = new ArrayList<>();
 
   private enum Direction {
     FORWARD,
@@ -44,7 +42,6 @@ public class LogReader {
   public LogReader() {
     lineDirection = Direction.NEUTRAL;
     blockDirection = Direction.NEUTRAL;
-    lines = new ArrayList<>();
   }
 
   public void initializeReader(File file, String mode)
@@ -68,7 +65,7 @@ public class LogReader {
    */
   public void resetBuffers() {
     lines.clear();
-    currPos = 0;
+    currLinePos = 0;
     lastBlockSize = 0;
     lineDirection = Direction.NEUTRAL;
     blockDirection = Direction.NEUTRAL;
@@ -166,7 +163,6 @@ public class LogReader {
    * @throws IOException if I/O operation error occurs
    */
   private BlockData readPreviousBlock() throws IOException {
-
     // Some error caused raf to not be initialized
     if (null == raf) {
       return null;
@@ -217,14 +213,12 @@ public class LogReader {
    * @throws IOException if I/O operation error occurs
    */
   private BlockData readNextBlock() throws IOException {
-
     // Some error caused raf to not be initialized
     if (null == raf) {
       return null;
     }
 
     long offset = raf.getFilePointer();
-
     // If the last block was read in the reverse direction we need
     // to adjust the position to the end of the block
     if (Direction.REVERSE == blockDirection) {
@@ -232,7 +226,7 @@ public class LogReader {
     }
 
     // If we are at the end of the file there is nothing more to be read
-    if (offset == getFileSize()) {
+    if (offset >= getFileSize()) {
       resetBuffers();
       return null;
     }
@@ -266,7 +260,7 @@ public class LogReader {
 
     // If the position is at the beginning of the line buffer
     // Load in the previous block of lines
-    if (currPos == 0) {
+    if (currLinePos == 0) {
       BlockData prevBlockData = readPreviousBlock();
       if (null == prevBlockData) {
         resetBuffers();
@@ -276,10 +270,9 @@ public class LogReader {
       currLinePos = lines.size();
     }
     currLinePos -= 1;
-    String line = lines.get(currLinePos);
-
     lineDirection = Direction.REVERSE;
-    return line;
+
+    return lines.get(currLinePos);
   }
 
   public String getNextLine() throws IOException {

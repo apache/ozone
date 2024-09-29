@@ -1,5 +1,6 @@
 package org.apache.hadoop.ozone.recon.logging.LogModels;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 
@@ -14,6 +15,11 @@ public class LogEvent {
   private List<String> prevLines;
 
   private long offset;
+
+  public LogEvent() {
+    this.prevLines = null;
+    this.offset = -1;
+  }
 
   public LogEvent(Date timestamp, String level,
                   String source, String message) {
@@ -77,6 +83,11 @@ public class LogEvent {
    * @param lines  Stores the lines that have been encountered for this event
    */
   public void addLinesToMessage(List<String> lines) {
-    this.message = message + String.join("\n", lines);
+    if (null != lines) {
+      String bufferLines = String.join("\n", lines);
+      this.message = message + bufferLines;
+      // Add the message length of bytes to current event offset
+      this.offset = offset + bufferLines.getBytes(StandardCharsets.UTF_8).length;
+    }
   }
 }

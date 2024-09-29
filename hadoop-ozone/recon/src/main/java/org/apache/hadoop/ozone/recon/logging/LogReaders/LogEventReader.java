@@ -25,15 +25,13 @@ import java.util.List;
  */
 public class LogEventReader {
 
-  private final LogReader lr;
+  private final static LogReader lr = new LogReader();
   private final LogParser lp = new Log4JParser();
 
   // Stores the next event in the log that is available
   private LogEvent nextEvent = null;
 
-  public LogEventReader() {
-    lr = new LogReader();
-  }
+  public LogEventReader() { }
 
   public void initializeReader(String path) throws IOException, LogFileEmptyException {
     File file = new File(path);
@@ -46,7 +44,6 @@ public class LogEventReader {
    */
   private LogEvent findNextEvent()
       throws IOException, IllegalStateException, ParseException {
-
     LogEvent event = null;
     // Store the lines we read while trying to get the next event occurrence
     List<String> lines = new ArrayList<>();
@@ -69,6 +66,11 @@ public class LogEventReader {
       lines.add(logLine);
     }
 
+    // If no event was found
+    if (null == event) {
+      //Return an event with blank information
+      return new LogEvent();
+    }
     return event;
   }
 
@@ -94,6 +96,11 @@ public class LogEventReader {
       }
     }
 
+    // If no event was found
+    if (null == event) {
+      // Return blank event
+      return new LogEvent();
+    }
     return event;
   }
 
