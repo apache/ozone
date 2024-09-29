@@ -143,6 +143,15 @@ public class ReconServer extends GenericCli {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
+      // Handle Recon Schema Versioning
+      ReconSchemaVersionTableManager versionTableManager =
+          injector.getInstance(ReconSchemaVersionTableManager.class);
+
+      ReconLayoutVersionManager layoutVersionManager =
+          new ReconLayoutVersionManager(versionTableManager);
+      // Run the upgrade framework to finalize layout features if needed
+      layoutVersionManager.finalizeLayoutFeatures();
+
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
