@@ -290,7 +290,8 @@ public class DeletedBlockLogImpl
     // We have made an improvement here, and we expect that all replicas
     // of the Container being sent will be included in the dnList.
     // This change benefits ACK confirmation and improves deletion speed.
-    // The principle behind it is that DN can receive the command to delete a certain Container at the same time and provide
+    // The principle behind it is that
+    // DN can receive the command to delete a certain Container at the same time and provide
     // feedback to SCM at roughly the same time.
     // This avoids the issue of deletion blocking,
     // where some replicas of a Container are deleted while others do not receive the delete command.
