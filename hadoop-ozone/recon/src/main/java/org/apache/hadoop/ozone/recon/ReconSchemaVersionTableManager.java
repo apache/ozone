@@ -1,46 +1,59 @@
-package org.apache.hadoop.ozone.recon;
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
+package org.apache.hadoop.ozone.recon;
 import com.google.inject.Inject;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.SQLException;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.name;
 
+/**
+ * ReconSchemaVersionTableManager is responsible for managing the schema version of the Recon Metadata.
+ */
 public class ReconSchemaVersionTableManager {
-
   private static final Logger LOG = LoggerFactory.getLogger(ReconSchemaVersionTableManager.class);
   public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DSLContext dslContext;
   private final DataSource dataSource;
-  private final Connection conn;
 
   @Inject
   public ReconSchemaVersionTableManager(DataSource src) throws
       SQLException {
     this.dataSource = src;
     this.dslContext = DSL.using(dataSource.getConnection());
-    this.conn = dataSource.getConnection();
   }
 
   /**
-   * Get the current schema version stored in the RECON_SCHEMA_VERSION_TABLE.
-   *
-   * @return The current schema version as a String, or null if no entry exists.
-   * @throws SQLException if any SQL error occurs.
+   * Get the current schema version from the RECON_SCHEMA_VERSION_TABLE.
+   * @return The current schema version.
    */
-  public String getCurrentSchemaVersion() {
-    if (!TABLE_EXISTS_CHECK.test(conn, RECON_SCHEMA_VERSION_TABLE_NAME)) {
-      return null;
-    }
+  public int getCurrentSchemaVersion() {
     return dslContext.select(DSL.field(name("version_number")))
-        .from(RECON_SCHEMA_VERSION_TABLE_NAME)
-        .fetchOneInto(String.class);  // Return the version number or null if no entry exists
+        .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+        .fetchOptional()
+        .map(record -> record.get(DSL.field(name("version_number"), Integer.class)))
+        .orElse(0);
   }
 
   /**
@@ -49,11 +62,10 @@ public class ReconSchemaVersionTableManager {
    * @param newVersion The new version to set.
    * @throws SQLException if any SQL error occurs.
    */
-  public void updateSchemaVersion(String newVersion) {
+  public void updateSchemaVersion(int newVersion) {
     boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
         .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
     );
-
     if (recordExists) {
       dslContext.update(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
           .set(DSL.field(name("version_number")), newVersion)
@@ -68,7 +80,6 @@ public class ReconSchemaVersionTableManager {
       LOG.info("Inserted new schema version '{}'.", newVersion);
     }
   }
-
   public DataSource getDataSource() {
     return dataSource;
   }
