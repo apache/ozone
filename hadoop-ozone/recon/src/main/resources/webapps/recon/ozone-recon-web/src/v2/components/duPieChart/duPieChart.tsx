@@ -49,6 +49,8 @@ const DUPieChart: React.FC<PieChartProps> = ({
   loading
 }) => {
 
+  const [subpathSize, setSubpathSize]  = React.useState<number>(0);
+
   function getSubpathSize(subpaths: DUSubpath[]): number {
     const subpathSize = subpaths
       .map((subpath) => subpath.size)
@@ -134,11 +136,15 @@ const DUPieChart: React.FC<PieChartProps> = ({
     });
   }
 
+  React.useEffect(() => {
+    setSubpathSize(getSubpathSize(subPaths));
+  }, [subPaths, limit]);
+
   const pieData = React.useMemo(() => updatePieData(), [path, subPaths, limit]);
 
   const eChartsOptions = {
     title: {
-      text: `${byteToSize(getSubpathSize(subPaths), 1)} /  ${byteToSize(size, 1)}`,
+      text: `${byteToSize(subpathSize, 1)} /  ${byteToSize(size, 1)}`,
       left: 'center',
       top: '95%'
     },
@@ -181,11 +187,23 @@ const DUPieChart: React.FC<PieChartProps> = ({
     ]
   };
 
+  const handleLegendChange = ({selected}: {selected: Record<string, boolean>}) => {
+    const filteredPath = subPaths.filter((value) => {
+      // In case of any leading '/' remove them and add a / at end
+      // to make it similar to legend
+      const pathName = value.path.replace('/', '') + ((value.isKey) ? '' : '/');
+      return selected[pathName];
+    })
+    const newSize = getSubpathSize(filteredPath);
+    setSubpathSize(newSize);
+  }
+
   return (
     <EChart
       loading={loading}
       option={eChartsOptions}
-      style={{ flex: '0 1 90%', height: '50vh' }} />
+      style={{ flex: '0 1 90%', height: '50vh' }}
+      eventHandler={{name: 'legendselectchanged', handler: handleLegendChange}}/>
   );
 }
 
