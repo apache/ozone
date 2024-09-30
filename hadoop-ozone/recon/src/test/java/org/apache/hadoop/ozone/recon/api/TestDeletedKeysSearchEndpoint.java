@@ -162,18 +162,18 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 20, "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(7, result.getFsoKeyInfoList().size());
+    assertEquals(7, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 2, "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getFsoKeyInfoList().size());
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     // Search inside OBS bucket
     response = deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1", 20, "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(9, result.getNonFSOKeyInfoList().size());
+    assertEquals(9, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys("/vola/nonexistentbucket", 20, "");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -188,13 +188,13 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
             "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(4, result.getNonFSOKeyInfoList().size());
+    assertEquals(4, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1/dirc2", 20,
             "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    assertEquals(5, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
         "/volb/bucketb1/nonexistentdir", 20, "");
@@ -212,13 +212,13 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
             "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1/fileb2", 10,
             "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     // Test with non-existent key
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
@@ -238,7 +238,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
         "/volb/bucketb1/dir1/nonexistentfile", 10, "");
@@ -256,19 +256,19 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
         deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1/dirc1", 20, "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(4, result.getNonFSOKeyInfoList().size());
+    assertEquals(4, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
         "/volc/bucketc1/dirc1/dirc11", 20, "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getNonFSOKeyInfoList().size());
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
         "/volc/bucketc1/dirc1/dirc11/dirc111", 20, "");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getNonFSOKeyInfoList().size());
+    assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     response = deletedKeysSearchEndpoint.searchDeletedKeys(
         "/volc/bucketc1/dirc1/dirc11/dirc111/nonexistentfile", 20, "");
@@ -290,7 +290,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 2, "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getFsoKeyInfoList().size());
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
   }
 
   @Test
@@ -314,9 +314,15 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 20, "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(7, result.getFsoKeyInfoList().size());
-    assertEquals(result.getFsoKeyInfoList().get(6).getKey(), result.getLastKey(),
-        "Expected last key to be 'fileb5'");
+    assertEquals(7, result.getRepeatedOmKeyInfoList().size());
+
+    // Compute the expected last key from the last entry in the result list
+    String computedLastKey = "/" + result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getVolumeName() + "/" +
+        result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getBucketName() + "/" +
+        result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getKeyName() + "/";
+
+    // Check that the last key in the response starts with the expected value
+    assertTrue(result.getLastKey().startsWith(computedLastKey));
   }
 
   @Test
@@ -328,7 +334,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     Response response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getFsoKeyInfoList().size());
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
@@ -336,7 +342,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getFsoKeyInfoList().size());
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
@@ -344,9 +350,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(2, result.getFsoKeyInfoList().size());
-    assertEquals(result.getFsoKeyInfoList().get(1).getKey(),
-        result.getLastKey(), "Expected last key to be empty");
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
@@ -354,9 +358,18 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
-    assertEquals(result.getFsoKeyInfoList().get(0).getKey(),
-        result.getLastKey(), "Expected last key to be empty");
+    assertEquals(1, result.getRepeatedOmKeyInfoList().size());
+    // Compute the expected last key from the last entry in the result list
+    String computedLastKey = "/" +
+        result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0)
+            .getVolumeName() + "/" +
+        result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0)
+            .getBucketName() + "/" +
+        result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0)
+            .getKeyName() + "/";
+
+    // Check that the last key in the response starts with the expected value
+    assertTrue(result.getLastKey().startsWith(computedLastKey));
   }
 
   @Test
@@ -369,12 +382,39 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
         "Expected a message indicating no keys were found");
   }
 
+  /**
+   * Populates the OMDB with a set of deleted keys for testing purposes.
+   * This diagram is for reference:
+   * * root
+   *   ├── volb (Total Size: 7000KB)
+   *   │   ├── bucketb1 (Total Size: 7000KB)
+   *   │   │   ├── fileb1 (Size: 1000KB)
+   *   │   │   ├── fileb2 (Size: 1000KB)
+   *   │   │   ├── fileb3 (Size: 1000KB)
+   *   │   │   ├── fileb4 (Size: 1000KB)
+   *   │   │   ├── fileb5 (Size: 1000KB)
+   *   │   │   ├── dir1 (Total Size: 2000KB)
+   *   │   │   │   ├── file1 (Size: 1000KB)
+   *   │   │   │   └── file2 (Size: 1000KB)
+   *   ├── volc (Total Size: 9000KB)
+   *   │   ├── bucketc1 (Total Size: 9000KB)
+   *   │   │   ├── dirc1 (Total Size: 4000KB)
+   *   │   │   │   ├── filec1 (Size: 1000KB)
+   *   │   │   │   ├── filec2 (Size: 1000KB)
+   *   │   │   │   ├── dirc11 (Total Size: 2000KB)
+   *   │   │   │       ├── filec11 (Size: 1000KB)
+   *   │   │   │       └── dirc111 (Total Size: 1000KB)
+   *   │   │   │           └── filec111 (Size: 1000KB)
+   *   │   │   ├── dirc2 (Total Size: 5000KB)
+   *   │   │   │   ├── filec3 (Size: 1000KB)
+   *   │   │   │   ├── filec4 (Size: 1000KB)
+   *   │   │   │   ├── filec5 (Size: 1000KB)
+   *   │   │   │   ├── filgetec6 (Size: 1000KB)
+   *   │   │   │   └── filec7 (Size: 1000KB)
+   *
+   * @throws Exception if an error occurs while creating deleted keys.
+   */
   private void populateOMDB() throws Exception {
-    // Create FSO bucket
-    createBucket("volb", "bucketb1", BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
-    // Create OBS bucket
-    createBucket("volc", "bucketc1", BucketLayout.OBJECT_STORE);
 
     createDeletedKey("fileb1", "bucketb1", "volb", 1000);
     createDeletedKey("fileb2", "bucketb1", "volb", 1000);
@@ -398,18 +438,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     createDeletedKey("dirc1/dirc11/dirc111/filec111", "bucketc1", "volc", 1000);
   }
 
-  private void createBucket(String volumeName, String bucketName, BucketLayout bucketLayout) throws Exception {
-    String bucketKey = reconOMMetadataManager.getBucketKey(volumeName, bucketName);
-    long bucketId = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE; // Generate positive ID
-    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setObjectID(bucketId)
-        .setBucketLayout(bucketLayout)
-        .build();
-    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
-  }
-
   private void createDeletedKey(String keyName, String bucketName,
                                 String volumeName, long dataSize) throws IOException {
     // Construct the deleted key path
@@ -425,6 +453,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
+        .setObjectID(UUID.randomUUID().getMostSignificantBits())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .build();

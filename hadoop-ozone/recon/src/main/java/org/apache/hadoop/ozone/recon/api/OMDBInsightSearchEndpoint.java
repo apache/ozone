@@ -354,12 +354,9 @@ public class OMDBInsightSearchEndpoint {
   @GET
   @Path("/deletePending/search")
   public Response searchDeletedKeys(
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix")
-      String startPrefix,
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
-      int limit,
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey")
-      String prevKey) throws IOException {
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix") String startPrefix,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit") int limit,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey") String prevKey) throws IOException {
 
     try {
       // Ensure startPrefix is not null or empty and starts with '/'
@@ -394,22 +391,16 @@ public class OMDBInsightSearchEndpoint {
         keysFound = true;
         RepeatedOmKeyInfo repeatedOmKeyInfo = entry.getValue();
 
-        for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
-          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
+        // We know each RepeatedOmKeyInfo has just one OmKeyInfo object
+        OmKeyInfo keyInfo = repeatedOmKeyInfo.getOmKeyInfoList().get(0);
+        KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
 
-          // Fetch bucket info and classify key as FSO or Non-FSO
-          String bucketKey = omMetadataManager.getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-          OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
-          if (bucketInfo != null) {
-            if (bucketInfo.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-              insightResponse.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
-            } else {
-              insightResponse.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
-            }
-            replicatedTotal += keyInfo.getReplicatedSize();
-            unreplicatedTotal += keyInfo.getDataSize();
-          }
-        }
+        // Add the key directly to the list without classification
+        insightResponse.getRepeatedOmKeyInfoList().add(repeatedOmKeyInfo);
+
+        replicatedTotal += keyInfo.getReplicatedSize();
+        unreplicatedTotal += keyInfo.getDataSize();
+
         lastKey = entry.getKey(); // Update lastKey
       }
 
