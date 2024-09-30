@@ -191,8 +191,8 @@ const DUPieChart: React.FC<PieChartProps> = ({
     const filteredPath = subPaths.filter((value) => {
       // In case of any leading '/' remove them and add a / at end
       // to make it similar to legend
-      const splitPath = value.path.split('/');
-      const pathName = splitPath[splitPath.length - 1] + ((value.isKey) ? '' : '/');
+      const splitPath = value.path?.split('/');
+      const pathName = splitPath[splitPath.length - 1] ?? '' + ((value.isKey) ? '' : '/');
       return selected[pathName];
     })
     const newSize = getSubpathSize(filteredPath);
