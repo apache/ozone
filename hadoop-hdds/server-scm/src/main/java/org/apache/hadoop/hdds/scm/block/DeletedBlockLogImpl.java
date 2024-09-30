@@ -311,7 +311,6 @@ public class DeletedBlockLogImpl
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(details.getUuid(), updatedTxn);
-        metrics.incrProcessedTransaction();
       }
     }
   }
@@ -374,6 +373,7 @@ public class DeletedBlockLogImpl
                 continue;
               }
               metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
+              metrics.incrProcessedTransaction();
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
             }
