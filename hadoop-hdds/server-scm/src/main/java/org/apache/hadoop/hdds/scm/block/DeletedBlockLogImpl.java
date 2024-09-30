@@ -299,20 +299,19 @@ public class DeletedBlockLogImpl
       DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
       if (!dnList.contains(datanodeDetails)) {
         DatanodeDetails dnDetail = replica.getDatanodeDetails();
-        LOG.debug("Skip Container = {}, because DN= {} is not in dnList.",
+        LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
             containerId, dnDetail.getUuid());
+        metrics.incrSkippedTransaction();
         return;
       }
     }
 
     for (ContainerReplica replica : replicas) {
       DatanodeDetails details = replica.getDatanodeDetails();
-      if (!dnList.contains(details)) {
-        continue;
-      }
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+        metrics.incrProcessedTransaction();
       }
     }
   }
@@ -374,6 +373,7 @@ public class DeletedBlockLogImpl
               if (checkInadequateReplica(replicas, txn)) {
                 continue;
               }
+              metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
             }
