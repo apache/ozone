@@ -558,7 +558,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      LOG.info("Starting {} {}", getClass().getSimpleName(), server.getId());
+      LOG.info("Starting {} raftPeerId : {}", getClass().getSimpleName(), server.getId());
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
@@ -584,7 +584,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int getRealPort(InetSocketAddress address, Port.Name name) {
     int realPort = address.getPort();
     datanodeDetails.setPort(DatanodeDetails.newPort(name, realPort));
-    LOG.info("{} {} is started using port {} for {}",
+    LOG.info("{} raftPeerId : {} is started using port {} for {}",
         getClass().getSimpleName(), server.getId(), realPort, name);
     return realPort;
   }
@@ -593,7 +593,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
-        LOG.info("Stopping {} {}", getClass().getSimpleName(), server.getId());
+        LOG.info("Stopping {} raftPeerId : {}", getClass().getSimpleName(), server.getId());
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();
@@ -602,7 +602,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         }
         isStarted = false;
       } catch (IOException e) {
-        LOG.error("XceiverServerRatis Could not be stopped gracefully.", e);
+        LOG.error("{} raftPeerId : {} Could not be stopped gracefully.",
+            getClass().getSimpleName(), server.getId(), e);
       }
     }
   }
@@ -713,11 +714,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftPeerId id = RaftPeerId.valueOf(roleInfoProto.getSelf().getId());
     switch (roleInfoProto.getRole()) {
     case CANDIDATE:
-      msg = datanode + " is in candidate state for " +
+      msg = "Server(DatanodeId=" + datanode + ") is in candidate state for " +
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
       break;
     case FOLLOWER:
-      msg = datanode + " closes pipeline when installSnapshot from leader " +
+      msg = "Server(DatanodeId=" + datanode + ") closes pipeline when installSnapshot from leader " +
           "because leader snapshot doesn't contain any data to replay, " +
           "all the log entries prior to the snapshot might have been purged." +
           "So follower should not try to install snapshot from leader but" +
@@ -726,11 +727,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       break;
     case LEADER:
       StringBuilder sb = new StringBuilder();
-      sb.append(datanode).append(" has not seen follower/s");
+      sb.append("Server(DatanodeId=" + datanode + ")").append(" has not seen follower/s. Slowness follower:");
       for (RaftProtos.ServerRpcProto follower : roleInfoProto.getLeaderInfo()
           .getFollowerInfoList()) {
         if (follower.getLastRpcElapsedTimeMs() > nodeFailureTimeoutMs) {
-          sb.append(" ").append(RatisHelper.toDatanodeId(follower.getId()))
+          sb.append(" ").append("Server(DatanodeId=" + RatisHelper.toDatanodeId(follower.getId()) + ")")
               .append(" for ").append(follower.getLastRpcElapsedTimeMs())
               .append("ms");
         }
