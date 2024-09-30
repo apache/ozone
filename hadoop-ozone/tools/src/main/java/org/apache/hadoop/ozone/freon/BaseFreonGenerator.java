@@ -290,7 +290,11 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    if (duration != null && allowDuration()) {
+    if (!allowDuration()) {
+      LOG.warn("--duration is ignored");
+      duration = null;
+    }
+    if (duration != null) {
       durationInSecond = TimeDurationUtil.getTimeDurationHelper(
           "--runtime", duration, TimeUnit.SECONDS);
       if (durationInSecond <= 0) {
@@ -327,7 +331,7 @@ public class BaseFreonGenerator {
     executor = Executors.newFixedThreadPool(threadNo);
     long maxValue;
     LongSupplier supplier;
-    if (duration != null && allowDuration()) {
+    if (duration != null) {
       maxValue = durationInSecond;
       supplier = () -> Duration.between(
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
@@ -561,10 +565,6 @@ public class BaseFreonGenerator {
    */
   public boolean allowDuration() {
     return true;
-  }
-
-  public String getDuration() {
-    return duration;
   }
 
   public MetricRegistry getMetrics() {
