@@ -48,6 +48,20 @@ export const AxiosPutHelper = (
   }
 }
 
+export const AxiosPostHelper = (
+  url: string,
+  data: any = {},
+  controller: AbortController |  undefined,
+  message: string = '' //optional 
+): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
+  controller && controller.abort(message);
+  controller = new AbortController(); // generate new AbortController for the new request
+  return {
+    request: axios.post(url, data, { signal: controller.signal }),
+    controller: controller
+  }
+}
+
 export const PromiseAllSettledGetHelper = (
   urls: string[],
   controller: AbortController | undefined,
