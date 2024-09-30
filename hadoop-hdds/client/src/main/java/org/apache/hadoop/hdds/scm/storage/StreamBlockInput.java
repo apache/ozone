@@ -101,6 +101,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
+    LOG.debug("Initializing StreamBlockInput for block {}", blockID);
     this.length = length;
     setPipeline(pipeline);
     tokenRef.set(token);
