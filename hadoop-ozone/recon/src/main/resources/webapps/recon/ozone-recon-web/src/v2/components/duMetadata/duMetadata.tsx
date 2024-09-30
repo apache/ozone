@@ -16,13 +16,15 @@
  * limitations under the License.
  */
 
+import React, { useRef, useState } from 'react';
+import moment from 'moment';
+import { AxiosError } from 'axios';
+import { Table } from 'antd';
+
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
+
 import { Acl } from '@/v2/types/acl.types';
-import { Table } from 'antd';
-import { AxiosError } from 'axios';
-import moment from 'moment';
-import React, { useRef, useState } from 'react';
 
 
 // ------------- Types -------------- //
@@ -141,7 +143,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType', 'usedBytes',
+      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType',
       'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
@@ -160,6 +162,11 @@ const DUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
       keys.push('Creation Time');
       values.push(moment(objectInfo.creationTime).format('ll LTS'));
+    }
+
+    if (objectInfo?.usedBytes !== undefined && objectInfo?.usedBytes !== -1 && objectInfo!.usedBytes !== null) {
+      keys.push('Used Bytes');
+      values.push(byteToSize(objectInfo.usedBytes, 3));
     }
 
     if (objectInfo?.dataSize !== undefined && objectInfo?.dataSize !== -1) {
@@ -242,6 +249,10 @@ const DUMetadata: React.FC<MetadataProps> = ({
           values.push(byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
           values.push(byteToSize(response.data.sizeWithReplica, 3));
+          keys.push("Creation Time");
+          values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
+          keys.push("Modification Time");
+          values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
 
           setState({
             keys: keys,
