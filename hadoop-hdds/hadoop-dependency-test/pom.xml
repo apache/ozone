@@ -67,5 +67,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>assertj-core</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <!-- required for Surefire versions before 3.0.0-M5 -->
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
