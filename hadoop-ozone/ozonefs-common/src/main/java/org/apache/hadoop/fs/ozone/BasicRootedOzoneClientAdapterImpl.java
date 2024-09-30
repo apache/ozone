@@ -93,6 +93,8 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.fs.ozone.BucketCache.BucketKey;
+import org.apache.hadoop.fs.ozone.BucketCache.BucketCacheInfo;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -1486,5 +1488,14 @@ public class BasicRootedOzoneClientAdapterImpl
 
     return ozoneClient.getProxy().getOzoneManagerClient().setSafeMode(
         action, isChecked);
+  }
+
+  public OzoneBucket toOzoneBucket(BucketKey key, BucketCacheInfo bucketInfo) {
+    return OzoneBucket.newBuilder(config, proxy)
+        .setVolumeName(key.getVolumeName())
+        .setName(key.getBucketName())
+        .setBucketLayout(bucketInfo.getBucketLayout())
+        .setSourceVolume(bucketInfo.getSourceVolume())
+        .build();
   }
 }
