@@ -69,6 +69,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
@@ -219,6 +220,9 @@ public class BucketEndpoint extends EndpointBase {
           !next.getName().startsWith(prefix)) {
         // prefix has delimiter but key don't have
         // example prefix: dir1/ key: dir123
+        continue;
+      }
+      if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
         continue;
       }
       String relativeKeyName = next.getName().substring(prefix.length());

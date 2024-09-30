@@ -439,13 +439,13 @@ public final class KeyValueContainerUtil {
 
   /**
    * Moves container directory to a new location
-   * under "<volume>/hdds/<cluster-id>/tmp/deleted-containers"
+   * under "volume/hdds/cluster-id/tmp/deleted-containers"
    * and updates metadata and chunks path.
    * Containers will be moved under it before getting deleted
    * to avoid, in case of failure, having artifact leftovers
    * on the default container path on the disk.
    *
-   * Delete operation for Schema < V3
+   * Delete operation for Schema &lt; V3
    * 1. Container is marked DELETED
    * 2. Container is removed from memory container set
    * 3. Container DB handler from cache is removed and closed
@@ -460,7 +460,6 @@ public final class KeyValueContainerUtil {
    * 5. Container is deleted from tmp directory.
    *
    * @param keyValueContainerData
-   * @return true if renaming was successful
    */
   public static void moveToDeletedContainerDir(
       KeyValueContainerData keyValueContainerData,

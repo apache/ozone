@@ -75,7 +75,6 @@ public abstract class ExtendedInputStream extends InputStream
    * readWithStrategy implementation, as it will never be called by the tests.
    *
    * @param strategy
-   * @return
    * @throws IOException
    */
   protected abstract int readWithStrategy(ByteReaderStrategy strategy) throws

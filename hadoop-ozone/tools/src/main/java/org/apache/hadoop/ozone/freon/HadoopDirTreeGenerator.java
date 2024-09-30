@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Directory & File Generator tool to test OM performance.
+ * Directory and File Generator tool to test OM performance.
  */
 @Command(name = "dtsg",
     aliases = "dfs-tree-generator",

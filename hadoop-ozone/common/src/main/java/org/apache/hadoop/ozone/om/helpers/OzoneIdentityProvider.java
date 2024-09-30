@@ -21,7 +21,6 @@ import io.netty.util.internal.StringUtil;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.IdentityProvider;
 import org.apache.hadoop.ipc.Schedulable;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +42,7 @@ public class OzoneIdentityProvider implements IdentityProvider {
   }
 
   /**
-   * If schedulable isn't instance of {@link Server.Call},
+   * If schedulable isn't instance of {@link org.apache.hadoop.ipc.Server.Call},
    * then trying to access getCallerContext() method, will
    * result in an exception.
    *

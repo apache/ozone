@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -42,6 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.UUID;
+
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
 
 /**
  * Handles purging of keys from OM DB.
@@ -58,30 +63,44 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
-    List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
-        .getDeletedKeysList();
-    List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest
-        .getKeysToUpdateList();
-    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
-        purgeKeysRequest.getSnapshotTableKey() : null;
-    List<String> keysToBePurgedList = new ArrayList<>();
+    List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest.getDeletedKeysList();
+    List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest.getKeysToUpdateList();
+    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ? purgeKeysRequest.getSnapshotTableKey() : null;
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    OMClientResponse omClientResponse = null;
+
+
+    final SnapshotInfo fromSnapshotInfo;
+    try {
+      fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
+          fromSnapshot) : null;
+      // Checking if this request is an old request or new one.
+      if (purgeKeysRequest.hasExpectedPreviousSnapshotID()) {
+        // Validating previous snapshot since while purging deletes, a snapshot create request could make this purge
+        // key request invalid on AOS since the deletedKey would be in the newly created snapshot. This would add an
+        // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
+        UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
+            ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
+        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId);
+      }
+    } catch (IOException e) {
+      LOG.error("Error occurred while performing OmKeyPurge. ", e);
+      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
+    }
+
+    List<String> keysToBePurgedList = new ArrayList<>();
 
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
-      for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
-        keysToBePurgedList.add(deletedKey);
-      }
+      keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
     }
-    final SnapshotInfo fromSnapshotInfo;
 
-    try {
-      fromSnapshotInfo = fromSnapshot == null ? null : SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot);
-    } catch (IOException ex) {
-      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, ex));
+    if (keysToBePurgedList.isEmpty()) {
+      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
+          new OMException("None of the keys can be purged be purged since a new snapshot was created for all the " +
+              "buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR)));
     }
 
     // Setting transaction info for snapshot, this is to prevent duplicate purge requests to OM from background
@@ -95,10 +114,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     } catch (IOException e) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
-    omClientResponse = new OMKeyPurgeResponse(omResponse.build(), keysToBePurgedList, fromSnapshotInfo,
-        keysToUpdateList);
 
-    return omClientResponse;
+    return new OMKeyPurgeResponse(omResponse.build(),
+        keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
   }
 
 }
