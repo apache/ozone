@@ -19,10 +19,10 @@
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { Acl } from '@/v2/types/acl.types';
-import { Drawer, Table } from 'antd';
+import { Table } from 'antd';
 import { AxiosError } from 'axios';
 import moment from 'moment';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 
 // ------------- Types -------------- //
@@ -349,7 +349,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
         cancelQuotaSignal.current!
       ]);
     })
-  }, []);
+  }, [path]);
 
   const content = [];
   for (const [i, v] of state.keys.entries()) {
