@@ -1,5 +1,7 @@
 package org.apache.hadoop.ozone.recon.logging.LogModels;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
@@ -12,8 +14,10 @@ public class LogEvent {
 
   // We might not find events in the immediate next line
   // So we will store the message from the previous lines until the current event occurs
+  @JsonIgnore
   private List<String> prevLines;
 
+  @JsonIgnore
   private long offset;
 
   public LogEvent() {
