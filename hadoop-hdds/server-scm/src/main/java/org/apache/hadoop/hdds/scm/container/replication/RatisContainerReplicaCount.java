@@ -186,9 +186,9 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * For example, consider a CLOSED container with the following replicas:
    * {CLOSED, CLOSING, OPEN, UNHEALTHY}
    * In this case, healthy replica count equals 3. Calculation:
-   * 1 CLOSED -> 1 matching replica.
-   * 1 OPEN, 1 CLOSING -> 2 mismatched replicas.
-   * 1 UNHEALTHY -> 1 unhealthy replica. Not counted as healthy.
+   * 1 CLOSED -&gt; 1 matching replica.
+   * 1 OPEN, 1 CLOSING -&gt; 2 mismatched replicas.
+   * 1 UNHEALTHY -&gt; 1 unhealthy replica. Not counted as healthy.
    * Total healthy replicas = 3 = 1 matching + 2 mismatched replicas
    */
   public int getHealthyReplicaCount() {

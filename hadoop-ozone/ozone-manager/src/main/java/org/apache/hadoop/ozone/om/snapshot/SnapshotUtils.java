@@ -284,7 +284,7 @@ public final class SnapshotUtils {
    * Returns merged repeatedKeyInfo entry with the existing deleted entry in the table.
    * @param snapshotMoveKeyInfos keyInfos to be added.
    * @param metadataManager metadataManager for a store.
-   * @return
+   * @return RepeatedOmKeyInfo
    * @throws IOException
    */
   public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(

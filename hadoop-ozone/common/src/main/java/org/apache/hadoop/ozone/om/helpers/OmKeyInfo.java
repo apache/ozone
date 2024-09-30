@@ -627,7 +627,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   /**
    * For network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(int clientVersion) {
     return getProtobuf(false, clientVersion);
@@ -659,7 +659,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    *
    * @param ignorePipeline true for persist to DB, false for network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     return getProtobuf(ignorePipeline, null, clientVersion, false);

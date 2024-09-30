@@ -609,7 +609,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf        HDDS configuration
    * @param configurator SCM configurator
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(
       OzoneConfiguration conf, SCMConfigurator configurator)
@@ -622,7 +623,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf        HDDS configuration
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {

@@ -139,7 +139,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * <p>
    * OM DB Schema:
    *
-   *
+   * <pre>
+   * {@code
    * Common Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
@@ -160,7 +161,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
-   *
+   * }
+   * </pre>
+   * <pre>
+   * {@code
    * Multi-Tenant Tables:
    * |----------------------------------------------------------------------|
    * | tenantStateTable          | tenantId -> OmDBTenantState              |
@@ -169,8 +173,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   *
-   *
+   * }
+   * </pre>
+   * <pre>
+   * {@code
    * Simple Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
@@ -181,7 +187,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
    * |----------------------------------------------------------------------|
-   *
+   * }
+   * </pre>
+   * <pre>
+   * {@code
    * Prefix Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family   |        VALUE                                      |
@@ -195,7 +204,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
    * |                  |                                      KeyInfo      |
    * |----------------------------------------------------------------------|
-   *
+   * }
+   * </pre>
+   * <pre>
+   * {@code
    * Snapshot Tables:
    * |-------------------------------------------------------------------------|
    * |  Column Family        |        VALUE                                    |
@@ -209,6 +221,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
    * |-------------------------------------------------------------------------|
+   * }
+   * </pre>
    */
 
   public static final String USER_TABLE = "userTable";

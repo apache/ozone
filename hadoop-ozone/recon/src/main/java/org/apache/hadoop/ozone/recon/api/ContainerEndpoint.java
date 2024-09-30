@@ -157,15 +157,15 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Return {@linkplain org.apache.hadoop.hdds.scm.container}
+   * Return {@code org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
    *
    * @param prevKey the containerID after which results are returned.
-   *                start containerID, >=0,
+   *                start containerID, &gt;=0,
    *                start searching at the head if 0.
    * @param limit   max no. of containers to get.
-   *                count must be >= 0
+   *                count must be &gt;= 0
    *                Usually the count will be replace with a very big
    *                value instead of being unlimited in case the db is very big.
    * @return {@link Response}

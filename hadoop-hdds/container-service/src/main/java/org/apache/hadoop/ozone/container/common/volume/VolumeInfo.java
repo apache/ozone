@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  *              |     fsAvail      |-------other-----------|
  * |<-                   fsCapacity                      ->|
  * }</pre>
- *
+ * <pre>
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
  * We could get from config:
@@ -80,13 +80,13 @@ import org.slf4j.LoggerFactory;
  * then we should use DedicatedDiskSpaceUsage for
  * `hdds.datanode.du.factory.classname`,
  * Then it is much simpler, since we don't care about other usage:
- * <pre>
  * {@code
  *  |----used----|             (avail)/fsAvail              |
  *  |<-              capacity/fsCapacity                  ->|
- *  }
- * </pre>
+ * }
+ *
  *  We have avail == fsAvail.
+ *  </pre>
  */
 public final class VolumeInfo {
 
@@ -157,14 +157,14 @@ public final class VolumeInfo {
   }
 
   /**
-   * Calculate available space use method A.
    * <pre>
    * {@code
+   * Calculate available space use method A.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    * |<-     capacity         ->|
-   * }
-   *</pre>
    * A) avail = capacity - used
+   * }
+   * </pre>
    */
   public long getAvailable() {
     return usage.getAvailable();

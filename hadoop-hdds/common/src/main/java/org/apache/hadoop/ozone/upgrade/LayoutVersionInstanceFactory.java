@@ -69,7 +69,7 @@ public class LayoutVersionInstanceFactory<T> {
   /**
    * Register an instance with a given factory key (key + version).
    * For safety reasons we dont allow (1) re-registering, (2) registering an
-   * instance with version > SLV.
+   * instance with version &gt; SLV.
    *
    * @param lvm LayoutVersionManager
    * @param key VersionFactoryKey key to associate with instance.
@@ -136,13 +136,15 @@ public class LayoutVersionInstanceFactory<T> {
   }
 
   /**
+   * <pre>
    * From the list of versioned instances for a given "key", this
    * returns the "floor" value corresponding to the given version.
-   * For example, if we have key = "CreateKey",  entry -> [(1, CreateKeyV1),
-   * (3, CreateKeyV2), and if the passed in key = CreateKey and version = 2, we
+   * For example, if we have key = "CreateKey",  entry -&gt; [(1, CreateKeyV1),
+   * (3, CreateKeyV2), and if the passed in key = CreateKey &amp; version = 2, we
    * return CreateKeyV1.
    * Since this is a priority queue based implementation, we use a O(1) peek()
    * lookup to get the current valid version.
+   * </pre>
    * @param lvm LayoutVersionManager
    * @param key Key and Version.
    * @return instance.
