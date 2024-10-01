@@ -322,8 +322,8 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Performs a search for deleted keys in the Ozone Manager DeletedTable using a specified search prefix.
-   * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
-   * compiling a list of keys that match the given prefix along with their data sizes.
+   * In the DeletedTable both the fso and non-fso keys are stored in a similar format, this endpoint compiles
+   * a list of keys that match the given prefix along with their data sizes.
    *
    * The search prefix must start from the bucket level ('/volumeName/bucketName/') or any specific directory
    * or key level (e.g., '/volA/bucketA/dir1' for everything under 'dir1' inside 'bucketA' of 'volA').
