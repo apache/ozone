@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.scm.client.ContainerListResult;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -344,14 +344,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
-      int count) throws IOException {
-    return storageContainerLocationClient.listContainer(
-        startContainerID, count);
-  }
-
-  @Override
-  public ContainerListResult listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
     if (count > maxCountOfContainerList) {
       LOG.error("Attempting to list {} containers. However, this exceeds" +
@@ -359,22 +352,12 @@ public class ContainerOperationClient implements ScmClient {
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;
     }
-    return storageContainerLocationClient.listContainerWithCount(
+    return storageContainerLocationClient.listContainer(
         startContainerID, count);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType repType,
-      ReplicationConfig replicationConfig) throws IOException {
-    return storageContainerLocationClient.listContainer(
-        startContainerID, count, state, repType, replicationConfig);
-  }
-
-
-  @Override
-  public ContainerListResult listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType repType,
       ReplicationConfig replicationConfig) throws IOException {
@@ -384,7 +367,7 @@ public class ContainerOperationClient implements ScmClient {
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;
     }
-    return storageContainerLocationClient.listContainerWithCount(
+    return storageContainerLocationClient.listContainer(
         startContainerID, count, state, repType, replicationConfig);
   }
 

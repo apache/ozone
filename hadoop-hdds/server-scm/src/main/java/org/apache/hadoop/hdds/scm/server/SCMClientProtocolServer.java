@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.client.ContainerListResult;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -419,11 +419,12 @@ public class SCMClientProtocolServer implements
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
     return listContainer(startContainerID, count, null, null, null);
   }
@@ -433,29 +434,14 @@ public class SCMClientProtocolServer implements
    *
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
    *
    * @return a list of containers capped by max count allowed
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
-  public ContainerListResult listContainerWithCount(long startContainerID,
-      int count) throws IOException {
-    return listContainerWithCount(startContainerID, count, null, null, null);
-  }
-
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   *
-   * @return a list of pipeline.
-   * @throws IOException
-   */
-  @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
     return listContainer(startContainerID, count, state, null, null);
   }
@@ -466,82 +452,17 @@ public class SCMClientProtocolServer implements
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    * @param state Container with this state will be returned.
-   *
+   * @param factor Container factor.
    * @return a list of containers capped by max count allowed
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
-  public ContainerListResult listContainerWithCount(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException {
-    return listContainerWithCount(startContainerID, count, state, null, null);
-  }
-
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param factor Container factor.
-   * @return a list of pipeline.
-   * @throws IOException
-   */
-  @Override
   @Deprecated
-  public List<ContainerInfo> listContainer(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("startContainerID", String.valueOf(startContainerID));
-    auditMap.put("count", String.valueOf(count));
-    if (state != null) {
-      auditMap.put("state", state.name());
-    }
-    if (factor != null) {
-      auditMap.put("factor", factor.name());
-    }
-    try {
-      final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if (state != null) {
-        if (factor != null) {
-          return scm.getContainerManager().getContainers(state).stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              //Filtering EC replication type as EC will not have factor.
-              .filter(info -> info
-                  .getReplicationType() != HddsProtos.ReplicationType.EC)
-              .filter(info -> (info.getReplicationFactor() == factor))
-              .sorted().limit(count).collect(Collectors.toList());
-        } else {
-          return scm.getContainerManager().getContainers(state).stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              .sorted().limit(count).collect(Collectors.toList());
-        }
-      } else {
-        if (factor != null) {
-          return scm.getContainerManager().getContainers().stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              //Filtering EC replication type as EC will not have factor.
-              .filter(info -> info
-                  .getReplicationType() != HddsProtos.ReplicationType.EC)
-              .filter(info -> info.getReplicationFactor() == factor)
-              .sorted().limit(count).collect(Collectors.toList());
-        } else {
-          return scm.getContainerManager().getContainers(containerId, count);
-        }
-      }
-    } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
-      }
-    }
+    return listContainerInternal(startContainerID, count, state, factor, null, null);
   }
 
   private ContainerListResult listContainerInternal(long startContainerID, int count,
@@ -633,82 +554,12 @@ public class SCMClientProtocolServer implements
    * @param count count must be {@literal >} 0.
    * @param state Container with this state will be returned.
    * @param repConfig Replication Config for the container.
-   * @return a list of pipeline.
-   * @throws IOException
-   */
-  @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) throws IOException {
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("startContainerID", String.valueOf(startContainerID));
-    auditMap.put("count", String.valueOf(count));
-    if (state != null) {
-      auditMap.put("state", state.name());
-    }
-    if (replicationType != null) {
-      auditMap.put("replicationType", replicationType.toString());
-    }
-    if (repConfig != null) {
-      auditMap.put("replicationConfig", repConfig.toString());
-    }
-    try {
-      final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if (state == null && replicationType == null && repConfig == null) {
-        // Not filters, so just return everything
-        return scm.getContainerManager().getContainers(containerId, count);
-      }
-
-      List<ContainerInfo> containerList;
-      if (state != null) {
-        containerList = scm.getContainerManager().getContainers(state);
-      } else {
-        containerList = scm.getContainerManager().getContainers();
-      }
-
-      Stream<ContainerInfo> containerStream = containerList.stream()
-          .filter(info -> info.containerID().getId() >= startContainerID);
-      // If we have repConfig filter by it, as it includes repType too.
-      // Otherwise, we may have a filter just for repType, eg all EC containers
-      // without filtering on their replication scheme
-      if (repConfig != null) {
-        containerStream = containerStream
-            .filter(info -> info.getReplicationConfig().equals(repConfig));
-      } else if (replicationType != null) {
-        containerStream = containerStream
-            .filter(info -> info.getReplicationType() == replicationType);
-      }
-      return containerStream.sorted()
-          .limit(count)
-          .collect(Collectors.toList());
-    } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
-      }
-    }
-  }
-
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param repConfig Replication Config for the container.
    * @return a list of containers capped by max count allowed
    * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
-  public ContainerListResult listContainerWithCount(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {

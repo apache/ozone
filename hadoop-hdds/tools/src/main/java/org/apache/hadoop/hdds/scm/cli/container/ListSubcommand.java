@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ContainerListResult;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
@@ -62,10 +62,7 @@ public class ListSubcommand extends ScmSubcommand {
   private int count;
 
   @Option(names = {"-a", "--all"},
-      description = "List all results. However the total number of containers might exceed " +
-          " the cluster's limit \"hdds.container.list.max.count\"." +
-          " The results will be capped at the " +
-          " maximum allowed count.",
+      description = "List all containers.",
       defaultValue = "false")
   private boolean all;
 
@@ -122,35 +119,45 @@ public class ListSubcommand extends ScmSubcommand {
     int maxCountAllowed = parent.getParent().getOzoneConf()
         .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
             ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
-    if (all) {
-      System.err.printf("Attempting to list all containers." +
-          " The total number of container might exceed" +
-          " the cluster's current limit of %s. The results will be capped at the" +
-          " maximum allowed count.%n", ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
-      count = maxCountAllowed;
-    } else {
+
+    ContainerListResult containerListAndTotalCount;
+
+    if (!all) {
       if (count > maxCountAllowed) {
         System.err.printf("Attempting to list the first %d records of containers." +
             " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
             " maximum allowed count.%n", count, ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
         count = maxCountAllowed;
       }
-    }
+      containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
+      for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+        outputContainerInfo(container);
+      }
 
-    ContainerListResult containerListAndTotalCount =
-        scmClient.listContainerWithCount(startId, count, state, type, repConfig);
+      if (containerListAndTotalCount.getTotalCount() > count) {
+        System.err.printf("Container list is truncated as it is too long. " +
+                        "Displayed the first %d records of %d total containers.%n",
+                count, containerListAndTotalCount.getTotalCount());
+      }
+    } else {
+      // Batch size is either count passed through cli or maxCountAllowed
+      int batchSize = (count > 0) ? count : maxCountAllowed;
+      long currentStartId = startId;
+      int fetchedCount;
 
-    // Output data list
-    for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-      outputContainerInfo(container);
-    }
+      do {
+        // Fetch containers in batches of 'batchSize'
+        containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+        fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
 
-    if (containerListAndTotalCount.getTotalCount() > count) {
-      System.err.printf("Container List is truncated since it's too long. " +
-              "List the first %d records of %d. " +
-              "User won't be able to view the full list of containers until " +
-              "pagination feature is supported.  %n",
-          count, containerListAndTotalCount.getTotalCount());
+        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+          outputContainerInfo(container);
+        }
+
+        if (fetchedCount > 0) {
+          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID();
+        }
+      } while (fetchedCount == batchSize);
     }
   }
 }

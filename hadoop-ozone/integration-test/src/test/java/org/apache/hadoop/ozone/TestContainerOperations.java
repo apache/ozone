@@ -159,7 +159,7 @@ public class TestContainerOperations {
           .ONE, OzoneConsts.OZONE);
     }
 
-    assertEquals(1, storageClient.listContainerWithCount(0, 2)
+    assertEquals(1, storageClient.listContainer(0, 2)
         .getContainerInfoList().size());
   }
 

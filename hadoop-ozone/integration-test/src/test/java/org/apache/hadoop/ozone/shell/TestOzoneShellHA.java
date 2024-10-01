@@ -966,16 +966,23 @@ public class TestOzoneShellHA {
   @Test
   public void testOzoneAdminCmdListAllContainer()
       throws UnsupportedEncodingException {
-    String[] args1 = new String[] {"container", "create", "--scm",
+    String[] args = new String[] {"container", "create", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
     for (int i = 0; i < 2; i++) {
-      execute(ozoneAdminShell, args1);
+      execute(ozoneAdminShell, args);
     }
 
-    String[] args = new String[] {"container", "list", "-a", "--scm",
-        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
-    execute(ozoneAdminShell, args);
+    String[] args1 = new String[] {"container", "list", "-c", "10", "--scm",
+            "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
+    execute(ozoneAdminShell, args1);
+    //results will be capped at the maximum allowed count
     assertEquals(1, getNumOfContainers());
+
+    String[] args2 = new String[] {"container", "list", "-a", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
+    execute(ozoneAdminShell, args2);
+    //Lists all containers
+    assertNotEquals(1, getNumOfContainers());
   }
 
   private int getNumOfContainers()
