@@ -1021,24 +1021,22 @@ public class KeyValueHandler extends Handler {
   public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
                                            ChunkBuffer data, KeyValueContainer kvContainer)
       throws IOException {
-
-    try {
-      Preconditions.checkNotNull(chunkInfo);
-      Preconditions.checkNotNull(data);
-      long writeChunkStartTime = Time.monotonicNowNanos();
-      checkContainerClose(kvContainer);
-
-      DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
-      chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
-          dispatcherContext);
-
-      // Increment write stats for WriteChunk after write.
-      metrics.incContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
-      metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
-    } catch (IOException ex) {
-      LOG.error("Write Chunk failed for closed container", ex);
-      throw new IOException(ex);
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(chunkInfo);
+    Preconditions.checkNotNull(data);
+    long writeChunkStartTime = Time.monotonicNowNanos();
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
     }
+
+    DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
+    chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
+        dispatcherContext);
+
+    // Increment write stats for WriteChunk after write.
+    metrics.incClosedContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
+    metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
   }
 
   /**
@@ -1048,26 +1046,24 @@ public class KeyValueHandler extends Handler {
   public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
                                           BlockData blockData, long blockCommitSequenceId)
       throws IOException {
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(blockData);
+    long startTime = Time.monotonicNowNanos();
 
-    try {
-      Preconditions.checkNotNull(blockData);
-      long startTime = Time.monotonicNowNanos();
-
-      checkContainerClose(kvContainer);
-      blockData.setChunks(chunkInfos);
-      // To be set from the Replica's BCSId
-      blockData.setBlockCommitSequenceId(blockCommitSequenceId);
-
-      blockManager.putBlock(kvContainer, blockData, false);
-      ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
-      final long numBytes = blockDataProto.getSerializedSize();
-      // Increment write stats for PutBlock after write.
-      metrics.incContainerBytesStats(Type.PutBlock, numBytes);
-      metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
-    } catch (IOException ex) {
-      LOG.error("Put Block failed for closed container", ex);
-      throw new IOException(ex);
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
     }
+    blockData.setChunks(chunkInfos);
+    // To be set from the Replica's BCSId
+    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+
+    blockManager.putBlock(kvContainer, blockData, false);
+    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+    final long numBytes = blockDataProto.getSerializedSize();
+    // Increment write stats for PutBlock after write.
+    metrics.incClosedContainerBytesStats(Type.PutBlock, numBytes);
+    metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
   }
 
   /**
@@ -1247,34 +1243,16 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
-   * Check if container is Closed. Throw exception otherwise.
+   * Check if container is Closed.
    * @param kvContainer
-   * @throws StorageContainerException
    */
-  private void checkContainerClose(KeyValueContainer kvContainer)
-      throws StorageContainerException {
+  private boolean checkContainerClose(KeyValueContainer kvContainer) {
 
     final State containerState = kvContainer.getContainerState();
     if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED || containerState == State.UNHEALTHY) {
-      return;
+      return true;
     }
-
-    final ContainerProtos.Result result;
-    switch (containerState) {
-    case OPEN:
-    case CLOSING:
-    case RECOVERING:
-      result = UNCLOSED_CONTAINER_IO;
-      break;
-    case INVALID:
-      result = INVALID_CONTAINER_STATE;
-      break;
-    default:
-      result = CONTAINER_INTERNAL_ERROR;
-    }
-    String msg = "Requested operation not allowed as ContainerState is " +
-        containerState;
-    throw new StorageContainerException(msg, result);
+    return false;
   }
 
   @Override

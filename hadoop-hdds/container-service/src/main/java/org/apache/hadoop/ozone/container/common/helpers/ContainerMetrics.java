@@ -60,6 +60,7 @@ public class ContainerMetrics {
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsForClosedContainer;
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
@@ -69,6 +70,7 @@ public class ContainerMetrics {
     MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsForClosedContainer = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatQuantiles = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry("StorageContainerMetrics");
@@ -77,7 +79,9 @@ public class ContainerMetrics {
       numOpsArray.put(type, registry.newCounter(
           "num" + type, "number of " + type + " ops", (long) 0));
       opsBytesArray.put(type, registry.newCounter(
-          "bytes" + type, "bytes used by " + type + "op", (long) 0));
+          "bytes" + type, "bytes used by " + type + " op", (long) 0));
+      opsForClosedContainer.put(type, registry.newCounter("bytesForClosedContainer" + type,
+          "bytes used by " + type + " for closed container op", (long) 0));
       opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
 
       for (int j = 0; j < len; j++) {
@@ -119,6 +123,10 @@ public class ContainerMetrics {
 
   public void incContainerBytesStats(ContainerProtos.Type type, long bytes) {
     opsBytesArray.get(type).incr(bytes);
+  }
+
+  public void incClosedContainerBytesStats(ContainerProtos.Type type, long bytes) {
+    opsForClosedContainer.get(type).incr(bytes);
   }
 
   public void incContainerDeleteFailedBlockCountNotZero() {
