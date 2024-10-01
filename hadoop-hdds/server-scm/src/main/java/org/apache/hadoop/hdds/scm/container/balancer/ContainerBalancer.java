@@ -188,7 +188,7 @@ public class ContainerBalancer extends StatefulService {
       if (isBalancerRunning()) {
         return new ContainerBalancerStatusInfo(
             this.startedAt,
-            config.toProtobufBuilder().build(),
+            config.toProtobufBuilder().setShouldRun(true).build(),
             task.getCurrentIterationsStatistic()
         );
       }
