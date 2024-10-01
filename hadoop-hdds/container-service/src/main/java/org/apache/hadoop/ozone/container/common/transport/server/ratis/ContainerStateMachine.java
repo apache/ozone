@@ -83,6 +83,7 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -1162,8 +1163,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void notifyFollowerSlowness(RoleInfoProto roleInfoProto) {
-    ratisServer.handleNodeSlowness(gid, roleInfoProto);
+  public void notifyFollowerSlowness(RoleInfoProto roleInfoProto, RaftPeer follower) {
+    ratisServer.handleFollowerSlowness(gid, roleInfoProto, follower);
   }
 
   @Override
