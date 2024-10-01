@@ -290,7 +290,7 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    if (!allowDuration()) {
+    if (duration != null && !allowDuration()) {
       LOG.warn("--duration is ignored");
       duration = null;
     }
