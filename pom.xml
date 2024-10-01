@@ -64,7 +64,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
   <properties>
     <hadoop2.version>2.10.2</hadoop2.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.1</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -193,11 +193,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
     <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
-    <proto3.hadooprpc.protobuf.version>3.7.1</proto3.hadooprpc.protobuf.version>
-    <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
+    <proto3.hadooprpc.protobuf.version>3.23.4</proto3.hadooprpc.protobuf.version>
+    <hadoop-thirdparty.version>1.3.0</hadoop-thirdparty.version>
 
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <dnsjava.version>2.1.9</dnsjava.version>
+    <dnsjava.version>3.6.1</dnsjava.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -1030,7 +1030,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
         <version>${hadoop-thirdparty.version}</version>
       </dependency>
       <dependency>

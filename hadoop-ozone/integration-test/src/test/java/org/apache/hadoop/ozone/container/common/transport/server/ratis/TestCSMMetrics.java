@@ -154,6 +154,14 @@ public class TestCSMMetrics {
       assertCounter("NumContainerNotOpenVerifyFailures", 0L, metric);
       assertCounter("WriteChunkMsNumOps", 1L, metric);
 
+      applyTransactionLatency = getDoubleGauge(
+          "ApplyTransactionNsAvgTime", metric);
+      assertThat(applyTransactionLatency).isGreaterThan(0.0);
+      writeStateMachineLatency = getDoubleGauge(
+          "WriteStateMachineDataNsAvgTime", metric);
+      assertThat(writeStateMachineLatency).isGreaterThan(0.0);
+
+
       //Read Chunk
       ContainerProtos.ContainerCommandRequestProto readChunkRequest =
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
@@ -166,12 +174,6 @@ public class TestCSMMetrics {
           RaftGroupId.valueOf(pipeline.getId().getId()));
       assertCounter("NumQueryStateMachineOps", 1L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
-      applyTransactionLatency = getDoubleGauge(
-          "ApplyTransactionNsAvgTime", metric);
-      assertThat(applyTransactionLatency).isGreaterThan(0.0);
-      writeStateMachineLatency = getDoubleGauge(
-          "WriteStateMachineDataNsAvgTime", metric);
-      assertThat(writeStateMachineLatency).isGreaterThan(0.0);
 
     } finally {
       if (client != null) {

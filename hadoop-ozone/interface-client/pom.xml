@@ -48,7 +48,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
 
     <dependency>
