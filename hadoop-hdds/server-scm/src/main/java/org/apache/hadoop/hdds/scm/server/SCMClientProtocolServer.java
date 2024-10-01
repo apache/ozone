@@ -566,7 +566,6 @@ public class SCMClientProtocolServer implements
     return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig);
   }
 
-
   @Override
   public void deleteContainer(long containerID) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();

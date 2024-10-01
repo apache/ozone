@@ -437,10 +437,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainersList()) {
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
+
     if (response.hasContainerCount()) {
       return new ContainerListResult(containerList, response.getContainerCount());
-    }
-    else {
+    } else {
       return new ContainerListResult(containerList, -1);
     }
   }
