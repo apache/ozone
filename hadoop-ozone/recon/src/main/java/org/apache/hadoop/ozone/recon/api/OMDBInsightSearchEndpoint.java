@@ -124,22 +124,10 @@ public class OMDBInsightSearchEndpoint {
       String prevKey) throws IOException {
 
     try {
-      // Ensure startPrefix is not null or empty and starts with '/'
-      if (startPrefix == null || startPrefix.length() == 0) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
+      // Validate the request parameters
+      if (!validateStartPrefixAndLimit(startPrefix, limit)) {
+        return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
-      startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
-
-      // Split the path to ensure it's at least at the bucket level
-      String[] pathComponents = startPrefix.split("/");
-      if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
-      }
-
-      // Ensure the limit is non-negative
-      limit = Math.max(0, limit);
 
       // Initialize response object
       KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
@@ -354,27 +342,18 @@ public class OMDBInsightSearchEndpoint {
   @GET
   @Path("/deletePending/search")
   public Response searchDeletedKeys(
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix") String startPrefix,
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit") int limit,
-      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey") String prevKey) throws IOException {
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix")
+      String startPrefix,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
+      int limit,
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey")
+      String prevKey) throws IOException {
 
     try {
-      // Ensure startPrefix is not null or empty and starts with '/'
-      if (startPrefix == null || startPrefix.length() == 0) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
+      // Validate the request parameters
+      if (!validateStartPrefixAndLimit(startPrefix, limit)) {
+        return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
-      startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
-
-      // Split the path to ensure it's at least at the bucket level
-      String[] pathComponents = startPrefix.split("/");
-      if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
-      }
-
-      // Ensure the limit is non-negative
-      limit = Math.max(0, limit);
 
       // Initialize response object
       KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
@@ -444,6 +423,25 @@ public class OMDBInsightSearchEndpoint {
     keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
     keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
     return keyEntityInfo;
+  }
+
+  private boolean validateStartPrefixAndLimit(String startPrefix, int limit) {
+    // Ensure startPrefix is not null or empty and starts with '/'
+    if (startPrefix == null || startPrefix.isEmpty()) {
+      return false;
+    }
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path to ensure it's at least at the bucket level
+    String[] pathComponents = startPrefix.split("/");
+    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+      return false;
+    }
+
+    // Ensure the limit is non-negative
+    limit = Math.max(0, limit);
+
+    return true; // Validation passed
   }
 
 }
