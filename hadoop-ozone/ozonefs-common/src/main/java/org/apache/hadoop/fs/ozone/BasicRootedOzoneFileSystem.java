@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
@@ -152,9 +153,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
         StorageUnit.BYTES);
-    hsyncEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OZONE_FS_HSYNC_ENABLED_DEFAULT);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -191,6 +189,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
       ConfigurationSource source = getConfSource();
+      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
+      LOG.debug("hsyncEnabled = {}", hsyncEnabled);
       this.adapter = createAdapter(source, omHostOrServiceId, omPort);
       this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
@@ -722,7 +722,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         throw new IOException("Recursive volume delete using " +
             "ofs is not supported. " +
             "Instead use 'ozone sh volume delete -r " +
-            "-id <OM_SERVICE_ID> <Volume_URI>' command");
+            "o3://<OM_SERVICE_ID>/<Volume_URI>' command");
       }
       return deleteVolume(f, ofsPath);
     }
@@ -1105,6 +1105,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public short getDefaultReplication() {
     return adapter.getDefaultReplication();
+  }
+
+  @Override
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
+    return adapter.getServerDefaults();
   }
 
   @Override

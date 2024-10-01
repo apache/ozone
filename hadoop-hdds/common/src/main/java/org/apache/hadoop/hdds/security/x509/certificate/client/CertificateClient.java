@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
@@ -129,23 +130,6 @@ public interface CertificateClient extends Closeable {
   Set<X509Certificate> getAllCaCerts();
 
   /**
-   * Return the pem encoded CA certificate list.
-   * <p>
-   * If initialized return list of pem encoded CA certificates, else return
-   * null.
-   *
-   * @return list of pem encoded CA certificates.
-   */
-  List<String> getCAList();
-
-  /**
-   * Update and returns the pem encoded CA certificate list.
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> updateCAList() throws IOException;
-
-  /**
    * Verifies a digital Signature, given the signature and the certificate of
    * the signer.
    * @param data - Data in byte array.
@@ -176,9 +160,31 @@ public interface CertificateClient extends Closeable {
     }
   }
 
+  /**
+   * Gets a KeyManager containing this CertificateClient's key material and trustchain.
+   * During certificate rotation this KeyManager is automatically updated with the new keys/certificates.
+   *
+   * @return A KeyManager containing keys and the trustchain for this CertificateClient.
+   * @throws CertificateException
+   */
   ReloadingX509KeyManager getKeyManager() throws CertificateException;
 
+  /**
+   * Gets a TrustManager containing the trusted certificates of this CertificateClient.
+   * During certificate rotation this TrustManager is automatically updated with the new certificates.
+   *
+   * @return A TrustManager containing trusted certificates for this CertificateClient.
+   * @throws CertificateException
+   */
   ReloadingX509TrustManager getTrustManager() throws CertificateException;
+
+  /**
+   * Creates a ClientTrustManager instance using the trusted certificates of this certificate client.
+   *
+   * @return The new ClientTrustManager instance.
+   * @throws IOException
+   */
+  ClientTrustManager createClientTrustManager() throws IOException;
 
   /**
    * Register a receiver that will be called after the certificate renewed.

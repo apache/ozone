@@ -307,10 +307,13 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * @param loc string location of a node. If loc starts with "/", it's a
    *            absolute path, otherwise a relative path. Following examples
    *            are all accepted,
+   *            <pre>
+   *            {@code
    *            1.  /dc1/rm1/rack1          -> an inner node
    *            2.  /dc1/rm1/rack1/node1    -> a leaf node
    *            3.  rack1/node1             -> a relative path to this node
-   *
+   *            }
+   *            </pre>
    * @return null if the node is not found
    */
   @Override

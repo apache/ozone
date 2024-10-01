@@ -388,6 +388,9 @@ public class DatanodeDetails extends NodeImpl implements
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+    } else {
+      // fallback to version 1 if not present
+      builder.setCurrentVersion(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
     }
     return builder;
   }

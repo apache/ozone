@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -83,6 +84,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
@@ -99,6 +101,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -117,6 +120,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * This class tests container commands on EC containers.
@@ -613,30 +617,33 @@ public class TestContainerCommandsEC {
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
+  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes, boolean triggerRetry)
       throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 3);
+    testECReconstructionCoordinator(missingIndexes, 3, triggerRetry);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes)
-      throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 1);
+  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes,
+      boolean triggerRetry) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 1, triggerRetry);
   }
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes)
-      throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 4);
+  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes,
+      boolean triggerRetry) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 4, triggerRetry);
   }
 
-  static Stream<List<Integer>> recoverableMissingIndexes() {
-    return Stream
-        .concat(IntStream.rangeClosed(1, 5).mapToObj(ImmutableList::of), Stream
-            .of(ImmutableList.of(2, 3), ImmutableList.of(2, 4),
-                ImmutableList.of(3, 5), ImmutableList.of(4, 5)));
+  static Stream<Arguments> recoverableMissingIndexes() {
+    Stream<Arguments> args = IntStream.rangeClosed(1, 5).mapToObj(i -> arguments(ImmutableList.of(i), true));
+    Stream<Arguments> args1 = IntStream.rangeClosed(1, 5).mapToObj(i -> arguments(ImmutableList.of(i), false));
+    Stream<Arguments> args2 =  Stream.of(arguments(ImmutableList.of(2, 3), true),
+        arguments(ImmutableList.of(2, 4), true), arguments(ImmutableList.of(3, 5), true));
+    Stream<Arguments> args3 =  Stream.of(arguments(ImmutableList.of(2, 3), false),
+        arguments(ImmutableList.of(2, 4), false), arguments(ImmutableList.of(3, 5), false));
+    return Stream.concat(Stream.concat(args, args1), Stream.concat(args2, args3));
   }
 
   /**
@@ -647,7 +654,7 @@ public class TestContainerCommandsEC {
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
         assertThrows(InsufficientLocationsException.class, () -> {
-          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3, false);
         });
 
     String expectedMessage =
@@ -658,7 +665,7 @@ public class TestContainerCommandsEC {
   }
 
   private void testECReconstructionCoordinator(List<Integer> missingIndexes,
-      int numInputChunks) throws Exception {
+      int numInputChunks, boolean triggerRetry) throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
@@ -667,7 +674,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket, numInputChunks);
+    createKeyAndWriteData(keyString, bucket, numInputChunks, triggerRetry);
 
     try (
         XceiverClientManager xceiverClientManager =
@@ -779,7 +786,7 @@ public class TestContainerCommandsEC {
                           .getReplicationConfig(), cToken);
           assertEquals(blockDataArrList.get(i).length,
               reconstructedBlockData.length);
-          checkBlockData(blockDataArrList.get(i), reconstructedBlockData);
+          checkBlockDataWithRetry(blockDataArrList.get(i), reconstructedBlockData, triggerRetry);
           XceiverClientSpi client = xceiverClientManager.acquireClient(
               newTargetPipeline);
           try {
@@ -800,7 +807,7 @@ public class TestContainerCommandsEC {
   }
 
   private void createKeyAndWriteData(String keyString, OzoneBucket bucket,
-      int numChunks) throws IOException {
+      int numChunks, boolean triggerRetry) throws IOException {
     for (int i = 0; i < numChunks; i++) {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
@@ -809,9 +816,46 @@ public class TestContainerCommandsEC {
         new HashMap<>())) {
       assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       for (int i = 0; i < numChunks; i++) {
+        // We generally wait until the data is written to the last chunk
+        // before attempting to trigger CloseContainer.
+        // We use an asynchronous approach for this trigger,
+        // aiming to ensure that closing the container does not interfere with the write operation.
+        // However, this process often needs to be executed multiple times before it takes effect.
+        if (i == numChunks - 1 && triggerRetry) {
+          triggerRetryByCloseContainer(out);
+        }
         out.write(inputChunks[i]);
       }
     }
+  }
+
+  private void triggerRetryByCloseContainer(OzoneOutputStream out) {
+    CompletableFuture.runAsync(() -> {
+      BlockOutputStreamEntry blockOutputStreamEntry = out.getKeyOutputStream().getStreamEntries().get(0);
+      BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
+      long entryContainerID = entryBlockID.getContainerID();
+      Pipeline entryPipeline = blockOutputStreamEntry.getPipeline();
+      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexes();
+      try {
+        for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
+          DatanodeDetails key = entry.getKey();
+          Integer value = entry.getValue();
+          XceiverClientManager xceiverClientManager = new XceiverClientManager(config);
+          Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
+              .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
+          XceiverClientSpi client = xceiverClientManager.acquireClient(
+              createSingleNodePipeline(entryPipeline, key, value));
+          try {
+            ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
+          } finally {
+            xceiverClientManager.releaseClient(client, false);
+          }
+          break;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
   }
 
   @Test
@@ -826,7 +870,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket, 3);
+    createKeyAndWriteData(keyString, bucket, 3, false);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
@@ -900,6 +944,25 @@ public class TestContainerCommandsEC {
         HddsProtos.LifeCycleEvent.CLOSE);
   }
 
+  private void checkBlockDataWithRetry(
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData,
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[]
+      reconstructedBlockData, boolean triggerRetry) {
+    if (triggerRetry) {
+      for (int i = 0; i < reconstructedBlockData.length; i++) {
+        assertEquals(blockData[i].getBlockID(), reconstructedBlockData[i].getBlockID());
+        List<ContainerProtos.ChunkInfo> oldBlockDataChunks = blockData[i].getChunks();
+        List<ContainerProtos.ChunkInfo> newBlockDataChunks = reconstructedBlockData[i].getChunks();
+        for (int j = 0; j < newBlockDataChunks.size(); j++) {
+          ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
+          assertEquals(chunkInfo, newBlockDataChunks.get(j));
+        }
+      }
+      return;
+    }
+    checkBlockData(blockData, reconstructedBlockData);
+  }
+
   private void checkBlockData(
       org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData,
       org.apache.hadoop.ozone.container.common.helpers.BlockData[]
@@ -967,8 +1030,7 @@ public class TestContainerCommandsEC {
         out.write(values[i]);
       }
     }
-//    List<ContainerID> containerIDs =
-//        new ArrayList<>(scm.getContainerManager().getContainerIDs());
+
     List<ContainerID> containerIDs =
             scm.getContainerManager().getContainers()
                     .stream()

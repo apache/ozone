@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -169,7 +170,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /**
    * Returns a prefixed iterator for this metadata store.
    * @param prefix
-   * @return
+   * @return MetaStoreIterator
    */
   TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
       throws IOException;
@@ -245,7 +246,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
   /**
    * Returns a certain range of key value pairs as a list based on a
-   * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter}
+   * startKey or count. Further a {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}
    * can be added to * filter keys if necessary.
    * To prevent race conditions while listing
    * entries, this implementation takes a snapshot and lists the entries from
@@ -261,7 +262,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * the value for count must be an integer greater than 0.
    * <p>
    * This method allows to specify one or more
-   * {@link MetadataKeyFilters.MetadataKeyFilter}
+   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}
    * to filter keys by certain condition. Once given, only the entries
    * whose key passes all the filters will be included in the result.
    *
@@ -269,7 +270,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @param count max number of entries to return.
    * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
-   * {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database or an empty list if the
    * startKey is invalid.
    * @throws IOException if there are I/O errors.
@@ -292,7 +293,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @param count max number of entries to return.
    * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
-   * {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database.
    * @throws IOException
    * @throws IllegalArgumentException
@@ -307,7 +308,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * as part of a batch operation.
    * @param batch
    * @param prefix
-   * @return
    */
   void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException;
@@ -353,6 +353,24 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       @Override
       public String toString() {
         return "(key=" + key + ", value=" + value + ")";
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (!(obj instanceof KeyValue)) {
+          return false;
+        }
+        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
+        try {
+          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(getKey(), getValue());
       }
     };
   }

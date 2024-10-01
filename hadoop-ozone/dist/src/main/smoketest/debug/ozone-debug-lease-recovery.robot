@@ -17,11 +17,13 @@
 Documentation       Test lease recovery of ozone filesystem
 Library             OperatingSystem
 Resource            ../lib/os.robot
+Resource            ../lib/fs.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 Suite Setup         Create volume bucket and put key
 
 *** Variables ***
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 ${VOLUME}           lease-recovery-volume
 ${BUCKET}           lease-recovery-bucket
 ${TESTFILE}         testfile22
@@ -35,13 +37,17 @@ Create volume bucket and put key
 
 *** Test Cases ***
 Test ozone debug recover for o3fs
-    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/${TESTFILE}
-    Should Contain    ${result}   Lease recovery SUCCEEDED
-    ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/randomfile
-    Should Contain    ${result}    not found
+    ${o3fs_path} =     Format FS URL         o3fs    ${VOLUME}    ${BUCKET}    ${TESTFILE}
+    ${result} =        Execute Lease recovery cli    ${o3fs_path}
+                       Should Contain    ${result}   Lease recovery SUCCEEDED
+    ${o3fs_path} =     Format FS URL         o3fs    ${VOLUME}    ${BUCKET}    randomfile
+    ${result} =        Execute Lease recovery cli    ${o3fs_path}
+                       Should Contain    ${result}    not found
 
 Test ozone debug recover for ofs
-    ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    Should Contain    ${result}   Lease recovery SUCCEEDED
-    ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/randomfile
-    Should Contain    ${result}    not found
+    ${ofs_path} =      Format FS URL         ofs     ${VOLUME}    ${BUCKET}    ${TESTFILE}
+    ${result} =        Execute Lease recovery cli    ${ofs_path}
+                       Should Contain    ${result}   Lease recovery SUCCEEDED
+    ${ofs_path} =      Format FS URL         ofs     ${VOLUME}    ${BUCKET}    randomfile
+    ${result} =        Execute Lease recovery cli    ${ofs_path}
+                       Should Contain    ${result}    not found

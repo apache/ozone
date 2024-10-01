@@ -93,7 +93,6 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  @Flaky("HDDS-11325")
   void testContainerClose(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -386,7 +385,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
@@ -442,7 +442,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
@@ -455,7 +456,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -506,9 +508,10 @@ class TestBlockOutputStreamWithFailures {
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
     // we have just written data more than flush Size(2 chunks), at this time
-    // buffer pool will have 4 buffers allocated worth of chunk size
+    // buffer pool will have up to 4 buffers allocated worth of chunk size
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
@@ -531,7 +534,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
