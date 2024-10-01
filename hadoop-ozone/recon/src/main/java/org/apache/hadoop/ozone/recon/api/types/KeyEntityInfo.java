@@ -143,7 +143,7 @@ public class KeyEntityInfo {
     return isKey;
   }
 
-  public void setIsKey(boolean key) {
-    isKey = key;
+  public void setIsKey(boolean isKey) {
+    this.isKey = isKey;
   }
 }
