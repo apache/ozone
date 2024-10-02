@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
 
+/**
+ * Exception used to indicate a problem with binding a port.
+ * Typically, the port is in use.
+ */
 public class BindException extends IOException {
     public BindException() {
     }
