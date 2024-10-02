@@ -326,7 +326,7 @@ public class TestEndPoint {
         .getReuseableAddress();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         nonExistentServerAddress, 1000)) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails,
           conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
@@ -353,7 +353,7 @@ public class TestEndPoint {
 
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, (int) rpcTimeout)) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails, conf,
           ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));

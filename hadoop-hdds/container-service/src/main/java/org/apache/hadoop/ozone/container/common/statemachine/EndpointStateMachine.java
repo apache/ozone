@@ -234,12 +234,15 @@ public class EndpointStateMachine
     }
 
     if (missCounter == 0) {
+      long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(
+              this.getMissedCount() * getScmHeartbeatInterval(this.conf)
+      );
       LOG.error(
               "Unable to communicate to {} server at {}:{} for past {} seconds.",
               serverName,
               address.getAddress(),
               address.getPort(),
-              TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() * getScmHeartbeatInterval(this.conf)),
+              missedDurationSeconds,
               ex
       );
     }
