@@ -28,7 +28,6 @@ import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -56,7 +55,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -1056,39 +1054,6 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   */
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException;
-
-  /**
-   * Recover trash allows the user to recover keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   * @throws IOException
-   */
-  default boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-    return false;
-  }
-
-  /**
    *
    * @param txnApplyWaitTimeoutSeconds Max time in SECONDS to wait for all
    *                                   transactions before the prepare request
@@ -1096,7 +1061,7 @@ public interface OzoneManagerProtocol
    * @param txnApplyCheckIntervalSeconds Time in SECONDS to wait between
    *                                     successive checks for all transactions
    *                                     to be applied to the OM DB.
-   * @return
+   * @return {@code long}
    */
   default long prepareOzoneManager(
       long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
@@ -1181,10 +1146,15 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   /**
-   * Get server default configurations.
-   *
-   * @return OzoneFsServerDefaults some default configurations from server.
+   * Get status of last triggered quota repair in OM.
+   * @return String
    * @throws IOException
    */
-  OzoneFsServerDefaults getServerDefaults() throws IOException;
+  String getQuotaRepairStatus() throws IOException;
+
+  /**
+   * start quota repair in OM.
+   * @throws IOException
+   */
+  void startQuotaRepair(List<String> buckets) throws IOException;
 }

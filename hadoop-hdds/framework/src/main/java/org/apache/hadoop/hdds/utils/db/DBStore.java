@@ -184,7 +184,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
   /**
    * Get List of Index to Table Names.
    * (For decoding table from column family index)
-   * @return Map of Index -> TableName
+   * @return Map of Index -&gt; TableName
    */
   Map<Integer, String> getTableNames();
 

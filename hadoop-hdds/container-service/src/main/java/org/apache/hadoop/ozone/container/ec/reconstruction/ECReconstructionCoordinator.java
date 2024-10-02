@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
@@ -371,7 +370,7 @@ public class ECReconstructionCoordinator implements Closeable {
           .append(" block length: ")
           .append(data.getSize())
           .append(" block group length: ")
-          .append(getBlockDataLength(data))
+          .append(data.getBlockGroupLength())
           .append(" chunk list: \n");
       int cnt = 0;
       for (ContainerProtos.ChunkInfo chunkInfo : data.getChunks()) {
@@ -573,22 +572,12 @@ public class ECReconstructionCoordinator implements Closeable {
         continue;
       }
 
-      long putBlockLen = getBlockDataLength(blockGroup[i]);
+      long putBlockLen = blockGroup[i].getBlockGroupLength();
       // Use safe length is the minimum of the lengths recorded across the
       // stripe
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
-  }
-
-  private long getBlockDataLength(BlockData blockData) {
-    String lenStr = blockData.getMetadata()
-        .get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
-    // If we don't have the length, then it indicates a problem with the stripe.
-    // All replica should carry the length, so if it is not there, we return 0,
-    // which will cause us to set the length of the block to zero and not
-    // attempt to reconstruct it.
-    return (lenStr == null) ? 0 : Long.parseLong(lenStr);
   }
 
   public ECReconstructionMetrics getECReconstructionMetrics() {

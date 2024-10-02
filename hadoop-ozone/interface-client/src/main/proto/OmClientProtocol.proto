@@ -97,8 +97,9 @@ enum Type {
 
   ListMultipartUploads = 82;
 
-  ListTrash = 91;
-  RecoverTrash = 92;
+  // Not used anymore due to HDDS-11251
+  ListTrash = 91; // [deprecated = true]
+  RecoverTrash = 92; // [deprecated = true]
 
   RevokeS3Secret = 93;
 
@@ -149,7 +150,9 @@ enum Type {
   RenameSnapshot = 131;
   ListOpenFiles = 132;
   QuotaRepair = 133;
-  GetServerDefaults = 134;
+  GetQuotaRepairStatus = 135;
+  StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
 }
 
 enum SafeMode {
@@ -233,8 +236,9 @@ message OMRequest {
   optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
-  optional ListTrashRequest                 listTrashRequest               = 91;
-  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+  // Not used anymore due to HDDS-11251
+  optional ListTrashRequest                 listTrashRequest               = 91 [deprecated = true];
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92 [deprecated = true];
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
@@ -288,7 +292,9 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
-  optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
+  optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
+  optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
 }
 
 message OMResponse {
@@ -362,8 +368,10 @@ message OMResponse {
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
-  optional ListTrashResponse                  listTrashResponse            = 91;
-  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  // Not used anymore due to HDDS-11251
+  optional ListTrashResponse                  listTrashResponse            = 91 [deprecated = true];
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92 [deprecated = true];
+
   optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
   optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
@@ -414,7 +422,8 @@ message OMResponse {
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
-  optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
+  optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
+  optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
 
 enum Status {
@@ -548,33 +557,39 @@ enum Status {
 /**
     This command acts as a list command for deleted keys that are still present
     in the deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 message ListTrashRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  optional string startKeyName = 3;
-  optional string keyPrefix = 4;
-  optional int32 maxKeys = 5;
+  // option deprecated = true;
+  required string volumeName = 1 [deprecated = true];
+  required string bucketName = 2 [deprecated = true];
+  optional string startKeyName = 3 [deprecated = true];
+  optional string keyPrefix = 4 [deprecated = true];
+  optional int32 maxKeys = 5 [deprecated = true];
 }
 
 message ListTrashResponse {
-  repeated RepeatedKeyInfo deletedKeys = 1;
+  // option deprecated = true;
+  repeated RepeatedKeyInfo deletedKeys = 1 [deprecated = true];
 }
 
 /**
     This command acts as a recover command for deleted keys that are still
     in deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 
 message RecoverTrashRequest {
-    required string volumeName = 1;
-    required string bucketName = 2;
-    required string keyName = 3;
-    required string destinationBucket = 4;
+    // option deprecated = true;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
+    required string keyName = 3 [deprecated = true];
+    required string destinationBucket = 4 [deprecated = true];
 }
 
 message RecoverTrashResponse {
-    required bool response = 1;
+    // option deprecated = true;
+    required bool response = 1 [deprecated = true];
 }
 
 message VolumeInfo {
@@ -870,6 +885,7 @@ message SnapshotInfo {
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
+  optional bytes lastTransactionInfo = 20;
 }
 
 message SnapshotDiffJobProto {
@@ -1362,6 +1378,8 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+    // previous snapshotID can also be null & this field would be absent in older requests.
+    optional NullableUUID expectedPreviousSnapshotID = 4;
 }
 
 message PurgeKeysResponse {
@@ -1384,6 +1402,12 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 3;
+}
+
+message NullableUUID {
+  optional hadoop.hdds.UUID uuid = 1;
 }
 
 message PurgeDirectoriesResponse {
@@ -1613,6 +1637,7 @@ message ServiceInfo {
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
     optional int32 OMVersion = 5 [default = 0];
+    optional FsServerDefaultsProto serverDefaults = 6;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1964,6 +1989,13 @@ message SnapshotMoveDeletedKeysRequest {
   repeated string deletedDirsToMove = 5;
 }
 
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+}
+
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
@@ -2205,15 +2237,19 @@ message BucketQuotaCount {
 message QuotaRepairResponse {
 }
 
-message ServerDefaultsRequest {
-}
-
 message FsServerDefaultsProto {
   optional string keyProviderUri = 1;
 }
 
-message ServerDefaultsResponse {
-  required FsServerDefaultsProto serverDefaults = 1;
+message GetQuotaRepairStatusRequest {
+}
+message GetQuotaRepairStatusResponse {
+    optional string status = 1;
+}
+message StartQuotaRepairRequest {
+    repeated string buckets = 1;
+}
+message StartQuotaRepairResponse {
 }
 
 message OMLockDetailsProto {

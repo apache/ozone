@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -172,7 +173,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -437,7 +437,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
 
   private KeyProviderCryptoExtension kmsProvider;
-  private OzoneFsServerDefaults serverDefaults;
   private final OMLayoutVersionManager versionManager;
 
   private final ReplicationConfigValidator replicationConfigValidator;
@@ -655,14 +654,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       kmsProvider = null;
       LOG.error("Fail to create Key Provider");
     }
-    Configuration hadoopConfig =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
-    URI keyProviderUri = KMSUtil.getKeyProviderUri(
-            hadoopConfig,
-            CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
-    String keyProviderUriStr =
-        (keyProviderUri != null) ? keyProviderUri.toString() : null;
-    serverDefaults = new OzoneFsServerDefaults(keyProviderUriStr);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -791,8 +782,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @param conf OzoneConfiguration
    * @return OM instance
-   * @throws IOException, AuthenticationException in case OM instance
-   *                      creation fails.
+   * @throws IOException AuthenticationException in case OM instance
+   *                      creation fails,
+   * @throws AuthenticationException
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -874,7 +866,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
-    accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
+    // If authorizer is not initialized or the authorizer is Native
+    // re-initialize the authorizer, else for non-native authorizer
+    // like ranger we can reuse previous value if it is initialized
+    if (null == accessAuthorizer || accessAuthorizer.isNative()) {
+      accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
+    }
+
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
@@ -2065,6 +2063,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException e) {
       LOG.error("{}: Couldn't add OM {} to peer list.", getOMNodeId(),
           newOMNodeId);
+      return;
     }
 
     if (omRatisSnapshotProvider == null) {
@@ -2970,39 +2969,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
-      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
-      throws IOException {
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volumeName);
-    auditMap.put(OzoneConsts.BUCKET, bucketName);
-    auditMap.put(OzoneConsts.START_KEY, startKeyName);
-    auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
-    auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
-    try {
-      if (isAclEnabled) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET,
-            StoreType.OZONE, ACLType.LIST,
-            volumeName, bucketName, keyPrefix);
-      }
-      metrics.incNumTrashKeyLists();
-      return keyManager.listTrash(volumeName, bucketName,
-          startKeyName, keyPrefix, maxKeys);
-    } catch (IOException ex) {
-      metrics.incNumTrashKeyListFails();
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_TRASH,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_TRASH,
-            auditMap));
-      }
-    }
-  }
-
-  @Override
   public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
                                       String snapshotName) throws IOException {
     metrics.incNumSnapshotInfos();
@@ -3171,6 +3137,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
             .build());
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
+    URI keyProviderUri = KMSUtil.getKeyProviderUri(
+        hadoopConfig,
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
+    String keyProviderUriStr =
+        (keyProviderUri != null) ? keyProviderUri.toString() : null;
+    omServiceInfoBuilder.setServerDefaults(
+        new OzoneFsServerDefaults(keyProviderUriStr));
     if (httpServer != null
         && httpServer.getHttpAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
@@ -4781,8 +4756,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OzoneFsServerDefaults getServerDefaults() {
-    return serverDefaults;
+  public String getQuotaRepairStatus() throws IOException {
+    checkAdminUserPrivilege("quota repair status");
+    return QuotaRepairTask.getStatus();
+  }
+
+  @Override
+  public void startQuotaRepair(List<String> buckets) throws IOException {
+    checkAdminUserPrivilege("start quota repair");
+    new QuotaRepairTask(this).repair(buckets);
   }
 
   /**
@@ -5040,6 +5022,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
     } else {
       getOmServerProtocol().awaitDoubleBufferFlush();
+    }
+  }
+
+  public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
+    String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
+    if (disabledFeatures.contains(feature.name())) {
+      throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
   }
 }

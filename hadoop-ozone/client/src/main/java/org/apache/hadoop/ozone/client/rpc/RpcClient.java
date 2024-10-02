@@ -34,6 +34,7 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -123,7 +124,6 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -1772,25 +1772,6 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
-
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
-
-    return ozoneManagerClient.listTrash(volumeName, bucketName, startKeyName,
-        keyPrefix, maxKeys);
-  }
-
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    return ozoneManagerClient.recoverTrash(volumeName, bucketName, keyName,
-        destinationBucket);
-  }
-
-  @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)
       throws IOException {
@@ -2184,8 +2165,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2337,9 +2316,16 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
     OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
-    return ozoneManagerClient
-        .listStatusLight(keyArgs, recursive, startKey, numEntries,
-            allowPartialPrefixes);
+    if (omVersion.compareTo(OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS) >= 0) {
+      return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
+          numEntries, allowPartialPrefixes);
+    } else {
+      return ozoneManagerClient.listStatus(keyArgs, recursive, startKey,
+              numEntries, allowPartialPrefixes)
+          .stream()
+          .map(OzoneFileStatusLight::fromOzoneFileStatus)
+          .collect(Collectors.toList());
+    }
   }
 
   /**
@@ -2511,9 +2497,7 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       KeyOutputStream keyOutputStream)
       throws IOException {
-    boolean enableHsync = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(conf, true);
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
@@ -2525,9 +2509,7 @@ public class RpcClient implements ClientProtocol {
 
   private OzoneOutputStream createSecureOutputStream(OpenKeySession openKey,
       OutputStream keyOutputStream, Syncable syncable) throws IOException {
-    boolean enableHsync = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(conf, true);
     final FileEncryptionInfo feInfo =
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
@@ -2608,17 +2590,27 @@ public class RpcClient implements ClientProtocol {
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
         (now - serverDefaultsLastUpdate > serverDefaultsValidityPeriod)) {
-      serverDefaults = ozoneManagerClient.getServerDefaults();
-      serverDefaultsLastUpdate = now;
+      try {
+        for (ServiceInfo si : ozoneManagerClient.getServiceInfo()
+            .getServiceInfoList()) {
+          if (si.getServerDefaults() != null) {
+            serverDefaults = si.getServerDefaults();
+            serverDefaultsLastUpdate = now;
+            break;
+          }
+        }
+      } catch (Exception e) {
+        LOG.warn("Could not get server defaults from OM.", e);
+      }
     }
-    assert serverDefaults != null;
     return serverDefaults;
   }
 
   @Override
   public URI getKeyProviderUri() throws IOException {
-    return OzoneKMSUtil.getKeyProviderUri(ugi,
-        null, getServerDefaults().getKeyProviderUri(), conf);
+    String keyProviderUri = (getServerDefaults() != null) ?
+        serverDefaults.getKeyProviderUri() : null;
+    return OzoneKMSUtil.getKeyProviderUri(ugi, null, keyProviderUri, conf);
   }
 
   @Override

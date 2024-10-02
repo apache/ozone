@@ -107,6 +107,11 @@ Test Multipart Upload Complete
     ${part2Md5Sum} =    Execute                       md5sum /tmp/part2 | awk '{print $1}'
                         Should Be Equal As Strings    ${eTag2}  ${part2Md5Sum}
 
+#complete multipart upload without any parts
+    ${result} =         Execute AWSS3APICli and checkrc    complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1    255
+                        Should contain    ${result}    InvalidRequest
+                        Should contain    ${result}    must specify at least one part
+
 #complete multipart upload
     ${result} =                 Execute AWSS3APICli           complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
                                 Should contain                ${result}    ${BUCKET}

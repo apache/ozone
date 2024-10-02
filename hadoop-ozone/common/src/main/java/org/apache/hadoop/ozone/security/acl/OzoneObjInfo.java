@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Class representing an ozone object.
- * It can be a volume with non-null volumeName (bucketName=null & name=null)
+ * It can be a volume with non-null volumeName {@literal (bucketName=null & name=null)}
  * or a bucket with non-null volumeName and bucketName (name=null)
  * or a key with non-null volumeName, bucketName and key name
  * (via getKeyName)

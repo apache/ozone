@@ -491,7 +491,6 @@ public class SCMDatanodeProtocolServer implements
 
   /**
    * Get Key associated with Datanode address for this server.
-   * @return
    */
   protected String getDatanodeAddressKey() {
     return this.scm.getScmNodeDetails().getDatanodeAddressKey();

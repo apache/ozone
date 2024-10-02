@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,15 +49,13 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,27 +73,31 @@ public class QuotaRepairTask {
   private static final int TASK_THREAD_CNT = 3;
   private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
   private static final RepairStatus REPAIR_STATUS = new RepairStatus();
+  private static final AtomicLong RUN_CNT = new AtomicLong(0);
   private final OzoneManager om;
-  private final AtomicLong runCount = new AtomicLong(0);
   private ExecutorService executor;
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
 
-  public CompletableFuture<Boolean> repair() throws Exception {
+  public CompletableFuture<Boolean> repair() throws IOException {
+    return repair(Collections.emptyList());
+  }
+
+  public CompletableFuture<Boolean> repair(List<String> buckets) throws IOException {
     // lock in progress operation and reject any other
     if (!IN_PROGRESS.compareAndSet(false, true)) {
       LOG.info("quota repair task already running");
-      return CompletableFuture.supplyAsync(() -> false);
+      throw new OMException("Quota repair is already running", OMException.ResultCodes.QUOTA_ERROR);
     }
-    REPAIR_STATUS.reset(runCount.get() + 1);
-    return CompletableFuture.supplyAsync(() -> repairTask());
+    REPAIR_STATUS.reset(RUN_CNT.get() + 1);
+    return CompletableFuture.supplyAsync(() -> repairTask(buckets));
   }
 
   public static String getStatus() {
     return REPAIR_STATUS.toString();
   }
-  private boolean repairTask() {
+  private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     OMMetadataManager activeMetaManager = null;
     try {
@@ -104,7 +107,7 @@ public class QuotaRepairTask {
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
       activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
-      repairActiveDb(activeMetaManager, builder);
+      repairActiveDb(activeMetaManager, builder, buckets);
 
       // TODO: repair snapshots for quota
 
@@ -116,12 +119,12 @@ public class QuotaRepairTask {
           .setClientId(clientId.toString())
           .build();
       OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest, clientId);
-      if (response != null && !response.getSuccess()) {
+      if (response != null && response.getSuccess()) {
+        REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
+      } else {
         LOG.error("update quota repair count response failed");
         REPAIR_STATUS.updateStatus("Response for update DB is failed");
         return false;
-      } else {
-        REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
       }
     } catch (Exception exp) {
       LOG.error("quota repair count failed", exp);
@@ -145,11 +148,15 @@ public class QuotaRepairTask {
 
   private void repairActiveDb(
       OMMetadataManager metadataManager,
-      OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder) throws Exception {
+      OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder,
+      List<String> buckets) throws Exception {
     Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
     Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
     Map<String, OmBucketInfo> oriBucketInfoMap = new HashMap<>();
-    prepareAllBucketInfo(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager);
+    prepareAllBucketInfo(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, buckets);
+    if (nameBucketInfoMap.isEmpty()) {
+      throw new OMException("no matching buckets", OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
 
     repairCount(nameBucketInfoMap, idBucketInfoMap, metadataManager);
 
@@ -174,31 +181,21 @@ public class QuotaRepairTask {
     }
 
     // update volume to support quota
-    builder.setSupportVolumeOldQuota(true);
+    if (buckets.isEmpty()) {
+      builder.setSupportVolumeOldQuota(true);
+    } else {
+      builder.setSupportVolumeOldQuota(false);
+    }
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitRequest(
-      OzoneManagerProtocolProtos.OMRequest omRequest, ClientId clientId) {
+      OzoneManagerProtocolProtos.OMRequest omRequest, ClientId clientId) throws Exception {
     try {
-      if (om.isRatisEnabled()) {
-        OzoneManagerRatisServer server = om.getOmRatisServer();
-        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(om.getOmRatisServer().getRaftPeerId())
-            .setGroupId(om.getOmRatisServer().getRaftGroupId())
-            .setCallId(runCount.getAndIncrement())
-            .setMessage(Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build();
-        return server.submitRequest(omRequest, raftClientRequest);
-      } else {
-        return om.getOmServerProtocol().submitRequest(
-            null, omRequest);
-      }
+      return OzoneManagerRatisUtils.submitRequest(om, omRequest, clientId, RUN_CNT.getAndIncrement());
     } catch (ServiceException e) {
       LOG.error("repair quota count " + omRequest.getCmdType() + " request failed.", e);
+      throw e;
     }
-    return null;
   }
   
   private OMMetadataManager createActiveDBCheckpoint(
@@ -228,22 +225,40 @@ public class QuotaRepairTask {
 
   private void prepareAllBucketInfo(
       Map<String, OmBucketInfo> nameBucketInfoMap, Map<String, OmBucketInfo> idBucketInfoMap,
-      Map<String, OmBucketInfo> oriBucketInfoMap, OMMetadataManager metadataManager) throws IOException {
+      Map<String, OmBucketInfo> oriBucketInfoMap, OMMetadataManager metadataManager,
+      List<String> buckets) throws IOException {
+    if (!buckets.isEmpty()) {
+      for (String bucketkey : buckets) {
+        OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(bucketkey);
+        if (null == bucketInfo) {
+          continue;
+        }
+        populateBucket(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, bucketInfo);
+      }
+      return;
+    }
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = metadataManager.getBucketTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
         OmBucketInfo bucketInfo = entry.getValue();
-        String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
-            bucketInfo.getBucketName());
-        oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
-        bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-        bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
-        nameBucketInfoMap.put(bucketNameKey, bucketInfo);
-        idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
-                bucketInfo.getObjectID()), bucketInfo);
+        populateBucket(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, bucketInfo);
       }
     }
+  }
+
+  private static void populateBucket(
+      Map<String, OmBucketInfo> nameBucketInfoMap, Map<String, OmBucketInfo> idBucketInfoMap,
+      Map<String, OmBucketInfo> oriBucketInfoMap, OMMetadataManager metadataManager,
+      OmBucketInfo bucketInfo) throws IOException {
+    String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
+        bucketInfo.getBucketName());
+    oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
+    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
+    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    nameBucketInfoMap.put(bucketNameKey, bucketInfo);
+    idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
+            bucketInfo.getObjectID()), bucketInfo);
   }
 
   private boolean isChange(OmBucketInfo lBucketInfo, OmBucketInfo rBucketInfo) {
@@ -468,8 +483,9 @@ public class QuotaRepairTask {
       }
       Map<String, Object> status = new HashMap<>();
       status.put("taskId", taskId);
-      status.put("lastRunStartTime", lastRunStartTime);
-      status.put("lastRunFinishedTime", lastRunFinishedTime);
+      status.put("lastRunStartTime", lastRunStartTime > 0 ? new java.util.Date(lastRunStartTime).toString() : "");
+      status.put("lastRunFinishedTime", lastRunFinishedTime > 0 ? new java.util.Date(lastRunFinishedTime).toString()
+          : "");
       status.put("errorMsg", errorMsg);
       status.put("bucketCountDiffMap", bucketCountDiffMap);
       try {

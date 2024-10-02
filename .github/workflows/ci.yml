@@ -218,7 +218,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dskip.npx -Dskip.installnpx -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
         env:
           OZONE_WITH_COVERAGE: false
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}

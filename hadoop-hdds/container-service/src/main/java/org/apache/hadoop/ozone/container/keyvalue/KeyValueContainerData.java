@@ -431,7 +431,6 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Schema v3 use a prefix as startKey,
    * for other schemas just return null.
-   * @return
    */
   public String startKeyEmpty() {
     if (hasSchema(SCHEMA_V3)) {
@@ -443,7 +442,6 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Schema v3 use containerID as key prefix,
    * for other schemas just return null.
-   * @return
    */
   public String containerPrefix() {
     if (hasSchema(SCHEMA_V3)) {

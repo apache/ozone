@@ -252,6 +252,7 @@ share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar
 share/ozone/lib/ratis-server.jar
+share/ozone/lib/ratis-shell.jar
 share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar

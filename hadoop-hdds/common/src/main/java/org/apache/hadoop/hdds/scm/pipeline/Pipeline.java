@@ -243,7 +243,6 @@ public final class Pipeline {
 
   /**
    * Get the replicaIndex Map.
-   * @return
    */
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
     return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));

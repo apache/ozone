@@ -933,7 +933,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   /**
    * Returns container DB file.
-   * @return
    */
   public File getContainerDBFile() {
     return KeyValueContainerLocationUtil.getContainerDBFile(containerData);

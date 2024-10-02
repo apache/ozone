@@ -1480,7 +1480,7 @@
     "path": "/dummyVolume/dummyBucket",
     "size": 200000,
     "sizeWithReplica": -1,
-    "subPathCount": 5,
+    "subPathCount": 8,
     "subPaths": [
       {
         "path": "/dummyVolume/dummyBucket/dir1",
