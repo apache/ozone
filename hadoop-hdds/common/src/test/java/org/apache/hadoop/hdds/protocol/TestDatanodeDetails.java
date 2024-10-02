@@ -71,15 +71,17 @@ public class TestDatanodeDetails {
     // test that if the current version is not set (Ozone 1.4.0 and earlier),
     // it falls back to SEPARATE_RATIS_PORTS_AVAILABLE
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
+        .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
     assertEquals(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
     protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
     assertEquals(DatanodeVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
   }
