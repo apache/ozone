@@ -336,7 +336,7 @@ public class TestEndPoint {
 
       // This version call did NOT work, so endpoint should remain in the same
       // state.
-      assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
+      assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN, newState);
     }
   }
 
@@ -366,7 +366,7 @@ public class TestEndPoint {
       long end = Time.monotonicNow();
       scmServerImpl.setRpcResponseDelay(0);
       assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
-      assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
+      assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN, newState);
     }
   }
 

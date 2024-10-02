@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.BindException;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -104,11 +105,10 @@ public class VersionEndpointTask implements
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
       }
-    } catch (DiskOutOfSpaceException ex) {
+    } catch (DiskOutOfSpaceException | BindException ex) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
-      LOG.error(ex.getCause().getMessage(), ex);
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
+      rpcEndPoint.logIfNeeded(ex);
     } finally {
       rpcEndPoint.unlock();
     }
