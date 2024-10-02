@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -46,7 +45,6 @@ import java.util.List;
  * The helper class to compute file checksum for EC files.
  */
 public class ECFileChecksumHelper extends BaseFileChecksumHelper {
-  private int blockIdx;
 
   public ECFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
       String keyName, long length, OzoneClientConfig.ChecksumCombineMode
@@ -56,64 +54,12 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         keyInfo);
   }
 
+  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos) {
+    return new ECBlockChecksumComputer(chunkInfos, getKeyInfo());
+  }
+
   @Override
-  protected void checksumBlocks() throws IOException {
-    long currentLength = 0;
-    for (blockIdx = 0;
-         blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
-         blockIdx++) {
-      OmKeyLocationInfo keyLocationInfo =
-          getKeyLocationInfoList().get(blockIdx);
-
-      if (currentLength > getLength()) {
-        return;
-      }
-
-      if (!checksumBlock(keyLocationInfo)) {
-        throw new PathIOException(getSrc(),
-            "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode: " + getCombineMode());
-      }
-
-      currentLength += keyLocationInfo.getLength();
-    }
-  }
-
-  private boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
-      throws IOException {
-    // for each block, send request
-    List<ContainerProtos.ChunkInfo> chunkInfos =
-        getChunkInfos(keyLocationInfo);
-    if (chunkInfos.size() == 0) {
-      return false;
-    }
-
-    long blockNumBytes = keyLocationInfo.getLength();
-
-    if (getRemaining() < blockNumBytes) {
-      blockNumBytes = getRemaining();
-    }
-    setRemaining(getRemaining() - blockNumBytes);
-
-    ContainerProtos.ChecksumData checksumData =
-        chunkInfos.get(0).getChecksumData();
-    setChecksumType(checksumData.getType());
-    int bytesPerChecksum = checksumData.getBytesPerChecksum();
-    setBytesPerCRC(bytesPerChecksum);
-
-    ByteBuffer blockChecksumByteBuffer =
-        getBlockChecksumFromChunkChecksums(chunkInfos);
-    String blockChecksumForDebug =
-        populateBlockChecksumBuf(blockChecksumByteBuffer);
-
-    LOG.debug("Got reply from EC pipeline {} for block {}: blockChecksum={}, " +
-            "blockChecksumType={}",
-        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
-        blockChecksumForDebug, checksumData.getType());
-    return true;
-  }
-
-  private String populateBlockChecksumBuf(
+  protected String populateBlockChecksumBuf(
       ByteBuffer blockChecksumByteBuffer) throws IOException {
     String blockChecksumForDebug = null;
     switch (getCombineMode()) {
@@ -139,17 +85,8 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
     return blockChecksumForDebug;
   }
 
-  private ByteBuffer getBlockChecksumFromChunkChecksums(
-      List<ContainerProtos.ChunkInfo> chunkInfos) throws IOException {
-
-    AbstractBlockChecksumComputer blockChecksumComputer =
-        new ECBlockChecksumComputer(chunkInfos, getKeyInfo());
-    blockChecksumComputer.compute(getCombineMode());
-
-    return blockChecksumComputer.getOutByteBuffer();
-  }
-
-  private List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo
+  @Override
+  protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo
       keyLocationInfo) throws IOException {
     // To read an EC block, we create a STANDALONE pipeline that contains the
     // single location for the block index we want to read. The EC blocks are
