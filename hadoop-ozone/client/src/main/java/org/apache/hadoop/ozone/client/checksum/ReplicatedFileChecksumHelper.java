@@ -52,9 +52,9 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-      String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+                                      String keyName, long length,
+                                      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+                                      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
         keyInfo);
   }
@@ -65,8 +65,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // copied from BlockInputStream
+
   /**
    * Send RPC call to get the block info from the container.
+   *
    * @return List of chunks in this block.
    */
   @Override
@@ -113,7 +115,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    * blockChecksumBuf with it.
    *
    * @return a debug-string representation of the parsed checksum if
-   *     debug is enabled, otherwise null.
+   * debug is enabled, otherwise null.
    */
   @Override
   protected String populateBlockChecksumBuf(ByteBuffer checksumData)

@@ -82,16 +82,16 @@ public abstract class BaseFileChecksumHelper {
     this.combineMode = checksumCombineMode;
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
-        ((RpcClient)rpcClient).getXceiverClientManager();
+        ((RpcClient) rpcClient).getXceiverClientManager();
     if (this.length > 0) {
       fetchBlocks();
     }
   }
 
   public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-      String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+                                String keyName, long length,
+                                OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+                                ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
     this.keyInfo = keyInfo;
   }
@@ -152,15 +152,16 @@ public abstract class BaseFileChecksumHelper {
   protected void setChecksumType(ContainerProtos.ChecksumType type) {
     checksumType = type;
   }
+
   protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos);
 
   protected abstract String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException;
 
   protected abstract List<ContainerProtos.ChunkInfo> getChunkInfos(
-          OmKeyLocationInfo keyLocationInfo) throws IOException;
+      OmKeyLocationInfo keyLocationInfo) throws IOException;
 
   protected ByteBuffer getBlockChecksumFromChunkChecksums(AbstractBlockChecksumComputer blockChecksumComputer)
-          throws IOException {
+      throws IOException {
     blockChecksumComputer.compute(getCombineMode());
     return blockChecksumComputer.getOutByteBuffer();
   }
@@ -177,15 +178,15 @@ public abstract class BaseFileChecksumHelper {
          blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
          blockIdx++) {
       OmKeyLocationInfo keyLocationInfo =
-              getKeyLocationInfoList().get(blockIdx);
+          getKeyLocationInfoList().get(blockIdx);
       if (currentLength > getLength()) {
         return;
       }
 
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
-                "Fail to get block checksum for " + keyLocationInfo
-                        + ", checksum combine mode: " + getCombineMode());
+            "Fail to get block checksum for " + keyLocationInfo
+                + ", checksum combine mode: " + getCombineMode());
       }
 
       currentLength += keyLocationInfo.getLength();
@@ -197,10 +198,10 @@ public abstract class BaseFileChecksumHelper {
    * condition or totally failed.
    */
   protected boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
-          throws IOException {
+      throws IOException {
     // for each block, send request
     List<ContainerProtos.ChunkInfo> chunkInfos =
-            getChunkInfos(keyLocationInfo);
+        getChunkInfos(keyLocationInfo);
     if (chunkInfos.isEmpty()) {
       return false;
     }
@@ -213,26 +214,27 @@ public abstract class BaseFileChecksumHelper {
     setRemaining(getRemaining() - blockNumBytes);
 
     ContainerProtos.ChecksumData checksumData =
-            chunkInfos.get(0).getChecksumData();
+        chunkInfos.get(0).getChecksumData();
     setChecksumType(checksumData.getType());
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
     AbstractBlockChecksumComputer blockChecksumComputer = getBlockChecksumComputer(chunkInfos);
     ByteBuffer blockChecksumByteBuffer =
-            getBlockChecksumFromChunkChecksums(blockChecksumComputer);
+        getBlockChecksumFromChunkChecksums(blockChecksumComputer);
     String blockChecksumForDebug =
-            populateBlockChecksumBuf(blockChecksumByteBuffer);
+        populateBlockChecksumBuf(blockChecksumByteBuffer);
 
     LOG.debug("Got reply from {} {} for block {}: blockChecksum={}, " +
-                    "blockChecksumType={}",
-            keyInfo.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC
-                    ? "EC pipeline" : "pipeline",
-            keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
-            blockChecksumForDebug, checksumData.getType());
+            "blockChecksumType={}",
+        keyInfo.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC
+            ? "EC pipeline" : "pipeline",
+        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
+        blockChecksumForDebug, checksumData.getType());
 
     return true;
   }
+
   /**
    * Request the blocks created in the most recent version from Ozone Manager.
    *
@@ -275,9 +277,10 @@ public abstract class BaseFileChecksumHelper {
 
   /**
    * Compute file checksum given the list of chunk checksums requested earlier.
-   *
+   * <p>
    * Skip computation if the already computed, or if the OmKeyInfo of the key
    * in OM has pre-computed checksum.
+   *
    * @throws IOException
    */
   public void compute() throws IOException {

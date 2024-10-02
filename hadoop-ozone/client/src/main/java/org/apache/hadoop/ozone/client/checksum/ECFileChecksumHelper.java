@@ -47,8 +47,8 @@ import java.util.List;
 public class ECFileChecksumHelper extends BaseFileChecksumHelper {
 
   public ECFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-      String keyName, long length, OzoneClientConfig.ChecksumCombineMode
-      checksumCombineMode, ClientProtocol rpcClient, OmKeyInfo keyInfo)
+                              String keyName, long length, OzoneClientConfig.ChecksumCombineMode
+                                  checksumCombineMode, ClientProtocol rpcClient, OmKeyInfo keyInfo)
       throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
         keyInfo);
@@ -88,7 +88,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
 
   @Override
   protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo
-      keyLocationInfo) throws IOException {
+                                                              keyLocationInfo) throws IOException {
     // To read an EC block, we create a STANDALONE pipeline that contains the
     // single location for the block index we want to read. The EC blocks are
     // indexed from 1 to N, however the data locations are stored in the
