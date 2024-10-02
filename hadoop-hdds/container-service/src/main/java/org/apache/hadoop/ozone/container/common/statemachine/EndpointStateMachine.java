@@ -234,12 +234,14 @@ public class EndpointStateMachine
     }
 
     if (missCounter == 0) {
-      LOG.warn(
-          "Unable to communicate to {} server at {} for past {} seconds.",
-          serverName,
-          getAddress().getHostString() + ":" + getAddress().getPort(),
-          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() *
-                  getScmHeartbeatInterval(this.conf)), ex);
+      LOG.error(
+              "Unable to communicate to {} server at {}:{} for past {} seconds.",
+              serverName,
+              address.getAddress(),
+              address.getPort(),
+              TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() * getScmHeartbeatInterval(this.conf)),
+              ex
+      );
     }
 
     if (LOG.isTraceEnabled()) {

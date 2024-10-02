@@ -107,7 +107,8 @@ public class VersionEndpointTask implements
     } catch (DiskOutOfSpaceException ex) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
-      rpcEndPoint.logIfNeeded(ex);
+      LOG.error(ex.getCause().getMessage(), ex);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } finally {
       rpcEndPoint.unlock();
     }
