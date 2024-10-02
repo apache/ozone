@@ -191,7 +191,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       } catch (IOException e) {
         LOG.error("Failed to bind to address", e);
         if (e.getMessage().contains("Failed to bind to address")) {
-          //todo custom exception
           throw new BindException(e);
         } else {
           throw e;
