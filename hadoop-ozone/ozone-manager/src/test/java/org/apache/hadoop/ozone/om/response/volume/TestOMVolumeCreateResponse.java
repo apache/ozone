@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -31,13 +27,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,29 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * This class tests OMVolumeCreateResponse.
  */
-public class TestOMVolumeCreateResponse {
-
-  @TempDir
-  private Path folder;
-
-  private OMMetadataManager omMetadataManager;
-  private BatchOperation batchOperation;
-
-  @BeforeEach
-  public void setup() throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
-    batchOperation = omMetadataManager.getStore().initBatchOperation();
-  }
-
-  @AfterEach
-  public void tearDown() {
-    if (batchOperation != null) {
-      batchOperation.close();
-    }
-  }
+public class TestOMVolumeCreateResponse extends TestOMVolumeResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
@@ -79,10 +48,10 @@ public class TestOMVolumeCreateResponse {
         .addVolumeNames(volumeName).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setSuccess(true)
-            .setCreateVolumeResponse(CreateVolumeResponse.getDefaultInstance())
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setSuccess(true)
+        .setCreateVolumeResponse(CreateVolumeResponse.getDefaultInstance())
         .build();
 
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
@@ -125,6 +94,4 @@ public class TestOMVolumeCreateResponse {
     assertEquals(0, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
   }
-
-
 }
