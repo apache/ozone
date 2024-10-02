@@ -123,8 +123,8 @@ import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilt
 /**
  * Create a Jetty embedded server to answer http requests. The primary goal is
  * to serve up status information for the server. There are three contexts:
- * "/logs/" -> points to the log directory "/static/" -> points to common static
- * files (src/webapps/static) "/" -> the jsp server code from
+ * "/logs/" -&gt; points to the log directory "/static/" -&gt; points to common static
+ * files (src/webapps/static) "/" -&gt; the jsp server code from
  * (src/webapps/<name>)
  *
  * This class is a fork of the old HttpServer. HttpServer exists for

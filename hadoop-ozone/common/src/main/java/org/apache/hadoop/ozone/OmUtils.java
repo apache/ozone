@@ -119,7 +119,7 @@ public final class OmUtils {
    * Return list of OM addresses by service ids - when HA is enabled.
    *
    * @param conf {@link ConfigurationSource}
-   * @return {service.id -> [{@link InetSocketAddress}]}
+   * @return {service.id -&gt; [{@link InetSocketAddress}]}
    */
   public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
       ConfigurationSource conf) {
@@ -707,7 +707,7 @@ public final class OmUtils {
    * Look at 'ozone.om.internal.service.id' first. If configured, return that.
    * If the above is not configured, look at 'ozone.om.service.ids'.
    * If count(ozone.om.service.ids) == 1, return that id.
-   * If count(ozone.om.service.ids) > 1 throw exception
+   * If count(ozone.om.service.ids) &gt; 1 throw exception
    * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
    * @param conf configuration
    * @return OM service ID.

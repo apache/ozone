@@ -265,7 +265,6 @@ share/ozone/lib/simpleclient_dropwizard.jar
 share/ozone/lib/simpleclient.jar
 share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-reload4j.jar
-share/ozone/lib/slf4j-simple.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
 share/ozone/lib/spring-beans.jar

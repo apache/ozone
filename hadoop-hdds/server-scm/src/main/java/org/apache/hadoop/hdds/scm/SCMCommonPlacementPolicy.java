@@ -525,7 +525,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas: Map of replicas with value signifying if
+   * @param replicas Map of replicas with value signifying if
    *                  replica can be copied
    */
   @Override
@@ -595,8 +595,8 @@ public abstract class SCMCommonPlacementPolicy implements
    * to be removed is also removed from the maps created above and
    * the count for rack is reduced.
    * The set of replicas computed are then returned by the function.
-   * @param replicas: Set of existing replicas of the container
-   * @param expectedCountPerUniqueReplica: Replication factor of each
+   * @param replicas Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica Replication factor of each
    *    *                                     unique replica
    * @return Set of replicas to be removed are computed.
    */

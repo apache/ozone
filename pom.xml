@@ -76,7 +76,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.1.0</ratis.version>
+    <ratis.version>3.1.1</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
@@ -114,7 +114,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
-    <commons-configuration2.version>2.10.1</commons-configuration2.version>
+    <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <zstd-jni.version>1.5.6-4</zstd-jni.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-io.version>2.16.1</commons-io.version>
@@ -265,7 +265,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
-    <maven-javadoc-plugin.version>3.7.0</maven-javadoc-plugin.version>
+    <maven-javadoc-plugin.version>3.10.0</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <maven-deploy-plugin.version>3.1.3</maven-deploy-plugin.version>
@@ -762,6 +762,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-shell</artifactId>
         <version>${ratis.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -1421,7 +1427,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <additionalJOption>-Xdoclint:none</additionalJOption>
+            <doclint>none</doclint>
           </configuration>
         </plugin>
         <plugin>
@@ -1882,8 +1888,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </plugin>
     </plugins>
   </build>
-
-
 
   <profiles>
     <profile>

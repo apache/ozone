@@ -50,8 +50,7 @@ public interface TokenVerifier {
       ContainerCommandRequestProtoOrBuilder cmd)
       throws SCMSecurityException;
 
-  /** Same as {@link #verify(Token,
-   * ContainerCommandRequestProtoOrBuilder)}, but with encoded token. */
+  /** Same as {@link #verify}, but with encoded token. */
   default void verify(ContainerCommandRequestProtoOrBuilder cmd,
       String encodedToken) throws SCMSecurityException {
 

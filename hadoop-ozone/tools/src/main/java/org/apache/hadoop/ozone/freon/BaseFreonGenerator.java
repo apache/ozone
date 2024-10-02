@@ -290,6 +290,10 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
+    if (duration != null && !allowDuration()) {
+      LOG.warn("--duration is ignored");
+      duration = null;
+    }
     if (duration != null) {
       durationInSecond = TimeDurationUtil.getTimeDurationHelper(
           "--runtime", duration, TimeUnit.SECONDS);
@@ -552,6 +556,15 @@ public class BaseFreonGenerator {
 
   public String getPrefix() {
     return prefix;
+  }
+
+  /**
+   * Whether to enable Duration.
+   * If enabled, the command will load the --duration option.
+   * If not enabled, the command will not load the --duration option.
+   */
+  public boolean allowDuration() {
+    return true;
   }
 
   public MetricRegistry getMetrics() {

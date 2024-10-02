@@ -27,7 +27,7 @@ import java.util.List;
 
 /**
  * Helper class to convert between protobuf lists and Java lists of
- * {@link ContainerProtos.ChunkInfo} objects.
+ * {@link org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo} objects.
  * <p>
  * This class is immutable.
  */
@@ -49,7 +49,7 @@ public class ChunkInfoList {
   }
 
   /**
-   * @return A new {@link ChunkInfoList} created from protobuf data.
+   * @return A new {@link #ChunkInfoList} created from protobuf data.
    */
   public static ChunkInfoList getFromProtoBuf(
           ContainerProtos.ChunkInfoList chunksProto) {

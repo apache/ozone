@@ -72,7 +72,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
-  private static ClientId clientId = ClientId.randomId();
+  private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -422,6 +422,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         }
         consumedSize += request.getSerializedSize();
         purgePathRequestList.add(request);
+        // reduce remain count for self, sub-files, and sub-directories
+        remainNum = remainNum - 1;
         remainNum = remainNum - request.getDeletedSubFilesCount();
         remainNum = remainNum - request.getMarkDeletedSubDirsCount();
         // Count up the purgeDeletedDir, subDirs and subFiles

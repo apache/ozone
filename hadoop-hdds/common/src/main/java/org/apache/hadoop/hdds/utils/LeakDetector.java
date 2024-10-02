@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to
  * observe resource object life-cycle and assert proper resource closure before they are GCed.
- *
  * <p>
  * Example usage:
  *
@@ -43,16 +42,18 @@ import java.util.concurrent.atomic.AtomicLong;
  *      // report leaks, don't refer to the original object (MyResource) here.
  *      System.out.println("MyResource is not closed before being discarded.");
  *   });
- *
- *   @Override
+ * }
+ * }
+ * </pre>
+ * <pre>
+ *   {@code @Override
  *   public void close() {
  *     // proper resources cleanup...
  *     // inform tracker that this object is closed properly.
  *     leakTracker.close();
  *   }
- * }
- *
- * }</pre>
+ *  }
+ * </pre>
  */
 public class LeakDetector {
   private static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);

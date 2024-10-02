@@ -335,11 +335,11 @@ public abstract class GenericTestUtils {
    * </pre>
    * <p>
    * TODO: Add lambda support once Java 8 is common.
-   * <pre>
+   * {@code
    *   SystemErrCapturer.withCapture(capture -> {
    *     ...
    *   })
-   * </pre>
+   * }
    */
   public static class SystemErrCapturer implements AutoCloseable {
     private final ByteArrayOutputStream bytes;
@@ -376,11 +376,11 @@ public abstract class GenericTestUtils {
    * </pre>
    * <p>
    * TODO: Add lambda support once Java 8 is common.
-   * <pre>
+   * {@code
    *   SystemOutCapturer.withCapture(capture -> {
    *     ...
    *   })
-   * </pre>
+   * }
    */
   public static class SystemOutCapturer implements AutoCloseable {
     private final ByteArrayOutputStream bytes;
@@ -475,8 +475,8 @@ public abstract class GenericTestUtils {
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
      * @return modifiers field
-     * @throws IllegalAccessException
-     * @throws NoSuchFieldException
+     * @throws IllegalAccessException illegalAccessException,
+     * @throws NoSuchFieldException noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;

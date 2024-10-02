@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,8 +73,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_
 public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
-
-  private static ClientId clientId = ClientId.randomId();
 
   // Use only a single thread for DirDeletion. Multiple threads would read
   // or write to same tables and can send deletion requests for same key
@@ -212,6 +209,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             }
             consumedSize += request.getSerializedSize();
             purgePathRequestList.add(request);
+            // reduce remain count for self, sub-files, and sub-directories
+            remainNum = remainNum - 1;
             remainNum = remainNum - request.getDeletedSubFilesCount();
             remainNum = remainNum - request.getMarkDeletedSubDirsCount();
             // Count up the purgeDeletedDir, subDirs and subFiles

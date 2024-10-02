@@ -668,6 +668,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *    certificate.
    *
    * Truth table:
+   * <pre>
+   * {@code
    *  +--------------+---------------+--------------+---------------------+
    *  | Private Key  | Public Keys   | Certificate  |   Result            |
    *  +--------------+---------------+--------------+---------------------+
@@ -680,7 +682,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *  | True   (1)   | True    (1)   | False  (0)   |   GETCERT->SUCCESS  |
    *  | True   (1)   | True    (1)   | True   (1)   |   SUCCESS           |
    *  +--------------+-----------------+--------------+----------------+
-   *
+   * }
+   * </pre>
    * Success in following cases:
    * 1. If keypair as well certificate is available.
    * 2. If private key and certificate is available and public key is
@@ -1083,7 +1086,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Renew keys and certificate. Save the keys are certificate to disk in new
    * directories, swap the current key directory and certs directory with the
    * new directories.
-   * @param force, check certificate expiry time again if force is false.
+   * @param force check certificate expiry time again if force is false.
    * @return String, new certificate ID
    * */
   public String renewAndStoreKeyAndCertificate(boolean force)
