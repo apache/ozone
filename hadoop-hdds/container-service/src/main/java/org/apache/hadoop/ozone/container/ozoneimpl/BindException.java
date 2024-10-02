@@ -24,18 +24,18 @@ import java.io.IOException;
  * Typically, the port is in use.
  */
 public class BindException extends IOException {
-    public BindException() {
-    }
+  public BindException() {
+  }
 
-    public BindException(String message) {
-        super(message);
-    }
+  public BindException(String message) {
+      super(message);
+  }
 
-    public BindException(String message, Throwable cause) {
-        super(message, cause);
-    }
+  public BindException(String message, Throwable cause) {
+      super(message, cause);
+  }
 
-    public BindException(Throwable cause) {
-        super(cause);
-    }
+  public BindException(Throwable cause) {
+      super(cause);
+  }
 }
