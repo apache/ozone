@@ -104,6 +104,7 @@ public class OMHANodeDetails {
     String localOMServiceId = null;
     String localOMNodeId = null;
     int localRatisPort = 0;
+    boolean localIsListener = false;
 
     Collection<String> omServiceIds;
 
@@ -129,6 +130,7 @@ public class OMHANodeDetails {
     for (String serviceId : omServiceIds) {
       Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
           serviceId);
+      Collection<String> listenerOmNodeIds = OmUtils.getListenerOMNodeIds(conf, serviceId);
 
       if (omNodeIds.size() == 0) {
         throwConfException("Configuration does not have any value set for %s " +
@@ -181,6 +183,7 @@ public class OMHANodeDetails {
               rpcAddrStr);
         }
 
+        boolean isListener = listenerOmNodeIds.contains(nodeId);
         if (!isPeer
                 && OzoneNetUtils
                 .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
@@ -188,25 +191,26 @@ public class OMHANodeDetails {
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
           localRatisPort = ratisPort;
+          localIsListener = isListener;
           found++;
         } else {
           // This OMNode belongs to same OM service as the current OMNode.
           // Add it to peerNodes list.
           peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
-              nodeId, addr, ratisPort));
+              nodeId, addr, ratisPort, isListener));
         }
       }
       if (found == 1) {
 
         LOG.info("Found matching OM address with OMServiceId: {}, " +
-                "OMNodeId: {}, RPC Address: {} and Ratis port: {}",
+                "OMNodeId: {}, RPC Address: {} ,Ratis port: {} and isListener: {}",
             localOMServiceId, localOMNodeId,
-            NetUtils.getHostPortString(localRpcAddress), localRatisPort);
+            NetUtils.getHostPortString(localRpcAddress), localRatisPort, localIsListener);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
             localOMServiceId, localOMNodeId, LOG);
         return new OMHANodeDetails(getHAOMNodeDetails(conf, localOMServiceId,
-            localOMNodeId, localRpcAddress, localRatisPort), peerNodesList);
+            localOMNodeId, localRpcAddress, localRatisPort, localIsListener), peerNodesList);
 
       } else if (found > 1) {
         throwConfException("Configuration has multiple %s addresses that " +
@@ -247,6 +251,12 @@ public class OMHANodeDetails {
   public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
+    return getOMNodeDetailsForNonHA(conf, serviceId, nodeId, rpcAddress, ratisPort, false);
+  }
+
+  public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
+      String serviceId, String nodeId, InetSocketAddress rpcAddress,
+      int ratisPort, boolean isListener) {
 
     if (serviceId == null) {
       // If no serviceId is set, take the default serviceID om-service
@@ -276,6 +286,7 @@ public class OMHANodeDetails {
         .setRatisPort(ratisPort)
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
+        .setIsListener(isListener)
         .build();
   }
 
@@ -290,6 +301,12 @@ public class OMHANodeDetails {
   public static OMNodeDetails getHAOMNodeDetails(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
+    return getHAOMNodeDetails(conf, serviceId, nodeId, rpcAddress, ratisPort, false);
+  }
+
+  public static OMNodeDetails getHAOMNodeDetails(OzoneConfiguration conf,
+      String serviceId, String nodeId, InetSocketAddress rpcAddress,
+      int ratisPort, boolean isListener) {
     Preconditions.checkNotNull(serviceId);
     Preconditions.checkNotNull(nodeId);
 
@@ -305,6 +322,7 @@ public class OMHANodeDetails {
         .setRatisPort(ratisPort)
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
+        .setIsListener(isListener)
         .build();
   }
 
