@@ -597,11 +597,11 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin-${{ env.TEST_JAVA_VERSION }}/ozone*.tar.gz -C hadoop-ozone/dist/target
-      - name: Setup java 17
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Sonar
