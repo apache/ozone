@@ -157,14 +157,14 @@ jobs:
           retention-days: 1
       - name: Store source tarball for compilation
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.java == '8' }}
+        if: ${{ matrix.java == env.BUILD_JAVA_VERSION }}
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.java == '8' }}
+        if: ${{ matrix.java == env.BUILD_JAVA_VERSION }}
         with:
           name: ozone-repo
           path: |
