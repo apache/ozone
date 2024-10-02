@@ -150,6 +150,28 @@ public class TestAddRemoveOzoneManager {
         .isGreaterThan(0);
   }
 
+  private void assertNewOMExistsInListenerList(String nodeId) throws Exception {
+    // Check that new peer exists in all OMs Peer list and also in their Ratis
+    // server's listener list
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      assertTrue(om.doesPeerExist(nodeId), "New OM node " + nodeId + " not present in Peer list " +
+          "of OM " + om.getOMNodeId());
+      assertTrue(om.getOmRatisServer().doesPeerExist(nodeId),
+          "New OM node " + nodeId + " not present in Peer list of OM " + om.getOMNodeId() + " RatisServer");
+      assertTrue(om.getOmRatisServer().getCurrentListenersFromRaftConf().contains(nodeId),
+          "New OM node " + nodeId + " not present in OM " + om.getOMNodeId() + "RatisServer's RaftConf");
+    }
+
+    OzoneManager newOM = cluster.getOzoneManager(nodeId);
+    GenericTestUtils.waitFor(() ->
+        newOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= lastTransactionIndex, 100, 100000);
+
+    // Check Ratis Dir for log files
+    File[] logFiles = getRatisLogFiles(newOM);
+    assertTrue(logFiles.length > 0, "There are no ratis logs in new OM ");
+  }
+
   private File[] getRatisLogFiles(OzoneManager om) {
     OzoneManagerRatisServer newOMRatisServer = om.getOmRatisServer();
     File ratisDir = new File(newOMRatisServer.getRatisStorageDir(),
@@ -169,6 +191,17 @@ public class TestAddRemoveOzoneManager {
       String nodeId =  "omNode-bootstrap-" + i;
       cluster.bootstrapOzoneManager(nodeId);
       assertNewOMExistsInPeerList(nodeId);
+      newOMNodeIds.add(nodeId);
+    }
+    return newOMNodeIds;
+  }
+
+  private List<String> testBootstrapListenerOMs(int numNewOMs) throws Exception {
+    List<String> newOMNodeIds = new ArrayList<>(numNewOMs);
+    for (int i = 1; i <= numNewOMs; i++) {
+      String nodeId =  "omNode-bootstrap-listener-" + i;
+      cluster.bootstrapOzoneManager(nodeId, true, false, true);
+      assertNewOMExistsInListenerList(nodeId);
       newOMNodeIds.add(nodeId);
     }
     return newOMNodeIds;
@@ -335,6 +368,36 @@ public class TestAddRemoveOzoneManager {
 
     // Verify that the newly bootstrapped OM is running
     assertTrue(newOM.isRunning());
+  }
+
+  /**
+   * Tests:
+   * 1. Start a Listener OM.
+   * 2. Decommission the Listener OM.
+   */
+  @Test
+  public void testBootstrapListenerOM() throws Exception {
+    setupCluster(3);
+    user = UserGroupInformation.getCurrentUser();
+
+    List<String> newOMNodeIds = testBootstrapListenerOMs(1);
+
+    for (String omId: newOMNodeIds) {
+      OzoneManager newOM = cluster.getOzoneManager(omId);
+      assertTrue(newOM.isRunning());
+    }
+
+    // Verify that we can read/ write to the cluster with only 1 OM.
+    OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
+    OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
+    String key = createKey(bucket);
+
+    assertNotNull(bucket.getKey(key));
+
+    for (String omId: newOMNodeIds) {
+      cluster.stopOzoneManager(omId);
+      decommissionOM(omId);
+    }
   }
 
   /**
