@@ -28,14 +28,14 @@ public class BindException extends IOException {
   }
 
   public BindException(String message) {
-      super(message);
+    super(message);
   }
 
   public BindException(String message, Throwable cause) {
-      super(message, cause);
+    super(message, cause);
   }
 
   public BindException(Throwable cause) {
-      super(cause);
+    super(cause);
   }
 }
