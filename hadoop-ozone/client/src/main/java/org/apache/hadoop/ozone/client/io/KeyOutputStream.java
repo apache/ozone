@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -58,6 +61,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,12 +113,26 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
   private ContainerClientMetrics clientMetrics;
   private OzoneManagerVersion ozoneManagerVersion;
+  private final Lock writeLock = new ReentrantLock();
+  private final Condition retryHandlingCondition = writeLock.newCondition();
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
 
+  @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
     return keyOutputStreamSemaphore;
+  }
+
+  /** Required to spy the object in testing. */
+  @VisibleForTesting
+  @SuppressWarnings("unused")
+  KeyOutputStream() {
+    maxConcurrentWritePerKey = 0;
+    keyOutputStreamSemaphore = null;
+    blockOutputStreamEntryPool = null;
+    retryPolicyMap = null;
+    replication = null;
   }
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
@@ -187,7 +205,7 @@ public class KeyOutputStream extends OutputStream
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
-  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
+  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
@@ -227,12 +245,21 @@ public class KeyOutputStream extends OutputStream
         return;
       }
 
-      synchronized (this) {
+      doInWriteLock(() -> {
         handleWrite(b, off, len, false);
         writeOffset += len;
-      }
+      });
     } finally {
       getRequestSemaphore().release();
+    }
+  }
+
+  private <E extends Throwable> void doInWriteLock(CheckedRunnable<E> block) throws E {
+    writeLock.lock();
+    try {
+      block.run();
+    } finally {
+      writeLock.unlock();
     }
   }
 
@@ -242,7 +269,7 @@ public class KeyOutputStream extends OutputStream
     while (len > 0) {
       try {
         BlockOutputStreamEntry current =
-            blockOutputStreamEntryPool.allocateBlockIfNeeded();
+            blockOutputStreamEntryPool.allocateBlockIfNeeded(retry);
         // length(len) will be in int range if the call is happening through
         // write API of blockOutputStream. Length can be in long range if it
         // comes via Exception path.
@@ -272,12 +299,18 @@ public class KeyOutputStream extends OutputStream
       boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
+      current.registerCallReceived();
       if (retry) {
         current.writeOnRetry(len);
       } else {
+        waitForRetryHandling(current);
         current.write(b, off, writeLen);
         offset += writeLen;
       }
+      current.registerCallFinished();
+    } catch (InterruptedException e) {
+      current.registerCallFinished();
+      throw new InterruptedIOException();
     } catch (IOException ioe) {
       // for the current iteration, totalDataWritten - currentPos gives the
       // amount of data already written to the buffer
@@ -295,9 +328,22 @@ public class KeyOutputStream extends OutputStream
         offset += writeLen;
       }
       LOG.debug("writeLen {}, total len {}", writeLen, len);
-      handleException(current, ioe);
+      handleException(current, ioe, retry);
     }
     return writeLen;
+  }
+
+  private void handleException(BlockOutputStreamEntry entry, IOException exception, boolean fromRetry)
+      throws IOException {
+    doInWriteLock(() -> {
+      handleExceptionInternal(entry, exception);
+      BlockOutputStreamEntry current = blockOutputStreamEntryPool.getCurrentStreamEntry();
+      if (!fromRetry && entry.registerCallFinished()) {
+        // When the faulty block finishes handling all its pending call, the current block can exit retry
+        // handling mode and unblock normal calls.
+        current.finishRetryHandling(retryHandlingCondition);
+      }
+    });
   }
 
   /**
@@ -310,8 +356,15 @@ public class KeyOutputStream extends OutputStream
    * @param exception   actual exception that occurred
    * @throws IOException Throws IOException if Write fails
    */
-  private synchronized void handleException(BlockOutputStreamEntry streamEntry,
-      IOException exception) throws IOException {
+  private void handleExceptionInternal(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
+    try {
+      // Wait for all pending flushes in the faulty stream. It's possible that a prior write is pending completion
+      // successfully. Errors are ignored here and will be handled by the individual flush call. We just want to ensure
+      // all the pending are complete before handling exception.
+      streamEntry.waitForAllPendingFlushes();
+    } catch (IOException ignored) {
+    }
+
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
     boolean retryFailure = checkForRetryFailure(t);
@@ -338,8 +391,6 @@ public class KeyOutputStream extends OutputStream
     }
     Preconditions.checkArgument(
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
-    Preconditions.checkArgument(
-        offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
@@ -498,12 +549,12 @@ public class KeyOutputStream extends OutputStream
       final long hsyncPos = writeOffset;
       handleFlushOrClose(StreamAction.HSYNC);
 
-      synchronized (this) {
+      doInWriteLock(() -> {
         Preconditions.checkState(offset >= hsyncPos,
             "offset = %s < hsyncPos = %s", offset, hsyncPos);
         MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
             () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
-      }
+      });
     } finally {
       getRequestSemaphore().release();
     }
@@ -532,20 +583,33 @@ public class KeyOutputStream extends OutputStream
           BlockOutputStreamEntry entry =
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
+            // If the current block is to handle retries, wait until all the retries are done.
+            waitForRetryHandling(entry);
+            entry.registerCallReceived();
             try {
               handleStreamAction(entry, op);
+              entry.registerCallFinished();
             } catch (IOException ioe) {
-              handleException(entry, ioe);
+              handleException(entry, ioe, false);
               continue;
+            } catch (Exception e) {
+              entry.registerCallFinished();
+              throw e;
             }
           }
           return;
+        } catch (InterruptedException e) {
+          throw new InterruptedIOException();
         } catch (Exception e) {
           markStreamClosed();
           throw e;
         }
       }
     }
+  }
+
+  private void waitForRetryHandling(BlockOutputStreamEntry currentEntry) throws InterruptedException {
+    doInWriteLock(() -> currentEntry.waitForRetryHandling(retryHandlingCondition));
   }
 
   private void handleStreamAction(BlockOutputStreamEntry entry,
@@ -583,7 +647,11 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
+    doInWriteLock(this::closeInternal);
+  }
+
+  private void closeInternal() throws IOException {
     if (closed) {
       return;
     }
@@ -781,7 +849,7 @@ public class KeyOutputStream extends OutputStream
    * the last state of the volatile {@link #closed} field.
    * @throws IOException if the connection is closed.
    */
-  private synchronized void checkNotClosed() throws IOException {
+  private void checkNotClosed() throws IOException {
     if (closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "

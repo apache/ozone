@@ -31,6 +31,7 @@ import org.jooq.impl.SQLDataType;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 
 /**
  * Class used to create tables that are required for tracking containers.
@@ -51,7 +52,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     UNDER_REPLICATED,
     OVER_REPLICATED,
     MIS_REPLICATED,
-    ALL_REPLICAS_UNHEALTHY,
+    ALL_REPLICAS_BAD,
     NEGATIVE_SIZE // Added new state to track containers with negative sizes
   }
 
@@ -69,9 +70,37 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+
+    if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      // Drop the existing constraint if it exists
+      String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
+      dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+          .dropConstraint(constraintName)
+          .execute();
+
+      // Add the updated constraint with all enum states
+      addUpdatedConstraint();
+    } else {
+      // Create the table if it does not exist
       createUnhealthyContainersTable();
     }
+  }
+
+  /**
+   * Add the updated constraint to the table.
+   */
+  private void addUpdatedConstraint() {
+    // Get all enum values as a list of strings
+    String[] enumStates = Arrays.stream(UnHealthyContainerStates.values())
+        .map(Enum::name)
+        .toArray(String[]::new);
+
+    // Alter the table to add the updated constraint
+    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .add(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
+            .check(field(name("container_state"))
+                .in(enumStates)))
+        .execute();
   }
 
   /**

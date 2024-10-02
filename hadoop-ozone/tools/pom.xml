@@ -160,6 +160,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-tools</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-shell</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>info.picocli</groupId>

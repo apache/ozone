@@ -41,11 +41,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * <pre>
  * Servlet that runs async-profiler as web-endpoint.
- * <p>
+ *
  * Source: https://github.com/apache/hive/blob/master/common/src/java/org
  * /apache/hive/http/ProfileServlet.java
- * <p>
+ *
  * Following options from async-profiler can be specified as query parameter.
  * //  -e event          profiling event: cpu|alloc|lock|cache-misses etc.
  * //  -d duration       run profiling for <duration> seconds
@@ -79,7 +80,7 @@ import org.slf4j.LoggerFactory;
  * curl "http://localhost:10002/prof"
  * - To collect 1 minute CPU profile of current process and output in tree
  * format (html)
- * curl "http://localhost:10002/prof?output=tree&duration=60"
+ * curl "http://localhost:10002/prof?output=tree&amp;duration=60"
  * - To collect 30 second heap allocation profile of current process (returns
  * FlameGraph svg)
  * curl "http://localhost:10002/prof?event=alloc"
@@ -111,6 +112,7 @@ import org.slf4j.LoggerFactory;
  * The default output format of the newest async profiler is HTML.
  * If the user is using an older version such as 1.5, HTML is not supported.
  * Please specify the corresponding output format.
+ * </pre>
  */
 public class ProfileServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;

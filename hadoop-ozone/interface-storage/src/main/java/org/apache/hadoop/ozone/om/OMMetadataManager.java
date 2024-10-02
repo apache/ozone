@@ -117,6 +117,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getBucketKey(String volume, String bucket);
 
   /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefix(String volume, String bucket);
+
+  /**
+   * Given a volume and bucket, return the corresponding DB key prefix for FSO buckets.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB key.
    *
    * @param volume - volume name
@@ -263,24 +279,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   */
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException;
-
-  /**
    * Returns snapshot info for volume/bucket snapshot path.
    * @param volumeName volume name
    * @param bucketName bucket name
@@ -303,18 +301,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
   ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
-
-  /**
-   * Recover trash allows the user to recover the keys
-   * that were marked as deleted, but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   */
-  boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException;
 
   /**
    * Returns a list of volumes owned by a given user; if user is null, returns
@@ -661,7 +647,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   long getBucketId(String volume, String bucket) throws IOException;
 
   /**
-   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * Returns {@code List<BlockGroup>} for a key in the deletedTable.
    * @param deletedKey - key to be purged from the deletedTable
    * @return {@link BlockGroup}
    */

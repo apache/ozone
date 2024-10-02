@@ -61,6 +61,7 @@ function ozone_usage
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "checknative" client "checks if native libraries are loaded"
+  ozone_add_subcommand "ratis" client "Ozone ratis tool"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
@@ -230,6 +231,10 @@ function ozonecmd_case
     checknative)
         OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.checknative.CheckNative
         OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    ratis)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"

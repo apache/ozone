@@ -15,12 +15,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { lazy } from 'react';
 
-import Overview  from '@/v2/pages/overview/overview';
+const Overview = lazy(() => import('@/v2/pages/overview/overview'));
+const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
+const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
+const Datanodes = lazy(() => import('@/v2/pages/datanodes/datanodes'));
+const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
+const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
 
-export const routesV2: IRoute[] = [
+export const routesV2 = [
   {
     path: '/Overview',
     component: Overview
+  },
+  {
+    path: '/Volumes',
+    component: Volumes
+  },
+  {
+    path: '/Buckets',
+    component: Buckets
+  },
+  {
+    path: '/Datanodes',
+    component: Datanodes
+  },
+  {
+    path: '/Pipelines',
+    component: Pipelines
+  },
+  {
+    path: '/DiskUsage',
+    component: DiskUsage
   }
 ];

@@ -88,7 +88,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
 
     String dbPath = parent.getDbPath();
     Map<String, Object> fields = new HashMap<>();
-    success = getValueFields(dbPath, fields);
+    success = getValueFields(dbPath, fields, depth, tableName, dnDBSchemaVersion);
 
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(fields));
 
@@ -101,7 +101,8 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     return null;
   }
 
-  private boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {
+  public static boolean getValueFields(String dbPath, Map<String, Object> valueSchema, int d, String table,
+                                       String dnDBSchemaVersion) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
@@ -111,19 +112,19 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
       return false;
     }
     final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-        dbDefinition.getColumnFamily(tableName);
+        dbDefinition.getColumnFamily(table);
     if (columnFamilyDefinition == null) {
-      err().print("Error: Table with name '" + tableName + "' not found");
+      err().print("Error: Table with name '" + table + "' not found");
       return false;
     }
 
     Class<?> c = columnFamilyDefinition.getValueType();
-    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, depth));
+    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, d));
 
     return true;
   }
 
-  private Object getFieldsStructure(Class<?> clazz, int currentDepth) {
+  private static Object getFieldsStructure(Class<?> clazz, int currentDepth) {
     if (clazz.isPrimitive() || String.class.equals(clazz)) {
       return clazz.getSimpleName();
     } else if (currentDepth == 0) {
@@ -148,7 +149,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     }
   }
 
-  private List<Field> getAllFields(Class clazz) {
+  public static List<Field> getAllFields(Class clazz) {
     // NOTE: Schema of interface type, like ReplicationConfig, cannot be fetched.
     //       An empty list "[]" will be shown for such types of fields.
     if (clazz == null) {
@@ -176,7 +177,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     return RDBParser.class;
   }
 
-  private String removeTrailingSlashIfNeeded(String dbPath) {
+  private static String removeTrailingSlashIfNeeded(String dbPath) {
     if (dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)) {
       dbPath = dbPath.substring(0, dbPath.length() - 1);
     }

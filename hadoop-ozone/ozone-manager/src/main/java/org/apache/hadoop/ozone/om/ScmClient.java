@@ -21,6 +21,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -113,12 +115,29 @@ public class ScmClient {
     }
     try {
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
-      // Don't keep empty pipelines in the cache.
-      List<Long> emptyPipelines = result.entrySet().stream()
-          .filter(e -> e.getValue().isEmpty())
+      // Don't keep empty pipelines or insufficient EC pipelines in the cache.
+      List<Long> uncachePipelines = result.entrySet().stream()
+          .filter(e -> {
+            Pipeline pipeline = e.getValue();
+            // filter empty pipelines
+            if (pipeline.isEmpty()) {
+              return true;
+            }
+            // filter insufficient EC pipelines which missing any data index
+            ReplicationConfig repConfig = pipeline.getReplicationConfig();
+            if (repConfig instanceof ECReplicationConfig) {
+              int d = ((ECReplicationConfig) repConfig).getData();
+              for (int i = 1; i <= d; i++) {
+                if (!pipeline.getReplicaIndexes().containsValue(i)) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          })
           .map(Map.Entry::getKey)
           .collect(Collectors.toList());
-      containerLocationCache.invalidateAll(emptyPipelines);
+      containerLocationCache.invalidateAll(uncachePipelines);
       return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
