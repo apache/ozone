@@ -36,6 +36,9 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.util.DurationUtil.getPrettyDuration;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
+
 /**
  * Handler to query status of container balancer.
  */
@@ -69,7 +72,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       if (verbose) {
         System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
         long balancingDuration = OffsetDateTime.now().toEpochSecond() - startedAtInstant.getEpochSecond();
-        System.out.printf("Balancing duration: %s%n%n", getPrettyIterationStatusInfo(balancingDuration));
+        System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
         List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
@@ -151,10 +154,10 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
     long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
     String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + getPrettySize(nodeInfo.getDataVolume()) + "\n")
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + byteDesc(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
     String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + getPrettySize(nodeInfo.getDataVolume()) + "\n")
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + byteDesc(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
     return String.format(
             "%-50s %s%n" +
@@ -171,11 +174,11 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %n%s",
             "Key", "Value",
             "Iteration number", iterationNumber,
-            "Iteration duration", getPrettyIterationStatusInfo(iterationDuration),
+            "Iteration duration", getPrettyDuration(iterationDuration),
             "Iteration result",
             iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,
-            "Size scheduled to move", getPrettySize(sizeScheduledForMove),
-            "Moved data size", getPrettySize(dataSizeMoved),
+            "Size scheduled to move", byteDesc(sizeScheduledForMove),
+            "Moved data size", byteDesc(dataSizeMoved),
             "Scheduled to move containers", containerMovesScheduled,
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
@@ -184,28 +187,5 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Exited data from nodes", leavingDataNodeList);
   }
 
-  private String getPrettyIterationStatusInfo(long duration) {
-    String prettyDuration;
-    if (duration >= 0 && duration < 60) {
-      prettyDuration = duration + "s";
-    } else if (duration >= 60 && duration < 3600) {
-      prettyDuration = (duration / 60 + "m " + duration % 60 + "s");
-    } else if (duration >= 3600) {
-      prettyDuration = (duration / 60 / 60 + "h " + duration / 60 % 60 + "m " + duration % 60 + "s");
-    } else {
-      throw new IllegalStateException("Incorrect duration exception" + duration);
-    }
-    return prettyDuration;
-  }
-
-  public static String getPrettySize(long sizeInBytes) {
-    if (sizeInBytes / OzoneConsts.GB > 0) {
-      return sizeInBytes / OzoneConsts.GB + " Gb " + sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
-    } else if (sizeInBytes == 0) {
-      return "0";
-    } else {
-      return sizeInBytes % OzoneConsts.GB / OzoneConsts.MB + " Mb";
-    }
-  }
 }
 

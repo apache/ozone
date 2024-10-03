@@ -19,9 +19,12 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Info about balancer status.
@@ -50,5 +53,50 @@ public class ContainerBalancerStatusInfo {
 
   public List<ContainerBalancerTaskIterationStatusInfo> getIterationsStatusInfo() {
     return iterationsStatusInfo;
+  }
+
+  public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo
+        .newBuilder()
+        .setStartedAt(getStartedAt().toEpochSecond())
+        .setConfiguration(getConfiguration())
+        .addAllIterationsStatusInfo(
+            getIterationsStatusInfo()
+                .stream()
+                .map(
+                    info -> StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+                        .setIterationNumber(info.getIterationNumber())
+                        .setIterationResult(Optional.ofNullable(info.getIterationResult()).orElse(""))
+                        .setIterationDuration(info.getIterationDuration())
+                        .setSizeScheduledForMove(info.getSizeScheduledForMove())
+                        .setDataSizeMoved(info.getDataSizeMoved())
+                        .setContainerMovesScheduled(info.getContainerMovesScheduled())
+                        .setContainerMovesCompleted(info.getContainerMovesCompleted())
+                        .setContainerMovesFailed(info.getContainerMovesFailed())
+                        .setContainerMovesTimeout(info.getContainerMovesTimeout())
+                        .addAllSizeEnteringNodes(
+                            info.getSizeEnteringNodes().entrySet()
+                                .stream()
+                                .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                                    .setUuid(entry.getKey().toString())
+                                    .setDataVolume(entry.getValue())
+                                    .build()
+                                )
+                                .collect(Collectors.toList())
+                        )
+                        .addAllSizeLeavingNodes(
+                            info.getSizeLeavingNodes().entrySet()
+                                .stream()
+                                .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                                    .setUuid(entry.getKey().toString())
+                                    .setDataVolume(entry.getValue())
+                                    .build()
+                                )
+                                .collect(Collectors.toList())
+                        )
+                        .build()
+                )
+                .collect(Collectors.toList())
+        ).build();
   }
 }

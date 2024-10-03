@@ -42,7 +42,7 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "Amount of bytes that Container Balancer moved" +
       " in the latest iteration.")
-  private MutableCounterLong dataSizeMovedInLatestIteration;
+  private MutableCounterLong dataSizeMovedBytesInLatestIteration;
 
   @Metric(about = "Number of completed container moves performed by " +
       "Container Balancer in the latest iteration.")
@@ -164,15 +164,15 @@ public final class ContainerBalancerMetrics {
    * @return size in bytes
    */
   public long getDataSizeMovedInLatestIteration() {
-    return dataSizeMovedInLatestIteration.value();
+    return dataSizeMovedBytesInLatestIteration.value();
   }
 
   public void incrementDataSizeMovedInLatestIteration(long valueToAdd) {
-    this.dataSizeMovedInLatestIteration.incr(valueToAdd);
+    this.dataSizeMovedBytesInLatestIteration.incr(valueToAdd);
   }
 
   public void resetDataSizeMovedInLatestIteration() {
-    dataSizeMovedInLatestIteration.incr(
+    dataSizeMovedBytesInLatestIteration.incr(
         -getDataSizeMovedInLatestIteration());
   }
 

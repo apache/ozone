@@ -339,11 +339,8 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-
-    int lastIterationNumber = iterationsStatistic.stream()
-        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
-        .max()
-        .orElse(0);
+    int lastIterationNumber = iterationsStatistic.isEmpty() ? 0 :
+        iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
     long iterationDuration = getCurrentIterationDuration();
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         lastIterationNumber + 1,
