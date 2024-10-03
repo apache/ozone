@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -39,7 +41,8 @@ public class TestOMVolumeSetQuotaResponse extends TestOMVolumeResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
-
+    OMMetadataManager omMetadataManager = getOmMetadataManager();
+    BatchOperation batchOperation = getBatchOperation();
     String volumeName = UUID.randomUUID().toString();
     String userName = "user1";
 
@@ -75,7 +78,8 @@ public class TestOMVolumeSetQuotaResponse extends TestOMVolumeResponse {
 
   @Test
   void testAddToDBBatchNoOp() throws Exception {
-
+    OMMetadataManager omMetadataManager = getOmMetadataManager();
+    BatchOperation batchOperation = getBatchOperation();
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
         .setStatus(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND)
