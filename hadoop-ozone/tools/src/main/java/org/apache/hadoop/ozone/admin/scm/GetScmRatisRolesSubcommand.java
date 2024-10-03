@@ -90,7 +90,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
 
         // In STANDALONE mode, output only the Host Name and Port information.
         if (roleItems.length == 2) {
-          formattingCLIUtils.addLine(roleItems[0], roleItems[1]);
+          formattingCLIUtils.addLine(roleItems);
         }
 
         // In RATIS mode, we can output the following information:
