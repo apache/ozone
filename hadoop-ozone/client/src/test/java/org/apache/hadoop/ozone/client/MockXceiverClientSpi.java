@@ -30,8 +30,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommittedBlockLengthResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
@@ -106,9 +104,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     case ListBlock:
       return result(request,
           r -> r.setListBlock(listBlock(request.getContainerID())));
-    case ReadBlock:
-      return result(request,
-          r -> r.setStreamData(readBlock(request.getReadBlock())));
     default:
       throw new IllegalArgumentException(
           "Mock version of datanode call " + request.getCmdType()
@@ -134,21 +129,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   private ContainerProtos.ListBlockResponseProto listBlock(long containerID) {
     return ContainerProtos.ListBlockResponseProto.newBuilder()
         .addAllBlockData(datanodeStorage.listBlock(containerID)).build();
-  }
-
-  private ContainerProtos.StreamDataResponseProto readBlock(
-      ReadBlockRequestProto readBlock) {
-    BlockData blockData = datanodeStorage.getBlock(readBlock.getBlockID());
-    List<ChunkInfo> chunkInfos = blockData.getChunksList();
-    StreamDataResponseProto.Builder builder = StreamDataResponseProto.newBuilder();
-    for (ChunkInfo chunkInfo : chunkInfos) {
-      builder.addReadBlock(ReadBlockResponseProto.newBuilder()
-          .setChunkData(chunkInfo)
-          .setData(datanodeStorage
-              .readChunkData(blockData.getBlockID(), chunkInfo))
-          .setBlockID(blockData.getBlockID()).build());
-    }
-    return builder.build();
   }
 
   private PutBlockResponseProto putBlock(PutBlockRequestProto putBlock) {

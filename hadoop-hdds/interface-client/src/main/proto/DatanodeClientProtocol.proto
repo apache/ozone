@@ -405,19 +405,8 @@ message ReadBlockRequestProto {
   optional ReadChunkVersion version = 5;
 }
 
-message ReadBlockResponseProto {
-  required DatanodeBlockID blockID = 1;
-  required ChunkInfo chunkData = 2;
-  optional uint32 startIndex = 3;
-  // Chunk data should be returned in one of the two for
-  oneof responseData {
-    bytes data = 4; // Chunk data is returned as single buffer for V0
-    DataBuffers dataBuffers = 5; // Chunk data is returned as a list of buffers
-  }
-}
-
 message StreamDataResponseProto {
-  repeated ReadBlockResponseProto readBlock = 1;
+  repeated ReadChunkResponseProto readChunk = 1;
 }
 
 message  EchoRequestProto {

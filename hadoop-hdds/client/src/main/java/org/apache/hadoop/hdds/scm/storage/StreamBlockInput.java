@@ -27,7 +27,7 @@ import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -565,9 +565,9 @@ public class StreamBlockInput extends BlockExtendedInputStream
     StreamDataResponseProto response =
         ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
         len, blockID, validators, tokenRef.get(), pipeline.getReplicaIndexes(), verifyChecksum);
-    List<ReadBlockResponseProto> readBlocks = response.getReadBlockList();
+    List<ReadChunkResponseProto> readBlocks = response.getReadChunkList();
 
-    for (ReadBlockResponseProto readBlock : readBlocks) {
+    for (ReadChunkResponseProto readBlock : readBlocks) {
       if (readBlock.hasData()) {
         buffers.add(readBlock.getData().asReadOnlyByteBuffer());
       } else if (readBlock.hasDataBuffers()) {
@@ -681,18 +681,18 @@ public class StreamBlockInput extends BlockExtendedInputStream
   ) throws IOException {
 
     StreamDataResponseProto streamData = response.getStreamData();
-    for (ReadBlockResponseProto readBlock : streamData.getReadBlockList()) {
+    for (ReadChunkResponseProto readChunk : streamData.getReadChunkList()) {
       List<ByteString> byteStrings;
       boolean isV0 = false;
 
       ContainerProtos.ChunkInfo chunkInfo =
-          readBlock.getChunkData();
+          readChunk.getChunkData();
       if (chunkInfo.getLen() <= 0) {
         throw new IOException("Failed to get chunk: chunkName == "
             + chunkInfo.getChunkName() + "len == " + chunkInfo.getLen());
       }
-      if (readBlock.hasData()) {
-        ByteString byteString = readBlock.getData();
+      if (readChunk.hasData()) {
+        ByteString byteString = readChunk.getData();
         if (byteString.size() != chunkInfo.getLen()) {
           // Bytes read from chunk should be equal to chunk size.
           throw new OzoneChecksumException(String.format(
@@ -704,7 +704,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
         byteStrings.add(byteString);
         isV0 = true;
       } else {
-        byteStrings = readBlock.getDataBuffers().getBuffersList();
+        byteStrings = readChunk.getDataBuffers().getBuffersList();
         long buffersLen = BufferUtils.getBuffersLen(byteStrings);
         if (buffersLen != chunkInfo.getLen()) {
           // Bytes read from chunk should be equal to chunk size.
@@ -718,12 +718,13 @@ public class StreamBlockInput extends BlockExtendedInputStream
       if (verifyChecksum) {
         ChecksumData checksumData = ChecksumData.getFromProtoBuf(
             chunkInfo.getChecksumData());
+        int startIndex = (int) readChunk.getChunkData().getOffset() / checksumData.getBytesPerChecksum();
 
         // ChecksumData stores checksum for each 'numBytesPerChecksum'
         // number of bytes in a list. Compute the index of the first
         // checksum to match with the read data
 
-        Checksum.verifyChecksum(byteStrings, checksumData, readBlock.getStartIndex(),
+        Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
             isV0);
       }
     }
