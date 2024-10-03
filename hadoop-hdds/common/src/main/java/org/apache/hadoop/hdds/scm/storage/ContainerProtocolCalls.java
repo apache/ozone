@@ -54,11 +54,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.FinalizeBlockRequestProto;
@@ -887,7 +887,7 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public static ContainerProtos.StreamDataResponseProto readBlock(
+  public static ContainerProtos.ReadBlockResponseProto readBlock(
       XceiverClientSpi xceiverClient, long offset, long len, BlockID blockID,
       List<Validator> validators, Token<? extends TokenIdentifier> token,
       Map<DatanodeDetails, Integer> replicaIndexes, boolean verifyChecksum) throws IOException {
@@ -895,8 +895,7 @@ public final class ContainerProtocolCalls  {
         ReadBlockRequestProto.newBuilder()
             .setOffset(offset)
             .setVerifyChecksum(verifyChecksum)
-            .setLen(len)
-            .setVersion(ContainerProtos.ReadChunkVersion.V1);
+            .setLen(len);
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
             .setContainerID(blockID.getContainerID());
@@ -911,12 +910,12 @@ public final class ContainerProtocolCalls  {
         d -> toErrorMessage(blockID, d));
   }
 
-  private static StreamDataResponseProto readBlock(XceiverClientSpi xceiverClient,
-                                                   List<Validator> validators, BlockID blockID,
-                                                   ContainerCommandRequestProto.Builder builder,
-                                                   ReadBlockRequestProto.Builder readBlockBuilder,
-                                                   DatanodeDetails datanode,
-                                                   Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+  private static ReadBlockResponseProto readBlock(XceiverClientSpi xceiverClient,
+                                                  List<Validator> validators, BlockID blockID,
+                                                  ContainerCommandRequestProto.Builder builder,
+                                                  ReadBlockRequestProto.Builder readBlockBuilder,
+                                                  DatanodeDetails datanode,
+                                                  Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
     int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
     if (replicaIndex > 0) {
@@ -928,6 +927,6 @@ public final class ContainerProtocolCalls  {
         .setReadBlock(readBlockBuilder).build();
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, validators);
-    return response.getStreamData();
+    return response.getReadBlock();
   }
 }

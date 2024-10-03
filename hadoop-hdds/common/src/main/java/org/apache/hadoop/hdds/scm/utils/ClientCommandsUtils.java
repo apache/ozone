@@ -48,13 +48,4 @@ public final class ClientCommandsUtils {
       return ContainerProtos.ReadChunkVersion.V0;
     }
   }
-
-  public static ContainerProtos.ReadChunkVersion getReadChunkVersion(
-      ReadBlockRequestProto readBlock) {
-    if (readBlock.hasVersion()) {
-      return readBlock.getVersion();
-    } else {
-      return ContainerProtos.ReadChunkVersion.V0;
-    }
-  }
 }

@@ -633,8 +633,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         new CompletableFuture<>();
     ContainerCommandResponseProto.Builder response =
         ContainerCommandResponseProto.newBuilder();
-    ContainerProtos.StreamDataResponseProto.Builder streamData =
-        ContainerProtos.StreamDataResponseProto.newBuilder();
+    ContainerProtos.ReadBlockResponseProto.Builder readBlock =
+        ContainerProtos.ReadBlockResponseProto.newBuilder();
     checkOpen(dn);
     UUID dnID = dn.getUuid();
     Type cmdType = request.getCmdType();
@@ -651,7 +651,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 ReadChunkResponseProto readChunk =
                     responseProto.getReadChunk();
                 if (responseProto.getResult() == Result.SUCCESS) {
-                  streamData.addReadChunk(readChunk);
+                  readBlock.addReadChunk(readChunk);
                 } else {
                   future.complete(
                       ContainerCommandResponseProto.newBuilder(responseProto)
@@ -670,8 +670,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
               @Override
               public void onCompleted() {
-                if (streamData.getReadChunkCount() > 0) {
-                  future.complete(response.setStreamData(streamData)
+                if (readBlock.getReadChunkCount() > 0) {
+                  future.complete(response.setReadBlock(readBlock)
                       .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
                 }
                 if (!future.isDone()) {

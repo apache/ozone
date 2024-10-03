@@ -253,7 +253,7 @@ message ContainerCommandResponseProto {
 
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
-  optional   StreamDataResponseProto streamData = 24;}
+  optional   ReadBlockResponseProto readBlock = 24;}
 
 message ContainerDataProto {
   enum State {
@@ -401,10 +401,9 @@ message ReadBlockRequestProto {
   required uint64 offset = 2;
   required uint64 len = 3;
   required bool verifyChecksum = 4;
-  optional ReadChunkVersion version = 5;
 }
 
-message StreamDataResponseProto {
+message ReadBlockResponseProto {
   repeated ReadChunkResponseProto readChunk = 1;
 }
 

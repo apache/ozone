@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -562,7 +562,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       throws IOException {
     Pipeline pipeline = pipelineRef.get();
     buffers = new ArrayList<>();
-    StreamDataResponseProto response =
+    ReadBlockResponseProto response =
         ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
         len, blockID, validators, tokenRef.get(), pipeline.getReplicaIndexes(), verifyChecksum);
     List<ReadChunkResponseProto> readBlocks = response.getReadChunkList();
@@ -680,8 +680,8 @@ public class StreamBlockInput extends BlockExtendedInputStream
       ContainerProtos.ContainerCommandResponseProto response
   ) throws IOException {
 
-    StreamDataResponseProto streamData = response.getStreamData();
-    for (ReadChunkResponseProto readChunk : streamData.getReadChunkList()) {
+    ReadBlockResponseProto readBlock = response.getReadBlock();
+    for (ReadChunkResponseProto readChunk : readBlock.getReadChunkList()) {
       List<ByteString> byteStrings;
 
       ContainerProtos.ChunkInfo chunkInfo =
