@@ -9,6 +9,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.NoSuchElementException;
 
 /**
  * This class will be used to implement the API call actions to /log endpoint
@@ -21,6 +22,18 @@ public class LogFetcherImpl implements LogFetcher {
 
   public LogFetcherImpl() {
     logEventReader = new LogEventReader();
+  }
+
+  /**
+   * Checks if the event provided is null or it's fields are null
+   * @param event  Stores the event to be checked
+   * @return true if the event or it's fields are null else false
+   */
+  private boolean checkEventIsNull(LogEvent event) {
+    return (null == event || null == event.getTimestamp()
+      || null == event.getSource()
+      || null == event.getLevel()
+      || null == event.getMessage());
   }
 
   /**
@@ -58,7 +71,8 @@ public class LogFetcherImpl implements LogFetcher {
       if (Direction.FORWARD == direction) {
         event = logEventReader.getNextEvent();
         // Did not find any event so assume end of events
-        if (null == event) {
+        // Or if the event fields are null, do not add it
+        if (checkEventIsNull(event)) {
           break;
         }
         logEventDeque.add(event);
@@ -67,16 +81,25 @@ public class LogFetcherImpl implements LogFetcher {
       if (Direction.REVERSE == direction) {
         event = logEventReader.getPrevEvent();
         // Did not find any event so assume end of events
-        if (null == event) {
+        // Or if the event fields are null
+        if (checkEventIsNull(event)) {
           break;
         }
         logEventDeque.addFirst(event);
       }
     }
 
-    // throws NPE if events are not found
-    long firstEventOffset = logEventDeque.getFirst().getOffset();
-    long lastEventOffset = logEventDeque.getLast().getOffset();
+    long firstEventOffset;
+    long lastEventOffset;
+    try {
+      //throws NPE here if the events are not found
+      firstEventOffset = logEventDeque.getFirst().getOffset();
+      lastEventOffset = logEventDeque.getLast().getOffset();
+    } catch (NoSuchElementException ne) {
+      firstEventOffset = -1;
+      lastEventOffset = -1;
+    }
+
     return LoggerResponse.newBuilder()
       .setLogs(new ArrayList<>(logEventDeque))
       .setFirstOffset(firstEventOffset)
@@ -99,22 +122,33 @@ public class LogFetcherImpl implements LogFetcher {
     Deque<LogEvent> logEventDeque = new LinkedList<>();
     LogEvent le = logEventReader.getLastEvent();
 
-    logEventDeque.add(le);
+    if (!checkEventIsNull(le)) {
+      logEventDeque.add(le);
+    }
 
     for (int idx = 1; idx < events; idx++) {
       LogEvent event = logEventReader.getPrevEvent();
 
-      //Did not find any event so assume end of events
-      if (null == event) {
+      // Did not find any event so assume end of events
+      // Or if the fields are empty for some reason, do not add the event
+      if (checkEventIsNull(event)) {
         break;
       }
       // Since we are reading in reverse we need to add the events before current event
       logEventDeque.addFirst(event);
     }
 
-    //throws NPE here if the events are not found
-    long firstEventOffset = logEventDeque.getFirst().getOffset();
-    long lastEventOffset = logEventDeque.getLast().getOffset();
+    long firstEventOffset;
+    long lastEventOffset;
+    try {
+      //throws NPE here if the events are not found
+      firstEventOffset = logEventDeque.getFirst().getOffset();
+      lastEventOffset = logEventDeque.getLast().getOffset();
+    } catch (NoSuchElementException ne) {
+      firstEventOffset = -1;
+      lastEventOffset = -1;
+    }
+
     return LoggerResponse.newBuilder()
       .setLogs(new ArrayList<>(logEventDeque))
       .setFirstOffset(firstEventOffset)

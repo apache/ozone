@@ -25,7 +25,7 @@ import java.util.List;
  */
 public class LogEventReader {
 
-  private final static LogReader lr = new LogReader();
+  private final LogReader lr = new LogReader();
   private final LogParser lp = new Log4JParser();
 
   // Stores the next event in the log that is available

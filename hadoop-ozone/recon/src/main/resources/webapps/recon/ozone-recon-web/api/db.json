@@ -6947,5 +6947,612 @@
     "selectedRowKeys": [
       "b5907812-a5f2-11ea-bb37-0242ac130011"
     ]
+  },
+  "logs": {
+    "logs": [
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #8 for port 9891 10:04:37 INFO  Server: Starting Socket Reader #10 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #7 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #6 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "PipelineStateManagerImpl",
+            "message": "No pipeline exists in current db"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Initializing support of Recon Features..."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Starting Recon server"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsConfig",
+            "message": "Loaded properties from hadoop-metrics2.properties"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Scheduled Metric snapshot period at 10 second(s)."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Recon metrics system started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "HttpServer2",
+            "message": "Jetty bound to port 9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "jetty-9.4.56.v20240826; built: 2024-08-26T17:15:05.868Z; git: ec6782ff5ead824dabdcf47fa98f90a4aedff401; jvm 11.0.21+9-LTS"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "DefaultSessionIdManager workerName=node0"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "No SessionScavenger set, using defaults"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "node0 Scavenging every 600000ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@388be5fd{logs,/logs,file:///var/log/hadoop/,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@3b170235{static,/static,jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/static,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.w.WebAppContext@18356d9e{recon,/,file:///tmp/ozone_http/jetty-0_0_0_0-9888-ozone-recon-1_5_0-SNAPSHOT_jar-_-any-8739727844254720610/webapp/,AVAILABLE}{jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/recon}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "AbstractConnector",
+            "message": "Started ServerConnector@7d66a126{HTTP/1.1, (http/1.1)}{0.0.0.0:9888}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Started @8805ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSinkAdapter",
+            "message": "Sink prometheus started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Registered sink prometheus"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "BaseHttpServer",
+            "message": "HTTP server of recon listening at http://0.0.0.0:9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Starting Ozone Manager Service Provider."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmDeltaRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmSnapshotRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconOmMetadataManagerImpl",
+            "message": "Starting ReconOMMetadataManagerImpl"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "WARN",
+            "source": "ReconUtils",
+            "message": "ozone.recon.om.db.dir is not configured. We recommend adding this setting. Falling back to ozone.metadata.dirs instead."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconTaskControllerImpl",
+            "message": "Starting Recon Task Controller."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconStorageContainerManagerFacade",
+            "message": "Recon ScmDatanodeProtocol RPC server is listening at /0.0.0.0:9891"
+        },
+        {
+            "timestamp": 1727863480000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 1 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 1."
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "HeatMapServiceImpl",
+            "message": "List of disabled features in Recon: [HEATMAP]"
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 2 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 2."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #8 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #2 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #9 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #8 for port 9891 10:04:37 INFO  Server: Starting Socket Reader #10 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #7 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #6 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "PipelineStateManagerImpl",
+            "message": "No pipeline exists in current db"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Initializing support of Recon Features..."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Starting Recon server"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsConfig",
+            "message": "Loaded properties from hadoop-metrics2.properties"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Scheduled Metric snapshot period at 10 second(s)."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Recon metrics system started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "HttpServer2",
+            "message": "Jetty bound to port 9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "jetty-9.4.56.v20240826; built: 2024-08-26T17:15:05.868Z; git: ec6782ff5ead824dabdcf47fa98f90a4aedff401; jvm 11.0.21+9-LTS"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "DefaultSessionIdManager workerName=node0"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "No SessionScavenger set, using defaults"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "node0 Scavenging every 600000ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@388be5fd{logs,/logs,file:///var/log/hadoop/,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@3b170235{static,/static,jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/static,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.w.WebAppContext@18356d9e{recon,/,file:///tmp/ozone_http/jetty-0_0_0_0-9888-ozone-recon-1_5_0-SNAPSHOT_jar-_-any-8739727844254720610/webapp/,AVAILABLE}{jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/recon}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "AbstractConnector",
+            "message": "Started ServerConnector@7d66a126{HTTP/1.1, (http/1.1)}{0.0.0.0:9888}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Started @8805ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSinkAdapter",
+            "message": "Sink prometheus started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Registered sink prometheus"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "BaseHttpServer",
+            "message": "HTTP server of recon listening at http://0.0.0.0:9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Starting Ozone Manager Service Provider."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmDeltaRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmSnapshotRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconOmMetadataManagerImpl",
+            "message": "Starting ReconOMMetadataManagerImpl"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "WARN",
+            "source": "ReconUtils",
+            "message": "ozone.recon.om.db.dir is not configured. We recommend adding this setting. Falling back to ozone.metadata.dirs instead."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconTaskControllerImpl",
+            "message": "Starting Recon Task Controller."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconStorageContainerManagerFacade",
+            "message": "Recon ScmDatanodeProtocol RPC server is listening at /0.0.0.0:9891"
+        },
+        {
+            "timestamp": 1727863480000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 1 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 1."
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "HeatMapServiceImpl",
+            "message": "List of disabled features in Recon: [HEATMAP]"
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 2 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 2."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #8 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #2 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #9 for port 9891"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Starting Socket Reader #8 for port 9891FO  PipelineStateManagerImpl: No pipeline exists in current db"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Initializing support of Recon Features..."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "ReconServer",
+            "message": "Starting Recon server"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsConfig",
+            "message": "Loaded properties from hadoop-metrics2.properties"
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Scheduled Metric snapshot period at 10 second(s)."
+        },
+        {
+            "timestamp": 1727863477000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Recon metrics system started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "HttpServer2",
+            "message": "Jetty bound to port 9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "jetty-9.4.56.v20240826; built: 2024-08-26T17:15:05.868Z; git: ec6782ff5ead824dabdcf47fa98f90a4aedff401; jvm 11.0.21+9-LTS"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "DefaultSessionIdManager workerName=node0"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "No SessionScavenger set, using defaults"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "session",
+            "message": "node0 Scavenging every 600000ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@388be5fd{logs,/logs,file:///var/log/hadoop/,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.s.ServletContextHandler@3b170235{static,/static,jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/static,AVAILABLE}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ContextHandler",
+            "message": "Started o.e.j.w.WebAppContext@18356d9e{recon,/,file:///tmp/ozone_http/jetty-0_0_0_0-9888-ozone-recon-1_5_0-SNAPSHOT_jar-_-any-8739727844254720610/webapp/,AVAILABLE}{jar:file:/opt/hadoop/share/ozone/lib/ozone-recon-1.5.0-SNAPSHOT.jar!/webapps/recon}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "AbstractConnector",
+            "message": "Started ServerConnector@7d66a126{HTTP/1.1, (http/1.1)}{0.0.0.0:9888}"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "Server",
+            "message": "Started @8805ms"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSinkAdapter",
+            "message": "Sink prometheus started"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "MetricsSystemImpl",
+            "message": "Registered sink prometheus"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "BaseHttpServer",
+            "message": "HTTP server of recon listening at http://0.0.0.0:9888"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Starting Ozone Manager Service Provider."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmDeltaRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "OzoneManagerServiceProviderImpl",
+            "message": "Registered OmSnapshotRequest task "
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconOmMetadataManagerImpl",
+            "message": "Starting ReconOMMetadataManagerImpl"
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "WARN",
+            "source": "ReconUtils",
+            "message": "ozone.recon.om.db.dir is not configured. We recommend adding this setting. Falling back to ozone.metadata.dirs instead."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconTaskControllerImpl",
+            "message": "Starting Recon Task Controller."
+        },
+        {
+            "timestamp": 1727863478000,
+            "level": "INFO",
+            "source": "ReconStorageContainerManagerFacade",
+            "message": "Recon ScmDatanodeProtocol RPC server is listening at /0.0.0.0:9891"
+        },
+        {
+            "timestamp": 1727863480000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 1 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 1."
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "HeatMapServiceImpl",
+            "message": "List of disabled features in Recon: [HEATMAP]"
+        },
+        {
+            "timestamp": 1727863482000,
+            "level": "INFO",
+            "source": "RetryInvocationHandler",
+            "message": "com.google.protobuf.ServiceException: java.net.ConnectException: Call From 0a2486b68d54/172.20.0.2 to scm:9860 failed on connection exception: java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused, while invoking $Proxy54.submitRequest over nodeId=scmNodeId,nodeAddress=scm/172.20.0.3:9860 after 2 failover attempts. Trying to failover after sleeping for 2000ms. Current retry count: 2."
+        },
+        {
+            "timestamp": 1727863484000,
+            "level": "INFO",
+            "source": "HeatMapServiceImpl",
+            "message": "List of disabled features in Recon: [HEATMAP]"
+        }
+    ],
+    "firstOffset": 46695,
+    "lastOffset": 46695,
+    "status": "OK"
   }
 }

@@ -103,10 +103,6 @@ const LogViewer: React.FC<{}> = () => {
     })
   }, []);
 
-  const pagination = (
-    <Pagination
-      onChange={handlePaginationChange}/>
-  )
 
   return (
     <>

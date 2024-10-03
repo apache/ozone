@@ -20,31 +20,10 @@ import React from 'react';
 
 import moment from 'moment';
 import Table, {
-  ColumnProps,
   ColumnsType,
   TablePaginationConfig
 } from 'antd/es/table';
-import Tag from 'antd/es/tag';
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  CloudServerOutlined,
-  FileUnknownOutlined,
-  HddOutlined,
-  LaptopOutlined,
-  SaveOutlined
-} from '@ant-design/icons';
 
-import QuotaBar from '@/components/quotaBar/quotaBar';
-import { nullAwareLocaleCompare } from '@/utils/common';
-import {
-  Bucket,
-  BucketLayout,
-  BucketLayoutTypeList,
-  BucketsTableProps,
-  BucketStorage,
-  BucketStorageTypeList
-} from '@/v2/types/bucket.types';
 import { Log, LogTableProps } from '@/v2/types/logs.types';
 
 export const COLUMNS: ColumnsType<Log> = [
@@ -75,20 +54,29 @@ const LogsTable: React.FC<LogTableProps> = ({
   data
 }) => {
 
-  const paginationConfig: TablePaginationConfig = {
-    showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} logs`,
-    showSizeChanger: true,
-  };
+  function parseLogData(data: Log[]) {
+    // We need to parse the date from timestamp to
+    // human readable time
+    return data.map((log) => ({
+      timestap: moment(log.timestamp).format('ll LTS'),
+      ...log
+    }));
+  }
+
+  const parsedData = React.useMemo(
+    () => parseLogData(data),
+    [data.length]
+  );
+
 
   return (
     <div>
       <Table
-        dataSource={data}
+        dataSource={parsedData}
         columns={COLUMNS}
         loading={loading}
         rowKey='message'
-        pagination={paginationConfig}
-        scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+        scroll={{ x: 'max-content', y: 400, scrollToFirstRowOnChange: false }}
         locale={{ filterTitle: '' }}
       />
     </div>

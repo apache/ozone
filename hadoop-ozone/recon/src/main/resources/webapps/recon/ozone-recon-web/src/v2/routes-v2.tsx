@@ -22,6 +22,7 @@ const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
 const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
 const Datanodes = lazy(() => import('@/v2/pages/datanodes/datanodes'));
 const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
+const Logs = lazy(() => import('@/v2/pages/logs/logs'));
 
 export const routesV2 = [
   {
@@ -43,5 +44,9 @@ export const routesV2 = [
   {
     path: '/Pipelines',
     component: Pipelines
+  },
+  {
+    path: '/Logs',
+    component: Logs
   }
 ];

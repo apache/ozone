@@ -340,7 +340,7 @@ public class LogReader {
    *         else -1 if the file is not open
    * @throws IOException in case of any I/O related error
    */
-  public long getCurrentOffset() throws IOException{
+  public long getCurrentOffset() throws IOException {
     return (null == raf) ? -1 : raf.getFilePointer();
   }
 
@@ -348,7 +348,7 @@ public class LogReader {
    * Get the file size of the file being read
    * @return the file size else -1 if file is not open
    */
-  public long getFileSize() throws IOException{
+  public long getFileSize() throws IOException {
     return (null == raf) ? -1 : raf.length();
   }
 
