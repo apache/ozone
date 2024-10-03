@@ -786,11 +786,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Set the configs for new OMs.
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
-      String omNodeId) {
-    return addNewOMToConfig(omServiceId, omNodeId, false);
-  }
-
-  private OzoneConfiguration addNewOMToConfig(String omServiceId,
       String omNodeId, boolean isListener) {
     OzoneConfiguration newConf = new OzoneConfiguration(getConf());
     configureOMPorts(newConf, omServiceId, omNodeId);
