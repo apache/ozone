@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -51,7 +52,6 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.BindException;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -191,7 +191,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       } catch (IOException e) {
         LOG.error("Error while starting the server", e);
         if (e.getMessage().contains("Failed to bind to address")) {
-          throw new BindException(e);
+          throw new BindException();
         } else {
           throw e;
         }
