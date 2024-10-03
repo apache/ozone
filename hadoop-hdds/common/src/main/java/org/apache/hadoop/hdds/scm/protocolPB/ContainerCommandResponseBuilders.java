@@ -335,27 +335,16 @@ public final class ContainerCommandResponseBuilders {
 
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, DatanodeBlockID blockID,
-      ChunkInfo chunkInfo, boolean isReadChunkV0, ChunkBuffer data,
-      Function<ByteBuffer, ByteString> byteBufferToByteString,
-      int startIndex) {
+      ChunkInfo chunkInfo, ChunkBuffer data,
+      Function<ByteBuffer, ByteString> byteBufferToByteString) {
 
     ReadChunkResponseProto.Builder response;
-
-    if (isReadChunkV0) {
-      // V0 has all response data in a single ByteBuffer
-      response = ReadChunkResponseProto.newBuilder()
-          .setChunkData(chunkInfo)
-          .setData(data.toByteString(byteBufferToByteString))
-          .setBlockID(blockID);
-    } else {
-      // V1 splits response data into a list of ByteBuffers
-      response = ReadChunkResponseProto.newBuilder()
-          .setChunkData(chunkInfo)
-          .setDataBuffers(DataBuffers.newBuilder()
-              .addAllBuffers(data.toByteStringList(byteBufferToByteString))
-              .build())
-          .setBlockID(blockID);
-    }
+    response = ReadChunkResponseProto.newBuilder()
+        .setChunkData(chunkInfo)
+        .setDataBuffers(DataBuffers.newBuilder()
+            .addAllBuffers(data.toByteStringList(byteBufferToByteString))
+            .build())
+        .setBlockID(blockID);
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
         .build();

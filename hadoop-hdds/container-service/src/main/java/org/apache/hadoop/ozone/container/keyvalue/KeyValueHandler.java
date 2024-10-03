@@ -1372,22 +1372,16 @@ public class KeyValueHandler extends Handler {
         dispatcherContext = DispatcherContext.getHandleReadBlock();
       }
 
-      boolean isReadChunkV0 = readBlock.getVersion()
-          .equals(ContainerProtos.ReadChunkVersion.V0);
-
       long offset = readBlock.getOffset();
       long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;
       do {
-        int startIndex = -1;
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
         if (readBlock.getVerifyChecksum()) {
           Pair<Long, Long> adjustedOffsetAndLength =
               computeChecksumBoundaries(chunk, offset, len);
           adjustedChunkOffset = adjustedOffsetAndLength.getLeft();
           adjustedChunkLen = adjustedOffsetAndLength.getRight();
-          startIndex = (int) adjustedChunkOffset /
-              chunk.getChecksumData().getBytesPerChecksum();
           adjustedChunkOffset += chunk.getOffset();
         } else {
           adjustedChunkOffset = offset;
@@ -1399,13 +1393,6 @@ public class KeyValueHandler extends Handler {
             ContainerProtos.ChunkInfo.newBuilder(chunk)
                 .setOffset(adjustedChunkOffset)
                 .setLen(adjustedChunkLen).build());
-        // For older clients, set ReadDataIntoSingleBuffer to true so that
-        // all the data read from chunk file is returned as a single
-        // ByteString. Older clients cannot process data returned as a list
-        // of ByteStrings.
-        if (isReadChunkV0) {
-          chunkInfo.setReadDataIntoSingleBuffer(isReadChunkV0);
-        }
         data = chunkManager.readChunk(
             kvContainer, blockID, chunkInfo, dispatcherContext);
 
@@ -1418,8 +1405,8 @@ public class KeyValueHandler extends Handler {
         streamObserver.onNext(
             getReadBlockResponse(request,
                 blockData.getProtoBufMessage().getBlockID(),
-                chunkInfo.getProtoBufMessage(), isReadChunkV0,
-                data, byteBufferToByteString, startIndex));
+                chunkInfo.getProtoBufMessage(),
+                data, byteBufferToByteString));
         len -= adjustedChunkLen + adjustedChunkOffset - offset;
         offset = adjustedChunkOffset + adjustedChunkLen;
         chunkIndex++;

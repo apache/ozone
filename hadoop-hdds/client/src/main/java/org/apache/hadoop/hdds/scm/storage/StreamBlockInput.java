@@ -683,7 +683,6 @@ public class StreamBlockInput extends BlockExtendedInputStream
     StreamDataResponseProto streamData = response.getStreamData();
     for (ReadChunkResponseProto readChunk : streamData.getReadChunkList()) {
       List<ByteString> byteStrings;
-      boolean isV0 = false;
 
       ContainerProtos.ChunkInfo chunkInfo =
           readChunk.getChunkData();
@@ -691,29 +690,16 @@ public class StreamBlockInput extends BlockExtendedInputStream
         throw new IOException("Failed to get chunk: chunkName == "
             + chunkInfo.getChunkName() + "len == " + chunkInfo.getLen());
       }
-      if (readChunk.hasData()) {
-        ByteString byteString = readChunk.getData();
-        if (byteString.size() != chunkInfo.getLen()) {
-          // Bytes read from chunk should be equal to chunk size.
-          throw new OzoneChecksumException(String.format(
-              "Inconsistent read for chunk=%s len=%d bytesRead=%d",
-              chunkInfo.getChunkName(), chunkInfo.getLen(),
-              byteString.size()));
-        }
-        byteStrings = new ArrayList<>();
-        byteStrings.add(byteString);
-        isV0 = true;
-      } else {
-        byteStrings = readChunk.getDataBuffers().getBuffersList();
-        long buffersLen = BufferUtils.getBuffersLen(byteStrings);
-        if (buffersLen != chunkInfo.getLen()) {
-          // Bytes read from chunk should be equal to chunk size.
-          throw new OzoneChecksumException(String.format(
-              "Inconsistent read for chunk=%s len=%d bytesRead=%d",
-              chunkInfo.getChunkName(), chunkInfo.getLen(),
-              buffersLen));
-        }
+      byteStrings = readChunk.getDataBuffers().getBuffersList();
+      long buffersLen = BufferUtils.getBuffersLen(byteStrings);
+      if (buffersLen != chunkInfo.getLen()) {
+        // Bytes read from chunk should be equal to chunk size.
+        throw new OzoneChecksumException(String.format(
+            "Inconsistent read for chunk=%s len=%d bytesRead=%d",
+            chunkInfo.getChunkName(), chunkInfo.getLen(),
+            buffersLen));
       }
+
 
       if (verifyChecksum) {
         ChecksumData checksumData = ChecksumData.getFromProtoBuf(
@@ -725,7 +711,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
         // checksum to match with the read data
 
         Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
-            isV0);
+            false);
       }
     }
   }
