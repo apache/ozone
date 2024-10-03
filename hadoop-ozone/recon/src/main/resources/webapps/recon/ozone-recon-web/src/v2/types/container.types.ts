@@ -100,5 +100,5 @@ export type ContainerState = {
   missingContainerData: Container[];
   underReplicatedContainerData: Container[];
   overReplicatedContainerData: Container[];
-  misRepilcatedContainerData: Container[];
+  misReplicatedContainerData: Container[];
 }

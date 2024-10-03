@@ -41,11 +41,11 @@ import './containers.less';
 
 
 const SearchableColumnOpts = [{
-  label: 'Bucket',
-  value: 'name'
+  label: 'Container ID',
+  value: 'containerID'
 }, {
-  label: 'Volume',
-  value: 'volumeName'
+  label: 'Pipeline ID',
+  value: 'pipelineID'
 }]
 
 const defaultColumns = COLUMNS.map(column => ({
@@ -63,7 +63,7 @@ const Containers: React.FC<{}> = () => {
     missingContainerData: [],
     underReplicatedContainerData: [],
     overReplicatedContainerData: [],
-    misRepilcatedContainerData: [],
+    misReplicatedContainerData: [],
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
 
@@ -97,7 +97,7 @@ const Containers: React.FC<{}> = () => {
       const overReplicatedContainerData: Container[] = containers?.filter(
         container => container.containerState === 'OVER_REPLICATED'
       ) ?? [];
-      const misRepilcatedContainerData: Container[] = containers?.filter(
+      const misReplicatedContainerData: Container[] = containers?.filter(
         container => container.containerState === 'MIS_REPLICATED'
       ) ?? [];
 
@@ -106,7 +106,7 @@ const Containers: React.FC<{}> = () => {
         missingContainerData: missingContainerData,
         underReplicatedContainerData: underReplicatedContainerData,
         overReplicatedContainerData: overReplicatedContainerData,
-        misRepilcatedContainerData: misRepilcatedContainerData,
+        misReplicatedContainerData: misReplicatedContainerData,
         lastUpdated: Number(moment())
       });
       setLoading(false)
@@ -135,7 +135,7 @@ const Containers: React.FC<{}> = () => {
   const {
     lastUpdated, columnOptions,
     missingContainerData, underReplicatedContainerData,
-    overReplicatedContainerData, misRepilcatedContainerData
+    overReplicatedContainerData, misReplicatedContainerData
   } = state;
 
   // Mapping the data to the Tab keys for enabling/disabling search
@@ -143,7 +143,7 @@ const Containers: React.FC<{}> = () => {
     1: missingContainerData,
     2: underReplicatedContainerData,
     3: overReplicatedContainerData,
-    4: misRepilcatedContainerData
+    4: misReplicatedContainerData
   }
 
   const highlightData = (
@@ -166,7 +166,7 @@ const Containers: React.FC<{}> = () => {
       </div>
       <div className='highlight-content'>
         Mis-Replicated <br/>
-        <span className='highlight-content-value'>{misRepilcatedContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
       </div>
     </div>
   )
@@ -251,7 +251,7 @@ const Containers: React.FC<{}> = () => {
               key='3'
               tab='Over-Replicated'>
               <ContainerTable
-                data={missingContainerData}
+                data={overReplicatedContainerData}
                 loading={loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
@@ -264,7 +264,7 @@ const Containers: React.FC<{}> = () => {
               key='4'
               tab='Mis-Replicated'>
               <ContainerTable
-                data={misRepilcatedContainerData}
+                data={misReplicatedContainerData}
                 loading={loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
