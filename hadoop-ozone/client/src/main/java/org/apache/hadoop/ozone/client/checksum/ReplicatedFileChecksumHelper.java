@@ -52,9 +52,9 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-                                      String keyName, long length,
-                                      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-                                      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
         keyInfo);
   }

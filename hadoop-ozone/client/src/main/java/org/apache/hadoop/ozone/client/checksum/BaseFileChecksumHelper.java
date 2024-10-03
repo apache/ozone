@@ -89,9 +89,9 @@ public abstract class BaseFileChecksumHelper {
   }
 
   public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-                                String keyName, long length,
-                                OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-                                ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
+      String keyName, long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
     this.keyInfo = keyInfo;
   }

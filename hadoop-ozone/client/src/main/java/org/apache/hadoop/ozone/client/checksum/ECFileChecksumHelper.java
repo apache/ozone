@@ -47,8 +47,8 @@ import java.util.List;
 public class ECFileChecksumHelper extends BaseFileChecksumHelper {
 
   public ECFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-                              String keyName, long length, OzoneClientConfig.ChecksumCombineMode
-                                  checksumCombineMode, ClientProtocol rpcClient, OmKeyInfo keyInfo)
+      String keyName, long length, OzoneClientConfig.ChecksumCombineMode
+      checksumCombineMode, ClientProtocol rpcClient, OmKeyInfo keyInfo)
       throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
         keyInfo);
