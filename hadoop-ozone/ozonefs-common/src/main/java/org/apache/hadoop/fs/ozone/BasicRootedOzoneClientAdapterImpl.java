@@ -714,7 +714,7 @@ public class BasicRootedOzoneClientAdapterImpl
    *
    * @param allUsers return trashRoots of all users if true, used by emptier
    * @param fs Pointer to the current OFS FileSystem
-   * @return
+   * @return {@code Collection<FileStatus>}
    */
   public Collection<FileStatus> getTrashRoots(boolean allUsers,
       BasicRootedOzoneFileSystem fs) {

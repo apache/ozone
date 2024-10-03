@@ -28,7 +28,6 @@ import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1062,7 +1061,7 @@ public interface OzoneManagerProtocol
    * @param txnApplyCheckIntervalSeconds Time in SECONDS to wait between
    *                                     successive checks for all transactions
    *                                     to be applied to the OM DB.
-   * @return
+   * @return {@code long}
    */
   default long prepareOzoneManager(
       long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
@@ -1145,14 +1144,6 @@ public interface OzoneManagerProtocol
    */
   boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException;
-
-  /**
-   * Get server default configurations.
-   *
-   * @return OzoneFsServerDefaults some default configurations from server.
-   * @throws IOException
-   */
-  OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
    * Get status of last triggered quota repair in OM.

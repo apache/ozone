@@ -63,7 +63,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY;
 
 /**
- * Separated network server for gRPC transport OzoneManagerService s3g->OM.
+ * Separated network server for gRPC transport OzoneManagerService s3g-&gt;OM.
  */
 public class GrpcOzoneManagerServer {
   private static final Logger LOG =

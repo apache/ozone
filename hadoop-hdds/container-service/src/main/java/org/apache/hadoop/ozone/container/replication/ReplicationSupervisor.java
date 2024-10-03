@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -50,6 +52,7 @@ import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Sta
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +80,10 @@ public final class ReplicationSupervisor {
   private final Map<String, AtomicLong> failureCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> queuedCounter = new ConcurrentHashMap<>();
+
+  private final MetricsRegistry registry;
+  private final Map<String, MutableRate> opsLatencyMs = new ConcurrentHashMap<>();
 
   private static final Map<String, String> METRICS_MAP;
 
@@ -218,6 +225,7 @@ public final class ReplicationSupervisor {
         nodeStateUpdated(dn.getPersistedOpState());
       }
     }
+    registry = new MetricsRegistry(ReplicationSupervisor.class.getSimpleName());
   }
 
   /**
@@ -240,6 +248,9 @@ public final class ReplicationSupervisor {
           failureCounter.put(task.getMetricName(), new AtomicLong(0));
           timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
           skippedCounter.put(task.getMetricName(), new AtomicLong(0));
+          queuedCounter.put(task.getMetricName(), new AtomicLong(0));
+          opsLatencyMs.put(task.getMetricName(), registry.newRate(
+              task.getClass().getSimpleName() + "Ms"));
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
@@ -253,6 +264,7 @@ public final class ReplicationSupervisor {
         taskCounter.computeIfAbsent(task.getClass(),
             k -> new AtomicInteger()).incrementAndGet();
       }
+      queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
     }
   }
@@ -353,6 +365,7 @@ public final class ReplicationSupervisor {
 
     @Override
     public void run() {
+      final long startTime = Time.monotonicNow();
       try {
         requestCounter.get(task.getMetricName()).incrementAndGet();
 
@@ -401,6 +414,8 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
       } finally {
+        queuedCounter.get(task.getMetricName()).decrementAndGet();
+        opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
@@ -511,4 +526,22 @@ public final class ReplicationSupervisor {
     return counter != null ? counter.get() : 0;
   }
 
+  public long getReplicationQueuedCount() {
+    return getCount(queuedCounter);
+  }
+
+  public long getReplicationQueuedCount(String metricsName) {
+    AtomicLong counter = queuedCounter.get(metricsName);
+    return counter != null ? counter.get() : 0;
+  }
+
+  public long getReplicationRequestAvgTime(String metricsName) {
+    MutableRate rate = opsLatencyMs.get(metricsName);
+    return rate != null ? (long) rate.lastStat().mean() : 0;
+  }
+
+  public long getReplicationRequestTotalTime(String metricsName) {
+    MutableRate rate = opsLatencyMs.get(metricsName);
+    return rate != null ? (long) rate.lastStat().total() : 0;
+  }
 }

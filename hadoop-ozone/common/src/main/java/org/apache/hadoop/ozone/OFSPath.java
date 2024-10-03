@@ -214,7 +214,7 @@ public class OFSPath {
   }
 
   /**
-   * Get the volume & bucket or mount name (non-key path).
+   * Get the volume and bucket or mount name (non-key path).
    * @return String of path excluding key in bucket.
    */
   // Prepend a delimiter at beginning. e.g. /vol1/buc1
