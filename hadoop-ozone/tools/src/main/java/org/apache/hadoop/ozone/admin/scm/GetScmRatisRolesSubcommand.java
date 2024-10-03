@@ -96,7 +96,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
         // In RATIS mode, we can output the following information:
         // Host Name, Ratis Port, Node ID, Role, and Host Address.
         if (roleItems.length == 5) {
-          formattingCLIUtils.addLine(roleItems[0], roleItems[1], roleItems[3], roleItems[2], roleItems[4]);
+          formattingCLIUtils.addLine(roleItems);
         }
       }
       System.out.println(formattingCLIUtils.render());
