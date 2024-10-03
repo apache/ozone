@@ -253,8 +253,7 @@ message ContainerCommandResponseProto {
 
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
-  optional   ReadBlockResponseProto readBlock = 24;
-  optional   StreamDataResponseProto streamData = 25;}
+  optional   StreamDataResponseProto streamData = 24;}
 
 message ContainerDataProto {
   enum State {

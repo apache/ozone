@@ -578,7 +578,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
             "from container. No data returned.");
       }
     }
-    return response.getReadBlock(0)
+    return response.getReadChunk(0)
         .getChunkData().getOffset();
   }
 

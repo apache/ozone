@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
@@ -648,7 +649,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               @Override
               public void onNext(
                   ContainerCommandResponseProto responseProto) {
-                ReadChunkRequestProto readChunk =
+                ReadChunkResponseProto readChunk =
                     responseProto.getReadChunk();
                 if (responseProto.getResult() == Result.SUCCESS) {
                   streamData.addReadChunk(readChunk);
@@ -670,7 +671,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
               @Override
               public void onCompleted() {
-                if (streamData.getReadBlockCount() > 0) {
+                if (streamData.getReadChunkCount() > 0) {
                   future.complete(response.setStreamData(streamData)
                       .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
                 }
