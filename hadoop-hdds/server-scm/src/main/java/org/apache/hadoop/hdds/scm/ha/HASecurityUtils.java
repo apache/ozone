@@ -58,7 +58,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 /**
  * Utilities for SCM HA security.
  */
-public final class HASecurityUtils {
+public final class  HASecurityUtils {
 
   private HASecurityUtils() {
   }
@@ -150,7 +150,6 @@ public final class HASecurityUtils {
    *
    * @param conf
    * @param certificateClient
-   * @return
    */
   public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
       CertificateClient certificateClient) throws IOException {

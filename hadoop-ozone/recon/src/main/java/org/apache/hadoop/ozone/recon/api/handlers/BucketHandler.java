@@ -118,7 +118,7 @@ public abstract class BucketHandler {
   }
 
   /**
-   * Example: /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt.
+   * Example: {@literal /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt} .
    * @param names parsed request
    * @return key name
    */

@@ -117,6 +117,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getBucketKey(String volume, String bucket);
 
   /**
+   * Given a volume and bucket, return the corresponding DB key prefix.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefix(String volume, String bucket);
+
+  /**
+   * Given a volume and bucket, return the corresponding DB key prefix for FSO buckets.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   */
+  String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB key.
    *
    * @param volume - volume name
@@ -631,7 +647,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   long getBucketId(String volume, String bucket) throws IOException;
 
   /**
-   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * Returns {@code List<BlockGroup>} for a key in the deletedTable.
    * @param deletedKey - key to be purged from the deletedTable
    * @return {@link BlockGroup}
    */

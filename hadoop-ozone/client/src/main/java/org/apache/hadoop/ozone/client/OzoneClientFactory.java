@@ -170,7 +170,7 @@ public final class OzoneClientFactory {
    * Create OzoneClient for token renew/cancel operations.
    * @param conf Configuration to be used for OzoneCient creation
    * @param token ozone token is involved
-   * @return
+   * @return OzoneClient
    * @throws IOException
    */
   public static OzoneClient getOzoneClient(Configuration conf,

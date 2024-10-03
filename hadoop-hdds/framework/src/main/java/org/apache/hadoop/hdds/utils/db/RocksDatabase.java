@@ -841,7 +841,7 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs, a map of TableName to prefixUsed.
+   * @param prefixPairs a map of TableName to prefixUsed.
    */
   public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs)
       throws IOException, RocksDBException {
