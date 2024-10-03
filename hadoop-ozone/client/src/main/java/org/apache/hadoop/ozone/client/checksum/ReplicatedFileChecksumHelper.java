@@ -65,10 +65,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // copied from BlockInputStream
-
   /**
    * Send RPC call to get the block info from the container.
-   *
    * @return List of chunks in this block.
    */
   @Override
@@ -115,7 +113,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    * blockChecksumBuf with it.
    *
    * @return a debug-string representation of the parsed checksum if
-   * debug is enabled, otherwise null.
+   *     debug is enabled, otherwise null.
    */
   @Override
   protected String populateBlockChecksumBuf(ByteBuffer checksumData)

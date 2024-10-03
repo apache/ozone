@@ -82,7 +82,7 @@ public abstract class BaseFileChecksumHelper {
     this.combineMode = checksumCombineMode;
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
-        ((RpcClient) rpcClient).getXceiverClientManager();
+        ((RpcClient)rpcClient).getXceiverClientManager();
     if (this.length > 0) {
       fetchBlocks();
     }
@@ -277,10 +277,9 @@ public abstract class BaseFileChecksumHelper {
 
   /**
    * Compute file checksum given the list of chunk checksums requested earlier.
-   * <p>
+   *
    * Skip computation if the already computed, or if the OmKeyInfo of the key
    * in OM has pre-computed checksum.
-   *
    * @throws IOException
    */
   public void compute() throws IOException {
