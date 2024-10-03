@@ -30,7 +30,7 @@ public final class ScmInfo {
   private final String clusterId;
   private final String scmId;
   private final List<String> peerRoles;
-  private final Boolean scmRatisEnabled;
+  private final boolean scmRatisEnabled;
 
   /**
    * Builder for ScmInfo.
@@ -123,7 +123,7 @@ public final class ScmInfo {
     return peerRoles;
   }
 
-  public Boolean getScmRatisEnabled() {
+  public boolean getScmRatisEnabled() {
     return scmRatisEnabled;
   }
 }

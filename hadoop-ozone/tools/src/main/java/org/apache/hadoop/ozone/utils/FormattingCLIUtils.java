@@ -83,7 +83,7 @@ public final class FormattingCLIUtils {
    * @param objects Common row data
    * @return FormattingCLIUtils object
    */
-  public FormattingCLIUtils addLine(Object... objects) {
+  public FormattingCLIUtils addLine(Object[] objects) {
     return this.appendRows(TableRowType.LINE, objects);
   }
 
@@ -93,7 +93,7 @@ public final class FormattingCLIUtils {
    * @param objects Table row data
    * @return FormattingCLIUtils object
    */
-  private FormattingCLIUtils appendRows(TableRowType tableRowType, Object... objects) {
+  private FormattingCLIUtils appendRows(TableRowType tableRowType, Object[] objects) {
     if (objects != null && objects.length > 0) {
       int len = objects.length;
       if (this.maxColMap.size() > len) {

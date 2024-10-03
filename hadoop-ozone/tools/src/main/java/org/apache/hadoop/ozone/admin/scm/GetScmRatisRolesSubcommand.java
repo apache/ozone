@@ -60,12 +60,12 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
   private static final String SCM_ROLES_TITLE = "Storage Container Manager Roles";
 
   private static final List<String> RATIS_SCM_ROLES_HEADER = Arrays.asList(
-      "Host Name", "Ratis Port", "Node ID", "Role", "Host Address");
+      "Host Name", "Ratis Port", "Role",  "Node ID", "Host Address");
 
   private static final List<String> STANDALONE_SCM_ROLES_HEADER = Arrays.asList("Host Name", "Port");
 
   @Override
-  protected void execute(ScmClient scmClient) throws IOException {
+  public void execute(ScmClient scmClient) throws IOException {
     List<String> ratisRoles = scmClient.getScmRatisRoles();
     boolean isRatisEnabled = scmClient.isScmRatisEnable();
     if (json) {
@@ -87,17 +87,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
         if (roleItems.length < 2) {
           err.println("Invalid response received for ScmRatisRoles.");
         }
-
-        // In STANDALONE mode, output only the Host Name and Port information.
-        if (roleItems.length == 2) {
-          formattingCLIUtils.addLine(roleItems);
-        }
-
-        // In RATIS mode, we can output the following information:
-        // Host Name, Ratis Port, Node ID, Role, and Host Address.
-        if (roleItems.length == 5) {
-          formattingCLIUtils.addLine(roleItems);
-        }
+        formattingCLIUtils.addLine(roleItems);
       }
       System.out.println(formattingCLIUtils.render());
     } else {

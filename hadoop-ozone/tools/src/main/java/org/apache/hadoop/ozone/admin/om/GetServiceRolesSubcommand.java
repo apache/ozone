@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -85,7 +86,8 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
           OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
           if (omRoleInfo != null &&
                serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
-            formattingCLIUtils.addLine(serviceInfo.getHostname(), omRoleInfo.getNodeId(), omRoleInfo.getServerRole());
+            formattingCLIUtils.addLine(new String[]{serviceInfo.getHostname(),
+                omRoleInfo.getNodeId(), omRoleInfo.getServerRole()});
           }
         }
         System.out.println(formattingCLIUtils.render());
@@ -133,5 +135,15 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     }
     System.out.print(
         JsonUtils.toJsonStringWithDefaultPrettyPrinter(omServiceList));
+  }
+
+  @VisibleForTesting
+  public void setOzoneManagerClient(OzoneManagerProtocol ozoneManagerClient) {
+    this.ozoneManagerClient = ozoneManagerClient;
+  }
+
+  @VisibleForTesting
+  public void setParent(OMAdmin parent) {
+    this.parent = parent;
   }
 }
