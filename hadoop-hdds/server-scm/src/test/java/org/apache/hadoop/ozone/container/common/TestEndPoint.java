@@ -353,7 +353,7 @@ public class TestEndPoint {
 
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, (int) rpcTimeout)) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails, conf,
           ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
@@ -366,7 +366,7 @@ public class TestEndPoint {
       long end = Time.monotonicNow();
       scmServerImpl.setRpcResponseDelay(0);
       assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
-      assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN, newState);
+      assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
     }
   }
 
