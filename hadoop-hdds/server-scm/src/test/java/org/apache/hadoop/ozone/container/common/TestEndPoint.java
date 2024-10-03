@@ -326,7 +326,7 @@ public class TestEndPoint {
         .getReuseableAddress();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         nonExistentServerAddress, 1000)) {
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails,
           conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
@@ -336,7 +336,7 @@ public class TestEndPoint {
 
       // This version call did NOT work, so endpoint should remain in the same
       // state.
-      assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN, newState);
+      assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
     }
   }
 
