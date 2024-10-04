@@ -95,7 +95,7 @@ public class TestReplicatedFileChecksumHelper {
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
-    ((InMemoryConfiguration) config).setFromObject(clientConfig);
+    ((InMemoryConfiguration)config).setFromObject(clientConfig);
 
     rpcClient = new RpcClient(config, null) {
 
@@ -268,27 +268,27 @@ public class TestReplicatedFileChecksumHelper {
     // return a GetBlockResponse message of a block and its chunk checksums.
     ContainerProtos.DatanodeBlockID blockID =
         ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(1)
-            .setLocalID(1)
-            .setBlockCommitSequenceId(1).build();
+        .setContainerID(1)
+        .setLocalID(1)
+        .setBlockCommitSequenceId(1).build();
 
     byte[] byteArray = new byte[12];
     ByteString byteString = ByteString.copyFrom(byteArray);
 
     ContainerProtos.ChecksumData checksumData =
         ContainerProtos.ChecksumData.newBuilder()
-            .setType(CRC32)
-            .setBytesPerChecksum(1024)
-            .addChecksums(byteString)
-            .build();
+        .setType(CRC32)
+        .setBytesPerChecksum(1024)
+        .addChecksums(byteString)
+        .build();
 
     ContainerProtos.ChunkInfo chunkInfo = type.equals("RATIS") ?
         ContainerProtos.ChunkInfo.newBuilder()
-            .setChunkName("dummy_chunk")
-            .setOffset(1)
-            .setLen(10)
-            .setChecksumData(checksumData)
-            .build()
+        .setChunkName("dummy_chunk")
+        .setOffset(1)
+        .setLen(10)
+        .setChecksumData(checksumData)
+        .build()
         : ContainerProtos.ChunkInfo.newBuilder()
         .setChunkName("dummy_chunk")
         .setOffset(1)
@@ -357,7 +357,7 @@ public class TestReplicatedFileChecksumHelper {
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
       assertEquals(DataChecksum.Type.CRC32C,
-          ((MD5MD5CRC32FileChecksum) fileChecksum).getCrcType());
+          ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());
     }
   }
