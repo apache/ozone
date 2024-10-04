@@ -49,7 +49,7 @@ public final class OzoneConfigUtil {
    * If ozone.s3.administrators value is empty string or unset,
    * defaults to ozone.administrators value.
    */
-  static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf)
+  public static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf)
           throws IOException {
     Collection<String> ozAdmins =
             conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS);
@@ -63,7 +63,7 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
-  static Collection<String> getS3AdminsGroupsFromConfig(
+  public static Collection<String> getS3AdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     Collection<String> s3AdminsGroup =
             conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS);

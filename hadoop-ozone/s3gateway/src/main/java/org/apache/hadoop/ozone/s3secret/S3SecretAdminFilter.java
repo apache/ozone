@@ -26,12 +26,13 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Filter that disables all endpoints annotated with {@link S3AdminEndpoint}.
@@ -67,14 +68,20 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
    * @return true if the user is admin else false
    */
   private boolean isAdmin(UserGroupInformation user) {
-    Collection<String> admins =
-        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
-    Collection<String> adminGroups =
-        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+    Collection<String> s3Admins;
+    try {
+      s3Admins = OzoneConfigUtil.getS3AdminsFromConfig(conf);
+    } catch (IOException ie) {
+      // We caught an exception while trying to log in using the UGI user
+      // Refer to UserGroupInformation.getCurrentUser() in getS3AdminsFromConfig
+      s3Admins = Collections.<String>emptyList();
+    }
+    Collection<String> s3AdminGroups =
+        OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
     // If there are no admins or admin groups specified, return false
-    if (admins.isEmpty() || adminGroups.isEmpty()) {
+    if (s3Admins.isEmpty() || s3AdminGroups.isEmpty()) {
       return false;
     }
-    return new OzoneAdmins(admins, adminGroups).isAdmin(user);
+    return new OzoneAdmins(s3Admins, s3AdminGroups).isAdmin(user);
   }
 }
