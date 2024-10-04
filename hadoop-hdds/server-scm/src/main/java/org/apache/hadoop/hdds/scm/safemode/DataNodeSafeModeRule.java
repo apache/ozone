@@ -114,6 +114,7 @@ public class DataNodeSafeModeRule extends
   @Override
   protected void cleanup() {
     registeredDnSet.clear();
+    unRegisteredDn.clear();
   }
 
   @Override
@@ -159,7 +160,11 @@ public class DataNodeSafeModeRule extends
         List<DatanodeDetails> nodes = pipeline.getNodes();
         for (DatanodeDetails node : nodes) {
           pipeLineDnSet.add(node.getUuid());
-          unRegisteredDn.put(node.getUuid(), node.getHostName());
+          // If the registeredDnSet does not contain this DN,
+          // we will place this DN in the unRegisteredDn.
+          if (!registeredDnSet.contains(node.getUuid())) {
+            unRegisteredDn.put(node.getUuid(), node.getHostName());
+          }
         }
       });
       requiredDns = (int) Math.ceil(dnReportedPercent * pipeLineDnSet.size());
