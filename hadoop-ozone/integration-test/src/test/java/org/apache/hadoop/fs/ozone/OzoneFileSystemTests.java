@@ -17,15 +17,24 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -33,8 +42,11 @@ import java.util.TreeSet;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+
 import static org.assertj.core.api.Assertions.assertThat;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Common test cases for Ozone file systems.
@@ -111,4 +123,33 @@ final class OzoneFileSystemTests {
       ContractTestUtils.touch(fileSystem, keyPath);
     }
   }
+
+  static void testSetReplication(FileSystem fs, OzoneBucket bucket, Path baseUri)
+      throws IOException {
+    String testKeyName = "testKey" + RandomStringUtils.randomNumeric(4);
+    Path keyPath = new Path(baseUri, testKeyName);
+    try (OzoneOutputStream outputStream = bucket.createKey(testKeyName, 1,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    OzoneKeyDetails key = bucket.getKey(testKeyName);
+    assertEquals(HddsProtos.ReplicationType.RATIS,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals(ReplicationFactor.ONE.toString(),
+        key.getReplicationConfig().getReplication());
+    fs.setReplication(keyPath, (short) 3);
+    key = bucket.getKey(testKeyName);
+    assertEquals(ReplicationFactor.THREE.toString(),
+        key.getReplicationConfig().getReplication());
+    IOException exception = assertThrows(IOException.class,
+        () -> fs.setReplication(keyPath, (short) 5),
+        "Does not throw IOException");
+    assertThat(exception.getMessage()).contains("not supported");
+    exception = assertThrows(IOException.class,
+        () -> fs.setReplication(keyPath, (short) 2),
+        "Does not throw IOException");
+    assertThat(exception.getMessage()).contains("not supported");
+  }
+
 }

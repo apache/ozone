@@ -2612,4 +2612,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
     }
   }
 
+  @Test
+  public void testSetReplication() throws IOException {
+    OzoneBucket ozoneBucket = objectStore.getVolume(volumeName)
+        .getBucket(bucketName);
+    OzoneFileSystemTests.testSetReplication(ofs, ozoneBucket, bucketPath);
+  }
+
 }

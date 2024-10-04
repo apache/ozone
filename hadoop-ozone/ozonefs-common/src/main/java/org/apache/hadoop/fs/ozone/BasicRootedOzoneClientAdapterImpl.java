@@ -370,26 +370,22 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public InputStream readFile(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ, 1);
-    OFSPath ofsPath = new OFSPath(pathStr,
-        config);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     String key = ofsPath.getKeyName();
-    try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-      return bucket.readFile(key).getInputStream();
-    } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
-        throw new FileNotFoundException(
-            ex.getResult().name() + ": " + ex.getMessage());
-      } else {
-        throw ex;
-      }
-    }
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return OzoneClientUtils.readFile(bucket, key);
   }
 
   protected void incrementCounter(Statistic objectsRead, long count) {
     //noop: Use RootedOzoneClientAdapterImpl which supports statistics.
+  }
+
+  @Override
+  public void setReplication(String key, short replication) throws IOException {
+    OFSPath ofsPath = new OFSPath(key, config);
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    String keyName = ofsPath.getKeyName();
+    OzoneClientUtils.setReplication(config, bucket, keyName, replication);
   }
 
   @Override

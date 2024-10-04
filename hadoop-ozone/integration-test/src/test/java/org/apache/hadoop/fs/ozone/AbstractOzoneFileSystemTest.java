@@ -2291,4 +2291,9 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(2, f2.length);
     assertEquals(3, f3.length);
   }
+
+  @Test
+  public void testSetReplication() throws IOException {
+    OzoneFileSystemTests.testSetReplication(o3fs, ozoneBucket, new Path("/"));
+  }
 }

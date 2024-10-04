@@ -83,6 +83,7 @@ import org.apache.hadoop.security.token.Token;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -236,18 +237,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public InputStream readFile(String key) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ, 1);
-    try {
-      return bucket.readFile(key).getInputStream();
-    } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
-          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
-        throw new FileNotFoundException(
-            ex.getResult().name() + ": " + ex.getMessage());
-      } else {
-        throw ex;
-      }
-    }
+    return OzoneClientUtils.readFile(bucket, key);
   }
 
   protected void incrementCounter(Statistic objectsRead, long count) {
@@ -810,5 +800,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
     return ozoneClient.getProxy().getOzoneManagerClient().setSafeMode(
         action, isChecked);
+  }
+
+  @Override
+  public void setReplication(String key, short replication) throws IOException {
+    OzoneClientUtils.setReplication(config, bucket, key, replication);
   }
 }

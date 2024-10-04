@@ -18,18 +18,23 @@ package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.checksum.ChecksumHelperFactory;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -38,15 +43,20 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Objects;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
@@ -278,6 +288,55 @@ public final class OzoneClientUtils {
               + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
           bucketName, volumeName,
           exception.getMessage());
+    }
+  }
+
+  public static void setReplication(OzoneConfiguration conf, OzoneBucket bucket,
+      String keyName, short replication) throws IOException {
+    OzoneKeyDetails keyDetails;
+    try {
+      keyDetails = bucket.getKey(keyName);
+    } catch (OMException ome) {
+      // if key does not exist, do nothing
+      if (ome.getResult() == KEY_NOT_FOUND) {
+        return;
+      }
+      throw ome;
+    }
+    ReplicationConfig newReplication =
+        resolveClientSideReplicationConfig(replication, null,
+            null, conf);
+    if (newReplication == null) {
+      throw new IOException(
+          "Replication factor of " + replication + " not supported");
+    }
+    if (newReplication.getReplication()
+        .equals(keyDetails.getReplicationConfig().getReplication())) {
+      return;
+    }
+    try (InputStream inputStream = readFile(bucket, keyName);
+        OzoneOutputStream outputStream = bucket.rewriteKey(keyName,
+            keyDetails.getDataSize(), keyDetails.getGeneration(),
+            newReplication, keyDetails.getMetadata())) {
+      int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+      IOUtils.copyBytes(inputStream, outputStream, chunkSize);
+    }
+  }
+
+  public static InputStream readFile(OzoneBucket bucket, String key)
+      throws IOException {
+    try {
+      return bucket.readFile(key).getInputStream();
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND ||
+          ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND ||
+          ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        throw new FileNotFoundException(
+            ex.getResult().name() + ": " + ex.getMessage());
+      } else {
+        throw ex;
+      }
     }
   }
 }
