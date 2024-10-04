@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.utils;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 
 /**
  * These methods should be merged with other similar utility classes.
