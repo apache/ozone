@@ -103,10 +103,6 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-build == 'true'
-    strategy:
-      matrix:
-        java: [ 17 ]
-      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -141,7 +137,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ matrix.java }}
+          java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Run a full build
         run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
         env:
