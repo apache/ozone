@@ -768,7 +768,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setRatisPeerRoles(resp.getPeerRolesList());
 
     // By default, we assume that SCM Ratis is not enabled.
-    builder.setScmRatisEnabled(Boolean.FALSE);
 
     // If the response contains the `ScmRatisEnabled` field,
     // we will set it directly; otherwise,
