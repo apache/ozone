@@ -309,7 +309,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.9</maven.core.version>
-    <snappy-java.version>1.1.10.6</snappy-java.version>
+    <snappy-java.version>1.1.10.7</snappy-java.version>
     <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>

@@ -28,8 +28,10 @@ on:
         required: false
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
+  BUILD_JAVA_VERSION: 8 # minimum version
+  TEST_JAVA_VERSION: 17 # preferred version
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' }}
+  OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -104,7 +106,7 @@ jobs:
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
-        java: [ 8 ]
+        java: [ 8, 17 ]
       fail-fast: false
     steps:
       - name: Checkout project
@@ -148,19 +150,21 @@ jobs:
       - name: Store binaries for tests
         uses: actions/upload-artifact@v4
         with:
-          name: ozone-bin
+          name: ozone-bin-${{ matrix.java }}
           path: |
             hadoop-ozone/dist/target/ozone-*.tar.gz
             !hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Store source tarball for compilation
         uses: actions/upload-artifact@v4
+        if: ${{ matrix.java == env.BUILD_JAVA_VERSION }}
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4
+        if: ${{ matrix.java == env.BUILD_JAVA_VERSION }}
         with:
           name: ozone-repo
           path: |
@@ -344,7 +348,7 @@ jobs:
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
-          name: ozone-bin
+          name: ozone-bin-${{ env.BUILD_JAVA_VERSION }}
       - name: Untar binaries
         run: |
           mkdir dist
@@ -421,8 +425,14 @@ jobs:
           ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
+        if: ${{ matrix.suite }} == 'MR' # until HDDS-11053 is fixed
         with:
-          name: ozone-bin
+          name: ozone-bin-${{ env.BUILD_JAVA_VERSION }}
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v4
+        if: ${{ matrix.suite }} != 'MR'
+        with:
+          name: ozone-bin-${{ env.TEST_JAVA_VERSION }}
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
@@ -465,7 +475,7 @@ jobs:
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
-          name: ozone-bin
+          name: ozone-bin-${{ env.BUILD_JAVA_VERSION }}
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
@@ -529,11 +539,11 @@ jobs:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
-      - name: Setup java
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
         continue-on-error: true
         run: |
@@ -558,7 +568,7 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name == 'push'
+    if: github.event_name == 'push'
     needs:
       - build-info
       - acceptance
@@ -586,16 +596,17 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
-          tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
-      - name: Calculate combined coverage
-        run: ./hadoop-ozone/dev-support/checks/coverage.sh
-      - name: Setup java 17
+          tar xzvf target/artifacts/ozone-bin-${{ env.TEST_JAVA_VERSION }}/ozone*.tar.gz -C hadoop-ozone/dist/target
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+      - name: Calculate combined coverage
+        run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Sonar
         run: ./hadoop-ozone/dev-support/checks/sonar.sh
+        if: github.repository == 'apache/ozone'
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

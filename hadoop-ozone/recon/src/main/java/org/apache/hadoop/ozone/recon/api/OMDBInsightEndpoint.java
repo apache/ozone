@@ -235,6 +235,7 @@ public class OMDBInsightEndpoint {
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+          keyEntityInfo.setIsKey(omKeyInfo.isFile());
           keyEntityInfo.setKey(key);
           keyEntityInfo.setPath(omKeyInfo.getKeyName());
           keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
@@ -549,6 +550,7 @@ public class OMDBInsightEndpoint {
           continue;
         }
         KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+        keyEntityInfo.setIsKey(omKeyInfo.isFile());
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
@@ -1257,6 +1259,7 @@ public class OMDBInsightEndpoint {
                                                          OmKeyInfo keyInfo) throws IOException {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setIsKey(keyInfo.isFile());
     keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
         omMetadataManager));
     keyEntityInfo.setSize(keyInfo.getDataSize());

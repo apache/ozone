@@ -380,6 +380,7 @@ public class OMDBInsightSearchEndpoint {
                                                          OmKeyInfo keyInfo) {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setIsKey(keyInfo.isFile());
     keyEntityInfo.setPath(keyInfo.getKeyName()); // Assuming path is the same as key name
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
