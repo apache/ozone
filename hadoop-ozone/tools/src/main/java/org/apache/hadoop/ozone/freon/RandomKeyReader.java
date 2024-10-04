@@ -77,13 +77,9 @@ public class RandomKeyReader extends BaseFreonGenerator
                 if (volBuckPairs.isEmpty()) {
                     throw new RuntimeException("No bucket exists in any volume. Create a bucket ");
                 }
-                Iterator<? extends OzoneKey> keyItereator;
-                Pair<OzoneVolume, OzoneBucket> pair;
-                do {
-                    int randomPairInd = new Random().nextInt(volBuckPairs.size());
-                    pair = volBuckPairs.get(randomPairInd);
-                    keyItereator = pair.getSecond().listKeys("", "");
-                } while (!keyItereator.hasNext());
+                int randomPairInd = new Random().nextInt(volBuckPairs.size());
+                Pair<OzoneVolume, OzoneBucket> pair = volBuckPairs.get(randomPairInd);
+                Iterator<? extends OzoneKey> keyItereator = pair.getSecond().listKeys("", "");;
 
                 while (keyItereator.hasNext()) {
                     String keyName = keyItereator.next().getName();
