@@ -143,13 +143,13 @@ public class TestReplicatedFileChecksumHelper {
         .build();
   }
 
-  private BaseFileChecksumHelper checksumHelper(String type, OzoneVolume volume, OzoneBucket bucket
-      , int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient rpcClient, OmKeyInfo keyInfo)
+  private BaseFileChecksumHelper checksumHelper(String type, OzoneVolume mockVolume, OzoneBucket mockBucket,
+    int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
       throws IOException {
     return type.equals("RATIS") ? new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", length, combineMode, rpcClient)
+        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient)
         : new ECFileChecksumHelper(
-        volume, bucket, "dummy", length, combineMode, rpcClient, keyInfo);
+        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient, keyInfo);
   }
 
   private Pipeline pipeline(String type, List<DatanodeDetails> datanodeDetails) {
