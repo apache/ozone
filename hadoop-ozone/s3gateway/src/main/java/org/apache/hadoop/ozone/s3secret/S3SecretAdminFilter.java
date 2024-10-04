@@ -52,25 +52,25 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
     if (null != userPrincipal) {
       UserGroupInformation user =
-        UserGroupInformation.createRemoteUser(userPrincipal.getName());
+          UserGroupInformation.createRemoteUser(userPrincipal.getName());
       if (!isAdmin(user)) {
         requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
-          .entity("Non-Admin user accessing endpoint")
-          .build());
+            .entity("Non-Admin user accessing endpoint")
+            .build());
       }
     }
   }
 
   /**
-   * Checks if the user that is passed is an Admin
+   * Checks if the user that is passed is an Admin.
    * @param user Stores the user to filter
    * @return true if the user is admin else false
    */
   private boolean isAdmin(UserGroupInformation user) {
     Collection<String> admins =
-      conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
+        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
     Collection<String> adminGroups =
-      conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
     // If there are no admins or admin groups specified, return false
     if (admins.isEmpty() || adminGroups.isEmpty()) {
       return false;
