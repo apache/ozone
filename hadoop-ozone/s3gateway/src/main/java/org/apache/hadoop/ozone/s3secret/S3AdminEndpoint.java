@@ -25,7 +25,7 @@ import java.lang.annotation.Target;
 import javax.ws.rs.NameBinding;
 
 /**
- * Annotation to disable S3 Secure Endpoint.
+ * Annotation to only allow admin users to access the endpoint.
  */
 @NameBinding
 @Retention(RetentionPolicy.RUNTIME)

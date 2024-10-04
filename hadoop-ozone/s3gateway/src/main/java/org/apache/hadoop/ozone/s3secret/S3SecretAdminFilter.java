@@ -35,27 +35,27 @@ import java.util.Collection;
 import java.util.Collections;
 
 /**
- * Filter that disables all endpoints annotated with {@link S3AdminEndpoint}.
- * Condition is based on the value of the configuration keys for
- *   - ozone.administrators
- *   - ozone.administrators.groups
+ * Filter that only allows admin to access endpoints annotated with {@link S3AdminEndpoint}.
+ * Condition is based on the value of the configuration keys for:
+ * <ul>
+ *   <li>ozone.administrators</li>
+ *   <li>ozone.administrators.groups</li>
+ * </ul>
  */
-
 @S3AdminEndpoint
 @Provider
 public class S3SecretAdminFilter implements ContainerRequestFilter {
+
   @Inject
   private OzoneConfiguration conf;
 
   @Override
-  public void filter(ContainerRequestContext requestContext)
-      throws IOException {
+  public void filter(ContainerRequestContext requestContext) throws IOException {
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
     if (null != userPrincipal) {
-      UserGroupInformation user =
-          UserGroupInformation.createRemoteUser(userPrincipal.getName());
+      UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
       if (!isAdmin(user)) {
-        requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
+        requestContext.abortWith(Response.status(403)
             .entity("Non-Admin user accessing endpoint")
             .build());
       }

@@ -132,13 +132,14 @@ public class GrpcOMFailoverProxyProvider<T> extends
     return (T) RPC.getProtocolProxy(
       getInterface(),
       0,
-      addr, ugi,
-      hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
+      addr,
+      ugi,
+      hadoopConf,
+      NetUtils.getDefaultSocketFactory(hadoopConf),
       (int) OmUtils.getOMClientRpcTimeOut(getConf()),
-      connectionRetryPolicy).getProxy();
+      connectionRetryPolicy
+    ).getProxy();
   }
-
-
 
   /**
    * Get the proxy object which should be used until the next failover event
