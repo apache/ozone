@@ -144,7 +144,7 @@ public class TestReplicatedFileChecksumHelper {
   }
 
   private BaseFileChecksumHelper checksumHelper(String type, OzoneVolume mockVolume, OzoneBucket mockBucket,
-    int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
+      int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
       throws IOException {
     return type.equals("RATIS") ? new ReplicatedFileChecksumHelper(
         mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient)
