@@ -41,6 +41,7 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
  */
 @Path("/secret")
 @S3SecretEnabled
+@S3AdminEndpoint
 public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3SecretManagementEndpoint.class);
@@ -54,8 +55,7 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   @Path("/{username}")
   public Response generate(@PathParam("username") String username)
       throws IOException {
-    // TODO: It is a temporary solution. To be removed after HDDS-11041 is done.
-    return Response.status(METHOD_NOT_ALLOWED).build();
+    return generateInternal(username);
   }
 
   private Response generateInternal(@Nullable String username) throws IOException {

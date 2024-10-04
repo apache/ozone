@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -41,6 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import io.grpc.StatusRuntimeException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,10 +62,14 @@ public class GrpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
+  private final UserGroupInformation ugi;
+
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
+                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
     super(configuration, omServiceId, protocol);
+    this.ugi = ugi;
   }
 
   @Override
@@ -118,8 +125,20 @@ public class GrpcOMFailoverProxyProvider<T> extends
     InetSocketAddress addr = new InetSocketAddress(0);
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
-    return (T) RPC.getProxy(getInterface(), 0, addr, hadoopConf);
+
+    // Ensure we do not attempt retry on the same OM in case of exceptions
+    RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
+
+    return (T) RPC.getProtocolProxy(
+      getInterface(),
+      0,
+      addr, ugi,
+      hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
+      (int) OmUtils.getOMClientRpcTimeOut(getConf()),
+      connectionRetryPolicy).getProxy();
   }
+
+
 
   /**
    * Get the proxy object which should be used until the next failover event
