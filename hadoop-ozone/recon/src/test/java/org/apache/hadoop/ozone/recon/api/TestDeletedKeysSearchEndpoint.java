@@ -24,8 +24,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -317,7 +315,8 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(7, result.getRepeatedOmKeyInfoList().size());
 
     // Compute the expected last key from the last entry in the result list
-    String computedLastKey = "/" + result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getVolumeName() + "/" +
+    String computedLastKey = "/" +
+        result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getVolumeName() + "/" +
         result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getBucketName() + "/" +
         result.getRepeatedOmKeyInfoList().get(6).getOmKeyInfoList().get(0).getKeyName() + "/";
 
