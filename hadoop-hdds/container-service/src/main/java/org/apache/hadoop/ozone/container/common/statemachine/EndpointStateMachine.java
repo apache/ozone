@@ -237,7 +237,7 @@ public class EndpointStateMachine
       long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(
               this.getMissedCount() * getScmHeartbeatInterval(this.conf)
       );
-      LOG.error(
+      LOG.warn(
               "Unable to communicate to {} server at {}:{} for past {} seconds.",
               serverName,
               address.getAddress(),
