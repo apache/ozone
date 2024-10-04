@@ -12,7 +12,9 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -62,6 +64,9 @@ public class RandomKeyReader extends BaseFreonGenerator
             Iterator<? extends OzoneVolume> vols = null;
             try {
                 vols = c.getObjectStore().listVolumes("");
+                if (!vols.hasNext()) {
+                    throw new RuntimeException("There is no volume.");
+                }
                 ArrayList<Pair<OzoneVolume, OzoneBucket>> volBuckPairs = new ArrayList<>();
                 vols.forEachRemaining(vol ->
                     vol.listBuckets("").forEachRemaining(buck -> {
@@ -69,6 +74,9 @@ public class RandomKeyReader extends BaseFreonGenerator
                         volBuckPairs.add(p);
                     })
                 );
+                if (volBuckPairs.isEmpty()) {
+                    throw new RuntimeException("No bucket exists in any volume. Create a bucket ");
+                }
                 Iterator<? extends OzoneKey> keyItereator;
                 Pair<OzoneVolume, OzoneBucket> pair;
                 do {
@@ -77,14 +85,12 @@ public class RandomKeyReader extends BaseFreonGenerator
                     keyItereator = pair.getSecond().listKeys("", "");
                 } while (!keyItereator.hasNext());
 
-                int numOfKeysInBuck = 0;
                 while (keyItereator.hasNext()) {
                     String keyName = keyItereator.next().getName();
                     OzoneInputStream stream = null;
                     try {
                         stream = pair.getSecond().readKey(keyName);
                         IOUtils.consume(stream);
-                        numOfKeysInBuck++;
                         readCount.incrementAndGet();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
