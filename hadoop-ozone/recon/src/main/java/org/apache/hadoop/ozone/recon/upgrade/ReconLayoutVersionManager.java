@@ -50,6 +50,14 @@ public class ReconLayoutVersionManager {
     this.currentSLV = determineSLV();
   }
 
+  public int getCurrentMLV() {
+    return currentMLV;
+  }
+
+  public int getCurrentSLV() {
+    return currentSLV;
+  }
+
   /**
    * Determines the current Metadata Layout Version (MLV) from the version table.
    * @return The current Metadata Layout Version (MLV).
@@ -95,7 +103,7 @@ public class ReconLayoutVersionManager {
    * Returns a list of ReconLayoutFeature objects that are registered for finalization.
    * @return List of ReconLayoutFeature objects that are registered for finalization.
    */
-  private List<ReconLayoutFeature> getRegisteredFeatures() {
+  protected List<ReconLayoutFeature> getRegisteredFeatures() {
     List<ReconLayoutFeature> allFeatures =
         Arrays.asList(ReconLayoutFeature.values());
 
@@ -103,8 +111,7 @@ public class ReconLayoutVersionManager {
 
     List<ReconLayoutFeature> registeredFeatures = allFeatures.stream()
         .filter(feature -> {
-          boolean shouldRegister =
-              feature.getVersion() > currentMLV && feature.getVersion() <= currentSLV;
+          boolean shouldRegister = feature.getVersion() > currentMLV;
           if (shouldRegister) {
             LOG.info("Feature {} (version {}) is registered for finalization.",
                 feature.name(), feature.getVersion());
