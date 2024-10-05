@@ -568,9 +568,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     List<ReadChunkResponseProto> readBlocks = response.getReadChunkList();
 
     for (ReadChunkResponseProto readBlock : readBlocks) {
-      if (readBlock.hasData()) {
-        buffers.add(readBlock.getData().asReadOnlyByteBuffer());
-      } else if (readBlock.hasDataBuffers()) {
+      if (readBlock.hasDataBuffers()) {
         buffers.addAll(BufferUtils.getReadOnlyByteBuffers(
             readBlock.getDataBuffers().getBuffersList()));
       } else {
