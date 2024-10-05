@@ -229,7 +229,7 @@ public class TestSCMSafeModeManager {
   @ParameterizedTest
   @MethodSource("testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck")
   public void testSafeModeExitRuleWithPipelineAvailabilityCheck1(int containerCount, int nodeCount, int pipelineCount,
-    double healthyPipelinePercent, double oneReplicaPercent) throws Exception {
+      double healthyPipelinePercent, double oneReplicaPercent) throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(containerCount,
         nodeCount, pipelineCount, healthyPipelinePercent, oneReplicaPercent);
   }
