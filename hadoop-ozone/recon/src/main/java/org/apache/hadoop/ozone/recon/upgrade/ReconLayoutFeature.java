@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,6 +24,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
  * and associated upgrade action to be executed during an upgrade.
  */
 public enum ReconLayoutFeature {
+  INITIAL_VERSION(0, "Initial Layout Version", new InitialLayoutUpgradeAction()),
   FEATURE_1(1, "Description for Feature 1", new Feature1UpgradeAction()),
   FEATURE_2(2, "Description for Feature 2", new Feature2UpgradeAction()),
   FEATURE_3(3, "Description for Feature 3", new Feature3UpgradeAction());
