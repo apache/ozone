@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.admin.scm.VolumeFailureSubCommand;
 import org.apache.hadoop.hdds.scm.datanode.VolumeFailureInfo;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,8 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -65,23 +70,42 @@ public class TestVolumeFailureSubCommand {
   }
 
   @Test
-  public void testCorrectJsonValuesInReport() throws IOException {
+  public void testCheckVolumeFailureJsonAccuracy() throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getVolumeFailureInfos()).thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--json");
-    cmd.execute(scmClient);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(scmClient);
+      String output = capture.getOutput();
+      assertNotNull(output);
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
+      assertTrue(json.isArray());
+      assertEquals(5, json.size());
+      System.out.println(output);
+    }
   }
 
   @Test
-  public void testCorrectTableValuesInReport() throws IOException {
+  public void testCheckVolumeFailureTableAccuracy() throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getVolumeFailureInfos()).thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--table");
     cmd.execute(scmClient);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+         new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(scmClient);
+      String output = capture.getOutput();
+      assertThat(output).contains("/data0/ozonedata/hdds");
+      assertThat(output).contains("6.76 TB");
+    }
   }
 
   private List<VolumeFailureInfo> getUsageProto() {
