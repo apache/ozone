@@ -54,14 +54,14 @@ public class TestVolumeFailureSubCommand {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new VolumeFailureSubCommand();
-    // System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
-    // System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   @AfterEach
   public void tearDown() {
-    // System.setOut(originalOut);
-    // System.setErr(originalErr);
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
@@ -105,16 +105,16 @@ public class TestVolumeFailureSubCommand {
   private HddsProtos.DatanodeDetailsProto createDatanodeDetails() {
     Random random = ThreadLocalRandom.current();
     String ipAddress = random.nextInt(256)
-            + "." + random.nextInt(256)
-            + "." + random.nextInt(256)
-            + "." + random.nextInt(256);
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256);
 
     DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
-            .setUuid(UUID.randomUUID())
-            .setHostName("localhost" + "-" + ipAddress)
-            .setIpAddress(ipAddress)
-            .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-            .setPersistedOpStateExpiry(0);
+        .setUuid(UUID.randomUUID())
+        .setHostName("localhost" + "-" + ipAddress)
+        .setIpAddress(ipAddress)
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0);
 
     for (DatanodeDetails.Port.Name name : ALL_PORTS) {
       dn.addPort(DatanodeDetails.newPort(name, 0));
