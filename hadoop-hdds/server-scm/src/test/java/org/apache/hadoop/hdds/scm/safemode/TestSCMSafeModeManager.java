@@ -216,24 +216,6 @@ public class TestSCMSafeModeManager {
     return conf;
   }
 
-  private static Stream<Arguments> testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck() {
-    return Stream.of(
-        Arguments.of(100, 30, 8, 0.90, 1),
-        Arguments.of(100, 90, 22, 0.10, 0.9),
-        Arguments.of(100, 30, 8, 0, 0.9),
-        Arguments.of(100, 90, 22, 0, 0),
-        Arguments.of(100, 90, 22, 0, 0.5)
-    );
-  }
-
-  @ParameterizedTest
-  @MethodSource("testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck")
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck1(int containerCount, int nodeCount, int pipelineCount,
-      double healthyPipelinePercent, double oneReplicaPercent) throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(containerCount,
-        nodeCount, pipelineCount, healthyPipelinePercent, oneReplicaPercent);
-  }
-
   @ParameterizedTest
   @CsvSource(value = {"100,0.9,false", "0.9,200,false", "0.9,0.1,true"})
   public void testHealthyPipelinePercentWithIncorrectValue(double healthyPercent,
@@ -258,6 +240,18 @@ public class TestSCMSafeModeManager {
     assertThat(exception).hasMessageEndingWith("value should be >= 0.0 and <= 1.0");
   }
 
+  private static Stream<Arguments> testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck() {
+    return Stream.of(
+        Arguments.of(100, 30, 8, 0.90, 1),
+        Arguments.of(100, 90, 22, 0.10, 0.9),
+        Arguments.of(100, 30, 8, 0, 0.9),
+        Arguments.of(100, 90, 22, 0, 0),
+        Arguments.of(100, 90, 22, 0, 0.5)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck")
   public void testSafeModeExitRuleWithPipelineAvailabilityCheck(
       int containerCount, int nodeCount, int pipelineCount,
       double healthyPipelinePercent, double oneReplicaPercent)
