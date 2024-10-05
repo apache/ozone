@@ -62,8 +62,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
   private void createSchemaVersionTable() throws SQLException {
     dslContext.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
         .column("version_number", SQLDataType.INTEGER.nullable(false))
-        .column("applied_on",
-            SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
+        .column("applied_on", SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
         .execute();
   }
 
