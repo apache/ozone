@@ -18,6 +18,9 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Reads keys from random volume/bucket pairs
+ */
 @CommandLine.Command(name = "random-key-reader",
         aliases = "rkr",
         description = "Read keys from random volume/buckets",
@@ -30,8 +33,8 @@ public class RandomKeyReader extends BaseFreonGenerator
   )
   private String omServiceID = null;
   private OzoneClient[] ozoneClients;
-  int clientCount;
-  Timer timer;
+  private int clientCount;
+  private Timer timer;
   private AtomicInteger readKeyCount = new AtomicInteger();
 
   public Void call() throws Exception {
