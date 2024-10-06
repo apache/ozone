@@ -779,31 +779,32 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload the file parts.
     long filePosition = 0;
     long fileLength = file.length();
-    FileInputStream fileInputStream = new FileInputStream(file);
-    for (int i = 1; filePosition < fileLength; i++) {
-      // Because the last part could be less than 5 MB, adjust the part size as
-      // needed.
-      partSize = Math.min(partSize, (fileLength - filePosition));
+    try (FileInputStream fileInputStream = new FileInputStream(file)) {
+      for (int i = 1; filePosition < fileLength; i++) {
+        // Because the last part could be less than 5 MB, adjust the part size as
+        // needed.
+        partSize = Math.min(partSize, (fileLength - filePosition));
 
-      // Create the request to upload a part.
-      UploadPartRequest uploadRequest = new UploadPartRequest()
-          .withBucketName(bucketName)
-          .withKey(key)
-          .withUploadId(uploadId)
-          .withPartNumber(i)
-          .withFileOffset(filePosition)
-          .withFile(file)
-          .withPartSize(partSize);
+        // Create the request to upload a part.
+        UploadPartRequest uploadRequest = new UploadPartRequest()
+            .withBucketName(bucketName)
+            .withKey(key)
+            .withUploadId(uploadId)
+            .withPartNumber(i)
+            .withFileOffset(filePosition)
+            .withFile(file)
+            .withPartSize(partSize);
 
-      // Upload the part and add the response's ETag to our list.
-      UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
-      PartETag partETag = uploadResult.getPartETag();
-      assertEquals(i, partETag.getPartNumber());
-      assertEquals(DatatypeConverter.printHexBinary(
-          calculateDigest(fileInputStream, 0, (int) partSize)).toLowerCase(), partETag.getETag());
-      partETags.add(partETag);
+        // Upload the part and add the response's ETag to our list.
+        UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+        PartETag partETag = uploadResult.getPartETag();
+        assertEquals(i, partETag.getPartNumber());
+        assertEquals(DatatypeConverter.printHexBinary(
+            calculateDigest(fileInputStream, 0, (int) partSize)).toLowerCase(), partETag.getETag());
+        partETags.add(partETag);
 
-      filePosition += partSize;
+        filePosition += partSize;
+      }
     }
 
     return partETags;
