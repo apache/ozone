@@ -39,7 +39,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static javax.ws.rs.core.Response.Status.*;
+import static javax.ws.rs.core.Response.Status.FORBIDDEN;
+import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
+import static javax.ws.rs.core.Response.Status.OK;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_SECRET_NOT_FOUND;
@@ -90,7 +93,11 @@ public class TestSecretRevoke {
   }
 
   private void mockSecurityContext(boolean isAdmin) {
-    when(principal.getName()).thenReturn(USER_NAME);
+    if (isAdmin) {
+      when(principal.getName()).thenReturn(ADMIN_USER_NAME);
+    } else {
+      when(principal.getName()).thenReturn(USER_NAME);
+    }
     when(securityContext.getUserPrincipal()).thenReturn(principal);
     when(context.getSecurityContext()).thenReturn(securityContext);
   }
