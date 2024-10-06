@@ -177,7 +177,7 @@ jobs:
         include:
           - os: ubuntu-20.04
           - java: 8
-            os: macos-12
+            os: macos-13
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
