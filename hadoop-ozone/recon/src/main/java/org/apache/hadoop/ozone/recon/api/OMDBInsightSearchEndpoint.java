@@ -125,9 +125,12 @@ public class OMDBInsightSearchEndpoint {
 
     try {
       // Validate the request parameters
-      if (!validateStartPrefixAndLimit(startPrefix, limit)) {
+      if (!validateStartPrefixAndLimit(startPrefix)) {
         return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
+
+      // Ensure the limit is non-negative
+      limit = Math.max(0, limit);
 
       // Initialize response object
       KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
@@ -351,9 +354,12 @@ public class OMDBInsightSearchEndpoint {
 
     try {
       // Validate the request parameters
-      if (!validateStartPrefixAndLimit(startPrefix, limit)) {
+      if (!validateStartPrefixAndLimit(startPrefix)) {
         return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
+      
+      // Ensure the limit is non-negative
+      limit = Math.max(0, limit);
 
       // Initialize response object
       KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
@@ -425,7 +431,7 @@ public class OMDBInsightSearchEndpoint {
     return keyEntityInfo;
   }
 
-  private boolean validateStartPrefixAndLimit(String startPrefix, int limit) {
+  private boolean validateStartPrefixAndLimit(String startPrefix) {
     // Ensure startPrefix is not null or empty and starts with '/'
     if (startPrefix == null || startPrefix.isEmpty()) {
       return false;
@@ -437,9 +443,6 @@ public class OMDBInsightSearchEndpoint {
     if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
       return false;
     }
-
-    // Ensure the limit is non-negative
-    limit = Math.max(0, limit);
 
     return true; // Validation passed
   }
