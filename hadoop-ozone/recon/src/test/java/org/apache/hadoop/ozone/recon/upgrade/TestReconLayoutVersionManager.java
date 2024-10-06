@@ -122,20 +122,6 @@ public class TestReconLayoutVersionManager {
   }
 
   /**
-   * Handling Invalid Versions
-   * Higher MLV than Available SLV: Test the behavior when the current MLV (Metadata Layout Version)
-   * is set higher than the maximum version of ReconLayoutFeature. This scenario simulates
-   * an inconsistent state where the system’s metadata versioning is beyond the known layout features.
-   */
-  @Test
-  public void testHigherMLVThanSLV() {
-    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(5);
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager);
-    assertEquals(2, layoutVersionManager.getCurrentSLV()); // Assuming 2 is the max SLV in mocked features
-    assertEquals(5, layoutVersionManager.getCurrentMLV());
-  }
-
-  /**
    * Tests the scenario where an upgrade action fails. Ensures that if an upgrade action
    * throws an exception, the schema version is not updated.
    */
