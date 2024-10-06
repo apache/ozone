@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.ozone.s3.Gateway;
+import org.apache.hadoop.ozone.s3.OzoneClientCache;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -616,6 +617,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     try {
       if (s3g != null) {
         LOG.info("Stopping S3G");
+        // TODO (HDDS-11539): Remove this workaround once the @PreDestroy issue is fixed
+        OzoneClientCache.closeClient();
         s3g.stop();
       }
     } catch (Exception e) {
