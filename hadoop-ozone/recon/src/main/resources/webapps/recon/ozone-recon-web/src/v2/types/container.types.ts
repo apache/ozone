@@ -55,13 +55,19 @@ export type UnhealthyContainersResponse = {
   containers: Container[];
 }
 
+type KeyResponseBlock = {
+  containerID: number;
+  localID: number;
+}
+
 export type KeyResponse = {
   Volume: string;
   Bucket: string;
   Key: string;
   DataSize: number;
+  CompletePath: string;
   Versions: number[];
-  Blocks: object;
+  Blocks: Record<number, KeyResponseBlock[]>;
   CreationTime: string;
   ModificationTime: string;
   uid?: string;

@@ -135,6 +135,11 @@ const KEY_TABLE_COLUMNS: ColumnsType<KeyResponse> = [
     dataIndex: 'ModificationTime',
     key: 'ModificationTime',
     render: (date: string) => getFormattedTime(date, 'lll')
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'path'
   }
 ];
 

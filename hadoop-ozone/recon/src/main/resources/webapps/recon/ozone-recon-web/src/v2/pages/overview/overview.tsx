@@ -322,20 +322,13 @@ const Overview: React.FC<{}> = () => {
     </Button>
   )
 
-  const containersLink = (missingContainersCount > 0)
-    ? (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/MissingContainers'> View More</Link>
-      </Button>
-    ) : (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/Containers'> View More</Link>
-      </Button>
-    )
+  const containersLink = (
+    <Button
+      type='link'
+      size='small'>
+      <Link to='/Containers'> View More</Link>
+    </Button>
+  )
 
   return (
     <>
