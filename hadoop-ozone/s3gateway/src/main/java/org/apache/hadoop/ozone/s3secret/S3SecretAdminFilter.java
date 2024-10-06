@@ -23,16 +23,14 @@ import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.om.OzoneConfigUtil;
+import org.apache.hadoop.ozone.common.OmUserUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.security.Principal;
-import java.util.Collection;
-import java.util.Collections;
 
 /**
  * Filter that only allows admin to access endpoints annotated with {@link S3AdminEndpoint}.
@@ -54,34 +52,9 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
     if (null != userPrincipal) {
       UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
-      if (!isAdmin(user)) {
-        requestContext.abortWith(Response.status(403)
-            .entity("Non-Admin user accessing endpoint")
-            .build());
+      if (!OmUserUtils.isS3Admin(user, conf)) {
+        requestContext.abortWith(Response.status(Status.FORBIDDEN).build());
       }
     }
-  }
-
-  /**
-   * Checks if the user that is passed is an Admin.
-   * @param user Stores the user to filter
-   * @return true if the user is admin else false
-   */
-  private boolean isAdmin(UserGroupInformation user) {
-    Collection<String> s3Admins;
-    try {
-      s3Admins = OzoneConfigUtil.getS3AdminsFromConfig(conf);
-    } catch (IOException ie) {
-      // We caught an exception while trying to log in using the UGI user
-      // Refer to UserGroupInformation.getCurrentUser() in getS3AdminsFromConfig
-      s3Admins = Collections.<String>emptyList();
-    }
-    Collection<String> s3AdminGroups =
-        OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
-    // If there are no admins or admin groups specified, return false
-    if (s3Admins.isEmpty() || s3AdminGroups.isEmpty()) {
-      return false;
-    }
-    return new OzoneAdmins(s3Admins, s3AdminGroups).isAdmin(user);
   }
 }
