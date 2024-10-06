@@ -19,83 +19,82 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @CommandLine.Command(name = "random-key-reader",
-    aliases = "rkr",
-    description = "Read keys from random volume/buckets",
-    mixinStandardHelpOptions = true)
+        aliases = "rkr",
+        description = "Read keys from random volume/buckets",
+        mixinStandardHelpOptions = true)
 public class RandomKeyReader extends BaseFreonGenerator
         implements Callable<Void> {
-    @CommandLine.Option(
-            names = "--om-service-id",
-            description = "OM Service ID"
-    )
-    private String omServiceID = null;
-    private OzoneClient[] ozoneClients;
-    int clientCount;
-    Timer timer;
-    AtomicInteger readCount = new AtomicInteger();
+  @CommandLine.Option(
+          names = "--om-service-id",
+          description = "OM Service ID"
+  )
+  private String omServiceID = null;
+  private OzoneClient[] ozoneClients;
+  int clientCount;
+  Timer timer;
+  private AtomicInteger readKeyCount = new AtomicInteger();
 
-    public Void call() throws Exception {
-        init();
-        OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-        clientCount =  getThreadNo();
-        ozoneClients = new OzoneClient[clientCount];
-        for (int i = 0; i < clientCount; i++) {
-            ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
-        }
-        timer = getMetrics().timer("key-read");
-
-        runTests(this::readRandomKeys);
-        for (int i = 0; i < clientCount; i++) {
-            if (ozoneClients[i] != null) {
-                ozoneClients[i].close();
-            }
-        }
-        String report = "The number of keys read: "
-                + readCount.get();
-        System.out.println(report);
-        return null;
+  public Void call() throws Exception {
+    init();
+    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    clientCount = getThreadNo();
+    ozoneClients = new OzoneClient[clientCount];
+    for (int i = 0; i < clientCount; i++) {
+      ozoneClients[i] = createOzoneClient(omServiceID, ozoneConfiguration);
     }
+    timer = getMetrics().timer("key-read");
 
-    // Get volume list,
-    public void readRandomKeys(long count) throws IOException {
-        int clientIndex = (int)(count % clientCount);
-        OzoneClient c = ozoneClients[clientIndex];
-        timer.time(() -> {
-            Iterator<? extends OzoneVolume> vols = null;
-            try {
-                vols = c.getObjectStore().listVolumes("");
-                if (!vols.hasNext()) {
-                    throw new RuntimeException("There is no volume.");
-                }
-                ArrayList<Pair<OzoneVolume, OzoneBucket>> volBuckPairs = new ArrayList<>();
-                vols.forEachRemaining(vol ->
-                    vol.listBuckets("").forEachRemaining(buck -> {
-                        Pair<OzoneVolume, OzoneBucket> p = new Pair<>(vol, buck);
-                        volBuckPairs.add(p);
-                    })
-                );
-                if (volBuckPairs.isEmpty()) {
-                    throw new RuntimeException("No bucket exists in any volume. Create a bucket ");
-                }
-                int randomPairInd = new Random().nextInt(volBuckPairs.size());
-                Pair<OzoneVolume, OzoneBucket> pair = volBuckPairs.get(randomPairInd);
-                Iterator<? extends OzoneKey> keyItereator = pair.getSecond().listKeys("", "");;
-
-                while (keyItereator.hasNext()) {
-                    String keyName = keyItereator.next().getName();
-                    OzoneInputStream stream = null;
-                    try {
-                        stream = pair.getSecond().readKey(keyName);
-                        IOUtils.consume(stream);
-                        readCount.incrementAndGet();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
-
+    runTests(this::readRandomKeys);
+    for (int i = 0; i < clientCount; i++) {
+      if (ozoneClients[i] != null) {
+        ozoneClients[i].close();
+      }
     }
+    String report = "The number of keys read: "
+            + readKeyCount.get();
+    System.out.println(report);
+    return null;
+  }
+
+  // Get volume list,
+  public void readRandomKeys(long count) throws IOException {
+    int clientIndex = (int) (count % clientCount);
+    OzoneClient c = ozoneClients[clientIndex];
+    timer.time(() -> {
+      Iterator<? extends OzoneVolume> vols = null;
+      try {
+        vols = c.getObjectStore().listVolumes("");
+        if (!vols.hasNext()) {
+          throw new RuntimeException("There is no volume.");
+        }
+        ArrayList<Pair<OzoneVolume, OzoneBucket>> volBuckPairs = new ArrayList<>();
+        vols.forEachRemaining(vol ->
+                vol.listBuckets("").forEachRemaining(buck -> {
+                  Pair<OzoneVolume, OzoneBucket> p = new Pair<>(vol, buck);
+                  volBuckPairs.add(p);
+                })
+        );
+        if (volBuckPairs.isEmpty()) {
+          throw new RuntimeException("No bucket exists in any volume. Create a bucket ");
+        }
+        int randomPairInd = new Random().nextInt(volBuckPairs.size());
+        Pair<OzoneVolume, OzoneBucket> pair = volBuckPairs.get(randomPairInd);
+        Iterator<? extends OzoneKey> keyItereator = pair.getSecond().listKeys("", "");
+
+        while (keyItereator.hasNext()) {
+          String keyName = keyItereator.next().getName();
+          OzoneInputStream stream = null;
+          try {
+            stream = pair.getSecond().readKey(keyName);
+            IOUtils.consume(stream);
+            readKeyCount.incrementAndGet();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+  }
 }
