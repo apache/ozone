@@ -146,7 +146,7 @@ class TestSecretGenerate {
   }
 
   /**
-   * Provides mocking for {@link ContainerRequestContext}.
+   * Provides mocking for users and security context.
    * @param isAdmin Stores whether the user to mock is an admin or not
    */
   private void setupSecurityContext(boolean isAdmin) {

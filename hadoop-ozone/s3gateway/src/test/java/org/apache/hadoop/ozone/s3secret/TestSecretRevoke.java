@@ -68,6 +68,7 @@ public class TestSecretRevoke {
 
   @Mock
   private ClientProtocol proxy;
+  @Mock
   private ContainerRequestContext context;
   @Mock
   private UriInfo uriInfo;
@@ -92,6 +93,10 @@ public class TestSecretRevoke {
     endpoint.setContext(context);
   }
 
+  /**
+   * Provides mocking for users and security context.
+   * @param isAdmin Stores whether the user is admin or not
+   */
   private void mockSecurityContext(boolean isAdmin) {
     if (isAdmin) {
       when(principal.getName()).thenReturn(ADMIN_USER_NAME);
