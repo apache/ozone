@@ -26,9 +26,11 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,9 +39,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
-import static javax.ws.rs.core.Response.Status.NOT_FOUND;
-import static javax.ws.rs.core.Response.Status.OK;
+import static javax.ws.rs.core.Response.Status.*;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,14 +56,15 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 public class TestSecretRevoke {
+  private static final String ADMIN_USER_NAME = "test_admin";
   private static final String USER_NAME = "test";
   private static final String OTHER_USER_NAME = "test2";
 
   private S3SecretManagementEndpoint endpoint;
+  private ObjectStoreStub objectStore;
 
   @Mock
-  private ObjectStoreStub objectStore;
-  @Mock
+  private ClientProtocol proxy;
   private ContainerRequestContext context;
   @Mock
   private UriInfo uriInfo;
@@ -73,6 +75,9 @@ public class TestSecretRevoke {
 
   @BeforeEach
   void setUp() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_ADMINISTRATORS, ADMIN_USER_NAME);
+    objectStore = new ObjectStoreStub(conf, proxy);
     OzoneClient client = new OzoneClientStub(objectStore);
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
@@ -84,15 +89,23 @@ public class TestSecretRevoke {
     endpoint.setContext(context);
   }
 
-  private void mockSecurityContext() {
+  private void mockSecurityContext(boolean isAdmin) {
     when(principal.getName()).thenReturn(USER_NAME);
     when(securityContext.getUserPrincipal()).thenReturn(principal);
     when(context.getSecurityContext()).thenReturn(securityContext);
   }
 
   @Test
-  void testSecretRevoke() throws IOException {
-    mockSecurityContext();
+  void testUnauthorizedUserSecretRevoke() throws IOException {
+    mockSecurityContext(false);
+    Response response = endpoint.revoke();
+
+    assertEquals(FORBIDDEN.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  void testAuthorizedUserSecretRevoke() throws IOException {
+    mockSecurityContext(true);
     endpoint.revoke();
     verify(objectStore, times(1)).revokeS3Secret(eq(USER_NAME));
   }
@@ -106,8 +119,18 @@ public class TestSecretRevoke {
   }
 
   @Test
-  void testSecretSequentialRevokes() throws IOException {
-    mockSecurityContext();
+  void testUnauthorizedUserSecretSequentialRevokes() throws IOException {
+    mockSecurityContext(false);
+    Response firstResponse = endpoint.revoke();
+    assertEquals(FORBIDDEN.getStatusCode(), firstResponse.getStatus());
+
+    Response secondResponse = endpoint.revoke();
+    assertEquals(FORBIDDEN.getStatusCode(), secondResponse.getStatus());
+  }
+
+  @Test
+  void testAuthorizedUserSecretSequentialRevokes() throws IOException {
+    mockSecurityContext(true);
     Response firstResponse = endpoint.revoke();
     assertEquals(OK.getStatusCode(), firstResponse.getStatus());
     doThrow(new OMException(S3_SECRET_NOT_FOUND))
@@ -118,7 +141,7 @@ public class TestSecretRevoke {
 
   @Test
   void testSecretRevokesHandlesException() throws IOException {
-    mockSecurityContext();
+    mockSecurityContext(true);
     doThrow(new OMException(ACCESS_DENIED))
         .when(objectStore).revokeS3Secret(any());
     Response response = endpoint.revoke();

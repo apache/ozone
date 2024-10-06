@@ -29,11 +29,11 @@ import java.io.IOException;
 import java.util.Collection;
 
 /**
- * Utility class to store User related utilities
+ * Utility class to store User related utilities.
  */
 public final class OmUserUtils {
   private static final Logger LOG =
-    LoggerFactory.getLogger(OmUserUtils.class);
+      LoggerFactory.getLogger(OmUserUtils.class);
 
   private OmUserUtils() { }
 
@@ -50,16 +50,20 @@ public final class OmUserUtils {
       s3Admins = null;
     }
     Collection<String> s3AdminGroups =
-      OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
+        OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
     if (LOG.isDebugEnabled()) {
-      if (null == s3Admins) LOG.debug("S3 Admins are not set in configuration");
-      if (null == s3AdminGroups) LOG.debug("S3 Admin Groups are not set in configuration");
+      if (null == s3Admins) {
+        LOG.debug("S3 Admins are not set in configuration");
+      }
+      if (null == s3AdminGroups) {
+        LOG.debug("S3 Admin Groups are not set in configuration");
+      }
     }
     return new OzoneAdmins(s3Admins, s3AdminGroups);
   }
 
   /**
-   * Check if the provided user is a part of the S3 admins
+   * Check if the provided user is a part of the S3 admins.
    * @param user Stores the user to verify
    * @param conf Stores the Ozone configuration being used
    * @return true if the provided user is an S3 admin else false
@@ -71,7 +75,7 @@ public final class OmUserUtils {
   }
 
   /**
-   * Check if the provided user is a part of the S3 admins
+   * Check if the provided user is a part of the S3 admins.
    * @param user Stores the user to verify
    * @param s3Admins Stores the users and groups that are admins
    * @return true if the provided user is an S3 admin else false
