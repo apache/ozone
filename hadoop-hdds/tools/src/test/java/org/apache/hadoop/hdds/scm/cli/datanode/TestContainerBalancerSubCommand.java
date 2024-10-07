@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +61,6 @@ class TestContainerBalancerSubCommand {
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
 
-  @NotNull
   private static ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfoResponseProto(
       ContainerBalancerConfiguration config) {
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration1StatusInfo =
@@ -188,7 +186,6 @@ class TestContainerBalancerSubCommand {
     return statusInfoResponseProto;
   }
 
-  @NotNull
   private static ContainerBalancerConfiguration getContainerBalancerConfiguration() {
     ContainerBalancerConfiguration config = new ContainerBalancerConfiguration();
     config.setThreshold(10);

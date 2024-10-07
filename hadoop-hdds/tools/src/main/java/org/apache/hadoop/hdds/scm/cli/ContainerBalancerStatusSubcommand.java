@@ -173,7 +173,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %n%s" +
                     "%-50s %n%s",
             "Key", "Value",
-            "Iteration number", iterationNumber,
+            "Iteration number", iterationNumber == 0 ? "-" : iterationNumber,
             "Iteration duration", getPrettyDuration(iterationDuration),
             "Iteration result",
             iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,

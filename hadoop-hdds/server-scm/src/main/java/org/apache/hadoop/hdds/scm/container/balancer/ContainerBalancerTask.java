@@ -265,7 +265,7 @@ public class ContainerBalancerTask implements Runnable {
       }
 
       IterationResult iR = doIteration();
-      saveIterationStatistic(i, iR);
+      saveIterationStatistic(i + 1, iR);
       metrics.incrementNumIterations(1);
 
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
@@ -351,7 +351,7 @@ public class ContainerBalancerTask implements Runnable {
         iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
     long iterationDuration = getCurrentIterationDuration();
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-        lastIterationNumber + 1,
+        lastIterationNumber,
         null,
         iterationDuration,
         getSizeScheduledForMoveInLatestIteration(),

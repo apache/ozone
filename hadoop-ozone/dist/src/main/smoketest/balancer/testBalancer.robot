@@ -61,7 +61,7 @@ Datanode Recommission is Finished
                             Should Not Contain   ${result}   ENTERING_MAINTENANCE
 
 Run Container Balancer
-    ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
+    ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 3
                             Should Contain                  ${result}             Container Balancer started successfully.
 
 Wait Finish Of Balancing
@@ -70,19 +70,16 @@ Wait Finish Of Balancing
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
                             Sleep                   60000ms
 
-Verify Verbose Balancer Status
-    [arguments]    ${output}
-
+Verify Balancer Iteration
+    [arguments]       ${output}    ${number}    ${containers}
     Should Contain    ${output}    ContainerBalancer is Running.
     Should Contain    ${output}    Started at:
     Should Contain    ${output}    Container Balancer Configuration values:
-
-Verify Balancer Iteration
-    [arguments]    ${output}    ${number}    ${status}    ${containers}
-
-    Should Contain    ${output}    Iteration number                                   ${number}
-    Should Contain    ${output}    Iteration result                                   ${status}
-    Should Contain    ${output}    Scheduled to move containers                       ${containers}
+    Should Contain    ${output}    Iteration number ${number}                    collapse_spaces=True
+    Should Contain    ${output}    Scheduled to move containers ${containers}    collapse_spaces=True
+    Should Contain    ${output}    Balancing duration:
+    Should Contain    ${output}    Iteration duration
+    Should Contain    ${output}    Current iteration info:
 
 Run Balancer Status
     ${result} =      Execute                         ozone admin containerbalancer status
@@ -90,19 +87,21 @@ Run Balancer Status
 
 Run Balancer Verbose Status
     ${result} =      Execute                         ozone admin containerbalancer status -v
-                     Verify Verbose Balancer Status    ${result}
-                     Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
-                     Should Contain                  ${result}             Current iteration info:
-                     Should Contain                  ${result}             Balancing duration:
-                     Should Contain                  ${result}             Iteration duration
+                     Verify Balancer Iteration       ${result}             -    3
+                     Should Contain                  ${result}             Iteration result IN_PROGRESS    collapse_spaces=True
+
 
 Run Balancer Verbose History Status
     ${result} =    Execute                         ozone admin containerbalancer status -v --history
-                   Verify Verbose Balancer Status          ${result}
-                   Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
+                   Verify Balancer Iteration       ${result}             1    3
                    Should Contain                  ${result}             Iteration history list:
-                   Should Contain                  ${result}             Balancing duration:
-                   Should Contain                  ${result}             Iteration duration
+                   Should Contain X Times                 ${result}             Size scheduled to move 300 MB             2      collapse_spaces=True
+                   Should Contain X Times                  ${result}             Moved data size 300 MB                   2      collapse_spaces=True
+                   Should Contain X Times                 ${result}             Scheduled to move containers 3            2      collapse_spaces=True
+                   Should Contain X Times                 ${result}             Already moved containers 3                2      collapse_spaces=True
+                   Should Contain X Times                 ${result}             Failed to move containers 0               2      collapse_spaces=True
+                   Should Contain X Times                 ${result}             Failed to move containers by timeout 0    2      collapse_spaces=True
+                   Should Contain                  ${result}             Iteration result ITERATION_COMPLETED                    collapse_spaces=True
 
 ContainerBalancer is Not Running
     ${result} =         Execute          ozone admin containerbalancer status
@@ -173,6 +172,8 @@ Verify Container Balancer for RATIS containers
 
     Run Balancer Verbose Status
 
+    Sleep                   30000ms
+
     Run Balancer Verbose History Status
 
     Wait Finish Of Balancing
@@ -181,8 +182,3 @@ Verify Container Balancer for RATIS containers
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * 3.5
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * 3
-
-
-
-
-
