@@ -1570,7 +1570,7 @@
 
   <property>
     <name>hdds.datanode.metadata.rocksdb.cache.size</name>
-    <value>64MB</value>
+    <value>1GB</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
     <description>
         Size of the block metadata cache shared among RocksDB instances on each
