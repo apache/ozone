@@ -23,9 +23,9 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 /**
- * A {@link Codec} to serialize/deserialize objects by delegation.
+ * A {@link org.apache.hadoop.hdds.utils.db.Codec} to serialize/deserialize objects by delegation.
  *
- * @param <T>        The object type of this {@link Codec}.
+ * @param <T>        The object type of this {@link org.apache.hadoop.hdds.utils.db.Codec}.
  * @param <DELEGATE> The object type of the {@link #delegate}.
  */
 public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
@@ -53,8 +53,8 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
    * Construct a {@link Codec} using the given delegate.
    *
    * @param delegate the delegate {@link Codec}
-   * @param forward a function to convert {@link DELEGATE} to {@link T}.
-   * @param backward a function to convert {@link T} back to {@link DELEGATE}.
+   * @param forward a function to convert {@code DELEGATE} to {@code T}.
+   * @param backward a function to convert {@code T} back to {@code DELEGATE}.
    * @param copyType How to {@link #copyObject(Object)}?
    */
   public DelegatedCodec(Codec<DELEGATE> delegate,

@@ -1050,7 +1050,7 @@ public final class OMFileRequest {
    * @param volumeName        - volume name.
    * @param bucketName        - bucket name.
    * @param keyName           - key name.
-   * @return
+   * @return {@code long}
    * @throws IOException
    */
   public static long getParentId(OMMetadataManager omMetadataManager,

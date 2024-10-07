@@ -20,9 +20,11 @@ import React from 'react';
 import { Input, Select } from 'antd';
 
 import { Option } from '@/v2/components/select/singleSelect';
+import { DownOutlined } from '@ant-design/icons';
 
 // ------------- Types -------------- //
 type SearchProps = {
+  disabled?: boolean;
   searchColumn?: string;
   searchInput: string;
   searchOptions?: Option[];
@@ -39,6 +41,7 @@ type SearchProps = {
 
 // ------------- Component -------------- //
 const Search: React.FC<SearchProps> = ({
+  disabled = false,
   searchColumn,
   searchInput = '',
   searchOptions = [],
@@ -48,6 +51,8 @@ const Search: React.FC<SearchProps> = ({
 
   const selectFilter = searchColumn
     ? (<Select
+      disabled={disabled}
+      suffixIcon={(searchOptions.length > 1) ? <DownOutlined/> : null}
       defaultValue={searchColumn}
       options={searchOptions}
       onChange={onChange} />)
@@ -55,6 +60,7 @@ const Search: React.FC<SearchProps> = ({
 
   return (
     <Input
+      disabled={disabled}
       placeholder='Enter Search text'
       allowClear={true}
       value={searchInput}

@@ -67,19 +67,53 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getTotalInFlightReplications())
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
-            supervisor.getQueueSize())
+            supervisor.getReplicationQueuedCount())
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
+        .addGauge(Interns.info("numSuccessReplications",
+            "Number of successful replications"),
+            supervisor.getReplicationSuccessCount())
+        .addGauge(Interns.info("numFailureReplications",
+            "Number of failure replications"),
+            supervisor.getReplicationFailureCount())
         .addGauge(Interns.info("numTimeoutReplications",
             "Number of replication requests timed out before being processed"),
             supervisor.getReplicationTimeoutCount())
         .addGauge(Interns.info("numSkippedReplications",
             "Number of replication requests skipped as the container is "
-            + "already present"), supervisor.getReplicationSkippedCount())
+            + "already present"),
+            supervisor.getReplicationSkippedCount())
         .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
             + "concurrent replication tasks which can run simultaneously"),
             supervisor.getMaxReplicationStreams());
+
+    Map<String, String> metricsMap = ReplicationSupervisor.getMetricsMap();
+    if (!metricsMap.isEmpty()) {
+      metricsMap.forEach((metricsName, descriptionSegment) -> {
+        if (!metricsName.equals("")) {
+          builder.addGauge(Interns.info("numRequested" + metricsName,
+              "Number of requested " + descriptionSegment),
+                  supervisor.getReplicationRequestCount(metricsName))
+              .addGauge(Interns.info("numSuccess" + metricsName,
+                  "Number of successful " + descriptionSegment),
+                  supervisor.getReplicationSuccessCount(metricsName))
+              .addGauge(Interns.info("numFailure" + metricsName,
+                  "Number of failure " + descriptionSegment),
+                  supervisor.getReplicationFailureCount(metricsName))
+              .addGauge(Interns.info("numTimeout" + metricsName,
+                  "Number of " + descriptionSegment + " timed out before being processed"),
+                  supervisor.getReplicationTimeoutCount(metricsName))
+              .addGauge(Interns.info("numSkipped" + metricsName,
+                  "Number of " + descriptionSegment + " skipped as the container is "
+                  + "already present"),
+                  supervisor.getReplicationSkippedCount(metricsName))
+              .addGauge(Interns.info("numQueued" + metricsName,
+                  "Number of " + descriptionSegment + " in queue"),
+                  supervisor.getReplicationQueuedCount(metricsName));
+        }
+      });
+    }
 
     Map<String, Integer> tasks = supervisor.getInFlightReplicationSummary();
     for (Map.Entry<String, Integer> entry : tasks.entrySet()) {

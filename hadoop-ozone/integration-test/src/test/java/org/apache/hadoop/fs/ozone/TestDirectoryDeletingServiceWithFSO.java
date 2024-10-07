@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -32,10 +36,16 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -48,12 +58,16 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +78,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,6 +88,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 /**
  * Directory deletion service test cases.
@@ -97,6 +119,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -458,6 +481,123 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
+  }
+
+  private void createFileKey(OzoneBucket bucket, String key)
+      throws Exception {
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    OzoneOutputStream fileKey = bucket.createKey(key, value.length);
+    fileKey.write(value);
+    fileKey.close();
+  }
+
+  /*
+   * Create key d1/k1
+   * Create snap1
+   * Rename dir1 to dir2
+   * Delete dir2
+   * Wait for KeyDeletingService to start processing deleted key k2
+   * Create snap2 by making the KeyDeletingService thread wait till snap2 is flushed
+   * Resume KeyDeletingService thread.
+   * Read d1 from snap1.
+   */
+  @Test
+  public void testAOSKeyDeletingWithSnapshotCreateParallelExecution()
+      throws Exception {
+    OMMetadataManager omMetadataManager = cluster.getOzoneManager().getMetadataManager();
+    Table<String, SnapshotInfo> snapshotInfoTable = omMetadataManager.getSnapshotInfoTable();
+    Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
+    Table<String, String> renameTable = omMetadataManager.getSnapshotRenamedTable();
+    cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().shutdown();
+    DirectoryDeletingService dirDeletingService = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
+    // Suspend KeyDeletingService
+    dirDeletingService.suspend();
+    GenericTestUtils.waitFor(() -> !dirDeletingService.isRunningOnAOS(), 1000, 10000);
+    Random random = new Random();
+    final String testVolumeName = "volume" + random.nextInt();
+    final String testBucketName = "bucket" + random.nextInt();
+    // Create Volume and Buckets
+    ObjectStore store = client.getObjectStore();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    OzoneManager ozoneManager = Mockito.spy(cluster.getOzoneManager());
+    OmSnapshotManager omSnapshotManager = Mockito.spy(ozoneManager.getOmSnapshotManager());
+    when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
+    DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
+        ozoneManager,
+        cluster.getConf()));
+    service.shutdown();
+    final int initialSnapshotCount =
+        (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
+    final int initialDeletedCount = (int) omMetadataManager.countRowsInTable(deletedDirTable);
+    final int initialRenameCount = (int) omMetadataManager.countRowsInTable(renameTable);
+    String snap1 = "snap1";
+    String snap2 = "snap2";
+    createFileKey(bucket, "dir1/key1");
+    store.createSnapshot(testVolumeName, testBucketName, "snap1");
+    bucket.renameKey("dir1", "dir2");
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(testVolumeName)
+        .setBucketName(testBucketName)
+        .setKeyName("dir2").build();
+    long objectId = store.getClientProxy().getOzoneManagerClient().getKeyInfo(omKeyArgs, false)
+        .getKeyInfo().getObjectID();
+    long volumeId = omMetadataManager.getVolumeId(testVolumeName);
+    long bucketId = omMetadataManager.getBucketId(testVolumeName, testBucketName);
+    String deletePathKey = omMetadataManager.getOzoneDeletePathKey(objectId,
+        omMetadataManager.getOzonePathKey(volumeId,
+        bucketId, bucketId, "dir2"));
+    bucket.deleteDirectory("dir2", true);
+
+
+    assertTableRowCount(deletedDirTable, initialDeletedCount + 1);
+    assertTableRowCount(renameTable, initialRenameCount + 1);
+    Mockito.doAnswer(i -> {
+      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(5);
+      for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
+        Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
+      }
+      return i.callRealMethod();
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyInt(), Mockito.any(), any());
+
+    Mockito.doAnswer(i -> {
+      store.createSnapshot(testVolumeName, testBucketName, snap2);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          SnapshotInfo snapshotInfo = store.getClientProxy().getOzoneManagerClient()
+              .getSnapshotInfo(testVolumeName, testBucketName, snap2);
+
+          return OmSnapshotManager.areSnapshotChangesFlushedToDB(cluster.getOzoneManager().getMetadataManager(),
+              snapshotInfo);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 100000);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return renameTable.get(omMetadataManager.getRenameKey(testVolumeName, testBucketName, objectId)) == null;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 10000);
+      return i.callRealMethod();
+    }).when(omSnapshotManager).getSnapshot(ArgumentMatchers.eq(testVolumeName), ArgumentMatchers.eq(testBucketName),
+        ArgumentMatchers.eq(snap1));
+    assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1);
+    service.runPeriodicalTaskNow();
+    service.runPeriodicalTaskNow();
+    assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2);
+    store.deleteSnapshot(testVolumeName, testBucketName, snap2);
+    service.runPeriodicalTaskNow();
+    store.deleteSnapshot(testVolumeName, testBucketName, snap1);
+    cluster.restartOzoneManager();
+    assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
+    dirDeletingService.resume();
   }
 
   @Test

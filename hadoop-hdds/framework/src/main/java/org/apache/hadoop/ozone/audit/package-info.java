@@ -48,7 +48,7 @@
  * This interface must be implemented by entities requiring audit logging.
  * For example - OMVolumeArgs, OMBucketArgs.
  * The implementing class must override toAuditMap() to return an
- * instance of Map<Key, Value> where both Key and Value are String.
+ * instance of {@code Map<Key, Value>} where both Key and Value are String.
  *
  * Key: must contain printable US ASCII characters
  * May not contain a space, =, ], or "

@@ -300,9 +300,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   /**
    * Block Iterator for KeyValue Container. This block iterator returns blocks
-   * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
+   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
    * filter is specified, then default filter used is
-   * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockIterator implements
@@ -405,9 +405,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   /**
    * Block localId Iterator for KeyValue Container.
    * This Block localId iterator returns localIds
-   * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
+   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
    * filter is specified, then default filter used is
-   * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockLocalIdIterator implements
