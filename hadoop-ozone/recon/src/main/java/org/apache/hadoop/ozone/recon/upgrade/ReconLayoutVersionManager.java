@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 /**
  * ReconLayoutVersionManager is responsible for managing the layout version of the Recon service.
- * It determines the current Metadata Layout Version (MLV) and Schema Layout Version (SLV) of the
+ * It determines the current Metadata Layout Version (MLV) and Software Layout Version (SLV) of the
  * Recon service, and finalizes the layout features that need to be upgraded.
  */
 public class ReconLayoutVersionManager {
@@ -40,7 +40,7 @@ public class ReconLayoutVersionManager {
 
   // Current Metadata Layout Version (MLV) of the Recon service
   private int currentMLV;
-  // Schema Layout Version (SLV) of the Recon service
+  // Software Layout Version (SLV) of the Recon service
   private final int currentSLV;
   private final ReconSchemaVersionTableManager schemaVersionTableManager;
 
@@ -67,8 +67,8 @@ public class ReconLayoutVersionManager {
   }
 
   /**
-   * Determines the Schema Layout Version (SLV) based on the latest feature version.
-   * @return The Schema Layout Version (SLV).
+   * Determines the Software Layout Version (SLV) based on the latest feature version.
+   * @return The Software Layout Version (SLV).
    */
   private int determineSLV() {
     return Arrays.stream(ReconLayoutFeature.values())
@@ -129,8 +129,8 @@ public class ReconLayoutVersionManager {
   }
 
   /**
-   * Updates the Schema Layout Version (SLV) in the database after finalizing a feature.
-   * @param newVersion The new Schema Layout Version (SLV) to set.
+   * Updates the Software Layout Version (SLV) in the database after finalizing a feature.
+   * @param newVersion The new Software Layout Version (SLV) to set.
    */
   private void updateSchemaVersion(int newVersion) {
     // Logic to update the MLV in the database
