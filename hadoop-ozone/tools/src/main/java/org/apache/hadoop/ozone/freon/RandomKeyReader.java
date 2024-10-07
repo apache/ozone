@@ -19,7 +19,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Reads keys from random volume/bucket pairs
+ * Reads keys from random volume/bucket pairs.
  */
 @CommandLine.Command(name = "random-key-reader",
         aliases = "rkr",
@@ -53,7 +53,8 @@ public class RandomKeyReader extends BaseFreonGenerator
         ozoneClients[i].close();
       }
     }
-    String report = "The number of keys read: "
+    String report = "-- Result ----------------------------------------------------------------------\n" +
+            "The number of keys read: "
             + readKeyCount.get();
     System.out.println(report);
     return null;
