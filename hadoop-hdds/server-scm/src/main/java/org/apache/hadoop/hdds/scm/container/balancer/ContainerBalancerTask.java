@@ -55,6 +55,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -117,7 +118,7 @@ public class ContainerBalancerTask implements Runnable {
   private IterationResult iterationResult;
   private int nextIterationIndex;
   private boolean delayStart;
-  private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
+  private CopyOnWriteArrayList<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -166,7 +167,7 @@ public class ContainerBalancerTask implements Runnable {
       findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
           placementPolicyValidateProxy, nodeManager);
     }
-    this.iterationsStatistic = new ArrayList<>();
+    this.iterationsStatistic = new CopyOnWriteArrayList<>();
   }
 
   /**
@@ -342,7 +343,7 @@ public class ContainerBalancerTask implements Runnable {
     iterationsStatistic.add(iterationStatistic);
   }
 
-  public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
+  public CopyOnWriteArrayList<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
 
     int lastIterationNumber = iterationsStatistic.stream()
         .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
@@ -380,7 +381,7 @@ public class ContainerBalancerTask implements Runnable {
                 )
             )
     );
-    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    CopyOnWriteArrayList<ContainerBalancerTaskIterationStatusInfo> resultList = new CopyOnWriteArrayList<>(iterationsStatistic);
     resultList.add(currentIterationStatistic);
     return resultList;
   }
