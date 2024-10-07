@@ -381,7 +381,8 @@ public class ContainerBalancerTask implements Runnable {
                 )
             )
     );
-    CopyOnWriteArrayList<ContainerBalancerTaskIterationStatusInfo> resultList = new CopyOnWriteArrayList<>(iterationsStatistic);
+    CopyOnWriteArrayList<ContainerBalancerTaskIterationStatusInfo> resultList =
+        new CopyOnWriteArrayList<>(iterationsStatistic);
     resultList.add(currentIterationStatistic);
     return resultList;
   }
