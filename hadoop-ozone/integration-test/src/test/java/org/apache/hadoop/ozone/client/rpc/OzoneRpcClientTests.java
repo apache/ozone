@@ -3140,6 +3140,32 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     doMultipartUpload(bucket, keyName, (byte)97, replication);
 
   }
+
+  @Test
+  public void testClientLeakDetector() throws Exception {
+    OzoneClient client = OzoneClientFactory.getRpcClient(cluster.getConf());
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer ozoneClienFactoryLogCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            OzoneClientFactory.getLogger());
+
+    client.getObjectStore().createVolume(volumeName);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte) 1);
+    try (OzoneOutputStream out = bucket.createKey(keyName, 10,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE), new HashMap<>())) {
+      out.write(data);
+    }
+    client = null;
+    System.gc();
+    GenericTestUtils.waitFor(() -> ozoneClienFactoryLogCapturer.getOutput()
+        .contains("is not closed properly"), 100, 2000);
+  }
   @Test
   public void testMultipartUploadOwner() throws Exception {
     // Save the old user, and switch to the old user after test
