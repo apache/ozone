@@ -103,7 +103,7 @@ const DiskUsage: React.FC<{}> = () => {
       <div className='page-header-v2'>
         Disk Usage
       </div>
-      <div style={{ padding: '24px' }}>
+      <div className='data-container'>
         <Alert
           className='du-alert-message'
           message="Additional block size is added to small entities, for better visibility.
