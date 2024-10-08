@@ -81,6 +81,17 @@ Verify Balancer Iteration
     Should Contain    ${output}    Iteration duration
     Should Contain    ${output}    Current iteration info:
 
+Verify Balancer Iteration History
+    [arguments]       ${output}
+    Should Contain                  ${output}             Iteration history list:
+    Should Contain X Times          ${output}             Size scheduled to move 300 MB             2      collapse_spaces=True
+    Should Contain X Times          ${output}             Moved data size 300 MB                    2      collapse_spaces=True
+    Should Contain X Times          ${output}             Scheduled to move containers 3            2      collapse_spaces=True
+    Should Contain X Times          ${output}             Already moved containers 3                2      collapse_spaces=True
+    Should Contain X Times          ${output}             Failed to move containers 0               2      collapse_spaces=True
+    Should Contain X Times          ${output}             Failed to move containers by timeout 0    2      collapse_spaces=True
+    Should Contain                  ${output}             Iteration result ITERATION_COMPLETED             collapse_spaces=True
+
 Run Balancer Status
     ${result} =      Execute                         ozone admin containerbalancer status
                      Should Contain                  ${result}             ContainerBalancer is Running.
@@ -93,15 +104,8 @@ Run Balancer Verbose Status
 
 Run Balancer Verbose History Status
     ${result} =    Execute                         ozone admin containerbalancer status -v --history
-                   Verify Balancer Iteration       ${result}             1    3
-                   Should Contain                  ${result}             Iteration history list:
-                   Should Contain X Times                 ${result}             Size scheduled to move 300 MB             2      collapse_spaces=True
-                   Should Contain X Times                  ${result}             Moved data size 300 MB                   2      collapse_spaces=True
-                   Should Contain X Times                 ${result}             Scheduled to move containers 3            2      collapse_spaces=True
-                   Should Contain X Times                 ${result}             Already moved containers 3                2      collapse_spaces=True
-                   Should Contain X Times                 ${result}             Failed to move containers 0               2      collapse_spaces=True
-                   Should Contain X Times                 ${result}             Failed to move containers by timeout 0    2      collapse_spaces=True
-                   Should Contain                  ${result}             Iteration result ITERATION_COMPLETED                    collapse_spaces=True
+                   Verify Balancer Iteration            ${result}             1    3
+                   Verify Balancer Iteration History    ${result}
 
 ContainerBalancer is Not Running
     ${result} =         Execute          ozone admin containerbalancer status
