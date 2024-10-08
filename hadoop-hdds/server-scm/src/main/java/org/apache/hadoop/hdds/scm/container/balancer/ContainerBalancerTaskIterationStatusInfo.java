@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Information about balancer task iteration.
@@ -105,6 +110,37 @@ public class ContainerBalancerTaskIterationStatusInfo {
 
   public long getIterationDuration() {
     return iterationDuration;
+  }
+
+  public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+        .setIterationNumber(getIterationNumber())
+        .setIterationResult(Optional.ofNullable(getIterationResult()).orElse(""))
+        .setIterationDuration(getIterationDuration())
+        .setSizeScheduledForMove(getSizeScheduledForMove())
+        .setDataSizeMoved(getDataSizeMoved())
+        .setContainerMovesScheduled(getContainerMovesScheduled())
+        .setContainerMovesCompleted(getContainerMovesCompleted())
+        .setContainerMovesFailed(getContainerMovesFailed())
+        .setContainerMovesTimeout(getContainerMovesTimeout())
+        .addAllSizeEnteringNodes(
+            mapNodes(getSizeEnteringNodes())
+        )
+        .addAllSizeLeavingNodes(
+            mapNodes(getSizeLeavingNodes())
+        )
+        .build();
+  }
+
+  private List<StorageContainerLocationProtocolProtos.NodeTransferInfo> mapNodes(Map<UUID, Long> nodes) {
+    return nodes.entrySet()
+        .stream()
+        .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+            .setUuid(entry.getKey().toString())
+            .setDataVolume(entry.getValue())
+            .build()
+        )
+        .collect(Collectors.toList());
   }
 }
 

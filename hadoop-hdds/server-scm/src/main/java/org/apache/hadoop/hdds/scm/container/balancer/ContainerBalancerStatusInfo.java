@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -63,40 +62,9 @@ public class ContainerBalancerStatusInfo {
         .addAllIterationsStatusInfo(
             getIterationsStatusInfo()
                 .stream()
-                .map(
-                    info -> StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                        .setIterationNumber(info.getIterationNumber())
-                        .setIterationResult(Optional.ofNullable(info.getIterationResult()).orElse(""))
-                        .setIterationDuration(info.getIterationDuration())
-                        .setSizeScheduledForMove(info.getSizeScheduledForMove())
-                        .setDataSizeMoved(info.getDataSizeMoved())
-                        .setContainerMovesScheduled(info.getContainerMovesScheduled())
-                        .setContainerMovesCompleted(info.getContainerMovesCompleted())
-                        .setContainerMovesFailed(info.getContainerMovesFailed())
-                        .setContainerMovesTimeout(info.getContainerMovesTimeout())
-                        .addAllSizeEnteringNodes(
-                            info.getSizeEnteringNodes().entrySet()
-                                .stream()
-                                .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid(entry.getKey().toString())
-                                    .setDataVolume(entry.getValue())
-                                    .build()
-                                )
-                                .collect(Collectors.toList())
-                        )
-                        .addAllSizeLeavingNodes(
-                            info.getSizeLeavingNodes().entrySet()
-                                .stream()
-                                .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid(entry.getKey().toString())
-                                    .setDataVolume(entry.getValue())
-                                    .build()
-                                )
-                                .collect(Collectors.toList())
-                        )
-                        .build()
-                )
+                .map(ContainerBalancerTaskIterationStatusInfo::toProto)
                 .collect(Collectors.toList())
         ).build();
   }
+
 }
