@@ -25,6 +25,7 @@ import org.apache.hadoop.security.authorize.Service;
 import org.apache.ratis.util.MemoizedSupplier;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -50,7 +51,7 @@ public final class HddsPolicyProvider extends PolicyProvider {
   }
 
   private static final List<Service> DN_SERVICES =
-      Arrays.asList(
+      Collections.singletonList(
           new Service(
               OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
               ReconfigureProtocol.class)
