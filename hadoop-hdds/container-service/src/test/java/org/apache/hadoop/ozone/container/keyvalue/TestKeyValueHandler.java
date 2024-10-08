@@ -78,7 +78,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -114,9 +113,8 @@ public class TestKeyValueHandler {
   private static final long DUMMY_CONTAINER_ID = 9999;
   private static final long LOCAL_ID = 1;
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
-  private static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
-  private static final int BLOCK_SIZE = 4 * CHUNK_SIZE;
-  private static final int BYTES_PER_CHECKSUM = 256 * 1024;
+  private static final long CHUNK_SIZE = 1024 * 1024;          // 1MB
+  private static final long BYTES_PER_CHECKSUM = 256 * 1024;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString =
       ByteStringConversion.createByteBufferConversion(true);
 
@@ -500,7 +498,7 @@ public class TestKeyValueHandler {
           .setOffset(CHUNK_SIZE * i)
           .setLen(CHUNK_SIZE)
           .setChecksumData(
-              ChecksumData.newBuilder().setBytesPerChecksum(BYTES_PER_CHECKSUM)
+              ChecksumData.newBuilder().setBytesPerChecksum((int) BYTES_PER_CHECKSUM)
                   .setType(ChecksumType.CRC32).build())
           .setChunkName("chunkName" + i)
           .build());

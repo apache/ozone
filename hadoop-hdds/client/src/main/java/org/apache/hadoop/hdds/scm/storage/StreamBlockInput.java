@@ -275,13 +275,6 @@ public class StreamBlockInput extends BlockExtendedInputStream
   }
 
   @Override
-  public synchronized void close() throws IOException {
-    releaseClient();
-    releaseBuffers();
-    xceiverClientFactory = null;
-  }
-
-  @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
     if (byteBuffer == null) {
       throw new NullPointerException();
@@ -775,5 +768,12 @@ public class StreamBlockInput extends BlockExtendedInputStream
    */
   private boolean isConnectivityIssue(IOException ex) {
     return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  }
+
+  @Override
+  public synchronized void close() throws IOException {
+    releaseClient();
+    releaseBuffers();
+    xceiverClientFactory = null;
   }
 }
