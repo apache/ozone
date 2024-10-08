@@ -183,6 +183,30 @@ public class TestLDBCli {
             Named.of("Expect key1-key3", null)
         ),
         Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter dataSize<2000", Arrays.asList("--filter", "dataSize:lesser:2000")),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter dataSize<500", Arrays.asList("--filter", "dataSize:lesser:500")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter dataSize>500", Arrays.asList("--filter", "dataSize:greater:500")),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter dataSize>2000", Arrays.asList("--filter", "dataSize:greater:2000")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),
