@@ -667,14 +667,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
               @Override
               public void onCompleted() {
+                if (readBlock.getReadChunkCount() > 0) {
+                  future.complete(response.setReadBlock(readBlock)
+                      .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
+                }
                 if (!future.isDone()) {
                   future.completeExceptionally(new IOException(
                       "Stream completed but no reply for request " +
                           processForDebug(request)));
-                }
-                if (readBlock.getReadChunkCount() > 0) {
-                  future.complete(response.setReadBlock(readBlock)
-                      .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
                 }
                 metrics.decrPendingContainerOpsMetrics(cmdType);
                 metrics.addContainerOpsLatency(
