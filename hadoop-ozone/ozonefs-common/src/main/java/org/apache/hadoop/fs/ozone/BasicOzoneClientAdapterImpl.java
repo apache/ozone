@@ -193,18 +193,24 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           OzoneClientFactory.getRpcClient(conf);
     }
     objectStore = ozoneClient.getObjectStore();
-    this.volume = objectStore.getVolume(volumeStr);
-    this.bucket = volume.getBucket(bucketStr);
-    bucketReplicationConfig = this.bucket.getReplicationConfig();
-    nextReplicationConfigRefreshTime =
-        clock.millis() + bucketRepConfigRefreshPeriodMS;
+    try {
+      this.volume = objectStore.getVolume(volumeStr);
+      this.bucket = volume.getBucket(bucketStr);
+      bucketReplicationConfig = this.bucket.getReplicationConfig();
+      nextReplicationConfigRefreshTime = clock.millis() + bucketRepConfigRefreshPeriodMS;
 
-    // resolve the bucket layout in case of Link Bucket
-    BucketLayout resolvedBucketLayout =
-        OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-            new HashSet<>());
+      // resolve the bucket layout in case of Link Bucket
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore, new HashSet<>());
 
-    OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+    } catch (IOException | IllegalArgumentException exception) {
+      // in case of exception, the adapter object will not be
+      // initialised making the client object unreachable, close the client
+      // to release resources in this case and rethrow.
+      ozoneClient.close();
+      throw exception;
+    }
 
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,

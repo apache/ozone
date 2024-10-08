@@ -32,12 +32,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -51,6 +53,7 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
@@ -221,6 +224,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
+  private static Set<OzoneClient> ozoneClients = new HashSet<>();
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException {
@@ -250,6 +254,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
+    ozoneClients.add(ozClient);
     store = ozClient.getObjectStore();
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
@@ -260,9 +265,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   static void shutdownCluster() throws IOException {
-    if (ozClient != null) {
-      ozClient.close();
+    for (OzoneClient ozoneClient : ozoneClients) {
+      if (ozoneClient != null) {
+        ozoneClient.close();
+      }
     }
+    ozoneClients.clear();
 
     if (storageContainerLocationClient != null) {
       storageContainerLocationClient.close();
@@ -274,6 +282,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private static void setOzClient(OzoneClient ozClient) {
+    ozoneClients.add(ozClient);
     OzoneRpcClientTests.ozClient = ozClient;
   }
 
@@ -3143,11 +3152,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testClientLeakDetector() throws Exception {
+    HddsUtils.setIgnoreReportingLeak(true);
     OzoneClient client = OzoneClientFactory.getRpcClient(cluster.getConf());
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    GenericTestUtils.LogCapturer ozoneClienFactoryLogCapturer =
+    GenericTestUtils.LogCapturer ozoneClientFactoryLogCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
             OzoneClientFactory.getLogger());
 
@@ -3163,8 +3173,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
     client = null;
     System.gc();
-    GenericTestUtils.waitFor(() -> ozoneClienFactoryLogCapturer.getOutput()
-        .contains("is not closed properly"), 100, 2000);
+    GenericTestUtils.waitFor(() -> ozoneClientFactoryLogCapturer.getOutput()
+        .contains("is not closed correctly"), 100, 2000);
+    HddsUtils.setIgnoreReportingLeak(false);
   }
   @Test
   public void testMultipartUploadOwner() throws Exception {
