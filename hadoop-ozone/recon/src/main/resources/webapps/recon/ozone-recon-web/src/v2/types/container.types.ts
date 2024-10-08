@@ -20,13 +20,6 @@ import { Option } from "@/v2/components/select/multiSelect";
 
 export type ContainerReplica = {
   containerId: number;
-  datanodeHost: string;
-  firstReportTimestamp: number;
-  lastReportTimestamp: number;
-}
-
-export type ContainerReplicas = {
-  containerId: number;
   datanodeUuid: string;
   datanodeHost: string;
   firstSeenTime: number;
@@ -44,15 +37,7 @@ export type Container = {
   reason: string;
   keys: number;
   pipelineID: string;
-  replicas: ContainerReplicas[];
-}
-
-export type UnhealthyContainersResponse = {
-  missingCount: number;
-  underReplicatedCount: number;
-  overReplicatedCount: number;
-  misReplicatedCount: number;
-  containers: Container[];
+  replicas: ContainerReplica[];
 }
 
 type KeyResponseBlock = {
@@ -70,7 +55,6 @@ export type KeyResponse = {
   Blocks: Record<number, KeyResponseBlock[]>;
   CreationTime: string;
   ModificationTime: string;
-  uid?: string;
 }
 
 export type ContainerKeysResponse = {

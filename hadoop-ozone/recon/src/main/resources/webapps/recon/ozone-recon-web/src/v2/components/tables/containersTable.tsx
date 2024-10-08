@@ -16,25 +16,24 @@
  * limitations under the License.
  */
 
-import React, { useState, useRef } from 'react';
-import moment from 'moment';
+import React, { useRef } from 'react';
 import filesize from 'filesize';
-import Table, {
-  ColumnProps,
+import { AxiosError } from 'axios';
+import { Popover, Table } from 'antd';
+import {
   ColumnsType,
   TablePaginationConfig
 } from 'antd/es/table';
-import {
-  Container, ContainerKeysResponse, ContainerReplicas,
-  ContainerTableProps,
-  ExpandedRow, ExpandedRowState, KeyResponse
-} from '@/v2/types/container.types';
-import { getFormattedTime } from '@/v2/utils/momentUtils';
 import { NodeIndexOutlined } from '@ant-design/icons';
-import { Popover } from 'antd';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+
+import { getFormattedTime } from '@/v2/utils/momentUtils';
 import { showDataFetchError } from '@/utils/common';
-import { AxiosError } from 'axios';
+import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import {
+  Container, ContainerKeysResponse, ContainerReplica,
+  ContainerTableProps,
+  ExpandedRowState, KeyResponse
+} from '@/v2/types/container.types';
 
 const size = filesize.partial({ standard: 'iec' });
 
@@ -68,8 +67,8 @@ export const COLUMNS: ColumnsType<Container> = [
     title: 'Datanodes',
     dataIndex: 'replicas',
     key: 'replicas',
-    render: (replicas: ContainerReplicas[]) => {
-      const renderDatanodes = (replicas: ContainerReplicas[]) => {
+    render: (replicas: ContainerReplica[]) => {
+      const renderDatanodes = (replicas: ContainerReplica[]) => {
         return replicas?.map((replica: any, idx: number) => (
           <div key={idx} className='datanode-container-v2'>
             <NodeIndexOutlined /> {replica.datanodeHost}
@@ -215,10 +214,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   function expandedRowRender(record: Container) {
     const containerId = record.containerID
     const containerKeys: ExpandedRowState = expandedRow[containerId];
-    const dataSource = containerKeys?.dataSource?.map(record => ({
-      ...record,
-      uid: `${record.Volume}/${record.Bucket}/${record.Key}`
-    })) ?? [];
+    const dataSource = containerKeys?.dataSource ?? [];
     const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} Keys`
     }
@@ -229,7 +225,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         dataSource={dataSource}
         columns={KEY_TABLE_COLUMNS}
         pagination={paginationConfig}
-        rowKey='uid'
+        rowKey={(record: KeyResponse) => `${record.Volume}/${record.Bucket}/${record.Key}`}
         locale={{ filterTitle: '' }} />
     )
   };
