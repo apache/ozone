@@ -37,7 +37,7 @@ find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
 if [[ "${CHECK:-unit}" == "integration" ]]; then
   find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
       | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
-      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      | awk -F/ '{sub("-output.txt",""); print $NF ": Memory Leak detected in test, Failing."}' \
       >> "${tempfile}"
 fi
 
