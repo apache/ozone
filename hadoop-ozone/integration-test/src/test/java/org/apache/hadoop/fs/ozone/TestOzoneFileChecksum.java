@@ -40,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
@@ -60,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.TestDataUtil.createBucket;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test FileChecksum API.
@@ -106,9 +108,6 @@ public class TestOzoneFileChecksum {
         OzoneConsts.OZONE_OFS_URI_SCHEME);
     conf.setBoolean(disableCache, true);
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
-    ofs = (RootedOzoneFileSystem) fs;
-    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
     System.arraycopy(DATA_SIZES_1, 0, dataSizes, 0, DATA_SIZES_1.length);
     System.arraycopy(DATA_SIZES_2, 0, dataSizes, DATA_SIZES_1.length, DATA_SIZES_2.length);
   }
@@ -125,9 +124,13 @@ public class TestOzoneFileChecksum {
    *  Test EC checksum with Replicated checksum.
    */
   @ParameterizedTest
-  @MethodSource("missingIndexes")
-  void testEcFileChecksum(List<Integer> missingIndexes) throws IOException {
+  @MethodSource("missingIndexesAndChecksumSize")
+  void testEcFileChecksum(List<Integer> missingIndexes, double checksumSizeInMB) throws IOException {
 
+    conf.setInt("ozone.client.bytes.per.checksum", (int) (checksumSizeInMB * 1024 * 1024));
+    fs = FileSystem.get(conf);
+    ofs = (RootedOzoneFileSystem) fs;
+    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
     String volumeName = UUID.randomUUID().toString();
     String legacyBucket = UUID.randomUUID().toString();
     String ecBucketName = UUID.randomUUID().toString();
@@ -200,14 +203,13 @@ public class TestOzoneFileChecksum {
     }
   }
 
-  static Stream<List<Integer>> missingIndexes() {
+  static Stream<Arguments> missingIndexesAndChecksumSize() {
     return Stream.of(
-        ImmutableList.of(0, 1),
-        ImmutableList.of(1, 2),
-        ImmutableList.of(2, 3),
-        ImmutableList.of(3, 4),
-        ImmutableList.of(0, 3),
-        ImmutableList.of(0, 4)
-    );
+        arguments(ImmutableList.of(0, 1), 0.001),
+        arguments(ImmutableList.of(1, 2), 0.01),
+        arguments(ImmutableList.of(2, 3), 0.1),
+        arguments(ImmutableList.of(3, 4), 0.5),
+        arguments(ImmutableList.of(0, 3), 1),
+        arguments(ImmutableList.of(0, 4), 2));
   }
 }
