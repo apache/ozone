@@ -33,7 +33,7 @@ public enum DatanodeVersion implements ComponentVersion {
   SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port."),
   COMBINED_PUTBLOCK_WRITECHUNK_RPC(2, "WriteChunk can optionally support " +
           "a PutBlock request"),
-  STEAM_BLOCK_SUPPORT(3,
+  STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "

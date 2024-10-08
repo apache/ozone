@@ -40,7 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.STEAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
 
 /**
  * Factory class to create various BlockStream instances.
@@ -105,7 +105,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
       if (dn.getCurrentVersion() <
-          STEAM_BLOCK_SUPPORT.toProtoValue()) {
+          STREAM_BLOCK_SUPPORT.toProtoValue()) {
         return false;
       }
     }

@@ -1348,14 +1348,14 @@ public class KeyValueHandler extends Handler {
         return malformedRequest(request);
       }
       ReadBlockRequestProto readBlock = request.getReadBlock();
-      ChunkBuffer data;
 
       BlockID blockID = BlockID.getFromProtobuf(
           readBlock.getBlockID());
       // This is a new api the block should always be checked.
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      BlockUtils.verifyBCSId(kvContainer, blockID);
 
-      BlockData blockData = blockManager.getBlock(kvContainer, blockID);
+      BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
       List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
       long blockOffset = 0;
       int chunkIndex = -1;
@@ -1366,12 +1366,13 @@ public class KeyValueHandler extends Handler {
           break;
         }
       }
+      Preconditions.checkState(chunkIndex >= 0);
 
-      BlockUtils.verifyBCSId(kvContainer, blockID);
       if (dispatcherContext == null) {
         dispatcherContext = DispatcherContext.getHandleReadBlock();
       }
 
+      ChunkBuffer data;
       long offset = readBlock.getOffset();
       long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;
@@ -1393,15 +1394,10 @@ public class KeyValueHandler extends Handler {
             ContainerProtos.ChunkInfo.newBuilder(chunk)
                 .setOffset(adjustedChunkOffset)
                 .setLen(adjustedChunkLen).build());
-        data = chunkManager.readChunk(
+        data = getChunkManager().readChunk(
             kvContainer, blockID, chunkInfo, dispatcherContext);
 
         Preconditions.checkNotNull(data, "Chunk data is null");
-        if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
-          validateChunkChecksumData(data, chunkInfo);
-          metrics.incBytesReadStateMachine(chunkInfo.getLen());
-          metrics.incNumReadStateMachine();
-        }
         streamObserver.onNext(
             getReadBlockResponse(request,
                 blockData.getProtoBufMessage().getBlockID(),
@@ -1476,7 +1472,7 @@ public class KeyValueHandler extends Handler {
       }
       if (nonZero) {
         LOG.error("blocks in rocksDB on container delete: {}",
-            stringBuilder.toString());
+            stringBuilder);
       }
     }
     return nonZero;

@@ -71,7 +71,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamBlockInput.class);
   private final BlockID blockID;
-  private final long length;
+  private final long blockLength;
   private final AtomicReference<Pipeline> pipelineRef =
       new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef =
@@ -84,7 +84,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private long blockPosition = -1;
   private List<ByteBuffer> buffers;
   private boolean allocated = false;
-  private long bufferOffsetWrtBlockDataData;
+  private long bufferOffsetWrtBlockData;
   private long buffersSize;
   private static final int EOF = -1;
   private final List<XceiverClientSpi.Validator> validators;
@@ -102,7 +102,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
     LOG.debug("Initializing StreamBlockInput for block {}", blockID);
-    this.length = length;
+    this.blockLength = length;
     setPipeline(pipeline);
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -122,12 +122,12 @@ public class StreamBlockInput extends BlockExtendedInputStream
   }
 
   public long getLength() {
-    return length;
+    return blockLength;
   }
 
   @Override
   public synchronized long getPos() {
-    if (length == 0) {
+    if (blockLength == 0) {
       return 0;
     }
     if (blockPosition >= 0) {
@@ -136,26 +136,24 @@ public class StreamBlockInput extends BlockExtendedInputStream
 
     if (allocated && !buffersHaveData() && !dataRemainingInBlock()) {
       Preconditions.checkState(
-          bufferOffsetWrtBlockDataData + buffersSize == length,
+          bufferOffsetWrtBlockData + buffersSize == blockLength,
           "EOF detected but not at the last byte of the chunk");
-      return length;
+      return blockLength;
     }
     if (buffersHaveData()) {
       // BufferOffset w.r.t to BlockData + BufferOffset w.r.t buffers +
       // Position of current Buffer
-      return bufferOffsetWrtBlockDataData + bufferoffsets.get(bufferIndex) +
+      return bufferOffsetWrtBlockData + bufferoffsets.get(bufferIndex) +
           buffers.get(bufferIndex).position();
     }
     if (buffersAllocated()) {
-      return bufferOffsetWrtBlockDataData + buffersSize;
+      return bufferOffsetWrtBlockData + buffersSize;
     }
     return 0;
   }
 
   @Override
   public synchronized int read() throws IOException {
-    checkOpen();
-
     int dataout = EOF;
     int len = 1;
     int available;
@@ -351,7 +349,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (pos < 0 || pos > length) {
+    if (pos < 0 || pos > blockLength) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -363,7 +361,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     if (buffersHavePosition(pos)) {
       // The bufferPosition is w.r.t the current block.
       // Adjust the bufferIndex and position to the seeked position.
-      adjustBufferPosition(pos - bufferOffsetWrtBlockDataData);
+      adjustBufferPosition(pos - bufferOffsetWrtBlockData);
     } else {
       blockPosition = pos;
     }
@@ -411,7 +409,8 @@ public class StreamBlockInput extends BlockExtendedInputStream
   }
 
   protected synchronized void acquireClient() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient == null) {
+    checkOpen();
+    if (xceiverClient == null) {
       final Pipeline pipeline = pipelineRef.get();
       try {
         xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
@@ -429,7 +428,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
         if (buffersHavePosition(blockPosition)) {
           // The current buffers have the seeked position. Adjust the buffer
           // index and position to point to the buffer position.
-          adjustBufferPosition(blockPosition - bufferOffsetWrtBlockDataData);
+          adjustBufferPosition(blockPosition - bufferOffsetWrtBlockData);
         } else {
           // Read a required block data to fill the buffers with seeked
           // position data
@@ -459,9 +458,9 @@ public class StreamBlockInput extends BlockExtendedInputStream
       // Check if the current buffers cover the input position
       // Released buffers should not be considered when checking if position
       // is available
-      return pos >= bufferOffsetWrtBlockDataData +
+      return pos >= bufferOffsetWrtBlockData +
           bufferoffsets.get(0) &&
-          pos < bufferOffsetWrtBlockDataData + buffersSize;
+          pos < bufferOffsetWrtBlockData + buffersSize;
     }
     return false;
   }
@@ -492,6 +491,8 @@ public class StreamBlockInput extends BlockExtendedInputStream
       bufferIndex = Collections.binarySearch(bufferoffsets.subList(
           bufferIndex + 1, buffers.size()), bufferPosition);
     }
+    // bufferIndex is negative if bufferPosition isn't found in bufferOffsets
+    // count (bufferIndex = -bufferIndex - 2) to get bufferPosition is between which offsets.
     if (bufferIndex < 0) {
       bufferIndex = -bufferIndex - 2;
     }
@@ -533,7 +534,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       startByteIndex = blockPosition;
     } else {
       // Start reading the block from the last blockPosition onwards.
-      startByteIndex = bufferOffsetWrtBlockDataData + buffersSize;
+      startByteIndex = bufferOffsetWrtBlockData + buffersSize;
     }
 
     // bufferOffsetWrtChunkData and buffersSize are updated after the data
@@ -541,7 +542,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     // and is retried, we need the previous position.  Position is reset after
     // successful read in adjustBufferPosition()
     blockPosition = getPos();
-    bufferOffsetWrtBlockDataData = readData(startByteIndex, len);
+    bufferOffsetWrtBlockData = readData(startByteIndex, len);
     long tempOffset = 0L;
     buffersSize = 0L;
     bufferoffsets = new ArrayList<>(buffers.size());
@@ -553,7 +554,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     }
     bufferIndex = 0;
     allocated = true;
-    adjustBufferPosition(startByteIndex - bufferOffsetWrtBlockDataData);
+    adjustBufferPosition(startByteIndex - bufferOffsetWrtBlockData);
 
   }
 
@@ -619,17 +620,17 @@ public class StreamBlockInput extends BlockExtendedInputStream
     if (blockPosition >= 0) {
       bufferPos = blockPosition;
     } else {
-      bufferPos = bufferOffsetWrtBlockDataData + buffersSize;
+      bufferPos = bufferOffsetWrtBlockData + buffersSize;
     }
 
-    return bufferPos < length;
+    return bufferPos < blockLength;
   }
 
   /**
    * Check if current buffer had been read till the end.
    */
   private boolean bufferEOF() {
-    return allocated && !buffers.get(bufferIndex).hasRemaining();
+    return allocated && buffersAllocated() && !buffers.get(bufferIndex).hasRemaining();
   }
 
   /**
@@ -644,7 +645,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       // blockPosition should be set to point to the last position of the
       // buffers. This should be done so that getPos() can return the current
       // block position
-      blockPosition = bufferOffsetWrtBlockDataData +
+      blockPosition = bufferOffsetWrtBlockData +
           bufferoffsets.get(releaseUptoBufferIndex) +
           buffers.get(releaseUptoBufferIndex).capacity();
       // Release all the buffers
@@ -653,6 +654,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       buffers = buffers.subList(releaseUptoBufferIndex + 1, buffersLen);
       bufferoffsets = bufferoffsets.subList(
           releaseUptoBufferIndex + 1, buffersLen);
+      bufferIndex = 0;
     }
   }
 
@@ -662,7 +664,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private void releaseBuffers() {
     buffers = null;
     bufferIndex = 0;
-    // We should not reset bufferOffsetWrtChunkData and buffersSize here
+    // We should not reset bufferOffsetWrtBlockData and buffersSize here
     // because when getPos() is called we use these
     // values and determine whether chunk is read completely or not.
   }
