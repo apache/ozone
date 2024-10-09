@@ -82,7 +82,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Unit tests for Replicated and EC FileChecksumHelper class.
  */
-public class TestReplicatedFileChecksumHelper {
+public class TestFileChecksumHelper {
   private final FileChecksum noCachedChecksum = null;
   private OzoneClient client;
   private ObjectStore store;
