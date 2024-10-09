@@ -67,7 +67,7 @@ public final class DBDefinitionFactory {
       dbName = OM_DB_NAME;
     }
     final DBDefinition definition = DB_MAP.get(dbName);
-    return definition != null? definition : getReconDBDefinition(dbName);
+    return definition != null ? definition : getReconDBDefinition(dbName);
   }
 
   public static DBDefinition getDefinition(Path dbPath,
