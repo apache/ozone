@@ -54,11 +54,8 @@ public final class DBDefinitionFactory {
 
   static {
     dbMap = new HashMap<>();
-    Arrays.asList(
-      new SCMDBDefinition(),
-        new OMDBDefinition(),
-        new ReconSCMDBDefinition()
-    ).forEach(dbDefinition -> dbMap.put(dbDefinition.getName(), dbDefinition));
+    Arrays.asList(new SCMDBDefinition(), OMDBDefinition.getInstance(), new ReconSCMDBDefinition())
+        .forEach(dbDefinition -> dbMap.put(dbDefinition.getName(), dbDefinition));
   }
 
   public static DBDefinition getDefinition(String dbName) {
@@ -102,7 +99,7 @@ public final class DBDefinitionFactory {
     if (dbName.startsWith(RECON_CONTAINER_KEY_DB)) {
       return new ReconDBDefinition(dbName);
     } else if (dbName.startsWith(RECON_OM_SNAPSHOT_DB)) {
-      return new OMDBDefinition();
+      return OMDBDefinition.getInstance();
     }
     return null;
   }
