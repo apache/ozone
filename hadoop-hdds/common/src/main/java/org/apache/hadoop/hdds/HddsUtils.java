@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 
 import jakarta.annotation.Nonnull;
