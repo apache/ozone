@@ -41,14 +41,6 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
  * Class defines the structure and types of the scm.db.
  */
 public class SCMDBDefinition extends DBDefinition.WithMap {
-  public SCMDBDefinition() {
-    this(COLUMN_FAMILIES);
-  }
-
-  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
-    super(map);
-  }
-
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETED_BLOCKS =
       new DBColumnFamilyDefinition<>(
@@ -155,6 +147,16 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           TRANSACTIONINFO,
           VALID_CERTS,
           VALID_SCM_CERTS);
+
+  private static final SCMDBDefinition INSTANCE = new SCMDBDefinition(COLUMN_FAMILIES);
+
+  public static SCMDBDefinition get() {
+    return INSTANCE;
+  }
+
+  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+    super(map);
+  }
 
   @Override
   public String getName() {

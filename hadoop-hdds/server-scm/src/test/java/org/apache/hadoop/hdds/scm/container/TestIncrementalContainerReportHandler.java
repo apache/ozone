@@ -126,8 +126,7 @@ public class TestIncrementalContainerReportHandler {
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
 
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
