@@ -220,7 +220,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setCreationTime(dirInfo.getCreationTime())
             .setModificationTime(dirInfo.getModificationTime())
             .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
-    if (  dirInfo.getMetadataList() != null) {
+    if (dirInfo.getMetadataList() != null) {
       opib.addAllMetadata(KeyValueUtil
               .getFromProtobuf(dirInfo.getMetadataList()));
     }

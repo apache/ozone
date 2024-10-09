@@ -48,7 +48,7 @@ public final class DBDefinitionFactory {
   private DBDefinitionFactory() {
   }
 
-  private static final HashMap<String, DBDefinition> dbMap;
+  private static HashMap<String, DBDefinition> dbMap;
 
   private static String dnDBSchemaVersion;
 
