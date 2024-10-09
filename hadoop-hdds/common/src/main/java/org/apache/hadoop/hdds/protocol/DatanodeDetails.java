@@ -74,7 +74,8 @@ public class DatanodeDetails extends NodeImpl implements
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
-      DatanodeDetails::getExtendedProtoBufMessage);
+      DatanodeDetails::getExtendedProtoBufMessage,
+      DatanodeDetails.class);
 
   public static Codec<DatanodeDetails> getCodec() {
     return CODEC;

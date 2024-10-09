@@ -50,7 +50,7 @@ import java.util.Map;
 /**
  * Class defines the structure and types of the om.db.
  */
-public class OMDBDefinition extends DBDefinition.WithMap {
+public final class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =

@@ -40,7 +40,8 @@ public class OmDirectoryInfo extends WithParentObjectId
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
       OmDirectoryInfo::getFromProtobuf,
-      OmDirectoryInfo::getProtobuf);
+      OmDirectoryInfo::getProtobuf,
+      OmDirectoryInfo.class);
 
   public static Codec<OmDirectoryInfo> getCodec() {
     return CODEC;
@@ -219,7 +220,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setCreationTime(dirInfo.getCreationTime())
             .setModificationTime(dirInfo.getModificationTime())
             .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
-    if (dirInfo.getMetadataList() != null) {
+    if (  dirInfo.getMetadataList() != null) {
       opib.addAllMetadata(KeyValueUtil
               .getFromProtobuf(dirInfo.getMetadataList()));
     }
