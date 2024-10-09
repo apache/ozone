@@ -1023,6 +1023,58 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
+   * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
+   *
+   */
+  public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
+                                           ChunkBuffer data, KeyValueContainer kvContainer)
+      throws IOException {
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(chunkInfo);
+    Preconditions.checkNotNull(data);
+    long writeChunkStartTime = Time.monotonicNowNanos();
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
+    }
+
+    DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
+    chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
+        dispatcherContext);
+
+    // Increment write stats for WriteChunk after write.
+    metrics.incClosedContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
+    metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
+  }
+
+  /**
+   * Handle Put Block operation for closed container. Calls BlockManager to process the request.
+   *
+   */
+  public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
+                                          BlockData blockData, long blockCommitSequenceId)
+      throws IOException {
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(blockData);
+    long startTime = Time.monotonicNowNanos();
+
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
+    }
+    blockData.setChunks(chunkInfos);
+    // To be set from the Replica's BCSId
+    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+
+    blockManager.putBlock(kvContainer, blockData, false);
+    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+    final long numBytes = blockDataProto.getSerializedSize();
+    // Increment write stats for PutBlock after write.
+    metrics.incClosedContainerBytesStats(Type.PutBlock, numBytes);
+    metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
+  }
+
+  /**
    * Handle Put Small File operation. Writes the chunk and associated key
    * using a single RPC. Calls BlockManager and ChunkManager to process the
    * request.
@@ -1196,6 +1248,19 @@ public class KeyValueHandler extends Handler {
     String msg = "Requested operation not allowed as ContainerState is " +
         containerState;
     throw new StorageContainerException(msg, result);
+  }
+
+  /**
+   * Check if container is Closed.
+   * @param kvContainer
+   */
+  private boolean checkContainerClose(KeyValueContainer kvContainer) {
+
+    final State containerState = kvContainer.getContainerState();
+    if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED || containerState == State.UNHEALTHY) {
+      return true;
+    }
+    return false;
   }
 
   @Override
