@@ -120,6 +120,7 @@ public class TestLDBCli {
   /**
    * Defines ldb tool test cases.
    */
+  @SuppressWarnings({"methodlength"})
   private static Stream<Arguments> scanTestCases() {
     return Stream.of(
         Arguments.of(
