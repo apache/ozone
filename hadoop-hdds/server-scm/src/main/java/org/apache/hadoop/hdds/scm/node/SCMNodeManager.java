@@ -1439,6 +1439,7 @@ public class SCMNodeManager implements NodeManager {
     MEDIAN("Median"),
     STDEV("Stdev");
     private String label;
+
     public String getLabel() {
       return label;
     }

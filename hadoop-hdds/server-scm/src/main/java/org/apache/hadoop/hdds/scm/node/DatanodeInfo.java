@@ -356,8 +356,8 @@ public class DatanodeInfo extends DatanodeDetails {
 
   public void setContainersReplicationMetrics(
       Map<String, String> containersReplicationMetrics) {
+    lock.writeLock().lock();
     try {
-      lock.writeLock().lock();
       this.containersReplicationMetrics =
           containersReplicationMetrics;
     } finally {
@@ -366,8 +366,8 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   public Map<String, String> getContainersReplicationMetrics() {
+    lock.readLock().lock();
     try {
-      lock.readLock().lock();
       return containersReplicationMetrics;
     } finally {
       lock.readLock().unlock();

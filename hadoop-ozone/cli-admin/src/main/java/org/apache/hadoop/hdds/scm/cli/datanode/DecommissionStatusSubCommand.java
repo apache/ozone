@@ -87,7 +87,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
    *    &lt;li&gt;closedContainersCount&lt;/li&gt;
    * &lt;/ul&gt;
    */
-  private Map<String, String> decommissionMetricsDescription =
+  private final Map<String, String> decommissionMetricsDescription =
       new HashMap<String, String>() {{
           put("numRequestedReplications", "Containers for replication");
           put("numSuccessReplications", "Successfully replicated containers");
