@@ -124,8 +124,10 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public SnapshotInfo getLatestSnapshot() {
     // Transaction buffer will be null during scm initlialization phase
-    return transactionBuffer == null
+    final SnapshotInfo snapshotInfo = transactionBuffer == null
         ? null : transactionBuffer.getLatestSnapshot();
+    LOG.debug("Latest Snapshot Info {}", snapshotInfo);
+    return snapshotInfo;
   }
 
   /**
@@ -137,6 +139,8 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
+      LOG.info("SCMStateMachine is initializing. raftPeerId = {}, raftGroupId = {}",
+          server.getId(), id);
     });
   }
 
@@ -149,6 +153,11 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
+      if (LOG.isDebugEnabled()) {
+        long term = trx.getLogEntry() != null ? trx.getLogEntry().getTerm() : -1;
+        long index = trx.getLogEntry() != null ? trx.getLogEntry().getIndex() : -1;
+        LOG.debug("A new transaction is being applied. term = {}, index = {}", term, index);
+      }
       try {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
@@ -388,6 +397,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void pause() {
+    LOG.info("SCMStateMachine is pausing");
     final LifeCycle lc = getLifeCycle();
     if (lc.getCurrentState() != LifeCycle.State.NEW) {
       lc.transition(LifeCycle.State.PAUSING);
@@ -413,6 +423,8 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.error("Failed to reinitialize SCMStateMachine.", e);
       throw new IOException(e);
     }
+
+    LOG.info("SCMStateMachine is reinitializing. newTermIndex = {}", termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {
