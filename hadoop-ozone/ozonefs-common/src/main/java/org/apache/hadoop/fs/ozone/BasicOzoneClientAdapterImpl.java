@@ -204,7 +204,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore, new HashSet<>());
 
       OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
-    } catch (IOException | IllegalArgumentException exception) {
+    } catch (IOException | RuntimeException exception) {
       // in case of exception, the adapter object will not be
       // initialised making the client object unreachable, close the client
       // to release resources in this case and rethrow.

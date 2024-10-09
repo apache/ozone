@@ -223,12 +223,12 @@ public class BasicRootedOzoneClientAdapterImpl
       // Fetches the bucket layout to be used by OFS.
       try {
         initDefaultFsBucketLayout(conf);
-      } catch (OMException ome) {
+      } catch (IOException | RuntimeException exception) {
         // in case of exception, the adapter object will not be
         // initialised making the client object unreachable, close the client
         // to release resources in this case and rethrow.
         ozoneClient.close();
-        throw ome;
+        throw exception;
       }
 
       config = conf;

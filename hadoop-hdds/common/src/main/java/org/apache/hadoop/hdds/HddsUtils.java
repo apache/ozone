@@ -113,8 +113,6 @@ public final class HddsUtils {
 
   private static final int NO_PORT = -1;
 
-  private static boolean ignoreReportingLeak = false;
-
   private HddsUtils() {
   }
 
@@ -882,15 +880,8 @@ public final class HddsUtils {
         : null;
   }
 
-  @VisibleForTesting
-  public static void setIgnoreReportingLeak(boolean ignoreReportingLeak) {
-    HddsUtils.ignoreReportingLeak = ignoreReportingLeak;
-  }
-
   /**
    * Logs a warning to report that the class is not closed properly.
-   * If {@link HddsUtils#ignoreReportingLeak} is set to true it will log that
-   * the message has been ignored. This only serves for testing purposes.
    */
   public static void reportLeak(Class<?> clazz, String stackTrace, Logger log) {
     String warning = String.format("%s is not closed properly", clazz.getSimpleName());
@@ -899,13 +890,6 @@ public final class HddsUtils {
           stackTrace);
       warning = warning.concat(debugMessage);
     }
-    if (!ignoreReportingLeak) {
-      log.warn(warning);
-    } else  {
-      String ignoreMessage =
-          String.format("Ignoring warning : %s is not closed correctly",
-              clazz.getSimpleName());
-      log.warn(ignoreMessage);
-    }
+    log.warn(warning);
   }
 }

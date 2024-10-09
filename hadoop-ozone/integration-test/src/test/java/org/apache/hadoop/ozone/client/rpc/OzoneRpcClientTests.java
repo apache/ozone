@@ -191,6 +191,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -264,12 +265,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  static void shutdownCluster() throws IOException {
-    for (OzoneClient ozoneClient : ozoneClients) {
-      if (ozoneClient != null) {
-        ozoneClient.close();
-      }
-    }
+  static void shutdownCluster() {
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(ozoneClients);
     ozoneClients.clear();
 
     if (storageContainerLocationClient != null) {
@@ -3150,9 +3147,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   }
 
-  @Test
+  /**
+   * This test prints out that there is a memory leak in the test logs
+   * which during post-processing is caught by the CI thereby failing the
+   * CI run. Hence, disabling this for CI.
+   */
+  @Unhealthy
   public void testClientLeakDetector() throws Exception {
-    HddsUtils.setIgnoreReportingLeak(true);
     OzoneClient client = OzoneClientFactory.getRpcClient(cluster.getConf());
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -3174,8 +3175,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     client = null;
     System.gc();
     GenericTestUtils.waitFor(() -> ozoneClientFactoryLogCapturer.getOutput()
-        .contains("is not closed correctly"), 100, 2000);
-    HddsUtils.setIgnoreReportingLeak(false);
+        .contains("is not closed properly"), 100, 2000);
   }
   @Test
   public void testMultipartUploadOwner() throws Exception {
