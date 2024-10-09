@@ -207,6 +207,18 @@ public class TestLDBCli {
             Named.of("Expect empty result", null)
         ),
         Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter key3 regex", Arrays.asList("--filter", "keyName:regex:^.*3$")),
+            Named.of("Expect key3", Pair.of("key3", "key4"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter dataSize>500 using regex", Arrays.asList("--filter", "dataSize:regex:^5.*$")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),
