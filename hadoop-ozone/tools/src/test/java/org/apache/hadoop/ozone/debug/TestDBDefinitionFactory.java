@@ -44,7 +44,7 @@ public class TestDBDefinitionFactory {
 
   @Test
   public void testGetDefinition() {
-    DBDefinition definition = DBDefinitionFactory.getDefinition(OMDBDefinition.getInstance().getName());
+    DBDefinition definition = DBDefinitionFactory.getDefinition(OMDBDefinition.get().getName());
     assertInstanceOf(OMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(
@@ -65,15 +65,16 @@ public class TestDBDefinitionFactory {
 
     DBDefinitionFactory.setDnDBSchemaVersion("V2");
     final Path dbPath = Paths.get("/tmp/test-container.db");
-    definition = DBDefinitionFactory.getDefinition(dbPath, new OzoneConfiguration());
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    definition = DBDefinitionFactory.getDefinition(dbPath, conf);
     assertInstanceOf(DatanodeSchemaTwoDBDefinition.class, definition);
 
     DBDefinitionFactory.setDnDBSchemaVersion("V1");
-    definition = DBDefinitionFactory.getDefinition(dbPath, new OzoneConfiguration());
+    definition = DBDefinitionFactory.getDefinition(dbPath, conf);
     assertInstanceOf(DatanodeSchemaOneDBDefinition.class, definition);
 
     DBDefinitionFactory.setDnDBSchemaVersion("V3");
-    definition = DBDefinitionFactory.getDefinition(dbPath, new OzoneConfiguration());
+    definition = DBDefinitionFactory.getDefinition(dbPath, conf);
     assertInstanceOf(DatanodeSchemaThreeDBDefinition.class, definition);
   }
 }

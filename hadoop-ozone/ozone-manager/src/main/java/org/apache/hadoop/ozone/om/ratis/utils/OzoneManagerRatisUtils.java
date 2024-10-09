@@ -439,7 +439,7 @@ public final class OzoneManagerRatisUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-    return HAUtils.getTrxnInfoFromCheckpoint(conf, dbPath, OMDBDefinition.getInstance());
+    return HAUtils.getTrxnInfoFromCheckpoint(conf, dbPath, OMDBDefinition.get());
   }
 
   /**

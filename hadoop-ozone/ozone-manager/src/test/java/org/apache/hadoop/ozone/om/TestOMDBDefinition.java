@@ -48,7 +48,7 @@ public class TestOMDBDefinition {
 
     // Get list of tables from DB Definitions
     final Collection<DBColumnFamilyDefinition<?, ?>> columnFamilyDefinitions
-        = OMDBDefinition.getInstance().getColumnFamilies();
+        = OMDBDefinition.get().getColumnFamilies();
     final int countOmDefTables = columnFamilyDefinitions.size();
     ArrayList<String> missingDBDefTables = new ArrayList<>();
 

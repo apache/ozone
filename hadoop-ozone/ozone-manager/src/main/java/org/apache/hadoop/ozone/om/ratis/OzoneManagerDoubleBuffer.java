@@ -40,7 +40,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -478,7 +477,7 @@ public final class OzoneManagerDoubleBuffer {
     if (cleanupTableInfo != null) {
       final List<String> cleanupTables;
       if (cleanupTableInfo.cleanupAll()) {
-        cleanupTables = OMDBDefinition.getInstance().getColumnFamilyNames();
+        cleanupTables = OMDBDefinition.get().getColumnFamilyNames();
       } else {
         cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
       }

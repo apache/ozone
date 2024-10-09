@@ -45,15 +45,12 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Class defines the structure and types of the om.db.
  */
-public class OMDBDefinition extends DBDefinition.WithMap {
+public final class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =
@@ -289,20 +286,12 @@ public class OMDBDefinition extends DBDefinition.WithMap {
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 
-  public static OMDBDefinition getInstance() {
+  public static OMDBDefinition get() {
     return INSTANCE;
   }
 
-  private final List<String> columnFamilyNames = Collections.unmodifiableList(getColumnFamilies().stream()
-        .map(DBColumnFamilyDefinition::getName)
-        .collect(Collectors.toList()));
-
   private OMDBDefinition() {
     super(COLUMN_FAMILIES);
-  }
-
-  public List<String> getColumnFamilyNames() {
-    return columnFamilyNames;
   }
 
   @Override

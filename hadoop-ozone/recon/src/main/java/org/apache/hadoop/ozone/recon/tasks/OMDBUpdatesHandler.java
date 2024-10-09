@@ -49,7 +49,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
   private Map<String, Map<Object, OMDBUpdateEvent>> omdbLatestUpdateEvents = new HashMap<>();
-  private final OMDBDefinition omdbDefinition = OMDBDefinition.getInstance();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private final OmUpdateEventValidator omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {

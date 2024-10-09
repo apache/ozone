@@ -53,7 +53,7 @@ import static org.mockito.Mockito.times;
 public class TestOmUpdateEventValidator {
 
   private OmUpdateEventValidator eventValidator;
-  private final OMDBDefinition omdbDefinition = OMDBDefinition.getInstance();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private OMMetadataManager omMetadataManager;
   private Logger logger;
   @TempDir
