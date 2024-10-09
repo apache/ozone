@@ -221,7 +221,15 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
       // Fetches the bucket layout to be used by OFS.
-      initDefaultFsBucketLayout(conf);
+      try {
+        initDefaultFsBucketLayout(conf);
+      } catch (IOException | RuntimeException exception) {
+        // in case of exception, the adapter object will not be
+        // initialised making the client object unreachable, close the client
+        // to release resources in this case and rethrow.
+        ozoneClient.close();
+        throw exception;
+      }
 
       config = conf;
     } finally {
