@@ -89,7 +89,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new SimpleStateMachineStorage();
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
-  private RaftGroupId raftGroupId;
   private volatile OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
@@ -135,10 +134,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       RaftStorage raftStorage) throws IOException {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
-      this.raftGroupId = id;
       storage.init(raftStorage);
-      LOG.info("OzoneManagerStateMachine is initializing. raftPeerId = {}, raftGroupId = {}",
-          server.getId(), raftGroupId);
+      LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
   }
 
@@ -146,10 +143,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public synchronized void reinitialize() throws IOException {
     loadSnapshotInfoFromDB();
     if (getLifeCycleState() == LifeCycle.State.PAUSED) {
-      unpause(getLastAppliedTermIndex().getIndex(),
-          getLastAppliedTermIndex().getTerm());
-      LOG.info("OzoneManagerStateMachine is reinitializing. raftPeerId = {}, raftGroupId = {}, " +
-          "lastAppliedTermIndex = {}", getId(), getGroupId(), getLastAppliedTermIndex());
+      final TermIndex lastApplied = getLastAppliedTermIndex();
+      unpause(lastApplied.getIndex(), lastApplied.getTerm());
+      LOG.info("{}: reinitialize {} with {}", getId(), getGroupId(), lastApplied);
     }
   }
 
@@ -165,8 +161,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                                   RaftPeerId newLeaderId) {
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
-    LOG.info("New Leader changes. RaftGroupMemberId = {}, newLeader = {}",
-        groupMemberId, newLeaderId);
+    LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
   }
 
   /** Notified by Ratis for non-StateMachine term-index update. */
@@ -270,7 +265,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         messageContent);
 
     Preconditions.checkArgument(raftClientRequest.getRaftGroupId().equals(
-        raftGroupId));
+        getGroupId()));
     try {
       handler.validateRequest(omRequest);
     } catch (IOException ioe) {
@@ -283,19 +278,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       return ctxt;
     }
 
-    TransactionContext ctxt = TransactionContext.newBuilder()
+    return TransactionContext.newBuilder()
         .setClientRequest(raftClientRequest)
         .setStateMachine(this)
         .setServerRole(RaftProtos.RaftPeerRole.LEADER)
         .setLogData(raftClientRequest.getMessage().getContent())
         .setStateMachineContext(omRequest)
         .build();
-    if (LOG.isDebugEnabled()) {
-      long term = ctxt.getLogEntry() != null ? ctxt.getLogEntry().getTerm() : -1;
-      long index = ctxt.getLogEntry() != null ? ctxt.getLogEntry().getIndex() : -1;
-      LOG.debug("Start a new transaction. term = {}, index = {}", term, index);
-    }
-    return ctxt;
   }
 
   @Override
@@ -307,9 +296,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
 
     if (LOG.isDebugEnabled()) {
-      long term = trx.getLogEntry() != null ? trx.getLogEntry().getTerm() : -1;
-      long index = trx.getLogEntry() != null ? trx.getLogEntry().getIndex() : -1;
-      LOG.debug("Preprocess a new transaction. term = {}, index = {}", term, index);
+      LOG.debug("{}: preAppendTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
     }
 
     if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
@@ -322,7 +309,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (ozoneManager.getAclsEnabled()
           && !ozoneManager.isAdmin(userGroupInformation)) {
         String message = "Access denied for user " + userGroupInformation
-            + ". Superuser privilege is required to prepare ozone managers.";
+            + ". Superuser privilege is required to prepare upgrade/downgrade.";
         OMException cause =
             new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
         // Leader should not step down because of this failure.
@@ -359,7 +346,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
-      LOG.debug("A new transaction is being applied. termIndex = {}", termIndex);
+      LOG.debug("applyTransaction {}", termIndex);
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -452,7 +439,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnaphsotIndex = {}, newLastAppliedSnapShotTermIndex = {}",
+            "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
                 newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }

@@ -124,10 +124,8 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public SnapshotInfo getLatestSnapshot() {
     // Transaction buffer will be null during scm initlialization phase
-    final SnapshotInfo snapshotInfo = transactionBuffer == null
+    return transactionBuffer == null
         ? null : transactionBuffer.getLatestSnapshot();
-    LOG.debug("Latest Snapshot Info {}", snapshotInfo);
-    return snapshotInfo;
   }
 
   /**
@@ -139,8 +137,7 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
-      LOG.info("SCMStateMachine is initializing. raftPeerId = {}, raftGroupId = {}",
-          server.getId(), id);
+      LOG.info("{}: initialize {}", server.getId(), id);
     });
   }
 
@@ -154,9 +151,7 @@ public class SCMStateMachine extends BaseStateMachine {
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
       if (LOG.isDebugEnabled()) {
-        long term = trx.getLogEntry() != null ? trx.getLogEntry().getTerm() : -1;
-        long index = trx.getLogEntry() != null ? trx.getLogEntry().getIndex() : -1;
-        LOG.debug("A new transaction is being applied. term = {}, index = {}", term, index);
+        LOG.debug("applyTransaction {}", TermIndex.valueOf(trx.getLogEntry()));
       }
       try {
         applyTransactionFuture.complete(process(request));
@@ -397,8 +392,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void pause() {
-    LOG.info("SCMStateMachine is pausing");
     final LifeCycle lc = getLifeCycle();
+    LOG.info("{}: Try to pause from current LifeCycle state {}", getId(), lc);
     if (lc.getCurrentState() != LifeCycle.State.NEW) {
       lc.transition(LifeCycle.State.PAUSING);
       lc.transition(LifeCycle.State.PAUSED);
@@ -424,7 +419,7 @@ public class SCMStateMachine extends BaseStateMachine {
       throw new IOException(e);
     }
 
-    LOG.info("SCMStateMachine is reinitializing. newTermIndex = {}", termIndex);
+    LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {
