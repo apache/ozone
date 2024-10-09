@@ -131,10 +131,10 @@ public final class ScmConfigKeys {
       "hdds.ratis.snapshot.threshold";
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT = 100000;
 
-  public static final String HDDS_CONTAINER_LIST_MAX_COUNT =
-      "hdds.container.list.max.count";
+  public static final String OZONE_SCM_CONTAINER_LIST_MAX_COUNT =
+      "ozone.scm.container.list.max.count";
 
-  public static final int HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT = 4096;
+  public static final int OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT = 4096;
 
   // TODO : this is copied from OzoneConsts, may need to move to a better place
   public static final String OZONE_SCM_CHUNK_SIZE_KEY = "ozone.scm.chunk.size";

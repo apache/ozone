@@ -113,8 +113,8 @@ public class ContainerOperationClient implements ScmClient {
     containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
         HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
     maxCountOfContainerList = conf
-        .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
-            ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
   }
 
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
@@ -347,7 +347,7 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
     if (count > maxCountOfContainerList) {
-      LOG.error("Attempting to list {} containers. However, this exceeds" +
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
           " the cluster's current limit of {}. The results will be capped at the" +
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;

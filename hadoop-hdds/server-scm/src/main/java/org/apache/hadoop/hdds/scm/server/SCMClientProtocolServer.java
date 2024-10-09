@@ -420,7 +420,7 @@ public class SCMClientProtocolServer implements
    * @param count count must be {@literal >} 0.
    *
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
@@ -437,7 +437,7 @@ public class SCMClientProtocolServer implements
    * @param state Container with this state will be returned.
    *
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
@@ -454,7 +454,7 @@ public class SCMClientProtocolServer implements
    * @param state Container with this state will be returned.
    * @param factor Container factor.
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override
@@ -555,7 +555,7 @@ public class SCMClientProtocolServer implements
    * @param state Container with this state will be returned.
    * @param repConfig Replication Config for the container.
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   @Override

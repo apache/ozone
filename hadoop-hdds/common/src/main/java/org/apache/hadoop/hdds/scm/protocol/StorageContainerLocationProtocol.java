@@ -148,7 +148,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    *
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID,
@@ -168,7 +168,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param state Container with this state will be returned.
    *
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID,
@@ -188,7 +188,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param state Container with this state will be returned.
    * @param factor Container factor
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID,
@@ -209,7 +209,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param state Container with this state will be returned.
    * @param replicationConfig Replication config for the containers
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID,

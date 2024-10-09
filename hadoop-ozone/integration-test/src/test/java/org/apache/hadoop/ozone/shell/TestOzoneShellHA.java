@@ -202,7 +202,7 @@ public class TestOzoneShellHA {
         getKeyProviderURI(miniKMS));
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.setInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, 1);
     ozoneConfiguration = conf;
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)

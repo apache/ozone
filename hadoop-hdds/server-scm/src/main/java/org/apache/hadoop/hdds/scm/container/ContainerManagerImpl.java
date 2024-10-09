@@ -118,8 +118,8 @@ public class ContainerManagerImpl implements ContainerManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.maxCountOfContainerList = conf
-        .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
-            ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }

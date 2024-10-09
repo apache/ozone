@@ -117,8 +117,8 @@ public class ListSubcommand extends ScmSubcommand {
     }
 
     int maxCountAllowed = parent.getParent().getOzoneConf()
-        .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
-            ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
     ContainerListResult containerListAndTotalCount;
 
@@ -126,7 +126,7 @@ public class ListSubcommand extends ScmSubcommand {
       if (count > maxCountAllowed) {
         System.err.printf("Attempting to list the first %d records of containers." +
             " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
-            " maximum allowed count.%n", count, ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+            " maximum allowed count.%n", count, ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
         count = maxCountAllowed;
       }
       containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
@@ -135,8 +135,8 @@ public class ListSubcommand extends ScmSubcommand {
       }
 
       if (containerListAndTotalCount.getTotalCount() > count) {
-        System.err.printf("Container list is truncated as it is too long. " +
-                        "Displayed the first %d records of %d total containers.%n",
+        System.err.printf("Displaying %d out of %d containers. " +
+                        "Container list has more containers.%n",
                 count, containerListAndTotalCount.getTotalCount());
       }
     } else {
@@ -155,9 +155,9 @@ public class ListSubcommand extends ScmSubcommand {
         }
 
         if (fetchedCount > 0) {
-          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID();
+          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
         }
-      } while (fetchedCount == batchSize);
+      } while (fetchedCount > 0);
     }
   }
 }

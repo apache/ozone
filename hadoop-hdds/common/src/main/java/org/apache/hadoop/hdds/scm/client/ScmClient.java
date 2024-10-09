@@ -124,7 +124,7 @@ public interface ScmClient extends Closeable {
    * @param count count must be {@literal >} 0.
    *
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID,
@@ -138,7 +138,7 @@ public interface ScmClient extends Closeable {
    * @param state Container of this state will be returned.
    * @param replicationConfig container replication Config.
    * @return a list of containers capped by max count allowed
-   * in "hdds.container.list.max.count" and total number of containers.
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   ContainerListResult listContainer(long startContainerID, int count,

@@ -77,7 +77,7 @@ public class TestContainerOperations {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-    ozoneConf.set(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT, "1");
+    ozoneConf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, "1");
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     storageClient = new ContainerOperationClient(ozoneConf);
     cluster.waitForClusterToBeReady();
