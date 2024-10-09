@@ -286,8 +286,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     storage.init(raftStorage);
     ratisServer.notifyGroupAdd(gid);
 
-    LOG.info("ContainerStateMachine is initializing. raftPeerId = {}, raftGroupId = {}",
-        server.getId(), id);
+    LOG.info("{}: initialize {}", server.getId(), id);
     loadSnapshot(storage.getLatestSnapshot());
   }
 
