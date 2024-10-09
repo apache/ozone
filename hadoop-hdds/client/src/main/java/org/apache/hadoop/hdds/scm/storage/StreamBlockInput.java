@@ -134,17 +134,17 @@ public class StreamBlockInput extends BlockExtendedInputStream
       return blockPosition;
     }
 
-    if (allocated && !buffersHaveData() && !dataRemainingInBlock()) {
-      Preconditions.checkState(
-          bufferOffsetWrtBlockData + buffersSize == blockLength,
-          "EOF detected but not at the last byte of the chunk");
-      return blockLength;
-    }
     if (buffersHaveData()) {
       // BufferOffset w.r.t to BlockData + BufferOffset w.r.t buffers +
       // Position of current Buffer
       return bufferOffsetWrtBlockData + bufferoffsets.get(bufferIndex) +
           buffers.get(bufferIndex).position();
+    }
+    if (allocated && !dataRemainingInBlock()) {
+      Preconditions.checkState(
+          bufferOffsetWrtBlockData + buffersSize == blockLength,
+          "EOF detected but not at the last byte of the chunk");
+      return blockLength;
     }
     if (buffersAllocated()) {
       return bufferOffsetWrtBlockData + buffersSize;
@@ -300,12 +300,12 @@ public class StreamBlockInput extends BlockExtendedInputStream
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    if (pos == 0 && blockLength == 0) {
+      // It is possible for length and pos to be zero in which case
+      // seek should return instead of throwing exception
+      return;
+    }
     if (pos < 0 || pos > blockLength) {
-      if (pos == 0) {
-        // It is possible for length and pos to be zero in which case
-        // seek should return instead of throwing exception
-        return;
-      }
       throw new EOFException("EOF encountered at pos: " + pos + " for block: " + blockID);
     }
 
