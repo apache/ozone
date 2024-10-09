@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
@@ -95,6 +96,7 @@ import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStor
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.Time;
@@ -138,6 +140,8 @@ public class OzoneContainer {
 
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
+
+  private HddsDatanodeService hddsDatanodeService;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -295,6 +299,9 @@ public class OzoneContainer {
 
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
+
+    this.hddsDatanodeService = hddsDatanodeService;
+
   }
 
   /**
@@ -306,6 +313,13 @@ public class OzoneContainer {
       StateContext context, VolumeChoosingPolicy volumeChoosingPolicy)
       throws IOException {
     this(null, datanodeDetails, conf, context, null, null, volumeChoosingPolicy);
+  }
+
+  @VisibleForTesting
+  public OzoneContainer(HddsDatanodeService hddsDatanodeService, DatanodeDetails datanodeDetails,
+                        ConfigurationSource conf,
+                        StateContext context) throws IOException {
+    this(hddsDatanodeService, datanodeDetails, conf, context, null, null);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -628,6 +642,8 @@ public class OzoneContainer {
       }
     }
 
+    collectReplicationSupervisorMetrics(nrb);
+
     return nrb.build();
   }
 
@@ -666,6 +682,77 @@ public class OzoneContainer {
       CompletableFuture.runAsync(hddsVolume::compactDb,
           dbCompactionExecutorService);
     }
+  }
+
+  private void collectReplicationSupervisorMetrics(StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb) {
+    List<HddsProtos.KeyValue> containerReplicationMetrics = new ArrayList<>();
+
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numInFlightReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getInFlightReplications(ReplicationTask.class))).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numQueuedReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getQueueSize())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numRequestedReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getReplicationRequestCount())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numSuccessReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getReplicationSuccessCount())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numFailedReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getReplicationFailureCount())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numTimeoutReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getReplicationTimeoutCount())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("numSkippedReplications")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getReplicationSkippedCount())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("maxReplicationStreams")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getSupervisor()
+                .getMaxReplicationStreams())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("transferredBytes")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getPushReplicatorWithMetrics()
+                .getTransferredBytes().value())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("successTime")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getPushReplicatorWithMetrics()
+                .getSuccessTime().value())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("failureBytes")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getPushReplicatorWithMetrics()
+                .getFailureBytes().value())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("failureTime")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getPushReplicatorWithMetrics()
+                .getFailureTime().value())).build());
+    containerReplicationMetrics.add(
+        HddsProtos.KeyValue.newBuilder()
+            .setKey("queueTime")
+            .setValue(String.valueOf(hddsDatanodeService.getDatanodeStateMachine().getPushReplicatorWithMetrics()
+                .getQueueTime().value())).build());
+    nrb.addAllReplicationMetrics(containerReplicationMetrics);
   }
 
 }

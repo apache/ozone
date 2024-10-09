@@ -19,18 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.Closeable;
-import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneId;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,6 +35,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
+import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -86,6 +76,19 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * State Machine Class.
@@ -753,4 +756,17 @@ public class DatanodeStateMachine implements Closeable {
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
   }
+
+  public void fillReplicatorSupervisorMetrics(MetricsCollector collector, boolean all) {
+    replicationSupervisorMetrics.getMetrics(collector, all);
+  }
+
+  public MeasuredReplicator getPullReplicatorWithMetrics() {
+    return pullReplicatorWithMetrics;
+  }
+
+  public MeasuredReplicator getPushReplicatorWithMetrics() {
+    return pushReplicatorWithMetrics;
+  }
+
 }
