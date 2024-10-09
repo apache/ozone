@@ -165,25 +165,11 @@ public class StreamBlockInput extends BlockExtendedInputStream
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
-          releaseClient();
-          refreshBlockInfo(e);
-          continue;
-        } else {
-          throw e;
-        }
+        handleStorageContainerException(e);
+        continue;
       } catch (IOException ioe) {
-        if (shouldRetryRead(ioe)) {
-          if (isConnectivityIssue(ioe)) {
-            releaseClient();
-            refreshBlockInfo(ioe);
-          } else {
-            releaseClient();
-          }
-          continue;
-        } else {
-          throw ioe;
-        }
+        handleIOException(ioe);
+        continue;
       }
       if (available == EOF) {
         // There is no more data in the chunk stream. The buffers should have
@@ -236,25 +222,11 @@ public class StreamBlockInput extends BlockExtendedInputStream
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
-          releaseClient();
-          refreshBlockInfo(e);
-          continue;
-        } else {
-          throw e;
-        }
+        handleStorageContainerException(e);
+        continue;
       } catch (IOException ioe) {
-        if (shouldRetryRead(ioe)) {
-          if (isConnectivityIssue(ioe)) {
-            releaseClient();
-            refreshBlockInfo(ioe);
-          } else {
-            releaseClient();
-          }
-          continue;
-        } else {
-          throw ioe;
-        }
+        handleIOException(ioe);
+        continue;
       }
       if (available == EOF) {
         // There is no more data in the block stream. The buffers should have
@@ -293,25 +265,11 @@ public class StreamBlockInput extends BlockExtendedInputStream
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
-          releaseClient();
-          refreshBlockInfo(e);
-          continue;
-        } else {
-          throw e;
-        }
+        handleStorageContainerException(e);
+        continue;
       } catch (IOException ioe) {
-        if (shouldRetryRead(ioe)) {
-          if (isConnectivityIssue(ioe)) {
-            releaseClient();
-            refreshBlockInfo(ioe);
-          } else {
-            releaseClient();
-          }
-          continue;
-        } else {
-          throw ioe;
-        }
+        handleIOException(ioe);
+        continue;
       }
       if (available == EOF) {
         // There is no more data in the block stream. The buffers should have
@@ -775,5 +733,27 @@ public class StreamBlockInput extends BlockExtendedInputStream
     releaseClient();
     releaseBuffers();
     xceiverClientFactory = null;
+  }
+
+  private void handleStorageContainerException(StorageContainerException e) throws IOException {
+    if (shouldRetryRead(e)) {
+      releaseClient();
+      refreshBlockInfo(e);
+    } else {
+      throw e;
+    }
+  }
+
+  private void handleIOException(IOException ioe) throws IOException {
+    if (shouldRetryRead(ioe)) {
+      if (isConnectivityIssue(ioe)) {
+        releaseClient();
+        refreshBlockInfo(ioe);
+      } else {
+        releaseClient();
+      }
+    } else {
+      throw ioe;
+    }
   }
 }
