@@ -58,6 +58,11 @@ public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
   }
 
   @Override
+  public Class<ChunkInfoList> getTypeClass() {
+    return ChunkInfoList.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(ChunkInfoList chunkList) {
     return chunkList.getProtoBufMessage().toByteArray();
   }

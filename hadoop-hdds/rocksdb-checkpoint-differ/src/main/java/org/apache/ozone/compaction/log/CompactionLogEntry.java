@@ -38,7 +38,8 @@ public final class CompactionLogEntry implements
   private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(CompactionLogEntryProto.getDefaultInstance()),
       CompactionLogEntry::getFromProtobuf,
-      CompactionLogEntry::getProtobuf);
+      CompactionLogEntry::getProtobuf,
+      CompactionLogEntry.class);
 
   public static Codec<CompactionLogEntry> getCodec() {
     return CODEC;
