@@ -137,7 +137,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(16, result.getRepeatedOmKeyInfoList().size());
 
     // Set limit to 10 and pass empty search prefix
-    response = omdbInsightEndpoint.getDeletedKeyInfo(10, "", null);
+    response = omdbInsightEndpoint.getDeletedKeyInfo(10, "", "");
     // In this case we get all the keys from the OMDB
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
