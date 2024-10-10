@@ -54,6 +54,10 @@ public class ContainerBalancerStatusInfo {
     return iterationsStatusInfo;
   }
 
+  /**
+   * Map to proto.
+   * @return proto representation
+   */
   public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo toProto() {
     return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo
         .newBuilder()
@@ -66,5 +70,4 @@ public class ContainerBalancerStatusInfo {
                 .collect(Collectors.toList())
         ).build();
   }
-
 }

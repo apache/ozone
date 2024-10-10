@@ -68,50 +68,98 @@ public class ContainerBalancerTaskIterationStatusInfo {
     this.sizeLeavingNodes = sizeLeavingNodes;
   }
 
+  /**
+   * Get number of iteration.
+   * @return iteration number
+   */
   public Integer getIterationNumber() {
     return iterationNumber;
   }
 
+  /**
+   * Get iteration result.
+   * @return iteration result
+   */
   public String getIterationResult() {
     return iterationResult;
   }
 
+  /**
+   * Get size in bytes scheduled to move in iteration.
+   * @return size in bytes
+   */
   public long getSizeScheduledForMove() {
     return sizeScheduledForMove;
   }
 
+  /**
+   * Get size in bytes moved in iteration.
+   * @return size in bytes
+   */
   public long getDataSizeMoved() {
     return dataSizeMoved;
   }
 
+  /**
+   * Get number of scheduled containers to move.
+   * @return number of scheduled containers to move
+   */
   public long getContainerMovesScheduled() {
     return containerMovesScheduled;
   }
 
+  /**
+   * Get number of successfully moved containers.
+   * @return number of successfully moved containers
+   */
   public long getContainerMovesCompleted() {
     return containerMovesCompleted;
   }
 
+  /**
+   * Get number of unsuccessfully moved containers.
+   * @return number of unsuccessfully moved containers
+   */
   public long getContainerMovesFailed() {
     return containerMovesFailed;
   }
 
+  /**
+   * Get number of moved with timeout containers.
+   * @return number of moved with timeout containers
+   */
   public long getContainerMovesTimeout() {
     return containerMovesTimeout;
   }
 
+  /**
+   * Get nodeId to size entering from node map.
+   * @return nodeId to size entering from node map
+   */
   public Map<UUID, Long> getSizeEnteringNodes() {
     return sizeEnteringNodes;
   }
 
+  /**
+   * Get nodeId to size leaving from node map.
+   * @return nodeId to size leaving from node map
+   */
   public Map<UUID, Long> getSizeLeavingNodes() {
     return sizeLeavingNodes;
   }
 
+  /**
+   * Get iteration duration
+   * @return iteration duration
+   */
   public long getIterationDuration() {
     return iterationDuration;
   }
 
+  /**
+   * Map to proto.
+   * @return proto representation
+   */
   public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo toProto() {
     return StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
         .setIterationNumber(getIterationNumber())
@@ -124,15 +172,22 @@ public class ContainerBalancerTaskIterationStatusInfo {
         .setContainerMovesFailed(getContainerMovesFailed())
         .setContainerMovesTimeout(getContainerMovesTimeout())
         .addAllSizeEnteringNodes(
-            mapNodes(getSizeEnteringNodes())
+            mapToProtoNodeTransferInfo(getSizeEnteringNodes())
         )
         .addAllSizeLeavingNodes(
-            mapNodes(getSizeLeavingNodes())
+            mapToProtoNodeTransferInfo(getSizeLeavingNodes())
         )
         .build();
   }
 
-  private List<StorageContainerLocationProtocolProtos.NodeTransferInfo> mapNodes(Map<UUID, Long> nodes) {
+  /**
+   * Map to proto node transfer info.
+   * @param nodes node id to node traffic size
+   * @return node transfer info proto representation
+   */
+  private List<StorageContainerLocationProtocolProtos.NodeTransferInfo> mapToProtoNodeTransferInfo(
+      Map<UUID, Long> nodes
+  ) {
     return nodes.entrySet()
         .stream()
         .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()

@@ -36,48 +36,46 @@ class DurationUtilTest {
     return Stream.of(
         arguments(
             "0s",
-            DurationUtil.getPrettyDuration(0)
+            DurationUtil.getPrettyDuration(Duration.ZERO)
         ),
         arguments(
             "2562047788015215h 30m 7s",
-            DurationUtil.getPrettyDuration(Long.MAX_VALUE)
+            DurationUtil.getPrettyDuration(Duration.ofSeconds(Long.MAX_VALUE))
         ),
         arguments(
             "1s",
-            DurationUtil.getPrettyDuration(Duration.ofSeconds(1).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofSeconds(1))
         ),
         arguments(
             "30s",
-            DurationUtil.getPrettyDuration(Duration.ofSeconds(30).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofSeconds(30))
         ),
         arguments(
             "1m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofMinutes(1).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofMinutes(1))
         ),
         arguments(
             "2m 30s",
-            DurationUtil.getPrettyDuration(Duration.ofMinutes(2).getSeconds() + Duration.ofSeconds(30).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofMinutes(2).plusSeconds(30))
         ),
         arguments(
             "1h 30m 45s",
             DurationUtil.getPrettyDuration(
-                Duration.ofHours(1).getSeconds() +
-                Duration.ofMinutes(30).getSeconds() +
-                Duration.ofSeconds(45).getSeconds())
+                Duration.ofHours(1).plusMinutes(30).plusSeconds(45))
         ),
         arguments(
             "24h 0m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofDays(1).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofDays(1))
         ),
         arguments(
             "48h 0m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofDays(2).getSeconds())
+            DurationUtil.getPrettyDuration(Duration.ofDays(2))
         )
     );
   }
 
-  private static Collection<Long> paramsForNegativeCases() {
-    return Arrays.asList(-1L, Long.MIN_VALUE);
+  private static Collection<Duration> paramsForNegativeCases() {
+    return Arrays.asList(Duration.ofSeconds(-1L), Duration.ofSeconds(Long.MIN_VALUE));
   }
 
   @ParameterizedTest
@@ -88,7 +86,7 @@ class DurationUtilTest {
 
   @ParameterizedTest
   @MethodSource("paramsForNegativeCases")
-  void testDuration(Long param) {
+  void testDuration(Duration param) {
     assertThrows(IllegalStateException.class, () -> DurationUtil.getPrettyDuration(param));
   }
 }

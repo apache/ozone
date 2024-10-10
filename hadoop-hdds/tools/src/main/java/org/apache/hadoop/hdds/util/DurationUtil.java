@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdds.util;
 
+import java.time.Duration;
+
+import static java.lang.String.format;
+
 /**
  * Pretty duration string representation.
  */
@@ -25,18 +29,24 @@ public final class DurationUtil {
   private DurationUtil() {
   }
 
-  public static String getPrettyDuration(long durationSeconds) {
-    String prettyDuration;
-    if (durationSeconds >= 0 && durationSeconds < 60) {
-      prettyDuration = durationSeconds + "s";
-    } else if (durationSeconds >= 60 && durationSeconds < 3600) {
-      prettyDuration = (durationSeconds / 60 + "m " + durationSeconds % 60 + "s");
-    } else if (durationSeconds >= 3600) {
-      prettyDuration =
-          (durationSeconds / 60 / 60 + "h " + durationSeconds / 60 % 60 + "m " + durationSeconds % 60 + "s");
+  /**
+   * Modify duration to string view. E.x. 1h 30m 45s, 2m 30s, 30s.
+   *
+   * @param duration duration
+   * @return duration in string format
+   */
+  public static String getPrettyDuration(Duration duration) {
+    long hours = duration.toHours();
+    long minutes = duration.getSeconds() / 60 % 60;
+    long seconds = duration.getSeconds() % 60;
+    if (hours > 0) {
+      return format("%dh %dm %ds", hours, minutes, seconds);
+    } else if (minutes > 0) {
+      return format("%dm %ds", minutes, seconds);
+    } else if (seconds >= 0) {
+      return format("%ds", seconds);
     } else {
-      throw new IllegalStateException("Incorrect duration exception" + durationSeconds);
+      throw new IllegalStateException("Incorrect duration exception" + duration);
     }
-    return prettyDuration;
   }
 }

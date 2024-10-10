@@ -71,7 +71,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
       if (verbose) {
         System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
-        long balancingDuration = OffsetDateTime.now().toEpochSecond() - startedAtInstant.getEpochSecond();
+        Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
         System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
         List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
@@ -174,7 +174,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %n%s",
             "Key", "Value",
             "Iteration number", iterationNumber == 0 ? "-" : iterationNumber,
-            "Iteration duration", getPrettyDuration(iterationDuration),
+            "Iteration duration", getPrettyDuration(Duration.ofSeconds(iterationDuration)),
             "Iteration result",
             iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,
             "Size scheduled to move", byteDesc(sizeScheduledForMove),

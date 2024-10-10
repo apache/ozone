@@ -64,6 +64,7 @@ import java.util.stream.Collectors;
 import static java.time.OffsetDateTime.now;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 /**
  * Container balancer task performs move of containers between over- and
@@ -310,45 +311,46 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private void saveIterationStatistic(Integer iterationNumber, IterationResult iR) {
+    long iterationDuration = now().toEpochSecond() - currentIterationStarted.toEpochSecond();
     ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-            iterationNumber,
-            iR.name(),
-        now().toEpochSecond() - currentIterationStarted.toEpochSecond(),
-            getSizeScheduledForMoveInLatestIteration(),
-            metrics.getDataSizeMovedInLatestIteration(),
-            metrics.getNumContainerMovesScheduledInLatestIteration(),
-            metrics.getNumContainerMovesCompletedInLatestIteration(),
-            metrics.getNumContainerMovesFailedInLatestIteration(),
-            metrics.getNumContainerMovesTimeoutInLatestIteration(),
-            findTargetStrategy.getSizeEnteringNodes()
-                    .entrySet()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                    .collect(
-                            Collectors.toMap(
-                                    entry -> entry.getKey().getUuid(),
-                                Map.Entry::getValue
-                            )
-                    ),
-            findSourceStrategy.getSizeLeavingNodes()
-                    .entrySet()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                    .collect(
-                            Collectors.toMap(
-                                    entry -> entry.getKey().getUuid(),
-                                    entry -> entry.getValue()
-                            )
-                    )
+        iterationNumber,
+        iR.name(),
+        iterationDuration,
+        getSizeScheduledForMoveInLatestIteration(),
+        metrics.getDataSizeMovedInLatestIteration(),
+        metrics.getNumContainerMovesScheduledInLatestIteration(),
+        metrics.getNumContainerMovesCompletedInLatestIteration(),
+        metrics.getNumContainerMovesFailedInLatestIteration(),
+        metrics.getNumContainerMovesTimeoutInLatestIteration(),
+        findTargetStrategy.getSizeEnteringNodes()
+            .entrySet()
+            .stream()
+            .filter(Objects::nonNull)
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    Map.Entry::getValue
+                )
+            ),
+        findSourceStrategy.getSizeLeavingNodes()
+            .entrySet()
+            .stream()
+            .filter(Objects::nonNull)
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    Map.Entry::getValue
+                )
+            )
     );
     iterationsStatistic.add(iterationStatistic);
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    int lastIterationNumber = iterationsStatistic.isEmpty() ? 0 :
-        iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
+    int lastIterationNumber = iterationsStatistic.isEmpty() ? 0
+        : iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
     long iterationDuration = getCurrentIterationDuration();
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         lastIterationNumber,
@@ -367,7 +369,7 @@ public class ContainerBalancerTask implements Runnable {
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(Collectors.toMap(
                     entry -> entry.getKey().getUuid(),
-                    entry -> entry.getValue()
+                    Map.Entry::getValue
                 )
             ),
         findSourceStrategy.getSizeLeavingNodes()
@@ -378,7 +380,7 @@ public class ContainerBalancerTask implements Runnable {
             .collect(
                 Collectors.toMap(
                     entry -> entry.getKey().getUuid(),
-                    entry -> entry.getValue()
+                    Map.Entry::getValue
                 )
             )
     );
@@ -718,28 +720,28 @@ public class ContainerBalancerTask implements Runnable {
       }
     }
 
-    countDatanodesInvolvedPerIteration =
-        selectedSources.size() + selectedTargets.size();
-    metrics.incrementNumDatanodesInvolvedInLatestIteration(
-        countDatanodesInvolvedPerIteration);
-    metrics.incrementNumContainerMovesScheduled(
-        metrics.getNumContainerMovesScheduledInLatestIteration());
-    metrics.incrementNumContainerMovesCompleted(
-        metrics.getNumContainerMovesCompletedInLatestIteration());
-    metrics.incrementNumContainerMovesTimeout(
-        metrics.getNumContainerMovesTimeoutInLatestIteration());
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
-    metrics.incrementDataSizeMovedInLatestIteration(
-        sizeActuallyMovedInLatestIteration);
-    metrics.incrementDataSizeMovedGB(
-        metrics.getDataSizeMovedGBInLatestIteration());
-    metrics.incrementNumContainerMovesFailed(
-        metrics.getNumContainerMovesFailedInLatestIteration());
+    countDatanodesInvolvedPerIteration = selectedSources.size() + selectedTargets.size();
+
+    metrics.incrementNumDatanodesInvolvedInLatestIteration(countDatanodesInvolvedPerIteration);
+
+    metrics.incrementNumContainerMovesScheduled(metrics.getNumContainerMovesScheduledInLatestIteration());
+
+    metrics.incrementNumContainerMovesCompleted(metrics.getNumContainerMovesCompletedInLatestIteration());
+
+    metrics.incrementNumContainerMovesTimeout(metrics.getNumContainerMovesTimeoutInLatestIteration());
+
+    metrics.incrementDataSizeMovedGBInLatestIteration(sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
+
+    metrics.incrementDataSizeMovedInLatestIteration(sizeActuallyMovedInLatestIteration);
+
+    metrics.incrementDataSizeMovedGB(metrics.getDataSizeMovedGBInLatestIteration());
+
+    metrics.incrementNumContainerMovesFailed(metrics.getNumContainerMovesFailedInLatestIteration());
+
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
             "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        StringUtils.byteDesc(sizeActuallyMovedInLatestIteration),
+        byteDesc(sizeActuallyMovedInLatestIteration),
         sizeActuallyMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
