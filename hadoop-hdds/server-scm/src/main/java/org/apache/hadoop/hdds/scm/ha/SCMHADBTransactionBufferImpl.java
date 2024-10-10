@@ -111,7 +111,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
-    LOG.info("Set latest Snapshot to {}", latestSnapshot);
+    LOG.info("{}: Set latest Snapshot to {}",
+        scm.getScmHAManager().getRatisServer().getDivision().getId(), latestSnapshot);
     this.latestSnapshot.set(latestSnapshot);
   }
 

@@ -346,7 +346,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
-      LOG.debug("applyTransaction {}", termIndex);
+      LOG.debug("{}: applyTransaction {}", getId(), termIndex);
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -438,9 +438,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-        LOG.info("OzoneManagerStateMachine un-pause completed. " +
+        LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
             "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
-                newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
+                getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }
   }
@@ -496,9 +496,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManager.setTransactionInfo(transactionInfo);
     ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
-    LOG.info("Taking snapshot. applied = {}, skipped = {}, " +
+    LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
         "notified = {}, current snapshot index = {}, took {} ms",
-            applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
+            getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
     return snapshot.getIndex();
   }
 

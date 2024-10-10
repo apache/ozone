@@ -151,7 +151,7 @@ public class SCMStateMachine extends BaseStateMachine {
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug("applyTransaction {}", TermIndex.valueOf(trx.getLogEntry()));
+        LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
       }
       try {
         applyTransactionFuture.complete(process(request));
