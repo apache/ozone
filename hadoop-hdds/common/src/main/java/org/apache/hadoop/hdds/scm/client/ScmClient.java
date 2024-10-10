@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -122,10 +123,11 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -135,10 +137,11 @@ public interface ScmClient extends Closeable {
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
    * @param replicationConfig container replication Config.
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count,
+  ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)

@@ -161,6 +161,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.list.max.count</name>
+    <value>4096</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>The max number of containers info could be included in
+      response of ListContainer request.</description>
+  </property>
+  <property>
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
