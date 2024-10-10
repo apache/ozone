@@ -619,33 +619,44 @@ public class ReconUtils {
    * 4. startPrefix provided, prevKey provided:
    *  - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix, up to the limit.
    *
-   * If limit is 0, all matching keys are retrieved. If both startPrefix and prevKey are empty, the method starts
-   * from the beginning of the table.
+   *  This method also handles the following limit scenarios:
+   *  - If limit == 0 or limit < -1, no records are returned.
+   *  - If limit == -1, all records are returned.
+   *  - For positive limits, it retrieves records up to the specified limit.
    */
   public static <T> Map<String, T> extractKeysFromTable(
       Table<String, T> table, String startPrefix, int limit, String prevKey)
       throws IOException {
 
     Map<String, T> matchedKeys = new LinkedHashMap<>();
+
+    // If limit == 0, return an empty result set
+    if (limit == 0 || limit < -1) {
+      return matchedKeys;
+    }
+
+    // If limit == -1, set it to Integer.MAX_VALUE to return all records
+    int actualLimit = (limit == -1) ? Integer.MAX_VALUE : limit;
+
     try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
 
       // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
       if (!prevKey.isEmpty()) {
         keyIter.seek(prevKey);
         if (keyIter.hasNext()) {
-          // Skip the previous key record
-          keyIter.next();
+          keyIter.next();  // Skip the previous key record
         }
       } else if (!startPrefix.isEmpty()) {
         // Scenario 3: startPrefix is provided but prevKey is empty, so seek to startPrefix
         keyIter.seek(startPrefix);
       }
+
       // Scenario 2: Both startPrefix and prevKey are empty (iterate from the start of the table)
       // No seeking needed; just start iterating from the first record in the table
       // This is implicit in the following loop, as the iterator will start from the beginning
 
       // Iterate through the keys while adhering to the limit (if the limit is not zero)
-      while (keyIter.hasNext() && (limit == 0 || matchedKeys.size() < limit)) {
+      while (keyIter.hasNext() && matchedKeys.size() < actualLimit) {
         Table.KeyValue<String, T> entry = keyIter.next();
         String dbKey = entry.getKey();
 

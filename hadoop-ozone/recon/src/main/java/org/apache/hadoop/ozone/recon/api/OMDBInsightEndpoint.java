@@ -434,22 +434,17 @@ public class OMDBInsightEndpoint {
     // Initialize the response object to hold the key information
     KeyInsightInfoResponse deletedKeyInsightInfo = new KeyInsightInfoResponse();
 
-    // Ensure the limit is non-negative
-    limit = Math.max(0, limit);
-
     boolean keysFound = false;
 
     try {
-      if (isNotBlank(startPrefix)) {
-        // Validate and apply prefix-based search
-        if (!validateStartPrefix(startPrefix)) {
-          return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
-        }
-        keysFound = getPendingForDeletionKeyInfo(limit, prevKey, startPrefix, deletedKeyInsightInfo);
-      } else {
-        // Retrieve all records without prefix
-        keysFound = getPendingForDeletionKeyInfo(limit, prevKey, "", deletedKeyInsightInfo);
+      // Validate startPrefix if it's provided
+      if (isNotBlank(startPrefix) && !validateStartPrefix(startPrefix)) {
+        return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
+
+      // Perform the search based on the limit, prevKey, and startPrefix
+      keysFound = getPendingForDeletionKeyInfo(limit, prevKey, startPrefix, deletedKeyInsightInfo);
+
     } catch (IllegalArgumentException e) {
       LOG.debug("Invalid startPrefix provided: {}", startPrefix, e);
       return createBadRequestResponse("Invalid startPrefix: " + e.getMessage());

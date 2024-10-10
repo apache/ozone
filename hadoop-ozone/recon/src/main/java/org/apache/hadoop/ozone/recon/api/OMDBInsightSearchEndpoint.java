@@ -124,7 +124,7 @@ public class OMDBInsightSearchEndpoint {
 
     try {
       // Validate the request parameters
-      if (!validateStartPrefixAndLimit(startPrefix)) {
+      if (!validateStartPrefix(startPrefix)) {
         return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
 
@@ -343,7 +343,7 @@ public class OMDBInsightSearchEndpoint {
     return keyEntityInfo;
   }
 
-  private boolean validateStartPrefixAndLimit(String startPrefix) {
+  private boolean validateStartPrefix(String startPrefix) {
     // Ensure startPrefix is not null or empty and starts with '/'
     if (startPrefix == null || startPrefix.isEmpty()) {
       return false;
