@@ -1923,7 +1923,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 1,
         "reason": null,
-        "keys": 1,
+        "keys": 4,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -1997,7 +1997,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2071,7 +2071,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2108,7 +2108,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 5,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2145,7 +2145,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2182,7 +2182,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 6,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a2",
         "replicas": [
           {
@@ -2219,7 +2219,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a3",
         "replicas": [
           {

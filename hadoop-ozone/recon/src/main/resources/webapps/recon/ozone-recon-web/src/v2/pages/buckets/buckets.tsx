@@ -26,6 +26,7 @@ import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
 import Search from '@/v2/components/search/search';
 import MultiSelect from '@/v2/components/select/multiSelect';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
+import BucketsTable, { COLUMNS } from '@/v2/components/tables/bucketsTable';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
@@ -39,7 +40,6 @@ import {
 } from '@/v2/types/bucket.types';
 
 import './buckets.less';
-import BucketsTable, { COLUMNS } from '@/v2/components/tables/bucketsTable';
 
 
 const LIMIT_OPTIONS: Option[] = [

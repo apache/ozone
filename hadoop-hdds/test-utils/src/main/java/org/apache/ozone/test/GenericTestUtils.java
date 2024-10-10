@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
@@ -203,6 +204,20 @@ public abstract class GenericTestUtils {
           "Thread diagnostics:\n" +
           TimedOutTestsListener.buildThreadDiagnosticString());
     }
+  }
+
+  public static <T extends Throwable> T assertThrows(
+      Class<T> expectedType,
+      Callable<? extends AutoCloseable> func) {
+    return Assertions.assertThrows(expectedType, () -> {
+      final AutoCloseable closeable = func.call();
+      try {
+        if (closeable != null) {
+          closeable.close();
+        }
+      } catch (Exception ignored) {
+      }
+    });
   }
 
   /**
