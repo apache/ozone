@@ -171,8 +171,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Path trashRootPath = trashRoot.getPath();
-              Runnable task = getEmptierTask(trashRootPath, trash, false);
+              Runnable task = getEmptierTask(trashRoot.getPath(), trash, false);
               om.getMetrics().incNumTrashRootsEnqueued();
               executor.submit(task);
             }

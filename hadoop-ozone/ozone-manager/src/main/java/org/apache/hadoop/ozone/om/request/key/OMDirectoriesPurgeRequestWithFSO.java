@@ -112,6 +112,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
+          omMetrics.incNumKeyDeletesWithoutOps();
           numSubDirMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
@@ -155,6 +156,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
 
           omMetrics.decNumKeys();
+          omMetrics.incNumKeyDeletesWithoutOps();
           numSubFilesMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);

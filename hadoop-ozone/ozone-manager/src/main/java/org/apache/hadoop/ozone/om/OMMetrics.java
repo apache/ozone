@@ -58,6 +58,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
   private @Metric MutableCounterLong numKeyDeletes;
+  private @Metric MutableCounterLong numKeyRetentionDeletes;
+  private @Metric MutableCounterLong numKeyTrashDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
@@ -120,6 +122,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookupFails;
   private @Metric MutableCounterLong numKeyRenameFails;
   private @Metric MutableCounterLong numKeyDeleteFails;
+  private @Metric MutableCounterLong numKeyRetentionDeleteFails;
+  private @Metric MutableCounterLong numKeyTrashDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
   private @Metric MutableCounterLong numVolumeListFails;
@@ -219,6 +223,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashRenames;
   private @Metric MutableCounterLong numTrashDeletes;
   private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashListKeys;
   private @Metric MutableCounterLong numTrashGetFileStatus;
   private @Metric MutableCounterLong numTrashGetTrashRoots;
   private @Metric MutableCounterLong numTrashExists;
@@ -799,9 +804,40 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeleteFails.incr();
   }
 
+  public void incNumKeyDeleteFails(int count) {
+    numKeyDeleteFails.incr(count);
+  }
+
+  public void incNumKeyRetentionDeleteFails(int count) {
+    numKeyRetentionDeleteFails.incr(count);
+  }
+
+  public void incNumKeyTrashDeleteFails(int count) {
+    numKeyTrashDeleteFails.incr(count);
+  }
+
   public void incNumKeyDeletes() {
     numKeyOps.incr();
     numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletesWithoutOps() {
+    numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletes(int count) {
+    numKeyOps.incr();
+    numKeyDeletes.incr(count);
+  }
+
+  public void incNumKeyRetentionDeletes(int count) {
+    numKeyOps.incr();
+    numKeyRetentionDeletes.incr(count);
+  }
+
+  public void incNumKeyTrashDeletes(int count) {
+    numKeyOps.incr();
+    numKeyTrashDeletes.incr(count);
   }
 
   public void incNumKeyCommits() {
@@ -1104,9 +1140,30 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyRetentionDeletes() {
+    return numKeyRetentionDeletes.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeletes() {
+    return numKeyTrashDeletes.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyDeletesFails() {
     return numKeyDeleteFails.value();
   }
+
+  @VisibleForTesting
+  public long getNumKeyRetentionDeleteFails() {
+    return numKeyRetentionDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeleteFails() {
+    return numKeyTrashDeleteFails.value();
+  }
+
 
   @VisibleForTesting
   public long getNumBucketListFails() {

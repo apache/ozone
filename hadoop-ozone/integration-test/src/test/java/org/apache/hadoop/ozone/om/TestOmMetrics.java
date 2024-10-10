@@ -476,6 +476,7 @@ public class TestOmMetrics {
     long initialNumCreateDirectory = getLongCounter("NumCreateDirectory", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
     long initialNumKeyRenames = getLongCounter("NumKeyRenames", omMetrics);
+    long numKeysDeleted = 0;
 
     // How long to wait for directory deleting service to clean up the files before aborting the test.
     final int timeoutMillis =
@@ -530,6 +531,7 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
 
     // Delete metric should be decremented by directory deleting service in the background.
+    long numKeysBeforeDeletion = getLongCounter("NumKeys", omMetrics);
     fs.delete(dirPath.getParent(), true);
     GenericTestUtils.waitFor(() -> {
       long keyCount = getLongCounter("NumKeys", getMetrics("OMMetrics"));
@@ -539,8 +541,8 @@ public class TestOmMetrics {
     assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
     // This is the number of times the create directory command was given, not the current number of directories.
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
-    // Directory delete counts as key delete. One command was given so the metric is incremented once.
-    assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
+    numKeysDeleted += numKeysBeforeDeletion - getLongCounter("NumKeys", omMetrics);
+    assertEquals(initialNumKeyDeletes + numKeysDeleted, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
 
     // Re-create the same tree as before, but this time delete the bucket recursively.
@@ -548,7 +550,9 @@ public class TestOmMetrics {
     fs.mkdirs(dirPath);
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumKeys + 4, getLongCounter("NumKeys", omMetrics));
+    numKeysBeforeDeletion = getLongCounter("NumKeys", omMetrics);
     fs.delete(bucketPath, true);
     GenericTestUtils.waitFor(() -> {
       long keyCount = getLongCounter("NumKeys", getMetrics("OMMetrics"));
@@ -557,8 +561,8 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
     assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 2, getLongCounter("NumCreateDirectory", omMetrics));
-    // One more keys delete request is given as part of the bucket delete to do a batch delete of its keys.
-    assertEquals(initialNumKeyDeletes + 2, getLongCounter("NumKeyDeletes", omMetrics));
+    numKeysDeleted += numKeysBeforeDeletion - getLongCounter("NumKeys", omMetrics);
+    assertEquals(initialNumKeyDeletes + numKeysDeleted, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
   }
 

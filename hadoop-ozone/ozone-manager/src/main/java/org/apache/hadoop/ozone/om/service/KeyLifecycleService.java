@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -812,7 +813,10 @@ public class KeyLifecycleService extends BackgroundService {
           builder.addAllUpdateIDs(keysList.updateIDSubList(startIndex, endIndex));
 
           DeleteKeyArgs deleteKeyArgs = builder.build();
-          DeleteKeysRequest deleteKeysRequest = DeleteKeysRequest.newBuilder().setDeleteKeys(deleteKeyArgs).build();
+          DeleteKeysRequest deleteKeysRequest = DeleteKeysRequest.newBuilder()
+                  .setDeleteKeys(deleteKeyArgs)
+                  .setSourceType(RequestSource.RETENTION)
+                  .build();
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {

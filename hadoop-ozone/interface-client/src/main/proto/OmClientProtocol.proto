@@ -1365,6 +1365,13 @@ message DeleteKeyRequest {
 
 message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
+    optional RequestSource sourceType = 2 [default = USER];
+}
+
+enum RequestSource {
+  USER = 1;
+  RETENTION = 2;
+  TRASH = 3;
 }
 
 message DeleteKeyArgs {
