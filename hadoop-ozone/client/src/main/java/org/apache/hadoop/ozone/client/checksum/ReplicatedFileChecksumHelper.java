@@ -60,7 +60,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   @Override
-  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos) {
+  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength) {
     return new ReplicatedBlockChecksumComputer(chunkInfos);
   }
 

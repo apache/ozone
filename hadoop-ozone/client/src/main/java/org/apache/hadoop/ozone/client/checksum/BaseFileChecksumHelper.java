@@ -153,7 +153,8 @@ public abstract class BaseFileChecksumHelper {
     checksumType = type;
   }
 
-  protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos);
+  protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength);
 
   protected abstract String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException;
 
@@ -219,7 +220,8 @@ public abstract class BaseFileChecksumHelper {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
-    AbstractBlockChecksumComputer blockChecksumComputer = getBlockChecksumComputer(chunkInfos);
+    AbstractBlockChecksumComputer blockChecksumComputer = getBlockChecksumComputer(chunkInfos,
+        keyLocationInfo.getLength());
     ByteBuffer blockChecksumByteBuffer =
         getBlockChecksumFromChunkChecksums(blockChecksumComputer);
     String blockChecksumForDebug =

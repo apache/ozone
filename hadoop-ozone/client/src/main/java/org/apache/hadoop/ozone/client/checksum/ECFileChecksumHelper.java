@@ -55,8 +55,9 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   @Override
-  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos) {
-    return new ECBlockChecksumComputer(chunkInfos, getKeyInfo());
+  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength) {
+    return new ECBlockChecksumComputer(chunkInfos, getKeyInfo(), blockLength);
   }
 
   @Override
