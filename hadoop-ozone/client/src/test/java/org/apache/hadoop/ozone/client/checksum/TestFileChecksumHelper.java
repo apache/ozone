@@ -59,6 +59,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -123,8 +124,8 @@ public class TestFileChecksumHelper {
     client.close();
   }
 
-  private OmKeyInfo omKeyInfo(String type, FileChecksum cachedChecksum, List<OmKeyLocationInfo> locationInfo) {
-    ReplicationConfig config = type.equals("EC") ? new ECReplicationConfig(6, 3)
+  private OmKeyInfo omKeyInfo(ReplicationType type, FileChecksum cachedChecksum, List<OmKeyLocationInfo> locationInfo) {
+    ReplicationConfig config = type == ReplicationType.EC ? new ECReplicationConfig(6, 3)
         : RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
 
     return new OmKeyInfo.Builder()
@@ -143,17 +144,17 @@ public class TestFileChecksumHelper {
         .build();
   }
 
-  private BaseFileChecksumHelper checksumHelper(String type, OzoneVolume mockVolume, OzoneBucket mockBucket,
+  private BaseFileChecksumHelper checksumHelper(ReplicationType type, OzoneVolume mockVolume, OzoneBucket mockBucket,
       int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
       throws IOException {
-    return type.equals("RATIS") ? new ReplicatedFileChecksumHelper(
+    return type == ReplicationType.RATIS ? new ReplicatedFileChecksumHelper(
         mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient)
         : new ECFileChecksumHelper(
         mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient, keyInfo);
   }
 
-  private Pipeline pipeline(String type, List<DatanodeDetails> datanodeDetails) {
-    ReplicationConfig config = type.equals("RATIS") ? RatisReplicationConfig
+  private Pipeline pipeline(ReplicationType type, List<DatanodeDetails> datanodeDetails) {
+    ReplicationConfig config = type == ReplicationType.RATIS ? RatisReplicationConfig
         .getInstance(HddsProtos.ReplicationFactor.THREE)
         : new ECReplicationConfig(6, 3);
 
@@ -166,8 +167,8 @@ public class TestFileChecksumHelper {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"EC", "RATIS"})
-  public void testEmptyBlock(String helperType) throws IOException {
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testEmptyBlock(ReplicationType helperType) throws IOException {
     // test the file checksum of a file with an empty block.
     RpcClient mockRpcClient = mock(RpcClient.class);
     OmKeyInfo omKeyInfo = omKeyInfo(helperType, noCachedChecksum, new ArrayList<>());
@@ -199,8 +200,8 @@ public class TestFileChecksumHelper {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"EC", "RATIS"})
-  public void testOneBlock(String helperType) throws IOException {
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testOneBlock(ReplicationType helperType) throws IOException {
     // test the file checksum of a file with one block.
     OzoneConfiguration conf = new OzoneConfiguration();
     RpcClient mockRpcClient = mock(RpcClient.class);
@@ -264,7 +265,7 @@ public class TestFileChecksumHelper {
     assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
-  private XceiverClientReply buildValidResponse(String type) {
+  private XceiverClientReply buildValidResponse(ReplicationType type) {
     // return a GetBlockResponse message of a block and its chunk checksums.
     ContainerProtos.DatanodeBlockID blockID =
         ContainerProtos.DatanodeBlockID.newBuilder()
@@ -282,20 +283,17 @@ public class TestFileChecksumHelper {
         .addChecksums(byteString)
         .build();
 
-    ContainerProtos.ChunkInfo chunkInfo = type.equals("RATIS") ?
-        ContainerProtos.ChunkInfo.newBuilder()
+    ContainerProtos.ChunkInfo.Builder chunkInfoBuilder = ContainerProtos.ChunkInfo.newBuilder()
         .setChunkName("dummy_chunk")
         .setOffset(1)
         .setLen(10)
-        .setChecksumData(checksumData)
-        .build()
-        : ContainerProtos.ChunkInfo.newBuilder()
-        .setChunkName("dummy_chunk")
-        .setOffset(1)
-        .setLen(10)
-        .setChecksumData(checksumData)
-        .setStripeChecksum(byteString)
-        .build();
+        .setChecksumData(checksumData);
+
+    if (type == ReplicationType.EC) {
+      chunkInfoBuilder.setStripeChecksum(byteString);
+    }
+
+    ContainerProtos.ChunkInfo chunkInfo = chunkInfoBuilder.build();
 
     ContainerProtos.BlockData blockData =
         ContainerProtos.BlockData.newBuilder()
