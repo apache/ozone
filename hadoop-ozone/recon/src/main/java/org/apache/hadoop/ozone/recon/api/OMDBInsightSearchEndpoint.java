@@ -55,7 +55,7 @@ import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResp
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconUtils.constructObjectPathWithPrefix;
-import static org.apache.hadoop.ozone.recon.ReconUtils.retrieveKeysFromTable;
+import static org.apache.hadoop.ozone.recon.ReconUtils.extractKeysFromTable;
 import static org.apache.hadoop.ozone.recon.ReconUtils.gatherSubPaths;
 import static org.apache.hadoop.ozone.recon.ReconUtils.validateNames;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
@@ -142,7 +142,7 @@ public class OMDBInsightSearchEndpoint {
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
       Map<String, OmKeyInfo> obsKeys =
-          retrieveKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+          extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -223,7 +223,8 @@ public class OMDBInsightSearchEndpoint {
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
-        matchedKeys.putAll(retrieveKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
+        matchedKeys.putAll(
+            extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -232,7 +233,8 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // If the search level is at the volume, bucket or key level, directly search the openFileTable
-    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
+    matchedKeys.putAll(
+        extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
     return matchedKeys;
   }
 

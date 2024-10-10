@@ -601,37 +601,60 @@ public class ReconUtils {
   }
 
   /**
-   * Common method to retrieve keys from a table based on a search prefix and a limit.
+   * Retrieves keys from the specified table based on pagination and prefix filtering.
+   * This method handles different scenarios based on the presence of startPrefix and prevKey,
+   * enabling efficient key retrieval from the table.
    *
-   * @param table       The table to retrieve keys from.
-   * @param startPrefix The search prefix to match keys against.
-   * @param limit       The maximum number of keys to retrieve.
-   * @param prevKey     The key to start after for the next set of records.
-   * @return A map of keys and their corresponding OmKeyInfo or RepeatedOmKeyInfo objects.
-   * @throws IOException If there are problems accessing the table.
+   * The method handles the following cases:
+   *
+   * 1. prevKey provided, startPrefix empty:
+   *  - Seeks to prevKey, skips it, and returns subsequent records up to the limit.
+   *
+   * 2. prevKey empty, startPrefix empty:
+   *  - Iterates from the beginning of the table, retrieving all records up to the limit.
+   *
+   * 3. startPrefix provided, prevKey empty:
+   *  - Seeks to the first key matching startPrefix and returns all matching keys up to the limit.
+   *
+   * 4. startPrefix provided, prevKey provided:
+   *  - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix, up to the limit.
+   *
+   * If limit is 0, all matching keys are retrieved. If both startPrefix and prevKey are empty, the method starts
+   * from the beginning of the table.
    */
-  public static <T> Map<String, T> retrieveKeysFromTable(
+  public static <T> Map<String, T> extractKeysFromTable(
       Table<String, T> table, String startPrefix, int limit, String prevKey)
       throws IOException {
+
     Map<String, T> matchedKeys = new LinkedHashMap<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
-      // If a previous key is provided, seek to the previous key and skip it.
+
+      // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
       if (!prevKey.isEmpty()) {
         keyIter.seek(prevKey);
         if (keyIter.hasNext()) {
-          // Skip the previous key
+          // Skip the previous key record
           keyIter.next();
         }
-      } else {
-        // If no previous key is provided, start from the search prefix.
+      } else if (!startPrefix.isEmpty()) {
+        // Scenario 3: startPrefix is provided but prevKey is empty, so seek to startPrefix
         keyIter.seek(startPrefix);
       }
-      while (keyIter.hasNext() && matchedKeys.size() < limit) {
+      // Scenario 2: Both startPrefix and prevKey are empty (iterate from the start of the table)
+      // No seeking needed; just start iterating from the first record in the table
+      // This is implicit in the following loop, as the iterator will start from the beginning
+
+      // Iterate through the keys while adhering to the limit (if the limit is not zero)
+      while (keyIter.hasNext() && (limit == 0 || matchedKeys.size() < limit)) {
         Table.KeyValue<String, T> entry = keyIter.next();
         String dbKey = entry.getKey();
-        if (!dbKey.startsWith(startPrefix)) {
-          break; // Exit the loop if the key no longer matches the prefix
+
+        // Scenario 3 & 4: If startPrefix is provided, ensure the key matches startPrefix
+        if (!startPrefix.isEmpty() && !dbKey.startsWith(startPrefix)) {
+          break;  // If the key no longer matches the prefix, exit the loop
         }
+
+        // Add the valid key-value pair to the results
         matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (IOException exception) {
