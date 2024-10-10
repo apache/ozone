@@ -255,7 +255,7 @@ const BucketsTable: React.FC<BucketsTableProps> = ({
         dataSource={getFilteredData(data)}
         columns={filterSelectedColumns()}
         loading={loading}
-        rowKey='volume'
+        rowKey={(record: Bucket) => `${record.volumeName}/${record.name}`}
         pagination={paginationConfig}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}

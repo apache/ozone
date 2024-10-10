@@ -32,10 +32,12 @@ Write keys
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     Execute             ozone sh volume create ${VOLUME}
     Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l OBJECT_STORE
-    Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE} bs=100000 count=15
-    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}1 ${TEMP_DIR}/${TESTFILE}
-    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}2 ${TEMP_DIR}/${TESTFILE}
-    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}3 ${TEMP_DIR}/${TESTFILE}
+    Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}1 bs=100 count=10
+    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}1 ${TEMP_DIR}/${TESTFILE}1
+    Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}2 bs=100 count=15
+    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}2 ${TEMP_DIR}/${TESTFILE}2
+    Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}3 bs=100 count=20
+    Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}3 ${TEMP_DIR}/${TESTFILE}3
     Execute             ozone sh key addacl -a user:systest:a ${VOLUME}/${BUCKET}/${TESTFILE}3
 
 *** Test Cases ***
@@ -71,6 +73,8 @@ Test ozone debug ldb scan
                         Should not contain      ${output}       objectID
                         Should not contain      ${output}       dataSize
                         Should not contain      ${output}       keyLocationVersions
+
+Test ozone debug ldb scan with filter option success
     # test filter option with one filter
     ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:equals:testfile2"
                         Should not contain      ${output}       testfile1
@@ -91,3 +95,32 @@ Test ozone debug ldb scan
                         Should not contain      ${output}       testfile1
                         Should not contain      ${output}       testfile2
                         Should not contain      ${output}       testfile3
+    # test filter option for size > 1200
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:greater:1200"
+                        Should not contain      ${output}       testfile1
+                        Should contain          ${output}       testfile2
+                        Should contain          ${output}       testfile3
+    # test filter option for size < 1200
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:lesser:1200"
+                        Should contain          ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should not contain      ${output}       testfile3
+    # test filter option with no records match both filters
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:lesser:1200,keyName:equals:testfile2"
+                        Should not contain      ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should not contain      ${output}       testfile3
+
+Test ozone debug ldb scan with filter option failure
+    # test filter option with invalid operator
+    ${output} =         Execute                         ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:lesserthan:1200"
+                        Should contain                  ${output}           Error: Invalid operator
+    # test filter option with invalid format
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:1200"
+                        Should contain                  ${output}           Error: Invalid format
+    # test filter option with invalid field
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="size:equals:1200"
+                        Should contain                  ${output}           Error: Invalid field
+    # test filter option for lesser/greater operator on non-numeric field
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:lesser:k1"
+                        Should contain                  ${output}           only on numeric values

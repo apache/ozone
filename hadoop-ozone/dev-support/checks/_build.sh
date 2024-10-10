@@ -26,5 +26,5 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
 
-export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
+export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
 mvn ${MAVEN_OPTIONS} clean "$@"

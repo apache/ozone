@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
@@ -51,6 +52,9 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @Spec
   private CommandSpec spec;
 
+  @ParentCommand
+  private OzoneAdmin parent;
+
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
@@ -60,5 +64,9 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return OzoneAdmin.class;
+  }
+
+  public OzoneAdmin getParent() {
+    return parent;
   }
 }

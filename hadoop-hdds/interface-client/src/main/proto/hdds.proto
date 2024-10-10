@@ -257,6 +257,7 @@ message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
     repeated string peerRoles = 3;
+    optional bool scmRatisEnabled = 4;
 }
 
 message AddScmRequestProto {

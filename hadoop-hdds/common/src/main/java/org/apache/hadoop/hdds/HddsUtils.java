@@ -878,4 +878,17 @@ public final class HddsUtils {
         ? Thread.currentThread().getStackTrace()
         : null;
   }
+
+  /**
+   * Logs a warning to report that the class is not closed properly.
+   */
+  public static void reportLeak(Class<?> clazz, String stackTrace, Logger log) {
+    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
+    if (stackTrace != null && LOG.isDebugEnabled()) {
+      String debugMessage = String.format("%nStackTrace for unclosed instance: %s",
+          stackTrace);
+      warning = warning.concat(debugMessage);
+    }
+    log.warn(warning);
+  }
 }
