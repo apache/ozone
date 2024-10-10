@@ -644,7 +644,7 @@ public class TestIncrementalContainerReportHandler {
           IOException, TimeoutException {
     List<DatanodeDetails> dns = IntStream.range(0, 5)
         .mapToObj(i -> randomDatanodeDetails()).collect(Collectors.toList());
-    dns.stream().forEach(dn -> nodeManager.register(dn, null, null));
+    dns.forEach(dn -> nodeManager.register(dn, null, null));
     ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo container = getECContainer(LifeCycleState.CLOSED,
             PipelineID.randomId(), replicationConfig);
