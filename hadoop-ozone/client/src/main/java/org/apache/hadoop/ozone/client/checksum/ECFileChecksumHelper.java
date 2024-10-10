@@ -102,7 +102,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
     setBytesPerCRC(bytesPerChecksum);
 
     ByteBuffer blockChecksumByteBuffer =
-        getBlockChecksumFromChunkChecksums(chunkInfos);
+        getBlockChecksumFromChunkChecksums(chunkInfos, keyLocationInfo.getLength());
     String blockChecksumForDebug =
         populateBlockChecksumBuf(blockChecksumByteBuffer);
 
@@ -140,10 +140,11 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   private ByteBuffer getBlockChecksumFromChunkChecksums(
-      List<ContainerProtos.ChunkInfo> chunkInfos) throws IOException {
+      List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength) throws IOException {
 
     AbstractBlockChecksumComputer blockChecksumComputer =
-        new ECBlockChecksumComputer(chunkInfos, getKeyInfo());
+        new ECBlockChecksumComputer(chunkInfos, getKeyInfo(), blockLength);
     blockChecksumComputer.compute(getCombineMode());
 
     return blockChecksumComputer.getOutByteBuffer();
