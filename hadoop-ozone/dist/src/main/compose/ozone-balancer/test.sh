@@ -30,4 +30,4 @@ source "$COMPOSE_DIR/../testlib.sh"
 # We need 4 dataNodes in this tests
 start_docker_env 4
 
-execute_robot_test ${OM} balancer/testBalancer.robot
+execute_robot_test ${OM} -v REPLICATION:THREE -v REPLICATION_TYPE:RATIS balancer/testBalancer.robot

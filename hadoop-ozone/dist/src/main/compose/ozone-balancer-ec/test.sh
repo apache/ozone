@@ -17,7 +17,7 @@
 
 #suite:balancer
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 export OM_SERVICE_ID="om"
 export OM=om1
@@ -26,6 +26,7 @@ export OZONE_REPLICATION_FACTOR=3
 
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env 5
+start_docker_env 6
+execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v REPLICATION_TYPE:EC balancer/testBalancerEC.robot
 
-execute_robot_test ${OM} balancer/testBalancerEC.robot
+
