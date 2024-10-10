@@ -110,6 +110,16 @@ Test ozone debug ldb scan with filter option success
                         Should not contain      ${output}       testfile1
                         Should not contain      ${output}       testfile2
                         Should not contain      ${output}       testfile3
+    # test filter option with regex matching numbers
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="dataSize:regex:^1[0-2]{3}$"
+                        Should contain          ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should not contain      ${output}       testfile3
+    # test filter option with regex matching string
+    ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:regex:^test.*[0-1]$"
+                        Should contain          ${output}       testfile1
+                        Should not contain      ${output}       testfile2
+                        Should not contain      ${output}       testfile3
 
 Test ozone debug ldb scan with filter option failure
     # test filter option with invalid operator
