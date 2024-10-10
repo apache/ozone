@@ -19,11 +19,12 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -32,14 +33,13 @@ import java.util.Collection;
  * Utility class to store User related utilities.
  */
 public final class OmUserUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmUserUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmUserUtils.class);
 
   private OmUserUtils() { }
 
   /**
-   * Get the users and groups that are S3 admin.
-   * @param conf  Stores the Ozone configuration being used
+   * Get the users and groups that are a part of S3 administrators.
+   * @param conf  Stores an instance of {@link OzoneConfiguration} being used
    * @return an instance of {@link OzoneAdmins} containing the S3 admin users and groups
    */
   public static OzoneAdmins getS3Admins(OzoneConfiguration conf) {
@@ -49,8 +49,8 @@ public final class OmUserUtils {
     } catch (IOException ie) {
       s3Admins = null;
     }
-    Collection<String> s3AdminGroups =
-        OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
+    Collection<String> s3AdminGroups = OzoneConfigUtil.getS3AdminsGroupsFromConfig(conf);
+
     if (LOG.isDebugEnabled()) {
       if (null == s3Admins) {
         LOG.debug("S3 Admins are not set in configuration");
@@ -63,25 +63,23 @@ public final class OmUserUtils {
   }
 
   /**
-   * Check if the provided user is a part of the S3 admins.
-   * @param user Stores the user to verify
-   * @param conf Stores the Ozone configuration being used
-   * @return true if the provided user is an S3 admin else false
+   * Check if the provided user is an S3 administrator.
+   * @param user an instance of {@link UserGroupInformation} with information about the user to verify
+   * @param s3Admins an instance of {@link OzoneAdmins} containing information of the S3 administrator users and groups in the system
+   * @return {@code true} if the provided user is an S3 administrator else {@code false}
    */
-  public static boolean isS3Admin(UserGroupInformation user,
-                                  OzoneConfiguration conf) {
-    OzoneAdmins s3Admins = getS3Admins(conf);
+  public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneAdmins s3Admins) {
     return null != user && s3Admins.isAdmin(user);
   }
 
   /**
-   * Check if the provided user is a part of the S3 admins.
-   * @param user Stores the user to verify
-   * @param s3Admins Stores the users and groups that are admins
-   * @return true if the provided user is an S3 admin else false
+   * Check if the provided user is an S3 administrator.
+   * @param user an instance of {@link UserGroupInformation} with information about the user to verify
+   * @param conf Stores an instance of {@link OzoneConfiguration} being used
+   * @return {@code true} if the provided user is an S3 administrator else {@code false}
    */
-  public static boolean isS3Admin(UserGroupInformation user,
-                                  OzoneAdmins s3Admins) {
-    return null != user && s3Admins.isAdmin(user);
+  public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneConfiguration conf) {
+    OzoneAdmins s3Admins = getS3Admins(conf);
+    return isS3Admin(user, s3Admins);
   }
 }
