@@ -216,7 +216,7 @@ public class TestLDBCli {
         Arguments.of(
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Default", Pair.of(0, "")),
-            Named.of("Filter dataSize>500 using regex", Arrays.asList("--filter", "dataSize:regex:^5.*$")),
+            Named.of("Filter keys whose dataSize digits start with 5 using regex", Arrays.asList("--filter", "dataSize:regex:^5.*$")),
             Named.of("Expect empty result", null)
         ),
         Arguments.of(
