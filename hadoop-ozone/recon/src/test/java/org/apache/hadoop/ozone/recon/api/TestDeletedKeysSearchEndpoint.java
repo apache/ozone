@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -80,7 +80,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OMDBInsightSearchEndpoint deletedKeysSearchEndpoint;
+  private OMDBInsightEndpoint omdbInsightEndpoint;
   private OzoneConfiguration ozoneConfiguration;
   private static final String ROOT_PATH = "/";
   private OMMetadataManager omMetadataManager;
@@ -99,17 +99,15 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
+            .addBinding(OzoneStorageContainerManager.class,
+                ReconStorageContainerManagerFacade.class)
+            .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(OzoneStorageContainerManager.class,
-                mock(OzoneStorageContainerManager.class))
-            .addBinding(ReconNamespaceSummaryManager.class,
-                mock(ReconNamespaceSummaryManager.class))
-            .addBinding(OMDBInsightSearchEndpoint.class)
+            .addBinding(OMDBInsightEndpoint.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    deletedKeysSearchEndpoint = reconTestInjector.getInstance(OMDBInsightSearchEndpoint.class);
-
+    omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     populateOMDB();
   }
 
@@ -123,31 +121,40 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testRootLevelSearchRestriction() throws IOException {
     String rootPath = "/";
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys(rootPath, 20, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", rootPath);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
-        "Expected a message indicating the path must be at the bucket level or deeper");
-
-    rootPath = "";
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(rootPath, 20, "");
-    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-    entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
         "Expected a message indicating the path must be at the bucket level or deeper");
   }
 
   @Test
+  public void testEmptySearchPrefix() throws IOException {
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(100, "", "");
+    // In this case we get all the keys from the OMDB
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(16, result.getRepeatedOmKeyInfoList().size());
+
+    // Set limit to 10 and pass empty search prefix
+    response = omdbInsightEndpoint.getDeletedKeyInfo(10, "", null);
+    // In this case we get all the keys from the OMDB
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(10, result.getRepeatedOmKeyInfoList().size());
+  }
+
+  @Test
   public void testVolumeLevelSearchRestriction() throws IOException {
     String volumePath = "/vola";
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys(volumePath, 20, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", volumePath);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
         "Expected a message indicating the path must be at the bucket level or deeper");
 
     volumePath = "/volb";
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(volumePath, 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", volumePath);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
@@ -157,23 +164,23 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testBucketLevelSearch() throws IOException {
     // Search inside FSO bucket
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 20, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb1");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(7, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 2, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(2, "", "/volb/bucketb1");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
     // Search inside OBS bucket
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(9, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("/vola/nonexistentbucket", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/vola/nonexistentbucket");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -182,20 +189,17 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testDirectoryLevelSearch() throws IOException {
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1/dirc1", 20,
-            "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(4, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1/dirc2", 20,
-            "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc2");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(5, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volb/bucketb1/nonexistentdir", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb1/nonexistentdir");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -206,22 +210,22 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   public void testKeyLevelSearch() throws IOException {
     // FSO Bucket key-level search
     Response response =
-        deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1/fileb1", 10,
-            "");
+        omdbInsightEndpoint.getDeletedKeyInfo(10, "", "/volb/bucketb1/fileb1");
     assertEquals(200, response.getStatus());
-    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1/fileb2", 10,
-            "");
+    response =
+        omdbInsightEndpoint.getDeletedKeyInfo(10, "", "/volb/bucketb1/fileb2");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     // Test with non-existent key
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volb/bucketb1/nonexistentfile", 1, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    response = omdbInsightEndpoint.getDeletedKeyInfo(1, "", "/volb/bucketb1/nonexistentfile");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
+        response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -231,15 +235,13 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   public void testKeyLevelSearchUnderDirectory() throws IOException {
     // FSO Bucket key-level search under directory
     Response response =
-        deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1/dir1/file1",
-            10, "");
+        omdbInsightEndpoint.getDeletedKeyInfo(10, "", "/volb/bucketb1/dir1/file1");
     assertEquals(200, response.getStatus());
-    KeyInsightInfoResponse result =
-        (KeyInsightInfoResponse) response.getEntity();
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volb/bucketb1/dir1/nonexistentfile", 10, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(10, "",
+        "/volb/bucketb1/dir1/nonexistentfile");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
         response.getStatus());
     String entity = (String) response.getEntity();
@@ -251,32 +253,28 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   public void testSearchUnderNestedDirectory() throws IOException {
     // OBS Bucket nested directory search
     Response response =
-        deletedKeysSearchEndpoint.searchDeletedKeys("/volc/bucketc1/dirc1", 20, "");
+        omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(4, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volc/bucketc1/dirc1/dirc11", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volc/bucketc1/dirc1/dirc11/dirc111", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11/dirc111");
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volc/bucketc1/dirc1/dirc11/dirc111/nonexistentfile", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11/dirc111/nonexistentfile");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(
-        "/volc/bucketc1/dirc1/dirc11/nonexistentfile", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11/nonexistentfile");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -285,7 +283,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testLimitSearch() throws IOException {
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 2, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(2, "", "/volb/bucketb1");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
@@ -294,13 +292,13 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testSearchDeletedKeysWithBadRequest() throws IOException {
     int negativeLimit = -1;
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys("@323232", negativeLimit, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(negativeLimit, "", "@323232");
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
         "Expected a message indicating the path must be at the bucket level or deeper");
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys("///", 20, "");
+    response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "///");
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
@@ -309,7 +307,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testLastKeyInResponse() throws IOException {
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb1", 20, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb1");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(7, result.getRepeatedOmKeyInfoList().size());
@@ -330,7 +328,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     int limit = 2;
     String prevKey = "";
 
-    Response response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
@@ -338,7 +336,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
+    response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
@@ -346,7 +344,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
+    response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getRepeatedOmKeyInfoList().size());
@@ -354,7 +352,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     prevKey = result.getLastKey();
     assertNotNull(prevKey, "Last key should not be null");
 
-    response = deletedKeysSearchEndpoint.searchDeletedKeys(startPrefix, limit, prevKey);
+    response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
     assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
@@ -373,13 +371,80 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testSearchInEmptyBucket() throws IOException {
-    Response response =
-        deletedKeysSearchEndpoint.searchDeletedKeys("/volb/bucketb2", 20, "");
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb2");
     assertEquals(404, response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
   }
+
+  @Test
+  public void testPrevKeyProvidedStartPrefixEmpty() throws IOException {
+    // Case 1: prevKey provided, startPrefix empty
+    // Seek to the prevKey, skip the first matching record, then return remaining records until limit is reached.
+    String prevKey = "/volb/bucketb1/fileb3"; // This key exists, will skip it
+    int limit = 3;
+    String startPrefix = ""; // Empty startPrefix
+
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+
+    // Assert that we get the next 3 records after skipping the prevKey
+    assertEquals(3, result.getRepeatedOmKeyInfoList().size());
+    assertEquals("fileb4", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+  }
+
+  @Test
+  public void testPrevKeyEmptyStartPrefixEmpty() throws IOException {
+    // Case 2: prevKey empty, startPrefix empty
+    // No need to seek, start from the first record and return records until limit is reached.
+    String prevKey = ""; // Empty prevKey
+    int limit = 100;
+    String startPrefix = ""; // Empty startPrefix
+
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+
+    // Assert that we get all the 16 records currently in the deleted keys table
+    assertEquals(16, result.getRepeatedOmKeyInfoList().size());
+  }
+
+  @Test
+  public void testPrevKeyEmptyStartPrefixProvided() throws IOException {
+    // Case 3: prevKey empty, startPrefix provided
+    // Seek to the startPrefix and return matching records until limit is reached.
+    String prevKey = ""; // Empty prevKey
+    int limit = 2;
+    String startPrefix = "/volb/bucketb1/fileb"; // Seek to startPrefix and match files
+
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+
+    // Assert that we get the first 2 records that match startPrefix
+    assertEquals(2, result.getRepeatedOmKeyInfoList().size());
+    assertEquals("fileb1", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+  }
+
+  @Test
+  public void testPrevKeyProvidedStartPrefixProvided() throws IOException {
+    // Case 4: prevKey provided, startPrefix provided
+    // Seek to the prevKey, skip it, and return remaining records matching startPrefix until limit is reached.
+    String prevKey = "/volb/bucketb1/fileb2"; // This key exists, will skip it
+    int limit = 3;
+    String startPrefix = "/volb/bucketb1"; // Matching prefix
+
+    Response response = omdbInsightEndpoint.getDeletedKeyInfo(limit, prevKey, startPrefix);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+
+    // Assert that we get the next 2 records that match startPrefix after skipping prevKey having fileb2
+    assertEquals(3, result.getRepeatedOmKeyInfoList().size());
+    assertEquals("fileb3", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+  }
+
 
   /**
    * Populates the OMDB with a set of deleted keys for testing purposes.
@@ -408,7 +473,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
    *   │   │   │   ├── filec3 (Size: 1000KB)
    *   │   │   │   ├── filec4 (Size: 1000KB)
    *   │   │   │   ├── filec5 (Size: 1000KB)
-   *   │   │   │   ├── filgetec6 (Size: 1000KB)
+   *   │   │   │   ├── filec6 (Size: 1000KB)
    *   │   │   │   └── filec7 (Size: 1000KB)
    *
    * @throws Exception if an error occurs while creating deleted keys.

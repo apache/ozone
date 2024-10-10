@@ -48,6 +48,7 @@ public final class ReconConstants {
   public static final String DEFAULT_BATCH_NUMBER = "1";
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
+  public static final String RECON_QUERY_START_PREFIX = "startPrefix";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
   public static final String RECON_OM_INSIGHTS_DEFAULT_START_PREFIX = "/";
@@ -55,8 +56,7 @@ public final class ReconConstants {
   public static final String RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY = "";
   public static final String RECON_QUERY_FILTER = "missingIn";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
-  public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =
-      "0";
+  public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE = "0";
   // Only include containers that are missing in OM by default
   public static final String DEFAULT_FILTER_FOR_MISSING_CONTAINERS = "SCM";
   public static final String RECON_QUERY_LIMIT = "limit";

@@ -66,19 +66,24 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
@@ -211,7 +216,7 @@ public class OMDBInsightEndpoint {
               keyIter = openKeyTable.iterator()) {
         boolean skipPrevKey = false;
         String seekKey = prevKey;
-        if (!skipPrevKeyDone && StringUtils.isNotBlank(prevKey)) {
+        if (!skipPrevKeyDone && isNotBlank(prevKey)) {
           skipPrevKey = true;
           Table.KeyValue<String, OmKeyInfo> seekKeyValue =
               keyIter.seek(seekKey);
@@ -219,7 +224,7 @@ public class OMDBInsightEndpoint {
           // if not, then return empty result
           // In case of an empty prevKeyPrefix, all the keys are returned
           if (seekKeyValue == null ||
-              (StringUtils.isNotBlank(prevKey) &&
+              (isNotBlank(prevKey) &&
                   !seekKeyValue.getKey().equals(prevKey))) {
             continue;
           }
@@ -339,62 +344,6 @@ public class OMDBInsightEndpoint {
     return record != null ? record.getValue() : 0L;
   }
 
-  private void getPendingForDeletionKeyInfo(
-      int limit,
-      String prevKey,
-      KeyInsightInfoResponse deletedKeyAndDirInsightInfo) {
-    List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
-        deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        omMetadataManager.getDeletedTable();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String,
-            RepeatedOmKeyInfo>>
-            keyIter = deletedTable.iterator()) {
-      boolean skipPrevKey = false;
-      String seekKey = prevKey;
-      String lastKey = "";
-      if (StringUtils.isNotBlank(prevKey)) {
-        skipPrevKey = true;
-        Table.KeyValue<String, RepeatedOmKeyInfo> seekKeyValue =
-            keyIter.seek(seekKey);
-        // check if RocksDB was able to seek correctly to the given key prefix
-        // if not, then return empty result
-        // In case of an empty prevKeyPrefix, all the keys are returned
-        if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(prevKey) &&
-                !seekKeyValue.getKey().equals(prevKey))) {
-          return;
-        }
-      }
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        String key = kv.getKey();
-        lastKey = key;
-        RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
-        // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKey)) {
-          continue;
-        }
-        updateReplicatedAndUnReplicatedTotal(deletedKeyAndDirInsightInfo,
-            repeatedOmKeyInfo);
-        repeatedOmKeyInfoList.add(repeatedOmKeyInfo);
-        if ((repeatedOmKeyInfoList.size()) == limit) {
-          break;
-        }
-      }
-      deletedKeyAndDirInsightInfo.setLastKey(lastKey);
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    } catch (IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
-    } catch (Exception ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   /** Retrieves the summary of deleted keys.
    *
    * This method calculates and returns a summary of deleted keys.
@@ -428,6 +377,7 @@ public class OMDBInsightEndpoint {
    * limit - limits the number of key/files returned.
    * prevKey - E.g. /vol1/bucket1/key1, this will skip keys till it
    * seeks correctly to the given prevKey.
+   * startPrefix - E.g. /vol1/bucket1, this will return keys matching this prefix.
    * Sample API Response:
    * {
    *   "lastKey": "vol1/bucket1/key1",
@@ -476,15 +426,157 @@ public class OMDBInsightEndpoint {
   @GET
   @Path("/deletePending")
   public Response getDeletedKeyInfo(
-      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-      int limit,
-      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKey) {
-    KeyInsightInfoResponse
-        deletedKeyInsightInfo = new KeyInsightInfoResponse();
-    getPendingForDeletionKeyInfo(limit, prevKey,
-        deletedKeyInsightInfo);
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY) String prevKey,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_START_PREFIX) String startPrefix) {
+
+    // Initialize the response object to hold the key information
+    KeyInsightInfoResponse deletedKeyInsightInfo = new KeyInsightInfoResponse();
+
+    // Ensure the limit is non-negative
+    limit = Math.max(0, limit);
+
+    boolean keysFound = false;
+
+    try {
+      if (isNotBlank(startPrefix)) {
+        // Validate and apply prefix-based search
+        if (!validateStartPrefix(startPrefix)) {
+          return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
+        }
+        keysFound = getPendingForDeletionKeyInfo(limit, prevKey, startPrefix, deletedKeyInsightInfo);
+      } else {
+        // Retrieve all records without prefix
+        keysFound = getPendingForDeletionKeyInfo(limit, prevKey, "", deletedKeyInsightInfo);
+      }
+    } catch (IllegalArgumentException e) {
+      LOG.debug("Invalid startPrefix provided: {}", startPrefix, e);
+      return createBadRequestResponse("Invalid startPrefix: " + e.getMessage());
+    } catch (IOException e) {
+      LOG.debug("I/O error while searching deleted keys in OM DB", e);
+      return createInternalServerErrorResponse("Error searching deleted keys in OM DB: " + e.getMessage());
+    } catch (Exception e) {
+      LOG.debug("Unexpected error occurred while searching deleted keys", e);
+      return createInternalServerErrorResponse("Unexpected error: " + e.getMessage());
+    }
+
+    if (!keysFound) {
+      return noMatchedKeysResponse("");
+    }
+
     return Response.ok(deletedKeyInsightInfo).build();
+  }
+
+  /**
+   * Retrieves keys pending deletion based on startPrefix, filtering keys matching the prefix.
+   *
+   * @param limit                 The limit of records to return.
+   * @param prevKey               Pagination key.
+   * @param startPrefix           The search prefix.
+   * @param deletedKeyInsightInfo The response object to populate.
+   */
+  private boolean getPendingForDeletionKeyInfo(
+      int limit, String prevKey, String startPrefix,
+      KeyInsightInfoResponse deletedKeyInsightInfo) throws IOException {
+
+    long replicatedTotal = 0;
+    long unreplicatedTotal = 0;
+    boolean keysFound = false;
+    String lastKey = null;
+
+    // Search for deleted keys in DeletedTable
+    Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+    Map<String, RepeatedOmKeyInfo> deletedKeys =
+        retrieveKeysFromTable(deletedTable, startPrefix, limit, prevKey);
+
+    // Iterate over the retrieved keys and populate the response
+    for (Map.Entry<String, RepeatedOmKeyInfo> entry : deletedKeys.entrySet()) {
+      keysFound = true;
+      RepeatedOmKeyInfo repeatedOmKeyInfo = entry.getValue();
+
+      // We know each RepeatedOmKeyInfo has just one OmKeyInfo object
+      OmKeyInfo keyInfo = repeatedOmKeyInfo.getOmKeyInfoList().get(0);
+      KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
+
+      // Add the key directly to the list without classification
+      deletedKeyInsightInfo.getRepeatedOmKeyInfoList().add(repeatedOmKeyInfo);
+
+      replicatedTotal += keyInfo.getReplicatedSize();
+      unreplicatedTotal += keyInfo.getDataSize();
+
+      lastKey = entry.getKey(); // Update lastKey
+    }
+
+    // Set the aggregated totals in the response
+    deletedKeyInsightInfo.setReplicatedDataSize(replicatedTotal);
+    deletedKeyInsightInfo.setUnreplicatedDataSize(unreplicatedTotal);
+    deletedKeyInsightInfo.setLastKey(lastKey);
+
+    return keysFound;
+  }
+
+  /**
+   * Retrieves keys from the specified table based on pagination and prefix filtering.
+   * This method handles different scenarios based on the presence of startPrefix and prevKey,
+   * enabling efficient key retrieval from the table.
+   *
+   * The method handles the following cases:
+   *
+   * 1. prevKey provided, startPrefix empty:
+   *  - Seeks to prevKey, skips it, and returns subsequent records up to the limit.
+   *
+   * 2. prevKey empty, startPrefix empty:
+   *  - Iterates from the beginning of the table, retrieving all records up to the limit.
+   *
+   * 3. startPrefix provided, prevKey empty:
+   *  - Seeks to the first key matching startPrefix and returns all matching keys up to the limit.
+   *
+   * 4. startPrefix provided, prevKey provided:
+   *  - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix, up to the limit.
+   *
+   * If limit is 0, all matching keys are retrieved. If both startPrefix and prevKey are empty, the method starts
+   * from the beginning of the table.
+   */
+  public static <T> Map<String, T> retrieveKeysFromTable(
+      Table<String, T> table, String startPrefix, int limit, String prevKey)
+      throws IOException {
+
+    Map<String, T> matchedKeys = new LinkedHashMap<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
+
+      // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
+      if (!prevKey.isEmpty()) {
+        keyIter.seek(prevKey);
+        if (keyIter.hasNext()) {
+          // Skip the previous key record
+          keyIter.next();
+        }
+      } else if (!startPrefix.isEmpty()) {
+        // Scenario 3: startPrefix is provided but prevKey is empty, so seek to startPrefix
+        keyIter.seek(startPrefix);
+      }
+      // Scenario 2: Both startPrefix and prevKey are empty (iterate from the start of the table)
+      // No seeking needed; just start iterating from the first record in the table
+      // This is implicit in the following loop, as the iterator will start from the beginning
+
+      // Iterate through the keys while adhering to the limit (if the limit is not zero)
+      while (keyIter.hasNext() && (limit == 0 || matchedKeys.size() < limit)) {
+        Table.KeyValue<String, T> entry = keyIter.next();
+        String dbKey = entry.getKey();
+
+        // Scenario 3 & 4: If startPrefix is provided, ensure the key matches startPrefix
+        if (!startPrefix.isEmpty() && !dbKey.startsWith(startPrefix)) {
+          break;  // If the key no longer matches the prefix, exit the loop
+        }
+
+        // Add the valid key-value pair to the results
+        matchedKeys.put(dbKey, entry.getValue());
+      }
+    } catch (IOException exception) {
+      LOG.error("Error retrieving keys from table for path: {}", startPrefix, exception);
+      throw exception;
+    }
+    return matchedKeys;
   }
 
   /**
@@ -526,7 +618,7 @@ public class OMDBInsightEndpoint {
       boolean skipPrevKey = false;
       String seekKey = prevKey;
       String lastKey = "";
-      if (StringUtils.isNotBlank(prevKey)) {
+      if (isNotBlank(prevKey)) {
         skipPrevKey = true;
         Table.KeyValue<String, OmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
@@ -534,7 +626,7 @@ public class OMDBInsightEndpoint {
         // if not, then return empty result
         // In case of an empty prevKeyPrefix, all the keys are returned
         if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(prevKey) &&
+            (isNotBlank(prevKey) &&
                 !seekKeyValue.getKey().equals(prevKey))) {
           return;
         }
@@ -1161,7 +1253,7 @@ public class OMDBInsightEndpoint {
     try (
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
 
-      if (!paramInfo.isSkipPrevKeyDone() && StringUtils.isNotBlank(seekKey)) {
+      if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;
         Table.KeyValue<String, OmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
@@ -1277,17 +1369,18 @@ public class OMDBInsightEndpoint {
     dirSummary.put("totalDeletedDirectories", deletedDirCount);
   }
 
-  private void updateReplicatedAndUnReplicatedTotal(
-      KeyInsightInfoResponse deletedKeyAndDirInsightInfo,
-      RepeatedOmKeyInfo repeatedOmKeyInfo) {
-    repeatedOmKeyInfo.getOmKeyInfoList().forEach(omKeyInfo -> {
-      deletedKeyAndDirInsightInfo.setUnreplicatedDataSize(
-          deletedKeyAndDirInsightInfo.getUnreplicatedDataSize() +
-              omKeyInfo.getDataSize());
-      deletedKeyAndDirInsightInfo.setReplicatedDataSize(
-          deletedKeyAndDirInsightInfo.getReplicatedDataSize() +
-              omKeyInfo.getReplicatedSize());
-    });
+  private boolean validateStartPrefix(String startPrefix) {
+
+    // Ensure startPrefix starts with '/' for non-empty values
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path to ensure it's at least at the bucket level (volume/bucket).
+    String[] pathComponents = startPrefix.split("/");
+    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+      return false; // Invalid if not at bucket level or deeper
+    }
+
+    return true;
   }
 
   private String createPath(OmKeyInfo omKeyInfo) {
