@@ -36,7 +36,7 @@ Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Execute                 ozone sh volume create /${VOLUME}
-    Execute                 ozone sh bucket create --replication rs-3-2-1024k --type EC /${VOLUME}/${BUCKET}
+    Execute                 ozone sh bucket create --replication ${REPLICATION} --type ${TYPE} /${VOLUME}/${BUCKET}
 
 
 Datanode In Maintenance Mode
@@ -112,7 +112,7 @@ Create Multiple Keys
             ${fileName} =           Set Variable            file-${INDEX}.txt
             ${key} =    Set Variable    /${VOLUME}/${BUCKET}/${fileName}
             LOG             ${fileName}
-            Create Key    ${key}    ${file}    --replication=rs-3-2-1024k --type=EC
+            Create Key    ${key}    ${file}    --replication=${REPLICATION} --type=${TYPE}
             Key Should Match Local File    ${key}      ${file}
     END
 
@@ -147,7 +147,7 @@ Get Datanode Ozone Used Bytes Info
     [return]          ${result}
 
 ** Test Cases ***
-Verify Container Balancer for RATIS containers
+Verify Container Balancer for RATIS/EC containers
     Prepare For Tests
 
     Datanode In Maintenance Mode
@@ -155,7 +155,7 @@ Verify Container Balancer for RATIS containers
     ${uuid} =                   Get Uuid
     Datanode Usageinfo          ${uuid}
 
-    Create Multiple Keys          3
+    Create Multiple Keys          ${KEYS}
 
     Close All Containers
 
@@ -176,8 +176,8 @@ Verify Container Balancer for RATIS containers
 
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
-    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * 3.5
-    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * 3
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * ${UPPER_LIMIT}
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * ${LOWER_LIMIT}
 
 
 
