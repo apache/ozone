@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
+import org.apache.hadoop.hdds.utils.db.cache.NoTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
@@ -125,6 +126,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
               CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
+    } else if (cacheType == CacheType.NO_CACHE) {
+      cache = new NoTableCache<>();
     } else {
       cache = new PartialTableCache<>(threadNamePrefix);
     }
@@ -549,7 +552,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @VisibleForTesting
-  public TableCache<KEY, VALUE> getCache() {
+  TableCache<KEY, VALUE> getCache() {
     return cache;
   }
 

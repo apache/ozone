@@ -44,7 +44,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
+public class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
@@ -110,7 +110,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   private String owner;
 
-  private OmBucketInfo(Builder b) {
+  protected OmBucketInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;

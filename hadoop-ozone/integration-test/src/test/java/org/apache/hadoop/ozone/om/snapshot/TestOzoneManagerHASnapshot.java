@@ -108,7 +108,6 @@ public class TestOzoneManagerHASnapshot {
 
   // Test snapshot diff when OM restarts in HA OM env.
   @Test
-  @Unhealthy("HDDS-11415 follower cache update")
   public void testSnapshotDiffWhenOmLeaderRestart()
       throws Exception {
     String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(10);
@@ -165,7 +164,6 @@ public class TestOzoneManagerHASnapshot {
   }
 
   @Test
-  @Unhealthy("HDDS-11415 follower cache update")
   public void testSnapshotIdConsistency() throws Exception {
     createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
 
@@ -203,7 +201,6 @@ public class TestOzoneManagerHASnapshot {
    * passed or empty.
    */
   @Test
-  @Unhealthy("HDDS-11415 follower cache update")
   public void testSnapshotNameConsistency() throws Exception {
     store.createSnapshot(volumeName, bucketName, "");
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
@@ -286,7 +283,7 @@ public class TestOzoneManagerHASnapshot {
    * and purgeSnapshot in same batch.
    */
   @Test
-  @Unhealthy("HDDS-11415 om statemachine change and follower cache update")
+  @Unhealthy("HDDS-11415 om statemachine change, remove")
   public void testKeyAndSnapshotDeletionService() throws IOException, InterruptedException, TimeoutException {
     OzoneManager omLeader = cluster.getOMLeader();
     OzoneManager omFollower;

@@ -89,6 +89,8 @@ public class OMPrepareRequest extends OMClientRequest {
     Exception exception = null;
 
     try {
+      // to enable at every follower node
+      ozoneManager.getPrepareState().enablePrepareGate();
       PrepareResponse omResponse = PrepareResponse.newBuilder().setTxnID(transactionLogIndex).build();
       responseBuilder.setPrepareResponse(omResponse);
       response = new DummyOMClientResponse(responseBuilder.build());
@@ -104,9 +106,25 @@ public class OMPrepareRequest extends OMClientRequest {
       ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
           TransactionInfo.valueOf(termIndex, index));
 
+      // update ratis index with current one
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+      omRatisServer.getOmBasicStateMachine().notifyTermIndexUpdated(termIndex.getTerm(), termIndex.getIndex());
+      Duration flushTimeout =
+          Duration.of(omRequest.getPrepareRequest().getArgs().getTxnApplyWaitTimeoutSeconds(), ChronoUnit.SECONDS);
+      Duration flushInterval =
+          Duration.of(omRequest.getPrepareRequest().getArgs().getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
+      long endTime = System.currentTimeMillis() + flushTimeout.toMillis();
+      while (omRatisServer.getOmBasicStateMachine().getLastAppliedTermIndex().getIndex() < (transactionLogIndex + 1)
+          && System.currentTimeMillis() < endTime) {
+        Thread.sleep(flushInterval.toMillis());
+      }
+      if (omRatisServer.getOmBasicStateMachine().getLastAppliedTermIndex().getIndex() < (transactionLogIndex + 1)) {
+        throw new IOException(String.format("After waiting for %d seconds, Ratis state machine applied index %d " +
+                "which is less than the minimum required index %d.", flushTimeout.getSeconds(), transactionLogIndex,
+            (transactionLogIndex + 1)));
+      }
       final RaftServer.Division division = omRatisServer.getServerDivision();
-      takeSnapshotAndPurgeLogs(transactionLogIndex, division);
+      takeSnapshotAndPurgeLogs(transactionLogIndex + 1, division);
 
       // Save prepare index to a marker file, so if the OM restarts,
       // it will remain in prepare mode as long as the file exists and its
@@ -119,7 +137,7 @@ public class OMPrepareRequest extends OMClientRequest {
       exception = e;
       LOG.error("Prepare Request Apply failed in {}. ", ozoneManager.getOMNodeId(), e);
       response = new DummyOMClientResponse(createErrorOMResponse(responseBuilder, e));
-    } catch (IOException e) {
+    } catch (InterruptedException | IOException e) {
       // Set error code so that prepare failure does not cause the OM to terminate.
       exception = e;
       LOG.error("Prepare Request Apply failed in {}. ", ozoneManager.getOMNodeId(), e);
