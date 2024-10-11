@@ -28,7 +28,7 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * This class is to test S3 configuration based utils
+ * This class is to test S3 configuration based utils.
  */
 public class TestOzoneS3ConfigUtils {
 

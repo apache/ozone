@@ -35,7 +35,7 @@ import java.io.IOException;
 import java.util.Collection;
 
 /**
- * Config based utilities for Ozone S3
+ * Config based utilities for Ozone S3.
  */
 public final class OzoneS3ConfigUtils {
   static final Logger LOG = LoggerFactory.getLogger(OzoneS3ConfigUtils.class);
