@@ -215,13 +215,17 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
       OMRequest requestToSubmit;
       try {
-        omClientRequest = createClientRequest(request, ozoneManager);
-        // TODO: Note: Due to HDDS-6055, createClientRequest() could now
-        //  return null, which triggered the findbugs warning.
-        //  Added the assertion.
-        assert (omClientRequest != null);
-        OMClientRequest finalOmClientRequest = omClientRequest;
-        requestToSubmit = preExecute(finalOmClientRequest);
+        if (ozoneManager.isLeaderExecutorEnabled()) {
+          requestToSubmit = request;
+        } else {
+          omClientRequest = createClientRequest(request, ozoneManager);
+          // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+          //  return null, which triggered the findbugs warning.
+          //  Added the assertion.
+          assert (omClientRequest != null);
+          OMClientRequest finalOmClientRequest = omClientRequest;
+          requestToSubmit = preExecute(finalOmClientRequest);
+        }
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
@@ -232,7 +236,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       OMResponse response = submitRequestToRatis(requestToSubmit);
-      if (!response.getSuccess()) {
+      if (!response.getSuccess() && omClientRequest != null) {
         omClientRequest.handleRequestFailure(ozoneManager);
       }
       return response;
