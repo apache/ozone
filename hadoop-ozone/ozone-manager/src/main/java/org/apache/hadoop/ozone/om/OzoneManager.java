@@ -437,7 +437,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
 
   private KeyProviderCryptoExtension kmsProvider;
-  private OzoneFsServerDefaults serverDefaults;
   private final OMLayoutVersionManager versionManager;
 
   private final ReplicationConfigValidator replicationConfigValidator;
@@ -655,14 +654,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       kmsProvider = null;
       LOG.error("Fail to create Key Provider");
     }
-    Configuration hadoopConfig =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
-    URI keyProviderUri = KMSUtil.getKeyProviderUri(
-            hadoopConfig,
-            CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
-    String keyProviderUriStr =
-        (keyProviderUri != null) ? keyProviderUri.toString() : null;
-    serverDefaults = new OzoneFsServerDefaults(keyProviderUriStr);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -791,8 +782,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @param conf OzoneConfiguration
    * @return OM instance
-   * @throws IOException, AuthenticationException in case OM instance
-   *                      creation fails.
+   * @throws IOException AuthenticationException in case OM instance
+   *                      creation fails,
+   * @throws AuthenticationException
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -874,7 +866,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
-    accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
+    // If authorizer is not initialized or the authorizer is Native
+    // re-initialize the authorizer, else for non-native authorizer
+    // like ranger we can reuse previous value if it is initialized
+    if (null == accessAuthorizer || accessAuthorizer.isNative()) {
+      accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
+    }
+
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
@@ -3139,6 +3137,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
             .build());
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(configuration);
+    URI keyProviderUri = KMSUtil.getKeyProviderUri(
+        hadoopConfig,
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
+    String keyProviderUriStr =
+        (keyProviderUri != null) ? keyProviderUri.toString() : null;
+    omServiceInfoBuilder.setServerDefaults(
+        new OzoneFsServerDefaults(keyProviderUriStr));
     if (httpServer != null
         && httpServer.getHttpAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
@@ -4746,11 +4753,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Unsupported safe mode action " + action,
           INTERNAL_ERROR);
     }
-  }
-
-  @Override
-  public OzoneFsServerDefaults getServerDefaults() {
-    return serverDefaults;
   }
 
   @Override

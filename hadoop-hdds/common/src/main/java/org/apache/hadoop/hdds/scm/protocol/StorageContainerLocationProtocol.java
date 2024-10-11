@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -146,10 +147,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big)
    *
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -165,10 +167,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    *
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
@@ -184,13 +187,13 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    * @param factor Container factor
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
-
 
   /**
    * Ask SCM for a list of containers with a range of container ID, state
@@ -205,10 +208,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    * @param replicationConfig Replication config for the containers
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig) throws IOException;
@@ -337,7 +341,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * considered to be failed if it has been sent more than MAX_RETRY limit
    * and its count is reset to -1.
    *
-   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param count Maximum num of returned transactions, if {@literal < 0}. return all.
    * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException

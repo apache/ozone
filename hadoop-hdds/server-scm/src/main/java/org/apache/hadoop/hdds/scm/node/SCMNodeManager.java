@@ -1166,7 +1166,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage capacity of the DataNode node.
    * @param storageReports Calculate the storage capacity corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String calculateStorageCapacity(
       List<StorageReportProto> storageReports) {
@@ -1214,7 +1213,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage usage percentage of a DataNode node.
    * @param storageReports Calculate the storage percentage corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String[] calculateStoragePercentage(
       List<StorageReportProto> storageReports) {

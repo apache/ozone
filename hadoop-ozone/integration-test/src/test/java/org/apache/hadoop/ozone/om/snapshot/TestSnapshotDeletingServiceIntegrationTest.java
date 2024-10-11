@@ -87,6 +87,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -130,6 +131,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         1, StorageUnit.MB);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         500, TimeUnit.MILLISECONDS);
+    conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 500);
@@ -447,7 +449,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       while (iterator.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> next = iterator.next();
         String activeDBDeletedKey = next.getKey();
-        if (activeDBDeletedKey.matches(".*/key1.*")) {
+        if (activeDBDeletedKey.matches(".*/key1/.*")) {
           RepeatedOmKeyInfo activeDBDeleted = next.getValue();
           OMMetadataManager metadataManager =
               cluster.getOzoneManager().getMetadataManager();
@@ -508,7 +510,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     KeyDeletingService keyDeletingService = Mockito.spy(new KeyDeletingService(ozoneManager,
         ozoneManager.getScmClient().getBlockClient(), keyManager, 10000,
-        100000, cluster.getConf()));
+        100000, cluster.getConf(), false));
     keyDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
         100000);

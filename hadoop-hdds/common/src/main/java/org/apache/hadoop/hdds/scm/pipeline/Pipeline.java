@@ -68,6 +68,7 @@ public final class Pipeline {
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
   public static Codec<Pipeline> getCodec() {
@@ -243,7 +244,6 @@ public final class Pipeline {
 
   /**
    * Get the replicaIndex Map.
-   * @return
    */
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
     return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));

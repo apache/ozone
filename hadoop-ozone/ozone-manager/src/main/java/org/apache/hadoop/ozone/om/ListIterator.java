@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 
 /**
  * Common class to do listing of resources after merging
- * rocksDB table cache & actual table.
+ * rocksDB table cache and actual table.
  */
 public class ListIterator {
 

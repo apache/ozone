@@ -407,9 +407,9 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Convert exception result to {@link OzoneManagerProtocolProtos.Status}.
+   * Convert exception result to {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status}.
    * @param exception
-   * @return OzoneManagerProtocolProtos.Status
+   * @return Status
    */
   public static Status exceptionToResponseStatus(Exception exception) {
     if (exception instanceof OMException) {
@@ -439,8 +439,7 @@ public final class OzoneManagerRatisUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-    return HAUtils
-        .getTrxnInfoFromCheckpoint(conf, dbPath, new OMDBDefinition());
+    return HAUtils.getTrxnInfoFromCheckpoint(conf, dbPath, OMDBDefinition.get());
   }
 
   /**

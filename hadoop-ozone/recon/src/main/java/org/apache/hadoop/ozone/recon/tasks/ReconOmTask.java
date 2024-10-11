@@ -35,14 +35,14 @@ public interface ReconOmTask {
   /**
    * Process a set of OM events on tables that the task is listening on.
    * @param events Set of events to be processed by the task.
-   * @return Pair of task name -> task success.
+   * @return Pair of task name -&gt; task success.
    */
   Pair<String, Boolean> process(OMUpdateEventBatch events);
 
   /**
    * Process a  on tables that the task is listening on.
    * @param omMetadataManager OM Metadata manager instance.
-   * @return Pair of task name -> task success.
+   * @return Pair of task name -&gt; task success.
    */
   Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager);
 

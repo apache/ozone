@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 
 /**
  * OmUpdateEventValidator is a utility class for validating OMDBUpdateEvents
@@ -48,7 +47,6 @@ public class OmUpdateEventValidator {
    * @param keyType          the key type of the event.
    * @param action           the action performed on the event.
    * @return true if the event is valid, false otherwise.
-   * @throws IOException if an I/O error occurs during the validation.
    */
   public boolean isValidEvent(String tableName,
                               Object actualValueType,

@@ -103,9 +103,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
               "Snapshot purge request.", snapTableKey);
           continue;
         }
-
-        SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
+        SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
         // Step 1: Update the deep clean flag for the next active snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
@@ -116,7 +114,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
         updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
       }
-
+      // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
         snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),

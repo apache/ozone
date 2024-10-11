@@ -110,6 +110,114 @@
     </tbody>
 </table>
 
+<h2>Pipeline Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Pipeline State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.pipelines.closed}}</td>
+    </tr>
+    <tr>
+        <td>Allocated</td>
+        <td>{{statistics.pipelines.allocated}}</td>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.pipelines.open}}</td>
+    </tr>
+    <tr>
+        <td>Dormant</td>
+        <td>{{statistics.pipelines.dormant}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Container Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Operational State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.containers.lifecycle.open}}</td>
+    </tr>
+    <tr>
+        <td>Closing</td>
+        <td>{{statistics.containers.lifecycle.closing}}</td>
+    </tr>
+    <tr>
+        <td>Quasi Closed</td>
+        <td>{{statistics.containers.lifecycle.quasi_closed}}</td>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.containers.lifecycle.closed}}</td>
+    </tr>
+    <tr>
+        <td>Deleting</td>
+        <td>{{statistics.containers.lifecycle.deleting}}</td>
+    </tr>
+    <tr>
+        <td>Deleted</td>
+        <td>{{statistics.containers.lifecycle.deleted}}</td>
+    </tr>
+    <tr>
+        <td>Recovering</td>
+        <td>{{statistics.containers.lifecycle.recovering}}</td>
+    </tr>
+    </tbody>
+</table>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Health</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Under Replicated</td>
+        <td>{{statistics.containers.health.under_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Mis Replicated</td>
+        <td>{{statistics.containers.health.mis_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Over Replicated</td>
+        <td>{{statistics.containers.health.over_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Missing</td>
+        <td>{{statistics.containers.health.missing}}</td>
+    </tr>
+    <tr>
+        <td>Unhealthy</td>
+        <td>{{statistics.containers.health.unhealthy}}</td>
+    </tr>
+    <tr>
+        <td>Empty</td>
+        <td>{{statistics.containers.health.empty}}</td>
+    </tr>
+    <tr>
+        <td>Open Unhealthy</td>
+        <td>{{statistics.containers.health.open_unhealthy}}</td>
+    </tr>
+    <tr>
+        <td>Quasi Closed Stuck</td>
+        <td>{{statistics.containers.health.quasi_closed_stuck}}</td>
+    </tr>
+    <tr>
+        <td>Open Without Pipeline</td>
+        <td>{{statistics.containers.health.open_without_pipeline}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Node Status</h2>
 <div class="row">
     <div class="col-md-6 text-left">

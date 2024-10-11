@@ -373,6 +373,7 @@ function check_needs_checkstyle() {
         "^hadoop-hdds/dev-support/checkstyle"
         "pom.xml"
         "src/..../java"
+        "src/..../resources/.*\.properties"
     )
     local ignore_array=(
         "^hadoop-ozone/dist"

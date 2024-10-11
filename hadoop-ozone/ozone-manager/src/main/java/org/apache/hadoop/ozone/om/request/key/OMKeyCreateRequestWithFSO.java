@@ -246,7 +246,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   @Override

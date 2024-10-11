@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -185,7 +186,16 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      server.start();
+      try {
+        server.start();
+      } catch (IOException e) {
+        LOG.error("Error while starting the server", e);
+        if (e.getMessage().contains("Failed to bind to address")) {
+          throw new BindException(e.getMessage());
+        } else {
+          throw e;
+        }
+      }
       int realPort = server.getPort();
 
       if (port == 0) {
