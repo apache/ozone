@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreWithIncrementalChunkList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -501,8 +502,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
-    final Table<String, BlockData> blockDataTable
-        = schemaTwoStore.getBlockDataTable();
 
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
         DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
@@ -515,7 +514,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         // counted towards bytes used and total block count above.
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, schemaTwoStore);
       }
     }
 
@@ -525,12 +524,12 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   static long computePendingDeleteBytes(List<Long> localIDs,
       KeyValueContainerData containerData,
-      Table<String, BlockData> blockDataTable) {
+      DatanodeStoreWithIncrementalChunkList store) {
     long pendingDeleteBytes = 0;
     for (long id : localIDs) {
       try {
         final String blockKey = containerData.getBlockKey(id);
-        final BlockData blockData = blockDataTable.get(blockKey);
+        final BlockData blockData = store.getBlockByID(null, blockKey);
         if (blockData != null) {
           pendingDeleteBytes += blockData.getSize();
         }
@@ -544,23 +543,21 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   static PendingDelete countPendingDeletesSchemaV3(
-      DatanodeStoreSchemaThreeImpl schemaThreeStore,
+      DatanodeStoreSchemaThreeImpl store,
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
     long pendingDeleteBytes = 0;
-    final Table<String, BlockData> blockDataTable
-        = schemaThreeStore.getBlockDataTable();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             DeletedBlocksTransaction>>
-            iter = schemaThreeStore.getDeleteTransactionTable()
+            iter = store.getDeleteTransactionTable()
             .iterator(containerData.containerPrefix())) {
       while (iter.hasNext()) {
         DeletedBlocksTransaction delTx = iter.next().getValue();
         final List<Long> localIDs = delTx.getLocalIDList();
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, store);
       }
     }
     return new PendingDelete(pendingDeleteBlockCountTotal,

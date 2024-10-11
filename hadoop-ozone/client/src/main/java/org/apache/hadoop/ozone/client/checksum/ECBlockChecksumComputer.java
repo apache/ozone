@@ -45,12 +45,14 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
   private final List<ContainerProtos.ChunkInfo> chunkInfoList;
   private final OmKeyInfo keyInfo;
+  private final long blockLength;
 
 
   public ECBlockChecksumComputer(
-      List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo) {
+      List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo, long blockLength) {
     this.chunkInfoList = chunkInfoList;
     this.keyInfo = keyInfo;
+    this.blockLength = blockLength;
   }
 
   @Override
@@ -72,15 +74,13 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
   private void computeMd5Crc() {
     Preconditions.checkArgument(chunkInfoList.size() > 0);
 
-    final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
-    long chunkSize = firstChunkInfo.getLen();
-    long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-    // Total parity checksum bytes per stripe to remove
-    int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
-
     final MessageDigest digester = MD5Hash.getDigester();
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
+      long chunkSize = chunkInfo.getLen();
+      long bytesPerCrc = chunkInfo.getChecksumData().getBytesPerChecksum();
+      // Total parity checksum bytes per stripe to remove
+      int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
       ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
       Preconditions.checkNotNull(stripeChecksum);
@@ -121,66 +121,40 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
     // Bytes required to create a CRC
     long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-    long chunkSize = firstChunkInfo.getLen();
-
-    //When EC chunk size is not a multiple of ozone.client.bytes.per.checksum
-    // (default = 16KB) the last checksum in an EC chunk is only generated for
-    // offset.
-    long bytesPerCrcOffset = chunkSize % bytesPerCrc;
-
-    long keySize = keyInfo.getDataSize();
-    // Total parity checksum bytes per stripe to remove
-    int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
-
-    // Number of checksum per chunk, Eg: 2MB EC chunk will
-    // have 2 checksum per chunk.
-    int numChecksumPerChunk = (int)
-        (Math.ceil((double) chunkSize / bytesPerCrc));
+    long blockSize = blockLength;
 
     CrcComposer blockCrcComposer =
         CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
       ByteString stripeChecksum = chunkInfo.getStripeChecksum();
+      long chunkSize = chunkInfo.getLen();
+
+      // Total parity checksum bytes per stripe to remove
+      int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
 
       Preconditions.checkNotNull(stripeChecksum);
       final int checksumSize = stripeChecksum.size();
       Preconditions.checkArgument(checksumSize % 4 == 0,
           "Checksum Bytes size does not match");
-      CrcComposer chunkCrcComposer =
-          CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
 
       // Limit parity bytes as they do not contribute to fileChecksum
       final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
       byteWrap.limit(checksumSize - parityBytes);
 
-      long chunkOffsetIndex = 1;
       while (byteWrap.hasRemaining()) {
-
-        /*
-        When chunk size is not a multiple of bytes.per.crc we get an offset.
-        For eg, RS-3-2-1524k is not a multiple of 1MB. So two checksums are
-        generated 1st checksum for 1024k bytes and 2nd checksum for 500k bytes.
-        When we reach the 2nd Checksum we need to modify the bytesPerCrc as in
-        this case 500k is the bytes for which the checksum is generated.
-        */
-        long currentChunkOffset = Long.MAX_VALUE;
-        if ((chunkOffsetIndex % numChecksumPerChunk == 0)
-            && (bytesPerCrcOffset > 0)) {
-          currentChunkOffset = bytesPerCrcOffset;
+        // Here Math.min in mainly required for last stripe's last chunk. The last chunk of the last stripe can be
+        // less than the chunkSize, chunkSize is only calculated from each stripe's first chunk. This would be fine
+        // for rest of the stripe because all the chunks are of the same size. But for the last stripe we don't know
+        // the exact size of the last chunk. So we calculate it with the of blockSize. If the block size is smaller
+        // than the chunk size, then we know it is the last stripe' last chunk.
+        long remainingChunkSize = Math.min(blockSize, chunkSize);
+        while (byteWrap.hasRemaining() && remainingChunkSize > 0) {
+          final int checksumData = byteWrap.getInt();
+          blockCrcComposer.update(checksumData, Math.min(bytesPerCrc, remainingChunkSize));
+          remainingChunkSize -= bytesPerCrc;
         }
-
-        final int checksumDataCrc = byteWrap.getInt();
-        //To handle last chunk when it size is lower than 1524K in the case
-        // of rs-3-2-1524k.
-        long chunkSizePerChecksum = Math.min(Math.min(keySize, bytesPerCrc),
-            currentChunkOffset);
-        chunkCrcComposer.update(checksumDataCrc, chunkSizePerChecksum);
-
-        int chunkChecksumCrc = CrcUtil.readInt(chunkCrcComposer.digest(), 0);
-        blockCrcComposer.update(chunkChecksumCrc, chunkSizePerChecksum);
-        keySize -= Math.min(bytesPerCrc, currentChunkOffset);
-        ++chunkOffsetIndex;
+        blockSize -= chunkSize;
       }
     }
 

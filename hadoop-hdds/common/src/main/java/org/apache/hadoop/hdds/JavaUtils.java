@@ -30,11 +30,23 @@ public final class JavaUtils {
    * is equal or greater than the parameter.
    *
    * @param version 8, 9, 10 etc.
-   * @return comparison with system property, always true for 8
+   * @return comparison with system property, always true for any int up to 8
    */
   public static boolean isJavaVersionAtLeast(int version) {
     return JAVA_SPEC_VER >= version;
   }
+
+  /**
+   * Query to see if major version of Java specification of the system
+   * is equal or less than the parameter.
+   *
+   * @param version 8, 9, 10 etc.
+   * @return comparison with system property
+   */
+  public static boolean isJavaVersionAtMost(int version) {
+    return JAVA_SPEC_VER <= version;
+  }
+
 
   /**
    * Private constructor.

@@ -206,7 +206,7 @@ public class TestSstFilteringService {
     createSnapshot(volumeName, bucketName2, snapshotName1);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
-    assertFalse(snapshotInfo.isSstFiltered());
+    assertFalse(SstFilteringService.isSstFiltered(om.getConfiguration(), snapshotInfo));
     waitForSnapshotsAtLeast(filteringService, countExistingSnapshots + 1);
     assertEquals(countExistingSnapshots + 1, filteringService.getSnapshotFilteredCount().get());
 
@@ -238,8 +238,9 @@ public class TestSstFilteringService {
 
     // Need to read the sstFiltered flag which is set in background process and
     // hence snapshotInfo.isSstFiltered() may not work sometimes.
-    assertTrue(om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
-        .getTableKey(volumeName, bucketName2, snapshotName1)).isSstFiltered());
+    assertTrue(SstFilteringService.isSstFiltered(om.getConfiguration(),
+        om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
+            .getTableKey(volumeName, bucketName2, snapshotName1))));
 
     String snapshotName2 = "snapshot2";
     final long count;
@@ -313,7 +314,7 @@ public class TestSstFilteringService {
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
 
     // delete snap1
-    writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
+    deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
     sstFilteringService.resume();
     // Filtering service will only act on snap2 as it is an active snaphot
     waitForSnapshotsAtLeast(sstFilteringService, countTotalSnapshots);
@@ -504,5 +505,10 @@ public class TestSstFilteringService {
   private void createSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
     writeClient.createSnapshot(volumeName, bucketName, snapshotName);
     countTotalSnapshots++;
+  }
+
+  private void deleteSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
+    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+    countTotalSnapshots--;
   }
 }

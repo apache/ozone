@@ -30,6 +30,10 @@ import org.apache.hadoop.hdds.utils.db.Codec;
  * Codec to serialize / deserialize PipelineID.
  */
 public class OldPipelineIDCodecForTesting implements Codec<PipelineID> {
+  @Override
+  public Class<PipelineID> getTypeClass() {
+    return PipelineID.class;
+  }
 
   @Override
   public byte[] toPersistedFormat(PipelineID object) throws IOException {

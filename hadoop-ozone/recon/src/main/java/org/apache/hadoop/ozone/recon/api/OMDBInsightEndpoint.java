@@ -241,6 +241,7 @@ public class OMDBInsightEndpoint {
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+          keyEntityInfo.setIsKey(omKeyInfo.isFile());
           keyEntityInfo.setKey(key);
           keyEntityInfo.setPath(omKeyInfo.getKeyName());
           keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
@@ -573,6 +574,7 @@ public class OMDBInsightEndpoint {
           continue;
         }
         KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+        keyEntityInfo.setIsKey(omKeyInfo.isFile());
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
@@ -758,7 +760,7 @@ public class OMDBInsightEndpoint {
    * /volume1/fso-bucket/dir1/dir2/dir3/file1
    * Input Request for OBS bucket:
    *
-   *    `api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&limit=2&replicationType=RATIS`
+   *    {@literal `api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&limit=2&replicationType=RATIS`}
    * Output Response:
    *
    * {
@@ -856,7 +858,7 @@ public class OMDBInsightEndpoint {
    * }
    * Input Request for FSO bucket:
    *
-   *        `api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=2&replicationType=RATIS`
+   *        {@literal `api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=2&replicationType=RATIS`}
    * Output Response:
    *
    * {
@@ -954,7 +956,6 @@ public class OMDBInsightEndpoint {
    * }
    *
    * ********************************************************
-   * @throws IOException
    */
   @GET
   @Path("/listKeys")
@@ -1282,6 +1283,7 @@ public class OMDBInsightEndpoint {
                                                          OmKeyInfo keyInfo) throws IOException {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setIsKey(keyInfo.isFile());
     keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
         omMetadataManager));
     keyEntityInfo.setSize(keyInfo.getDataSize());

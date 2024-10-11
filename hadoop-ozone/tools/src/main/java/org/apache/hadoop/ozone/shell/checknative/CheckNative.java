@@ -19,9 +19,14 @@
 package org.apache.hadoop.ozone.shell.checknative;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
-import org.apache.hadoop.util.NativeCodeLoader;
 import picocli.CommandLine;
+
+import java.util.Collections;
+
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 /**
  * CLI command to check if native libraries are loaded.
@@ -36,12 +41,12 @@ public class CheckNative extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    boolean nativeHadoopLoaded = NativeCodeLoader.isNativeCodeLoaded();
+    boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
     String hadoopLibraryName = "";
     String isalDetail = "";
     boolean isalLoaded = false;
     if (nativeHadoopLoaded) {
-      hadoopLibraryName = NativeCodeLoader.getLibraryName();
+      hadoopLibraryName = org.apache.hadoop.util.NativeCodeLoader.getLibraryName();
 
       isalDetail = ErasureCodeNative.getLoadingFailureReason();
       if (isalDetail != null) {
@@ -50,12 +55,21 @@ public class CheckNative extends GenericCli {
         isalDetail = ErasureCodeNative.getLibraryName();
         isalLoaded = true;
       }
-
     }
     System.out.println("Native library checking:");
     System.out.printf("hadoop:  %b %s%n", nativeHadoopLoaded,
         hadoopLibraryName);
     System.out.printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
+
+    // Attempt to load the rocks-tools lib
+    boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
+        ROCKS_TOOLS_NATIVE_LIBRARY_NAME,
+        Collections.singletonList(ManagedRocksObjectUtils.getRocksDBLibFileName()));
+    String rocksToolsDetail = "";
+    if (nativeRocksToolsLoaded) {
+      rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
+    }
+    System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
     return null;
   }
 }

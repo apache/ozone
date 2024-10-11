@@ -90,7 +90,7 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
   /**
    * Abstract step for ordering the container data to be deleted.
    * Subclass need to implement the concrete ordering implementation
-   * in descending order (more prioritized -> less prioritized)
+   * in descending order (more prioritized -&gt; less prioritized)
    * @param candidateContainers candidate containers to be ordered
    */
   protected abstract void orderByDescendingPriority(

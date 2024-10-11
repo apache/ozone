@@ -429,3 +429,15 @@ load bats-assert/load.bash
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
 }
+
+@test "properties file in resources" {
+  run dev-support/ci/selective_ci_checks.sh 71b8bdd8becf72d6f7d4e7986895504b8259b3e5
+
+  assert_output -p 'basic-checks=["rat","checkstyle","native"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}

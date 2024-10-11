@@ -65,13 +65,14 @@ public class AccessHeatMapEndpoint {
    * with volume, buckets under that volume,
    * then directories, subdirectories and paths
    * under that bucket.
-   * E.g. -------->>
+   * <pre>
+   * E.g. --------&gt;&gt;
    * vol1                           vol2
    * - bucket1                      - bucket2
    * - dir1/dir2/key1               - dir4/dir1/key1
    * - dir1/dir2/key2               - dir4/dir5/key2
    * - dir1/dir3/key1               - dir5/dir3/key1
-   *
+   * </pre>
    * @return {@link Response}
    */
   @GET
@@ -106,5 +107,16 @@ public class AccessHeatMapEndpoint {
     if (null != heatMapFeature) {
       throw new WebApplicationException(Response.Status.NOT_FOUND);
     }
+  }
+
+  /**
+   * This API do a health check for HeatMapProvider source if it is initialized
+   * and returning response.
+   * @return HealthCheckResponse wrapped in Response object.
+   */
+  @GET
+  @Path("/healthCheck")
+  public Response getReadAccessMetaData() {
+    return Response.ok(heatMapService.doHeatMapHealthCheck()).build();
   }
 }

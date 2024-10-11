@@ -206,8 +206,7 @@ public class ScmConfig extends ReconfigurableConfig {
    * required for SCMSecurityProtocol where the KerberosInfo references
    * the old configuration with
    * the annotation shown below:-
-   * @KerberosInfo(serverPrincipal = ScmConfigKeys
-   *    .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+   * {@code @KerberosInfo(serverPrincipal = ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)}
    */
   public static class ConfigStrings {
     public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY =

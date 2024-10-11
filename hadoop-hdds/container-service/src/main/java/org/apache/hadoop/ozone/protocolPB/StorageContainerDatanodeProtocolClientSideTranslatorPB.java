@@ -84,11 +84,9 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
    * fail require careful attention. It is strongly advised to relinquish the
    * underlying resources and to internally <em>mark</em> the {@code Closeable}
    * as closed, prior to throwing the {@code IOException}.
-   *
-   * @throws IOException if an I/O error occurs
    */
   @Override
-  public void close() throws IOException {
+  public void close() {
     RPC.stopProxy(rpcProxy);
   }
 
@@ -124,7 +122,6 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
   /**
    * Returns SCM version.
    *
-   * @param unused - set to null and unused.
    * @return Version info.
    */
   @Override

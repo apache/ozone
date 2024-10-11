@@ -37,10 +37,10 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
  * <p>
  * Currently we manage the following attributes for a container.
  * <p>
- * 1. StateMap - LifeCycleState -> Set of ContainerIDs
- * 2. TypeMap  - ReplicationType -> Set of ContainerIDs
- * 3. OwnerMap - OwnerNames -> Set of ContainerIDs
- * 4. FactorMap - ReplicationFactor -> Set of ContainerIDs
+ * 1. StateMap - LifeCycleState -&gt; Set of ContainerIDs
+ * 2. TypeMap  - ReplicationType -&gt; Set of ContainerIDs
+ * 3. OwnerMap - OwnerNames -&gt; Set of ContainerIDs
+ * 4. FactorMap - ReplicationFactor -&gt; Set of ContainerIDs
  * <p>
  * This means that for a cluster size of 750 PB -- we will have around 150
  * Million containers, if we assume 5GB average container size.

@@ -22,7 +22,6 @@ import jnr.constants.platform.Signal;
 import jnr.posix.POSIX;
 import jnr.posix.POSIXFactory;
 import jnr.posix.SignalHandler;
-import jnr.posix.util.DefaultPOSIXHandler;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
@@ -44,6 +43,10 @@ public enum SignalLogger {
 
   private static final Set<Signal> SIGNALS = EnumSet.of(Signal.SIGHUP, Signal.SIGINT, Signal.SIGTERM);
 
+  private static final POSIX POSIX_IMPL = POSIXFactory.getJavaPOSIX();
+
+  private static final SignalHandler DEFAULT_HANDLER = System::exit;
+
   private boolean registered = false;
 
   /**
@@ -51,9 +54,12 @@ public enum SignalLogger {
    */
   private static class Handler implements SignalHandler {
     private final Logger log;
+    private final SignalHandler prevHandler;
 
-    Handler(Logger log) {
+    Handler(Signal signal, Logger log) {
       this.log = log;
+      SignalHandler handler = POSIX_IMPL.signal(signal, this);
+      prevHandler = handler != null ? handler : DEFAULT_HANDLER;
     }
 
     /**
@@ -64,6 +70,7 @@ public enum SignalLogger {
     @Override
     public void handle(int signal) {
       log.error("RECEIVED SIGNAL {}: {}", signal, Signal.valueOf(signal));
+      prevHandler.handle(signal);
     }
   }
 
@@ -80,15 +87,13 @@ public enum SignalLogger {
     StringBuilder bld = new StringBuilder();
     bld.append("registered UNIX signal handlers for [");
     String separator = "";
-    final POSIX posix = POSIXFactory.getPOSIX(new DefaultPOSIXHandler(), true);
-    final Handler handler = new Handler(log);
     for (Signal signal : SIGNALS) {
       try {
-        posix.signal(signal, handler);
+        new Handler(signal, log);
         bld.append(separator).append(signal.name());
         separator = ", ";
       } catch (Exception e) {
-        log.debug("", e);
+        log.info("Error installing UNIX signal handler for {}", signal, e);
       }
     }
     bld.append("]");

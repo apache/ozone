@@ -46,16 +46,18 @@ import org.slf4j.LoggerFactory;
  * - fsCapacity: reported total capacity from local fs.
  * - minVolumeFreeSpace (mvfs) : determines the free space for closing
      containers.This is like adding a few reserved bytes to reserved space.
-     Dn's will send close container action to SCM at this limit & it is
+     Dn's will send close container action to SCM at this limit, and it is
      configurable.
 
  *
- *
+ * <pre>
+ * {@code
  * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
  * |<-     capacity                  ->|
  *              |     fsAvail      |-------other-----------|
  * |<-                   fsCapacity                      ->|
- *
+ * }</pre>
+ * <pre>
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
  * We could get from config:
@@ -78,11 +80,13 @@ import org.slf4j.LoggerFactory;
  * then we should use DedicatedDiskSpaceUsage for
  * `hdds.datanode.du.factory.classname`,
  * Then it is much simpler, since we don't care about other usage:
- *
+ * {@code
  *  |----used----|             (avail)/fsAvail              |
  *  |<-              capacity/fsCapacity                  ->|
+ * }
  *
  *  We have avail == fsAvail.
+ *  </pre>
  */
 public final class VolumeInfo {
 
@@ -153,11 +157,14 @@ public final class VolumeInfo {
   }
 
   /**
+   * <pre>
+   * {@code
    * Calculate available space use method A.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    * |<-     capacity         ->|
-   *
    * A) avail = capacity - used
+   * }
+   * </pre>
    */
   public long getAvailable() {
     return usage.getAvailable();
