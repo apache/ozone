@@ -437,11 +437,11 @@ jobs:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
-      - name: Setup java
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
         run: |
           hadoop-ozone/dev-support/checks/${{ github.job }}.sh
