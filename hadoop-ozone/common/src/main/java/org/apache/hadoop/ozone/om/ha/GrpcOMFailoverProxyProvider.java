@@ -129,12 +129,12 @@ public class GrpcOMFailoverProxyProvider<T> extends
   }
 
   /**
-   * Get the protocol proxy for provided address
+   * Get the protocol proxy for provided address.
    * @param address An instance of {@link InetSocketAddress} which contains the address to connect
    * @return the proxy connection to the address and the set of methods supported by the server at the address
    * @throws IOException if any error occurs while trying to get the proxy
    */
-  private T createOmProxy(InetSocketAddress address) throws IOException{
+  private T createOmProxy(InetSocketAddress address) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
 
