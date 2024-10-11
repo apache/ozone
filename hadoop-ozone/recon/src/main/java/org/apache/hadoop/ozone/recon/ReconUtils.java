@@ -620,8 +620,8 @@ public class ReconUtils {
    *  - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix, up to the limit.
    *
    *  This method also handles the following limit scenarios:
-   *  - If limit == 0 or limit < -1, no records are returned.
-   *  - If limit == -1, all records are returned.
+   *  - If limit = 0 or limit < -1, no records are returned.
+   *  - If limit = -1, all records are returned.
    *  - For positive limits, it retrieves records up to the specified limit.
    *
    * @param table       The table to retrieve keys from.
@@ -637,12 +637,12 @@ public class ReconUtils {
 
     Map<String, T> matchedKeys = new LinkedHashMap<>();
 
-    // If limit == 0, return an empty result set
+    // If limit = 0, return an empty result set
     if (limit == 0 || limit < -1) {
       return matchedKeys;
     }
 
-    // If limit == -1, set it to Integer.MAX_VALUE to return all records
+    // If limit = -1, set it to Integer.MAX_VALUE to return all records
     int actualLimit = (limit == -1) ? Integer.MAX_VALUE : limit;
 
     try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
