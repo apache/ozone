@@ -623,6 +623,13 @@ public class ReconUtils {
    *  - If limit == 0 or limit < -1, no records are returned.
    *  - If limit == -1, all records are returned.
    *  - For positive limits, it retrieves records up to the specified limit.
+   *
+   * @param table       The table to retrieve keys from.
+   * @param startPrefix The search prefix to match keys against.
+   * @param limit       The maximum number of keys to retrieve.
+   * @param prevKey     The key to start after for the next set of records.
+   * @return A map of keys and their corresponding OmKeyInfo or RepeatedOmKeyInfo objects.
+   * @throws IOException If there are problems accessing the table.
    */
   public static <T> Map<String, T> extractKeysFromTable(
       Table<String, T> table, String startPrefix, int limit, String prevKey)
