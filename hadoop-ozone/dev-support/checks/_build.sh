@@ -28,3 +28,4 @@ fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
 mvn ${MAVEN_OPTIONS} clean "$@"
+rc=$?

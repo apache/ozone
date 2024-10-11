@@ -153,6 +153,7 @@ jobs:
           retention-days: 1
       - name: Store source tarball for compilation
         uses: actions/upload-artifact@v4
+        if: needs.build-info.outputs.needs-compile == 'true'
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
@@ -444,7 +445,18 @@ jobs:
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
         run: |
-          hadoop-ozone/dev-support/checks/${{ github.job }}.sh
+          hadoop-ozone/dev-support/checks/${{ github.job }}.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
+        continue-on-error: true
+      - name: Install diffoscope
+        run: |
+          sudo apt update -q
+          sudo apt install -y diffoscope
+        if: ${{ failure() }}
+        continue-on-error: true
+      - name: Check artifact differences
+        run: |
+          hadoop-ozone/dev-support/checks/_diffoscope.sh
+        if: ${{ failure() }}
         continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
