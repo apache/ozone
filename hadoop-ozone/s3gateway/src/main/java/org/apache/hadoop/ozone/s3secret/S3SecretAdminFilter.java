@@ -26,7 +26,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.common.OmUserUtils;
+import org.apache.hadoop.ozone.conf.OzoneS3ConfigUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -52,7 +52,7 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
     if (null != userPrincipal) {
       UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
-      if (!OmUserUtils.isS3Admin(user, conf)) {
+      if (!OzoneS3ConfigUtils.isS3Admin(user, conf)) {
         requestContext.abortWith(Response.status(Status.FORBIDDEN).build());
       }
     }

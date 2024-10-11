@@ -63,6 +63,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
   private final UserGroupInformation ugi;
+  private final long protocolVer;
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
@@ -70,6 +71,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
                                      Class<T> protocol) throws IOException {
     super(configuration, omServiceId, protocol);
     this.ugi = ugi;
+    this.protocolVer = RPC.getProtocolVersion(protocol);
   }
 
   @Override
@@ -123,6 +125,16 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   private T createOMProxy() throws IOException {
     InetSocketAddress addr = new InetSocketAddress(0);
+    return createOmProxy(addr);
+  }
+
+  /**
+   * Get the protocol proxy for provided address
+   * @param address An instance of {@link InetSocketAddress} which contains the address to connect
+   * @return the proxy connection to the address and the set of methods supported by the server at the address
+   * @throws IOException if any error occurs while trying to get the proxy
+   */
+  private T createOmProxy(InetSocketAddress address) throws IOException{
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
 
@@ -130,14 +142,14 @@ public class GrpcOMFailoverProxyProvider<T> extends
     RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
 
     return (T) RPC.getProtocolProxy(
-      getInterface(),
-      0,
-      addr,
-      ugi,
-      hadoopConf,
-      NetUtils.getDefaultSocketFactory(hadoopConf),
-      (int) OmUtils.getOMClientRpcTimeOut(getConf()),
-      connectionRetryPolicy
+        getInterface(),
+        protocolVer,
+        address,
+        ugi,
+        hadoopConf,
+        NetUtils.getDefaultSocketFactory(hadoopConf),
+        (int) OmUtils.getOMClientRpcTimeOut(getConf()),
+        connectionRetryPolicy
     ).getProxy();
   }
 
