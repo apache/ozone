@@ -284,6 +284,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     storage.init(raftStorage);
     ratisServer.notifyGroupAdd(gid);
 
+    LOG.info("{}: initialize {}", server.getId(), id);
     loadSnapshot(storage.getLatestSnapshot());
   }
 
