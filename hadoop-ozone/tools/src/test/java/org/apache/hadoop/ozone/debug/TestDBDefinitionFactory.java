@@ -47,8 +47,7 @@ public class TestDBDefinitionFactory {
     DBDefinition definition = DBDefinitionFactory.getDefinition(OMDBDefinition.get().getName());
     assertInstanceOf(OMDBDefinition.class, definition);
 
-    definition = DBDefinitionFactory.getDefinition(
-        new SCMDBDefinition().getName());
+    definition = DBDefinitionFactory.getDefinition(SCMDBDefinition.get().getName());
     assertInstanceOf(SCMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(

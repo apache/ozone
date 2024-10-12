@@ -56,7 +56,7 @@ public final class DBDefinitionFactory {
 
   static {
     final Map<String, DBDefinition> map = new HashMap<>();
-    Arrays.asList(new SCMDBDefinition(), OMDBDefinition.get(), new ReconSCMDBDefinition())
+    Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), new ReconSCMDBDefinition())
         .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
     DB_MAP = Collections.unmodifiableMap(map);
   }
