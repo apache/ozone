@@ -22,20 +22,18 @@ import java.util.Objects;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The task to download a container from the sources.
  */
 public class ReplicationTask extends AbstractReplicationTask {
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationTask.class);
 
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
-
-  /**
-   * Counter for the transferred bytes.
-   */
-  private long transferredBytes;
 
   public ReplicationTask(ReplicateContainerCommand cmd,
                          ContainerReplicator replicator) {
@@ -106,23 +104,6 @@ public class ReplicationTask extends AbstractReplicationTask {
     return debugString;
   }
 
-  @Override
-  public String toString() {
-    String str = super.toString();
-    if (transferredBytes > 0) {
-      str += ", transferred " + transferredBytes + " bytes";
-    }
-    return str;
-  }
-
-  public long getTransferredBytes() {
-    return transferredBytes;
-  }
-
-  public void setTransferredBytes(long transferredBytes) {
-    this.transferredBytes = transferredBytes;
-  }
-
   DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
   }
@@ -130,5 +111,6 @@ public class ReplicationTask extends AbstractReplicationTask {
   @Override
   public void runTask() {
     replicator.replicate(this);
+    LOG.info("{}", this);
   }
 }

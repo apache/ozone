@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -84,6 +85,8 @@ public final class ReplicationSupervisor {
 
   private final MetricsRegistry registry;
   private final Map<String, MutableRate> opsLatencyMs = new ConcurrentHashMap<>();
+  private final Map<String, MutableRate> opsQueueTimeMs = new ConcurrentHashMap<>();
+  private final Map<String, MutableStat> transferredBytesOps = new ConcurrentHashMap<>();
 
   private static final Map<String, String> METRICS_MAP;
 
@@ -251,6 +254,10 @@ public final class ReplicationSupervisor {
           queuedCounter.put(task.getMetricName(), new AtomicLong(0));
           opsLatencyMs.put(task.getMetricName(), registry.newRate(
               task.getClass().getSimpleName() + "Ms"));
+          opsQueueTimeMs.put(task.getMetricName(), registry.newRate(
+              task.getClass().getSimpleName() + "QueuedTimeMs"));
+          String name = task.getClass().getSimpleName() + "Ops";
+          transferredBytesOps.put(task.getMetricName(), registry.newStat(name, "", name, name));
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
@@ -265,6 +272,7 @@ public final class ReplicationSupervisor {
             k -> new AtomicInteger()).incrementAndGet();
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
+      task.enterQueue();
       executor.execute(new TaskRunner(task));
     }
   }
@@ -398,6 +406,7 @@ public final class ReplicationSupervisor {
         }
 
         task.setStatus(Status.IN_PROGRESS);
+        task.exitQueue();
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
@@ -416,8 +425,10 @@ public final class ReplicationSupervisor {
       } finally {
         queuedCounter.get(task.getMetricName()).decrementAndGet();
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
+        opsQueueTimeMs.get(task.getMetricName()).add(task.getQueuedTime());
         inFlight.remove(task);
         decrementTaskCounter(task);
+        transferredBytesOps.get(task.getMetricName()).add(task.getTransferredBytes());
       }
     }
 
@@ -543,5 +554,31 @@ public final class ReplicationSupervisor {
   public long getReplicationRequestTotalTime(String metricsName) {
     MutableRate rate = opsLatencyMs.get(metricsName);
     return rate != null ? (long) rate.lastStat().total() : 0;
+  }
+
+  public long getQueuedTime(String metricsName) {
+    MutableRate rate = opsQueueTimeMs.get(metricsName);
+    return rate != null ? (long) rate.lastStat().total() : 0;
+  }
+
+  public long getQueuedTime() {
+    long total = 0;
+    for (Map.Entry<String, MutableRate> entry : opsQueueTimeMs.entrySet()) {
+      total += ((long) entry.getValue().lastStat().total());
+    }
+    return total;
+  }
+
+  public long getTransferredBytes() {
+    long total = 0;
+    for (Map.Entry<String, MutableStat> entry : transferredBytesOps.entrySet()) {
+      total += ((long) entry.getValue().lastStat().total());
+    }
+    return total;
+  }
+
+  public long getTransferredBytes(String metricsName) {
+    MutableStat stat = transferredBytesOps.get(metricsName);
+    return stat != null ? (long) stat.lastStat().total() : 0;
   }
 }

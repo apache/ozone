@@ -330,7 +330,7 @@ public class TestECContainerRecovery {
         invocation.callRealMethod();
         return null;
       }).when(coordinator).reconstructECBlockGroup(any(), any(),
-              any(), any());
+              any(), any(), any());
     }
 
     // Shutting down DN triggers close pipeline and close container.
