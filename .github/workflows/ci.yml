@@ -447,20 +447,18 @@ jobs:
         run: |
           hadoop-ozone/dev-support/checks/${{ github.job }}.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
         continue-on-error: true
+      - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
       - name: Install diffoscope
         run: |
           sudo apt update -q
           sudo apt install -y diffoscope
         if: ${{ failure() }}
-        continue-on-error: true
       - name: Check artifact differences
         run: |
           hadoop-ozone/dev-support/checks/_diffoscope.sh
         if: ${{ failure() }}
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
