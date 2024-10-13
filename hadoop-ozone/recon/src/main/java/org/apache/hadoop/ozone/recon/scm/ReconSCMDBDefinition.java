@@ -43,9 +43,7 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
       NODES =
       new DBColumnFamilyDefinition<UUID, DatanodeDetails>(
           "nodes",
-          UUID.class,
           UUID_CODEC,
-          DatanodeDetails.class,
           DatanodeDetails.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
