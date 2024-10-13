@@ -295,7 +295,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.15.0</aspectj-plugin.version>
-    <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
+    <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
 
