@@ -275,6 +275,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteExactlyFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -573,6 +574,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteExactlyMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
