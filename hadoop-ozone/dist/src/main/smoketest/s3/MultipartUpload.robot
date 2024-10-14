@@ -180,10 +180,10 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
 
 Test abort Multipart upload
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    0     '--storage-class REDUCED_REDUNDANCY'
-    ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --upload-id ${uploadID}    0
+    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey4    ${uploadID}    0
 
 Test abort Multipart upload with invalid uploadId
-    ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id "random"    255
+    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey5    "random"    255
 
 Upload part with Incorrect uploadID
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
@@ -219,7 +219,7 @@ Test list parts
                        Should contain        ${result}   STANDARD
 
 #finally abort it
-    ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id ${uploadID}    0
+    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey5    ${uploadID}    0
 
 Test Multipart Upload with the simplified aws s3 cp API
                         Execute AWSS3Cli        cp /tmp/22mb s3://${BUCKET}/mpyawscli

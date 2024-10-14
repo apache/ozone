@@ -65,6 +65,12 @@ Complete MPU
     END
 
 
+Abort MPU
+    [arguments]    ${bucket}    ${key}    ${upload_id}    ${expected_rc}=0
+
+    ${result} =    Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id}    ${expected_rc}
+
+
 Upload MPU parts
     [arguments]    ${bucket}    ${key}    ${upload_id}    @{files}
 
