@@ -20,7 +20,7 @@ summary: Ozone Debug command can be used for all the debugging related tasks.
   limitations under the License.
 -->
 
-Ozone Debug command (`ozone debug`) is a collection of tools intended to be used only by admins.
+Ozone Debug command (`ozone debug`) is a collection of tools intended to help in debugging and get more information of various components of ozone.
 
 ```bash
 $ ozone debug --help 
