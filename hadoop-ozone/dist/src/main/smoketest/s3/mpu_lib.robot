@@ -40,6 +40,7 @@ Upload MPU part
 
     ${result} =    Execute AWSS3APICli and checkrc    upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}    ${expected_rc}
     IF    '${expected_rc}' == '0'
+        Should contain    ${result}    ETag
         ${etag} =    Execute    echo '${result}' | jq -r '.ETag'
         RETURN    ${etag}
     ELSE
@@ -50,13 +51,20 @@ Upload MPU part
 Complete MPU
     [arguments]    ${bucket}    ${key}    ${upload_id}    ${parts}    ${expected_rc}=0
 
-    Execute AWSS3APICli and checkrc    complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'    ${expected_rc}
+    ${result} =    Execute AWSS3APICli and checkrc    complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'    ${expected_rc}
+    IF    '${expected_rc}' == '0'
+        Should contain    ${result}    ${bucket}
+        Should contain    ${result}    ${key}
+        Should contain    ${result}    ETag
+        ${etag} =    Execute    echo '${result}' | jq -r '.ETag'
+        RETURN    ${etag}
+    ELSE
+        RETURN    ${result}
+    END
 
 
-Perform Multipart Upload
-    [arguments]    ${bucket}    ${key}    @{files}
-
-    ${upload_id} =      Initiate MPU    ${bucket}    ${key}
+Upload MPU parts
+    [arguments]    ${bucket}    ${key}    ${upload_id}    @{files}
 
     @{etags} =    Create List
     FOR    ${i}    ${file}    IN ENUMERATE    @{files}
@@ -64,8 +72,16 @@ Perform Multipart Upload
         ${etag} =    Upload MPU part    ${bucket}    ${key}    ${upload_id}    ${part}    ${file}
         Append To List    ${etags}    {ETag=${etag},PartNumber=${part}}
     END
-
     ${parts} =    Catenate    SEPARATOR=,    @{etags}
+
+    RETURN    ${parts}
+
+
+Perform Multipart Upload
+    [arguments]    ${bucket}    ${key}    @{files}
+
+    ${upload_id} =      Initiate MPU    ${bucket}    ${key}
+    ${parts} =          Upload MPU parts    ${bucket}    ${key}    ${upload_id}    @{files}
     Complete MPU    ${bucket}    ${key}    ${upload_id}    ${parts}
 
 

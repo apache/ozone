@@ -101,12 +101,8 @@ Test Multipart Upload Complete
                         Should contain    ${result}    must specify at least one part
 
 #complete multipart upload
-    ${result} =                 Execute AWSS3APICli           complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
-                                Should contain                ${result}    ${BUCKET}
-                                Should contain                ${result}    ${PREFIX}/multipartKey1
-    ${resultETag} =             Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+    ${resultETag} =     Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    '{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}'
     ${expectedResultETag} =     Execute                       echo -n ${eTag1}${eTag2} | md5sum | awk '{print $1}'
-                                Should contain                ${result}    ETag
                                 Should Be Equal As Strings    ${resultETag}     "${expectedResultETag}-2"
 
 #check whether the user defined metadata and parts count can be retrieved
@@ -157,18 +153,8 @@ Test Multipart Upload with user defined metadata size larger than 2 KB
 
 Test Multipart Upload Complete Entity too small
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey2
-
-#upload parts
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey2 --part-number 1 --body /tmp/10kb --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
-
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey2 --part-number 2 --body /tmp/10kb --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
-
-#complete multipart upload
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey2 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'    255
+    ${parts} =          Upload MPU parts    ${BUCKET}    ${PREFIX}/multipartKey2    /tmp/10kb    /tmp/10kb
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey2    ${uploadID}    ${parts}    255
                         Should contain          ${result}    EntityTooSmall
 
 
@@ -176,37 +162,25 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey3
 
 #complete multipart upload when no parts uploaded
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}]'    255
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    '{ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}'    255
                         Should contain          ${result}    InvalidPart
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=etag1,PartNumber=2},{ETag=etag2,PartNumber=1}]'    255
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    '{ETag=etag1,PartNumber=2},{ETag=etag2,PartNumber=1}'    255
                         Should contain          ${result}    InvalidPart
 #upload parts
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
-
-
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 2 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
-
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    1    /tmp/part1
+    ${eTag2} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    2    /tmp/part1
                         Execute                 echo "Part3" > /tmp/part3
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 --body /tmp/part3 --upload-id ${uploadID}
-    ${eTag3} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+    ${eTag3} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    3    /tmp/part3
 
 #complete multipart upload
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}]'    255
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   '{ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}'    255
                         Should contain          ${result}    InvalidPart
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=etag2,PartNumber=2}]'    255
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   '{ETag=${eTag1},PartNumber=1},{ETag=etag2,PartNumber=2}'    255
                         Should contain          ${result}    InvalidPart
-    ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=4},{ETag=etag2,PartNumber=2}]'    255
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   '{ETag=${eTag1},PartNumber=4},{ETag=etag2,PartNumber=2}'    255
                         Should contain          ${result}    InvalidPartOrder
 #complete multipart upload(merge with few parts)
-    ${result} =         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag3},PartNumber=3}]'
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey3
-                        Should contain          ${result}    ETag
+    ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   '{ETag=${eTag1},PartNumber=1},{ETag=${eTag3},PartNumber=3}'
 
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 /tmp/${PREFIX}-multipartKey3.result
                         Execute                    cat /tmp/part1 /tmp/part3 > /tmp/${PREFIX}-multipartKey3
@@ -284,7 +258,7 @@ Test Multipart Upload Put With Copy
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
 
-                        Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copytest/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1}]'
+                        Complete MPU    ${BUCKET}    ${PREFIX}/copytest/destination    ${uploadID}    '{ETag=${eTag1},PartNumber=1}'
                         Execute AWSS3APICli     get-object --bucket ${BUCKET} --key ${PREFIX}/copytest/destination /tmp/part-result
 
                         Compare files           /tmp/part1        /tmp/part-result
@@ -306,7 +280,7 @@ Test Multipart Upload Put With Copy and range
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
 
-                        Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
+                        Complete MPU    ${BUCKET}    ${PREFIX}/copyrange/destination    ${uploadID}    '{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}'
                         Execute AWSS3APICli     get-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination /tmp/part-result
 
                         Compare files           /tmp/10mb        /tmp/part-result
@@ -353,8 +327,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
 
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
-
-                        Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
+                        Complete MPU    ${BUCKET}    ${PREFIX}/copyrange/destination    ${uploadID}   '{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}'
                         Execute AWSS3APICli     get-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination /tmp/part-result
 
                         Compare files           /tmp/10mb        /tmp/part-result
