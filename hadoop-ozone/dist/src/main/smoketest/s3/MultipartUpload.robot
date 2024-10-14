@@ -20,6 +20,7 @@ Library             String
 Library             DateTime
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
+Resource            mpu_lib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup Multipart Tests
 Suite Teardown      Teardown Multipart Tests
