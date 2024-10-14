@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,11 +46,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -64,7 +60,6 @@ public class TestSecretRevoke {
   private static final String OTHER_USER_NAME = "test2";
 
   private S3SecretManagementEndpoint endpoint;
-  private ObjectStoreStub objectStore;
 
   @Mock
   private ClientProtocol proxy;
@@ -155,7 +150,7 @@ public class TestSecretRevoke {
     Response firstResponse = endpoint.revoke();
     assertEquals(OK.getStatusCode(), firstResponse.getStatus());
     doThrow(new OMException(S3_SECRET_NOT_FOUND))
-        .when(objectStore).revokeS3Secret(any());
+        .when(proxy).revokeS3Secret(anyString());
     Response secondResponse = endpoint.revoke();
     assertEquals(NOT_FOUND.getStatusCode(), secondResponse.getStatus());
   }
@@ -164,7 +159,7 @@ public class TestSecretRevoke {
   void testSecretRevokesHandlesException() throws IOException {
     mockSecurityContext(true);
     doThrow(new OMException(ACCESS_DENIED))
-        .when(objectStore).revokeS3Secret(any());
+        .when(proxy).revokeS3Secret(anyString());
     Response response = endpoint.revoke();
     assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
   }

@@ -135,7 +135,6 @@ class TestSecretGenerate {
   }
 
   @Test
-  @Unhealthy("HDDS-11041")
   void testSecretGenerateWithUsername() throws IOException {
     hasNoSecretYet();
 
