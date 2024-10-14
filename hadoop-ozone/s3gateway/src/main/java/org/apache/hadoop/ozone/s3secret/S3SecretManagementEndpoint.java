@@ -33,7 +33,6 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
-import static javax.ws.rs.core.Response.Status.METHOD_NOT_ALLOWED;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
