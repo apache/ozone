@@ -74,6 +74,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -132,9 +134,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @CommandLine.Option(names = {"--filter"},
       description = "Comma-separated list of \"<field>:<operator>:<value>\" where " +
           "<field> is any valid field of the record, " +
-          "<operator> is (EQUALS,LESSER or GREATER) and " +
-          "<value> is the value of the field. " +
-          "eg.) \"dataSize:equals:1000\" for showing records having the value 1000 for dataSize")
+          "<operator> is [EQUALS,LESSER, GREATER or REGEX]. (EQUALS compares the exact string, " +
+          "REGEX compares with a valid regular expression passed, and LESSER/GREATER works with numeric values), " +
+          "<value> is the value of the field. \n" +
+          "eg.) \"dataSize:equals:1000\" for showing records having the value 1000 for dataSize, \n" +
+          "     \"keyName:regex:^key.*$\" for showing records having keyName that matches the given regex.")
   private String filter;
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
@@ -396,7 +400,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           throw new IOException("Invalid filter passed");
         } else if (fieldValue.getNextLevel() == null) {
           // reached the end of fields hierarchy, check if they match the filter
-          // Currently, only equals operation is supported
           try {
             switch (fieldValue.getOperator()) {
             case EQUALS:
@@ -416,8 +419,15 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 return false;
               }
               break;
+            case REGEX:
+              Pattern p = Pattern.compile(String.valueOf(fieldValue.getValue()));
+              Matcher m = p.matcher(String.valueOf(valueObject));
+              if (!m.find()) {
+                return false;
+              }
+              break;
             default:
-              err().println("Only EQUALS/LESSER/GREATER operator is supported currently.");
+              err().println("Only EQUALS/LESSER/GREATER/REGEX operator is supported currently.");
               throw new IOException("Invalid filter passed");
             }
           } catch (NumberFormatException ex) {

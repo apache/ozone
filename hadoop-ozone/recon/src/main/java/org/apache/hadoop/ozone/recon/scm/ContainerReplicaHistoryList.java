@@ -34,11 +34,11 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
  * For Recon DB table definition.
  */
 public class ContainerReplicaHistoryList {
-  private static final Codec<ContainerReplicaHistoryList> CODEC
-      = new DelegatedCodec<>(Proto2Codec.get(
-      ContainerReplicaHistoryListProto.getDefaultInstance()),
+  private static final Codec<ContainerReplicaHistoryList> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(ContainerReplicaHistoryListProto.getDefaultInstance()),
       ContainerReplicaHistoryList::fromProto,
-      ContainerReplicaHistoryList::toProto);
+      ContainerReplicaHistoryList::toProto,
+      ContainerReplicaHistoryList.class);
 
   public static Codec<ContainerReplicaHistoryList> getCodec() {
     return CODEC;

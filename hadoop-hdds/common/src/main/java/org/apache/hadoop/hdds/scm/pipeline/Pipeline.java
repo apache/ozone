@@ -68,6 +68,7 @@ public final class Pipeline {
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
   public static Codec<Pipeline> getCodec() {

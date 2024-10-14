@@ -93,8 +93,7 @@ public class TestRatisPipelineProvider {
 
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);

@@ -120,6 +120,7 @@ public class TestLDBCli {
   /**
    * Defines ldb tool test cases.
    */
+  @SuppressWarnings({"methodlength"})
   private static Stream<Arguments> scanTestCases() {
     return Stream.of(
         Arguments.of(
@@ -204,6 +205,19 @@ public class TestLDBCli {
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("Filter dataSize>2000", Arrays.asList("--filter", "dataSize:greater:2000")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter key3 regex", Arrays.asList("--filter", "keyName:regex:^.*3$")),
+            Named.of("Expect key3", Pair.of("key3", "key4"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("Filter keys whose dataSize digits start with 5 using regex",
+                Arrays.asList("--filter", "dataSize:regex:^5.*$")),
             Named.of("Expect empty result", null)
         ),
         Arguments.of(

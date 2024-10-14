@@ -86,6 +86,8 @@ public class Filter {
       return FilterOperator.GREATER;
     } else if (op.equalsIgnoreCase("LESSER")) {
       return FilterOperator.LESSER;
+    } else if (op.equalsIgnoreCase("REGEX")) {
+      return FilterOperator.REGEX;
     } else {
       return null;
     }
@@ -102,6 +104,7 @@ public class Filter {
   public enum FilterOperator {
     EQUALS,
     LESSER,
-    GREATER;
+    GREATER,
+    REGEX;
   }
 }
