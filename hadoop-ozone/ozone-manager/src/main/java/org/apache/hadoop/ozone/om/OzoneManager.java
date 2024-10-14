@@ -274,7 +274,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
@@ -1494,7 +1494,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // snapshot directory in Ratis storage directory. if yes, move it to
       // new snapshot directory.
 
-      File snapshotDir = new File(omRatisDirectory, OM_RATIS_SNAPSHOT_DIR);
+      File snapshotDir = new File(omRatisDirectory, OZONE_RATIS_SNAPSHOT_DIR);
 
       if (snapshotDir.isDirectory()) {
         FileUtils.moveDirectory(snapshotDir.toPath(),
