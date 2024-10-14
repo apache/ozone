@@ -76,7 +76,7 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
-    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey1    0     '--metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"'
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey1    0     --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"
 
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    1    /tmp/part1
     ${eTag2} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    2    /tmp/part2
@@ -133,7 +133,7 @@ Test Multipart Upload Complete
 
 Test Multipart Upload with user defined metadata size larger than 2 KB
     ${custom_metadata_value} =  Generate Random String   3000
-    ${result} =    Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    255     '--metadata="custom-key1=${custom_metadata_value}"'
+    ${result} =    Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    255     --metadata="custom-key1=${custom_metadata_value}"
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
@@ -179,7 +179,7 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
 
 Test abort Multipart upload
-    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    0     '--storage-class REDUCED_REDUNDANCY'
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    0     --storage-class REDUCED_REDUNDANCY
     ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey4    ${uploadID}    0
 
 Test abort Multipart upload with invalid uploadId
