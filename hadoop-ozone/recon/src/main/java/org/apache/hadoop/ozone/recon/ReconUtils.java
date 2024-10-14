@@ -602,33 +602,33 @@ public class ReconUtils {
 
   /**
    * Retrieves keys from the specified table based on pagination and prefix filtering.
-   * This method handles different scenarios based on the presence of startPrefix and prevKey,
-   * enabling efficient key retrieval from the table.
+   * This method handles different scenarios based on the presence of {@code startPrefix}
+   * and {@code prevKey}, enabling efficient key retrieval from the table.
    *
    * The method handles the following cases:
    *
-   * 1. prevKey provided, startPrefix empty:
-   *  - Seeks to prevKey, skips it, and returns subsequent records up to the limit.
+   * 1. {@code prevKey} provided, {@code startPrefix} empty:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent records up to the limit.
    *
-   * 2. prevKey empty, startPrefix empty:
-   *  - Iterates from the beginning of the table, retrieving all records up to the limit.
+   * 2. {@code prevKey} empty, {@code startPrefix} empty:
+   *    - Iterates from the beginning of the table, retrieving all records up to the limit.
    *
-   * 3. startPrefix provided, prevKey empty:
-   *  - Seeks to the first key matching startPrefix and returns all matching keys up to the limit.
+   * 3. {@code startPrefix} provided, {@code prevKey} empty:
+   *    - Seeks to the first key matching {@code startPrefix} and returns all matching keys up to the limit.
    *
-   * 4. startPrefix provided, prevKey provided:
-   *  - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix, up to the limit.
+   * 4. {@code startPrefix} provided, {@code prevKey} provided:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix}, up to the limit.
    *
-   *  This method also handles the following limit scenarios:
-   *  - If limit = 0 or limit < -1, no records are returned.
-   *  - If limit = -1, all records are returned.
-   *  - For positive limits, it retrieves records up to the specified limit.
+   * This method also handles the following {@code limit} scenarios:
+   * - If {@code limit == 0} or {@code limit < -1}, no records are returned.
+   * - If {@code limit == -1}, all records are returned.
+   * - For positive {@code limit}, it retrieves records up to the specified {@code limit}.
    *
    * @param table       The table to retrieve keys from.
    * @param startPrefix The search prefix to match keys against.
    * @param limit       The maximum number of keys to retrieve.
    * @param prevKey     The key to start after for the next set of records.
-   * @return A map of keys and their corresponding OmKeyInfo or RepeatedOmKeyInfo objects.
+   * @return A map of keys and their corresponding {@code OmKeyInfo} or {@code RepeatedOmKeyInfo} objects.
    * @throws IOException If there are problems accessing the table.
    */
   public static <T> Map<String, T> extractKeysFromTable(
