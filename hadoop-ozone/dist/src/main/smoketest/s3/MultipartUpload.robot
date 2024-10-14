@@ -71,29 +71,15 @@ Test Multipart Upload
 # upload we get error entity too small. So, considering further complete
 # multipart upload, uploading each part as 5MB file, exception is for last part
 
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/part1 --upload-id ${nextUploadID}
-                        Should contain          ${result}    ETag
-# override part
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/part1 --upload-id ${nextUploadID}
-                        Should contain          ${result}    ETag
+                        Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey    ${nextUploadID}    1    /tmp/part1
+                        Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey    ${nextUploadID}    1    /tmp/part1
 
 
 Test Multipart Upload Complete
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey1    0     '--metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"'
 
-#upload parts
-    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
-                        Should contain                ${result}    ETag
-    ${part1Md5Sum} =    Execute                       md5sum /tmp/part1 | awk '{print $1}'
-                        Should Be Equal As Strings    ${eTag1}  ${part1Md5Sum}
-
-                        Execute                       echo "Part2" > /tmp/part2
-    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
-                        Should contain                ${result}    ETag
-    ${part2Md5Sum} =    Execute                       md5sum /tmp/part2 | awk '{print $1}'
-                        Should Be Equal As Strings    ${eTag2}  ${part2Md5Sum}
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    1    /tmp/part1
+    ${eTag2} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    2    /tmp/part2
 
 #complete multipart upload without any parts
     ${result} =         Execute AWSS3APICli and checkrc    complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1    255
@@ -209,14 +195,8 @@ Test list parts
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey5
 
 #upload parts
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
-
-                        Execute                 echo "Part2" > /tmp/part2
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey5    ${uploadID}    1    /tmp/part1
+    ${eTag2} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey5    ${uploadID}    2    /tmp/part2
 
 #list parts
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id ${uploadID}

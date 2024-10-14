@@ -41,7 +41,9 @@ Upload MPU part
     ${result} =    Execute AWSS3APICli and checkrc    upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}    ${expected_rc}
     IF    '${expected_rc}' == '0'
         Should contain    ${result}    ETag
-        ${etag} =    Execute    echo '${result}' | jq -r '.ETag'
+        ${etag} =      Execute    echo '${result}' | jq -r '.ETag'
+        ${md5sum} =    Execute    md5sum ${file} | awk '{print $1}'
+        Should Be Equal As Strings    ${etag}    ${md5sum}
         RETURN    ${etag}
     ELSE
         RETURN    ${result}
