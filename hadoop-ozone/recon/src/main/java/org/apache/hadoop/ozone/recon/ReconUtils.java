@@ -617,7 +617,8 @@ public class ReconUtils {
    *    - Seeks to the first key matching {@code startPrefix} and returns all matching keys up to the limit.
    *
    * 4. {@code startPrefix} provided, {@code prevKey} provided:
-   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix}, up to the limit.
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix},
+   *      up to the limit.
    *
    * This method also handles the following {@code limit} scenarios:
    * - If {@code limit == 0} or {@code limit < -1}, no records are returned.
