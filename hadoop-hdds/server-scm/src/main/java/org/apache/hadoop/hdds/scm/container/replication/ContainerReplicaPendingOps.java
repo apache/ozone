@@ -116,7 +116,7 @@ public class ContainerReplicaPendingOps {
    * Store a ContainerReplicaOp to add a replica for the given ContainerID.
    * @param containerID ContainerID for which to add a replica
    * @param target The target datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            added and reported by the datanode, or it will
    *                            be discarded.
@@ -130,7 +130,7 @@ public class ContainerReplicaPendingOps {
    * Store a ContainerReplicaOp to delete a replica for the given ContainerID.
    * @param containerID ContainerID for which to delete a replica
    * @param target The target datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            deleted and reported by the datanode, or it will
    *                            be discarded.
@@ -145,7 +145,7 @@ public class ContainerReplicaPendingOps {
    * been replicated successfully.
    * @param containerID ContainerID for which to complete the replication
    * @param target The target Datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
    * @return True if a pending replica was found and removed, false otherwise.
    */
   public boolean completeAddReplica(ContainerID containerID,
@@ -167,7 +167,7 @@ public class ContainerReplicaPendingOps {
    * been deleted successfully.
    * @param containerID ContainerID for which to complete the deletion
    * @param target The target Datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
    * @return True if a pending replica was found and removed, false otherwise.
    */
   public boolean completeDeleteReplica(ContainerID containerID,

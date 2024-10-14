@@ -228,6 +228,19 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Returns count of failed volumes reported by the data node.
+   * @return count of failed volumes
+   */
+  public int getFailedVolumeCount() {
+    try {
+      lock.readLock().lock();
+      return failedVolumeCount;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
    * Returns count of healthy metadata volumes reported from datanode.
    * @return count of healthy metdata log volumes
    */
@@ -333,7 +346,7 @@ public class DatanodeInfo extends DatanodeDetails {
    * Retrieve the number of queued commands of the given type, as reported by
    * the datanode at the last heartbeat.
    * @param cmd The command for which to receive the queued command count
-   * @return -1 if we have no information about the count, or an integer >= 0
+   * @return -1 if we have no information about the count, or an integer &gt;= 0
    *         indicating the command count at the last heartbeat.
    */
   public int getCommandCount(SCMCommandProto.Type cmd) {

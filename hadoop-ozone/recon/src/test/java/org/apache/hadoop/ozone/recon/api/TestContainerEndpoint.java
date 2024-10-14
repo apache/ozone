@@ -886,7 +886,9 @@ public class TestContainerEndpoint {
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
     String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
+    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString(); // For NEGATIVE_SIZE state
 
+    // Initial empty response verification
     Response response = containerEndpoint
         .getUnhealthyContainers(missing, 1000, 1);
 
@@ -899,43 +901,54 @@ public class TestContainerEndpoint {
     assertEquals(0, responseObject.getMisReplicatedCount());
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
+    // Add unhealthy records
     putContainerInfos(5);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
-    createEmptyMissingUnhealthyRecords(2);
+    createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
+    createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
+    // Check for unhealthy containers
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
+
     // Summary should have the count for all unhealthy:
     assertEquals(5, responseObject.getMissingCount());
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
 
-    Collection<UnhealthyContainerMetadata> records
-        = responseObject.getContainers();
+    Collection<UnhealthyContainerMetadata> records = responseObject.getContainers();
     assertTrue(records.stream()
         .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
             .map(ContainerHistory::getState))
         .allMatch(s -> s.equals("UNHEALTHY")));
-    // There should only be 5 missing containers and no others as we asked for
-    // only missing.
+
+    // Verify only missing containers are returned
     assertEquals(5, records.size());
     for (UnhealthyContainerMetadata r : records) {
       assertEquals(missing, r.getContainerState());
     }
 
+    // Check for empty missing containers, should return zero
     Response filteredEmptyMissingResponse = containerEndpoint
         .getUnhealthyContainers(emptyMissing, 1000, 1);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
-    // Assert for zero empty missing containers.
+    assertEquals(0, records.size());
+
+    // Check for negative size containers, should return zero
+    Response filteredNegativeSizeResponse = containerEndpoint
+        .getUnhealthyContainers(negativeSize, 1000, 1);
+    responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
+    records = responseObject.getContainers();
     assertEquals(0, records.size());
   }
+
 
   @Test
   public void testUnhealthyContainersInvalidState() {
@@ -1042,6 +1055,15 @@ public class TestContainerEndpoint {
           3, 3, 0, null);
     }
   }
+
+  private void createNegativeSizeUnhealthyRecords(int negativeSize) {
+    int cid = 0;
+    for (int i = 0; i < negativeSize; i++) {
+      createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+          3, 3, 0, null); // Added for NEGATIVE_SIZE state
+    }
+  }
+
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
                                       int misRep) {

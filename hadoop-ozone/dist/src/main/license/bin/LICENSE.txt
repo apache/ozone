@@ -407,6 +407,7 @@ Apache License 2.0
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api
+   org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift

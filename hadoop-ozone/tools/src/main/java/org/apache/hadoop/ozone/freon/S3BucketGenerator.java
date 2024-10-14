@@ -28,9 +28,9 @@ import java.util.concurrent.Callable;
  * Generate buckets via the s3 interface.
  *
  * For a secure cluster,
- * $> init user keytab
- * $> kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
- * $> eval $(ozone s3 getsecret -e)
+ * $&gt; init user keytab
+ * $&gt; kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
+ * $&gt; eval $(ozone s3 getsecret -e)
  * for getting and exporting access_key_id and secret_access_key
  * to freon shell test environment
  * secret access key.

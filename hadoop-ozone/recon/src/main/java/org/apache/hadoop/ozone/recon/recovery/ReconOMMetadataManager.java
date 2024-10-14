@@ -109,7 +109,7 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Return the OzoneConfiguration instance used by Recon.
-   * @return
+   * @return OzoneConfiguration
    */
   OzoneConfiguration getOzoneConfiguration();
 

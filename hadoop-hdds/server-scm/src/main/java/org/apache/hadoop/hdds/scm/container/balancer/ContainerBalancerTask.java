@@ -51,12 +51,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -115,6 +117,7 @@ public class ContainerBalancerTask implements Runnable {
   private IterationResult iterationResult;
   private int nextIterationIndex;
   private boolean delayStart;
+  private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -155,6 +158,15 @@ public class ContainerBalancerTask implements Runnable {
     this.selectedSources = new HashSet<>();
     this.selectedTargets = new HashSet<>();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
+    if (config.getNetworkTopologyEnable()) {
+      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
+          containerManager, placementPolicyValidateProxy,
+          nodeManager, networkTopology);
+    } else {
+      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
+          placementPolicyValidateProxy, nodeManager);
+    }
+    this.iterationsStatistic = new ArrayList<>();
   }
 
   /**
@@ -250,7 +262,9 @@ public class ContainerBalancerTask implements Runnable {
       }
 
       IterationResult iR = doIteration();
+      saveIterationStatistic(i, iR);
       metrics.incrementNumIterations(1);
+
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
 
       // if no new move option is generated, it means the cluster cannot be
@@ -290,6 +304,85 @@ public class ContainerBalancerTask implements Runnable {
     }
     
     tryStopWithSaveConfiguration("Completed all iterations.");
+  }
+
+  private void saveIterationStatistic(Integer iterationNumber, IterationResult iR) {
+    ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+            iterationNumber,
+            iR.name(),
+            getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
+            metrics.getDataSizeMovedGBInLatestIteration(),
+            metrics.getNumContainerMovesScheduledInLatestIteration(),
+            metrics.getNumContainerMovesCompletedInLatestIteration(),
+            metrics.getNumContainerMovesFailedInLatestIteration(),
+            metrics.getNumContainerMovesTimeoutInLatestIteration(),
+            findTargetStrategy.getSizeEnteringNodes()
+                    .entrySet()
+                    .stream()
+                    .filter(Objects::nonNull)
+                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+                    .collect(
+                            Collectors.toMap(
+                                    entry -> entry.getKey().getUuid(),
+                                    entry -> entry.getValue() / OzoneConsts.GB
+                            )
+                    ),
+            findSourceStrategy.getSizeLeavingNodes()
+                    .entrySet()
+                    .stream()
+                    .filter(Objects::nonNull)
+                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+                    .collect(
+                            Collectors.toMap(
+                                    entry -> entry.getKey().getUuid(),
+                                    entry -> entry.getValue() / OzoneConsts.GB
+                            )
+                    )
+    );
+    iterationsStatistic.add(iterationStatistic);
+  }
+
+  public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
+
+    int lastIterationNumber = iterationsStatistic.stream()
+        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+        .max()
+        .orElse(0);
+
+    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+        lastIterationNumber + 1,
+        null,
+        getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
+        sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
+        metrics.getNumContainerMovesScheduledInLatestIteration(),
+        metrics.getNumContainerMovesCompletedInLatestIteration(),
+        metrics.getNumContainerMovesFailedInLatestIteration(),
+        metrics.getNumContainerMovesTimeoutInLatestIteration(),
+        findTargetStrategy.getSizeEnteringNodes()
+            .entrySet()
+            .stream()
+            .filter(Objects::nonNull)
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
+            ),
+        findSourceStrategy.getSizeLeavingNodes()
+            .entrySet()
+            .stream()
+            .filter(Objects::nonNull)
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
+            )
+    );
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    resultList.add(currentIterationStatistic);
+    return resultList;
   }
 
   /**
@@ -347,14 +440,7 @@ public class ContainerBalancerTask implements Runnable {
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
-    if (config.getNetworkTopologyEnable()) {
-      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicyValidateProxy,
-          nodeManager, networkTopology);
-    } else {
-      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicyValidateProxy, nodeManager);
-    }
+
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();
     // include/exclude nodes from balancing according to configs
@@ -605,7 +691,7 @@ public class ContainerBalancerTask implements Runnable {
         moveSelectionToFutureMap.values();
     if (!futures.isEmpty()) {
       CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
-          futures.toArray(new CompletableFuture[futures.size()]));
+          futures.toArray(new CompletableFuture[0]));
       try {
         allFuturesResult.get(config.getMoveTimeout().toMillis(),
             TimeUnit.MILLISECONDS);
@@ -1060,6 +1146,7 @@ public class ContainerBalancerTask implements Runnable {
     this.sizeScheduledForMoveInLatestIteration = 0;
     this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
+    metrics.resetNumContainerMovesScheduledInLatestIteration();
     metrics.resetNumContainerMovesCompletedInLatestIteration();
     metrics.resetNumContainerMovesTimeoutInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
@@ -1134,6 +1221,10 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   IterationResult getIterationResult() {
     return iterationResult;
+  }
+
+  ContainerBalancerConfiguration getConfig() {
+    return config;
   }
 
   @VisibleForTesting

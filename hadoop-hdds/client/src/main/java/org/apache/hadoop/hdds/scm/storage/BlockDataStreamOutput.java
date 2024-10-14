@@ -364,7 +364,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * it is a no op.
    * @param bufferFull flag indicating whether bufferFull condition is hit or
    *              its called as part flush/close
-   * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
   public void watchForCommit(boolean bufferFull) throws IOException {

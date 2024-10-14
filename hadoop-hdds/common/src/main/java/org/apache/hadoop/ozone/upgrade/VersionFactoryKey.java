@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 /**
  * "Key" element to the Version specific instance factory. Currently it has 2
- * dimensions -> a 'key' string and a version. This is to support a factory
+ * dimensions -&gt; a 'key' string and a version. This is to support a factory
  * which returns an instance for a given "key" and "version".
  */
 public class VersionFactoryKey {

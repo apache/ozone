@@ -240,7 +240,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, result,
@@ -257,7 +257,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param bucketInfo
    * @param omPathInfo
    * @param trxnLogIndex
-   * @return
+   * @return {@code List<OmKeyInfo>}
    * @throws IOException
    */
   public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,

@@ -43,6 +43,11 @@ public final class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
   }
 
   @Override
+  public Class<OzoneTokenIdentifier> getTypeClass() {
+    return OzoneTokenIdentifier.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(OzoneTokenIdentifier object) {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");

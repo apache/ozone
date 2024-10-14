@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 public class ReconSCMDBDefinition extends SCMDBDefinition {
   private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
       StringCodec.get(), UUID::fromString, UUID::toString,
-      DelegatedCodec.CopyType.SHALLOW);
+      UUID.class, DelegatedCodec.CopyType.SHALLOW);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 
@@ -43,14 +43,12 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
       NODES =
       new DBColumnFamilyDefinition<UUID, DatanodeDetails>(
           "nodes",
-          UUID.class,
           UUID_CODEC,
-          DatanodeDetails.class,
           DatanodeDetails.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-          new SCMDBDefinition().getMap(), NODES);
+          SCMDBDefinition.get().getMap(), NODES);
 
   public ReconSCMDBDefinition() {
     super(COLUMN_FAMILIES);

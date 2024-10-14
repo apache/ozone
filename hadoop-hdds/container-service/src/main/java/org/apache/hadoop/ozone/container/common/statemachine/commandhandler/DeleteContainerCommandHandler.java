@@ -22,6 +22,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -36,11 +38,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.OptionalLong;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Handler to process the DeleteContainerCommand from SCM.
@@ -52,10 +52,10 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final AtomicInteger timeoutCount = new AtomicInteger(0);
-  private final AtomicLong totalTime = new AtomicLong(0);
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private final Clock clock;
   private int maxQueueSize;
+  private final MutableRate opsLatencyMs;
 
   public DeleteContainerCommandHandler(
       int threadPoolSize, Clock clock, int queueSize, String threadNamePrefix) {
@@ -70,10 +70,13 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
-      ExecutorService executor, int queueSize) {
+      ThreadPoolExecutor executor, int queueSize) {
     this.executor = executor;
     this.clock = clock;
     maxQueueSize = queueSize;
+    MetricsRegistry registry = new MetricsRegistry(
+        DeleteContainerCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteContainerCommand + "Ms");
   }
   @Override
   public void handle(final SCMCommand command,
@@ -125,13 +128,13 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     } catch (IOException e) {
       LOG.error("Exception occurred while deleting the container.", e);
     } finally {
-      totalTime.getAndAdd(Time.monotonicNow() - startTime);
+      this.opsLatencyMs.add(Time.monotonicNow() - startTime);
     }
   }
 
   @Override
   public int getQueuedCount() {
-    return ((ThreadPoolExecutor)executor).getQueue().size();
+    return executor.getQueue().size();
   }
 
   @Override
@@ -150,14 +153,22 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    final int invocations = invocationCount.get();
-    return invocations == 0 ?
-        0 : totalTime.get() / invocations;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime.get();
+    return (long) this.opsLatencyMs.lastStat().total();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return executor.getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return executor.getActiveCount();
   }
 
   @Override

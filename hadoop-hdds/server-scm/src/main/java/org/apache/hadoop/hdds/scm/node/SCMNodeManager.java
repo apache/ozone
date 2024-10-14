@@ -83,6 +83,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -145,6 +146,8 @@ public class SCMNodeManager implements NodeManager {
   private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
   private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
   private static final String TOTALCAPACITY = "CAPACITY";
+  private static final String DNUUID = "UUID";
+  private static final String VERSION = "VERSION";
   /**
    * Constructs SCM machine Manager.
    */
@@ -446,6 +449,11 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+        } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          LOG.info("Update the version for registered datanode = {}, " +
+              "oldVersion = {}, newVersion = {}.",
+              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -505,6 +513,18 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return ipChanged || hostNameChanged;
+  }
+
+  /**
+   * Check if the version has been updated.
+   *
+   * @param oldVersion datanode oldVersion
+   * @param newVersion datanode newVersion
+   * @return true means replacement is needed, while false means replacement is not needed.
+   */
+  private boolean isVersionChange(String oldVersion, String newVersion) {
+    final boolean versionChanged = !Objects.equals(oldVersion, newVersion);
+    return versionChanged;
   }
 
   /**
@@ -981,6 +1001,7 @@ public class SCMNodeManager implements NodeManager {
     DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
+      usageInfo.setPipelineCount(getPipeLineCount(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1134,6 +1155,8 @@ public class SCMNodeManager implements NodeManager {
       String nonScmUsedPerc = storagePercentage[1];
       map.put(USEDSPACEPERCENT,
           "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      map.put(DNUUID, dni.getUuidString());
+      map.put(VERSION, dni.getVersion());
       nodes.put(hostName, map);
     }
     return nodes;
@@ -1143,7 +1166,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage capacity of the DataNode node.
    * @param storageReports Calculate the storage capacity corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String calculateStorageCapacity(
       List<StorageReportProto> storageReports) {
@@ -1154,36 +1176,43 @@ public class SCMNodeManager implements NodeManager {
       }
     }
 
-    double ua = capacityByte;
+    return convertUnit(capacityByte);
+  }
+
+  /**
+   * Convert byte value to other units, such as KB, MB, GB, TB.
+   * @param value Original value, in byte.
+   * @return
+   */
+  private static String convertUnit(double value) {
     StringBuilder unit = new StringBuilder("B");
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 1, "KB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "MB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "GB");
     }
-    if (ua > 1024) {
-      ua = ua / 1024;
+    if (value > 1024) {
+      value = value / 1024;
       unit.replace(0, 2, "TB");
     }
 
     DecimalFormat decimalFormat = new DecimalFormat("#0.0");
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    String capacity = decimalFormat.format(ua);
-    return capacity + unit.toString();
+    String newValue = decimalFormat.format(value);
+    return newValue + unit.toString();
   }
 
   /**
    * Calculate the storage usage percentage of a DataNode node.
    * @param storageReports Calculate the storage percentage corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String[] calculateStoragePercentage(
       List<StorageReportProto> storageReports) {
@@ -1215,6 +1244,102 @@ public class SCMNodeManager implements NodeManager {
     storagePercentage[0] = usedPercentage;
     storagePercentage[1] = nonUsedPercentage;
     return storagePercentage;
+  }
+
+  @Override
+  public Map<String, String> getNodeStatistics() {
+    Map<String, String> nodeStatistics = new HashMap<>();
+    // Statistics node usaged
+    nodeUsageStatistics(nodeStatistics);
+    // Statistics node states
+    nodeStateStatistics(nodeStatistics);
+    // Statistics node space
+    nodeSpaceStatistics(nodeStatistics);
+    // todo: Statistics of other instances
+    return nodeStatistics;
+  }
+
+  private void nodeUsageStatistics(Map<String, String> nodeStatics) {
+    if (nodeStateManager.getAllNodes().size() < 1) {
+      return;
+    }
+    float[] usages = new float[nodeStateManager.getAllNodes().size()];
+    float totalOzoneUsed = 0;
+    int i = 0;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      String[] storagePercentage = calculateStoragePercentage(
+              dni.getStorageReports());
+      if (storagePercentage[0].equals("N/A")) {
+        usages[i++] = 0;
+      } else {
+        float storagePerc = Float.parseFloat(storagePercentage[0]);
+        usages[i++] = storagePerc;
+        totalOzoneUsed = totalOzoneUsed + storagePerc;
+      }
+    }
+
+    totalOzoneUsed /= nodeStateManager.getAllNodes().size();
+    Arrays.sort(usages);
+    float median = usages[usages.length / 2];
+    nodeStatics.put(UsageStatics.MEDIAN.getLabel(), String.valueOf(median));
+    float max = usages[usages.length - 1];
+    nodeStatics.put(UsageStatics.MAX.getLabel(), String.valueOf(max));
+    float min = usages[0];
+    nodeStatics.put(UsageStatics.MIN.getLabel(), String.valueOf(min));
+
+    float dev = 0;
+    for (i = 0; i < usages.length; i++) {
+      dev += (usages[i] - totalOzoneUsed) * (usages[i] - totalOzoneUsed);
+    }
+    dev = (float) Math.sqrt(dev / usages.length);
+    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+  }
+
+  private void nodeStateStatistics(Map<String, String> nodeStatics) {
+    int healthyNodeCount = nodeStateManager.getHealthyNodeCount();
+    int deadNodeCount = nodeStateManager.getDeadNodeCount();
+    int decommissioningNodeCount = nodeStateManager.getDecommissioningNodeCount();
+    int enteringMaintenanceNodeCount = nodeStateManager.getEnteringMaintenanceNodeCount();
+    int volumeFailuresNodeCount = nodeStateManager.getVolumeFailuresNodeCount();
+    nodeStatics.put(StateStatistics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
+    nodeStatics.put(StateStatistics.DEAD.getLabel(), String.valueOf(deadNodeCount));
+    nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
+    nodeStatics.put(StateStatistics.ENTERING_MAINTENANCE.getLabel(), String.valueOf(enteringMaintenanceNodeCount));
+    nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
+  }
+
+  private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
+    if (nodeStateManager.getAllNodes().size() < 1) {
+      return;
+    }
+    long capacityByte = 0;
+    long scmUsedByte = 0;
+    long remainingByte = 0;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      List<StorageReportProto> storageReports = dni.getStorageReports();
+      if (storageReports != null && !storageReports.isEmpty()) {
+        for (StorageReportProto storageReport : storageReports) {
+          capacityByte += storageReport.getCapacity();
+          scmUsedByte += storageReport.getScmUsed();
+          remainingByte += storageReport.getRemaining();
+        }
+      }
+    }
+
+    long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
+    if (nonScmUsedByte < 0) {
+      nonScmUsedByte = 0;
+    }
+    String capacity = convertUnit(capacityByte);
+    String scmUsed = convertUnit(scmUsedByte);
+    String remaining = convertUnit(remainingByte);
+    String nonScmUsed = convertUnit(nonScmUsedByte);
+    nodeStatics.put(SpaceStatistics.CAPACITY.getLabel(), capacity);
+    nodeStatics.put(SpaceStatistics.SCM_USED.getLabel(), scmUsed);
+    nodeStatics.put(SpaceStatistics.REMAINING.getLabel(), remaining);
+    nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
   /**
@@ -1280,6 +1405,49 @@ public class SCMNodeManager implements NodeManager {
     }
 
     UsageStates(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum UsageStatics {
+    MIN("Min"),
+    MAX("Max"),
+    MEDIAN("Median"),
+    STDEV("Stdev");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    UsageStatics(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum StateStatistics {
+    HEALTHY("Healthy"),
+    DEAD("Dead"),
+    DECOMMISSIONING("Decommissioning"),
+    ENTERING_MAINTENANCE("EnteringMaintenance"),
+    VOLUME_FAILURES("VolumeFailures");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    StateStatistics(String label) {
+      this.label = label;
+    }
+  }
+
+  private enum SpaceStatistics {
+    CAPACITY("Capacity"),
+    SCM_USED("Scmused"),
+    NON_SCM_USED("NonScmused"),
+    REMAINING("Remaining");
+    private String label;
+    public String getLabel() {
+      return label;
+    }
+    SpaceStatistics(String label) {
       this.label = label;
     }
   }
@@ -1460,6 +1628,11 @@ public class SCMNodeManager implements NodeManager {
   public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
+  }
+
+  public int getPipeLineCount(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getPipelinesCount(datanodeDetails);
   }
 
   @Override

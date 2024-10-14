@@ -48,9 +48,9 @@ import { ColumnSearch } from '@/utils/columnSearch';
 import { ReplicationIcon } from '@/utils/themeIcons';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper, AxiosPutHelper } from '@/utils/axiosRequestHelper';
+import DecommissionSummary from './decommissionSummary';
 
 import './datanodes.less';
-
 
 interface IDatanodeResponse {
   hostname: string;
@@ -190,7 +190,6 @@ const COLUMNS = [
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
-
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -198,7 +197,14 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
-    defaultSortOrder: 'ascend' as const
+    defaultSortOrder: 'ascend' as const,
+    render: (uuid: IDatanode, record: IDatanode) => {
+      return (
+        //1. Compare Decommission Api's UUID with all UUID in table and show Decommission Summary
+        (decommissionUuids && decommissionUuids.includes(record.uuid) && record.opState !== 'DECOMMISSIONED') ? 
+           <DecommissionSummary uuid={uuid} record={record} /> : <span>{uuid}</span>
+      );
+    }
   },
   {
     title: 'Storage Capacity',
@@ -356,6 +362,17 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
 }));
 
 let cancelSignal: AbortController;
+let cancelDecommissionSignal: AbortController;
+let decommissionUuids: string | string[] =[];
+const COLUMN_UPDATE_DECOMMISSIONING = 'DECOMMISSIONING';
+
+type DatanodeDetails = {
+  uuid: string;
+}
+
+type DatanodeDecomissionInfo = {
+datanodeDetails: DatanodeDetails
+}
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
@@ -389,24 +406,34 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     return selectedColumns;
   };
 
-  _loadData = () => {
-    this.setState(prevState => ({
-      loading: true,
-      selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
-    }));
-
-    const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
-    cancelSignal = controller;
-    request.then(response => {
-      const datanodesResponse: IDatanodesResponse = response.data;
+  _loadData = async () => {
+    // Need to call decommission API on each interval to get updated status before datanode API to compare UUID's
+    // update Operation State Column in table Manually before rendering
+    try {
+    let decomissionResponse = await this._loadDecommisionAPI();
+    decommissionUuids =  decomissionResponse.data?.DatanodesDecommissionInfo?.map((item: DatanodeDecomissionInfo) => item.datanodeDetails.uuid);
+    }
+    catch (error: any)
+    {
+      this.setState({
+        loading: false
+      });
+      decommissionUuids = [];
+      showDataFetchError(error.toString());
+    }
+    try {
+    // Call Datanode API Synchronously after completing Decommission API to render Operation Status Column
+    let datanodeApiResponse = await this._loadDataNodeAPI();
+      const datanodesResponse: IDatanodesResponse = datanodeApiResponse.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
       const dataSource: IDatanode[] = datanodes && datanodes.map(datanode => {
+        let decommissionCondition = decommissionUuids && decommissionUuids.includes(datanode.uuid) && datanode.opState !== 'DECOMMISSIONED';
         return {
           hostname: datanode.hostname,
           uuid: datanode.uuid,
           state: datanode.state,
-          opState: datanode.opState,
+          opState: decommissionCondition ? COLUMN_UPDATE_DECOMMISSIONING : datanode.opState,
           lastHeartbeat: datanode.lastHeartbeat,
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
@@ -423,19 +450,40 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           networkLocation: datanode.networkLocation
         };
       });
-
       this.setState({
         loading: false,
         dataSource,
         totalCount,
         lastUpdated: Number(moment())
       });
-    }).catch(error => {
+    }
+    catch (error: any) {
       this.setState({
         loading: false
       });
+      decommissionUuids = [];
       showDataFetchError(error.toString());
+    }
+  };
+
+  _loadDecommisionAPI = async () => {
+    this.setState({
+      loading: true
     });
+    decommissionUuids = [];
+    const { request, controller } = await AxiosGetHelper('/api/v1/datanodes/decommission/info', cancelDecommissionSignal);
+    cancelDecommissionSignal = controller;
+    return request
+  };
+
+  _loadDataNodeAPI = async () => {
+    this.setState(prevState => ({
+      loading: true,
+      selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
+    }));
+    const { request, controller } = await AxiosGetHelper('/api/v1/datanodes', cancelSignal);
+    cancelSignal = controller;
+    return request;
   };
 
   removeDatanode = async (selectedRowKeys: any) => {
@@ -462,6 +510,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
     cancelSignal && cancelSignal.abort();
+    cancelDecommissionSignal && cancelDecommissionSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -511,7 +560,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       onShowSizeChange: this.onShowSizeChange
     };
     return (
-      <div className='datanodes-container'>
+      <div className='datanodes-container' data-testid='datanodes-container'>
         <div className='page-header'>
           Datanodes ({totalCount})
           <div className='filter-block'>
@@ -526,6 +575,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
               value={selectedColumns}
               allOption={allColumnsOption}
               onChange={this._handleColumnChange}
+              data-testid='datanodes-multiselect'
             /> Columns
           </div>
           <AutoReloadPanel

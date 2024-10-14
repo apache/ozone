@@ -135,8 +135,7 @@ public class TestPipelinePlacementFactory {
           .thenReturn(dn);
     }
 
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
 
     stateManager = PipelineStateManagerImpl.newBuilder()

@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.UnsignedLong;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;

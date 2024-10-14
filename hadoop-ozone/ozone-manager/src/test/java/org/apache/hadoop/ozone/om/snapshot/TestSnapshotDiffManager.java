@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -364,7 +364,6 @@ public class TestSnapshotDiffManager {
 
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    when(omSnapshotManager.isSnapshotStatus(any(), any())).thenReturn(true);
     SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0);
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))

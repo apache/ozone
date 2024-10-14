@@ -57,7 +57,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   @Override
   protected String getHttpBindHostKey() {
-    return OZONE_S3G_HTTP_BIND_HOST_KEY;
+    return S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
   }
 
   @Override
@@ -87,12 +87,12 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   @Override
   protected String getKeytabFile() {
-    return OZONE_S3G_KEYTAB_FILE;
+    return S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
   }
 
   @Override
   protected String getSpnegoPrincipal() {
-    return OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+    return S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
   }
 
   @Override

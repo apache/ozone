@@ -32,12 +32,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -188,6 +190,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -221,6 +224,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
+  private static Set<OzoneClient> ozoneClients = new HashSet<>();
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException {
@@ -250,6 +254,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
+    ozoneClients.add(ozClient);
     store = ozClient.getObjectStore();
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
@@ -259,10 +264,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  static void shutdownCluster() throws IOException {
-    if (ozClient != null) {
-      ozClient.close();
-    }
+  static void shutdownCluster() {
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(ozoneClients);
+    ozoneClients.clear();
 
     if (storageContainerLocationClient != null) {
       storageContainerLocationClient.close();
@@ -274,6 +278,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private static void setOzClient(OzoneClient ozClient) {
+    ozoneClients.add(ozClient);
     OzoneRpcClientTests.ozClient = ozClient;
   }
 
@@ -3140,6 +3145,37 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     doMultipartUpload(bucket, keyName, (byte)97, replication);
 
   }
+
+  /**
+   * This test prints out that there is a memory leak in the test logs
+   * which during post-processing is caught by the CI thereby failing the
+   * CI run. Hence, disabling this for CI.
+   */
+  @Unhealthy
+  public void testClientLeakDetector() throws Exception {
+    OzoneClient client = OzoneClientFactory.getRpcClient(cluster.getConf());
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer ozoneClientFactoryLogCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            OzoneClientFactory.getLogger());
+
+    client.getObjectStore().createVolume(volumeName);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte) 1);
+    try (OzoneOutputStream out = bucket.createKey(keyName, 10,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE), new HashMap<>())) {
+      out.write(data);
+    }
+    client = null;
+    System.gc();
+    GenericTestUtils.waitFor(() -> ozoneClientFactoryLogCapturer.getOutput()
+        .contains("is not closed properly"), 100, 2000);
+  }
   @Test
   public void testMultipartUploadOwner() throws Exception {
     // Save the old user, and switch to the old user after test
@@ -4906,6 +4942,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
 
     assertThat(omSMLog.getOutput()).contains("Failed to write, Exception occurred");
+  }
+
+  @Test
+  public void testGetServerDefaults() throws IOException {
+    assertNotNull(getClient().getProxy().getServerDefaults());
+    assertNull(getClient().getProxy().getServerDefaults().getKeyProviderUri());
   }
 
   private static class OMRequestHandlerPauseInjector extends FaultInjector {

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
@@ -76,6 +77,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
  * @see TestOzoneManagerHAWithAllRunning
  */
+@Flaky("HDDS-11352")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
@@ -484,6 +486,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
         omFailoverProxyProvider.getWaitTime());
   }
+
+  @Flaky("HDDS-11353")
   @Test
   void testOMHAMetrics() throws Exception {
     // Get leader OM

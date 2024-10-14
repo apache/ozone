@@ -789,6 +789,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
       List<N> shuffledNodes =
           new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Sorted datanodes {}, result: {}", nodes, shuffledNodes);
+      }
       return shuffledNodes;
     }
     // Sort weights for the nodes array
@@ -815,6 +818,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
     Preconditions.checkState(ret.size() == activeLen,
         "Wrong number of nodes sorted!");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
+    }
     return ret;
   }
 
