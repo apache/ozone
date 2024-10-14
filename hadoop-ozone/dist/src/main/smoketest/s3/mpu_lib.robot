@@ -21,22 +21,46 @@ Resource            commonawslib.robot
 
 *** Keywords ***
 
+Initiate MPU
+    [arguments]    ${bucket}    ${key}    ${expected_rc}=0
+
+    ${result} =    Execute AWSS3APICli and checkrc    create-multipart-upload --bucket ${bucket} --key ${key}    ${expected_rc}
+    IF    '${expected_rc}' == '0'
+        ${upload_id} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
+        RETURN    ${upload_id}
+    END
+
+
+Upload MPU part
+    [arguments]    ${bucket}    ${key}    ${upload_id}    ${part}    ${file}    ${expected_rc}=0
+
+    ${result} =    Execute AWSS3APICli and checkrc    upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}    ${expected_rc}
+    IF    '${expected_rc}' == '0'
+        ${etag} =    Execute    echo '${result}' | jq -r '.ETag'
+        RETURN    ${etag}
+    END
+
+
+Complete MPU
+    [arguments]    ${bucket}    ${key}    ${upload_id}    ${parts}    ${expected_rc}=0
+
+    Execute AWSS3APICli and checkrc    complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'    ${expected_rc}
+
+
 Perform Multipart Upload
     [arguments]    ${bucket}    ${key}    @{files}
 
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key ${key}
-    ${upload_id} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
+    ${upload_id} =      Initiate MPU    ${bucket}    ${key}
 
     @{etags} =    Create List
     FOR    ${i}    ${file}    IN ENUMERATE    @{files}
         ${part} =    Evaluate    ${i} + 1
-        ${result} =   Execute AWSS3APICli     upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}
-        ${etag} =     Execute                 echo '${result}' | jq -r '.ETag'
+        ${etag} =    Upload MPU part    ${bucket}    ${key}    ${upload_id}    ${part}    ${file}
         Append To List    ${etags}    {ETag=${etag},PartNumber=${part}}
     END
 
     ${parts} =    Catenate    SEPARATOR=,    @{etags}
-    Execute AWSS3APICli     complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'
+    Complete MPU    ${bucket}    ${key}    ${upload_id}    ${parts}
 
 
 Verify Multipart Upload
