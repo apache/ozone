@@ -79,11 +79,7 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey1    0     '--metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"'
 
 #upload parts
     ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
@@ -155,7 +151,7 @@ Test Multipart Upload Complete
 
 Test Multipart Upload with user defined metadata size larger than 2 KB
     ${custom_metadata_value} =  Generate Random String   3000
-    ${result} =                 Execute AWSS3APICli and checkrc       create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpuWithLargeMetadata --metadata="custom-key1=${custom_metadata_value}"    255
+    ${result} =    Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    255     '--metadata="custom-key1=${custom_metadata_value}"'
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
@@ -223,12 +219,7 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
 
 Test abort Multipart upload
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --storage-class REDUCED_REDUNDANCY
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
-
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/mpuWithLargeMetadata    0     '--storage-class REDUCED_REDUNDANCY'
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --upload-id ${uploadID}    0
 
 Test abort Multipart upload with invalid uploadId

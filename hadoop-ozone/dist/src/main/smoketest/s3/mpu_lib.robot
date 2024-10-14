@@ -22,9 +22,9 @@ Resource            commonawslib.robot
 *** Keywords ***
 
 Initiate MPU
-    [arguments]    ${bucket}    ${key}    ${expected_rc}=0
+    [arguments]    ${bucket}    ${key}    ${expected_rc}=0    ${opts}=${EMPTY}
 
-    ${result} =    Execute AWSS3APICli and checkrc    create-multipart-upload --bucket ${bucket} --key ${key}    ${expected_rc}
+    ${result} =    Execute AWSS3APICli and checkrc    create-multipart-upload --bucket ${bucket} --key ${key} ${opts}    ${expected_rc}
     IF    '${expected_rc}' == '0'
         Should contain          ${result}    ${bucket}
         Should contain          ${result}    ${key}
