@@ -402,6 +402,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       int remainingBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId) {
 
+    long limit = remainNum;
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
@@ -452,9 +453,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
               "deleted: {}, Number of sub-files moved:" +
               " {} to DeletedTable, Number of sub-dirs moved {} to " +
-              "DeletedDirectoryTable, iteration elapsed: {}ms," +
+              "DeletedDirectoryTable, current iteration limit: {}, iteration elapsed: {}ms," +
               " totalRunCount: {}",
-          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
+          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
           Time.monotonicNow() - startTime, getRunCount());
     }
     return remainNum;
