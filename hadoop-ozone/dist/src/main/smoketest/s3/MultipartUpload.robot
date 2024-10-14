@@ -62,17 +62,8 @@ Test Multipart Upload With Adjusted Length
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
 Test Multipart Upload
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
-# initiate again
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
-    ${nextUploadID} =   Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
+    ${nextUploadID} =   Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
                         Should Not Be Equal     ${uploadID}  ${nextUploadID}
 
 # upload part
@@ -169,11 +160,7 @@ Test Multipart Upload with user defined metadata size larger than 2 KB
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
 Test Multipart Upload Complete Entity too small
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey2
 
 #upload parts
     ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey2 --part-number 1 --body /tmp/10kb --upload-id ${uploadID}
@@ -190,11 +177,7 @@ Test Multipart Upload Complete Entity too small
 
 
 Test Multipart Upload Complete Invalid part errors and complete mpu with few parts
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey3
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey3
 
 #complete multipart upload when no parts uploaded
     ${result} =         Execute AWSS3APICli and checkrc  complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --multipart-upload 'Parts=[{ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}]'    255
@@ -252,18 +235,13 @@ Test abort Multipart upload with invalid uploadId
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id "random"    255
 
 Upload part with Incorrect uploadID
-        ${result} =     Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
-                        Execute                 echo "Multipart upload" > /tmp/testfile
-        ${result} =     Execute AWSS3APICli and checkrc     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
+    ${result} =         Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey    "no-such-upload-id"    1    /tmp/testfile    255
                         Should contain          ${result}    NoSuchUpload
 
 Test list parts
 #initiate multipart upload
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5
-    ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey
-                        Should contain          ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey5
 
 #upload parts
     ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
@@ -308,12 +286,7 @@ Test Multipart Upload Put With Copy
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copytest/source --body /tmp/part1
 
 
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/copytest/destination
-
-    ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
-                        Should contain           ${result}    ${BUCKET}
-                        Should contain           ${result}    UploadId
-
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/copytest/destination
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copytest/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copytest/source
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
@@ -329,11 +302,7 @@ Test Multipart Upload Put With Copy and range
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/10mb
 
 
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination
-
-    ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
-                        Should contain           ${result}    ${BUCKET}
-                        Should contain           ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/copyrange/destination
 
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757
                         Should contain           ${result}    ETag
@@ -358,11 +327,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
 
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/10mb
 
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination
-
-    ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
-                        Should contain           ${result}    ${BUCKET}
-                        Should contain           ${result}    UploadId
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/copyrange/destination
 
 #calc time-to-sleep from time-last-modified plus a few seconds
     ${result} =         Execute AWSS3APICli      head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
@@ -404,17 +369,8 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Compare files           /tmp/10mb        /tmp/part-result
 
 Test Multipart Upload list
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/listtest/key1
-    ${uploadID1} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/listtest/key1
-                        Should contain          ${result}    UploadId
-
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/listtest/key2
-    ${uploadID2} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/listtest/key2
-                        Should contain          ${result}    UploadId
+    ${uploadID1} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key1
+    ${uploadID2} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key2
 
     ${result} =         Execute AWSS3APICli     list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest
                         Should contain          ${result}    ${uploadID1}

@@ -26,8 +26,12 @@ Initiate MPU
 
     ${result} =    Execute AWSS3APICli and checkrc    create-multipart-upload --bucket ${bucket} --key ${key}    ${expected_rc}
     IF    '${expected_rc}' == '0'
+        Should contain          ${result}    ${bucket}
+        Should contain          ${result}    ${key}
         ${upload_id} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
         RETURN    ${upload_id}
+    ELSE
+        RETURN    ${result}
     END
 
 
@@ -38,6 +42,8 @@ Upload MPU part
     IF    '${expected_rc}' == '0'
         ${etag} =    Execute    echo '${result}' | jq -r '.ETag'
         RETURN    ${etag}
+    ELSE
+        RETURN    ${result}
     END
 
 
