@@ -430,17 +430,18 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
 
     OzoneConfiguration conf = cluster.getConf();
-    OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf);
-    ObjectStore store = ozoneClient.getObjectStore();
+    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore store = ozoneClient.getObjectStore();
 
-    OzoneVolume volume = store.getS3Volume();
-    OzoneBucket bucket = volume.getBucket(bucketName);
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
 
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        valueBytes.length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-        Collections.emptyMap())) {
-      out.write(valueBytes);
+      try (OzoneOutputStream out = bucket.createKey(keyName,
+          valueBytes.length,
+          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+          Collections.emptyMap())) {
+        out.write(valueBytes);
+      }
     }
 
     S3Object s3Object = s3Client.getObject(bucketName, keyName);
