@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -137,6 +138,9 @@ public class GrpcOMFailoverProxyProvider<T> extends
   private T createOmProxy(InetSocketAddress address) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+
+    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
+    RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 
     // Ensure we do not attempt retry on the same OM in case of exceptions
     RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);

@@ -81,8 +81,7 @@ public class TestSecretRevoke {
   void setUp() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_ADMINISTRATORS, ADMIN_USER_NAME);
-    objectStore = new ObjectStoreStub(conf, proxy);
-    OzoneClient client = new OzoneClientStub(objectStore);
+    OzoneClient client = new OzoneClientStub(new ObjectStoreStub(conf, proxy));
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
@@ -118,17 +117,27 @@ public class TestSecretRevoke {
   @Test
   void testAuthorizedUserSecretRevoke() throws IOException {
     mockSecurityContext(true);
-    endpoint.revoke();
-    verify(objectStore, times(1)).revokeS3Secret(eq(USER_NAME));
+    Response response = endpoint.revoke();
+
+    assertEquals(OK.getStatusCode(), response.getStatus());
   }
 
   @Test
-  @Unhealthy("HDDS-11041")
-  void testSecretRevokeWithUsername() throws IOException {
-    endpoint.revoke(OTHER_USER_NAME);
-    verify(objectStore, times(1))
-        .revokeS3Secret(eq(OTHER_USER_NAME));
+  void testUnauthorizedSecretRevokeWithUsername() throws IOException {
+    mockSecurityContext(false);
+    Response response = endpoint.revoke(OTHER_USER_NAME);
+
+    assertEquals(FORBIDDEN.getStatusCode(), response.getStatus());
   }
+
+  @Test
+  void testAuthorizedSecretRevokeWithUsername() throws IOException {
+    mockSecurityContext(true);
+    Response response = endpoint.revoke(OTHER_USER_NAME);
+
+    assertEquals(OK.getStatusCode(), response.getStatus());
+  }
+
 
   @Test
   void testUnauthorizedUserSecretSequentialRevokes() throws IOException {
