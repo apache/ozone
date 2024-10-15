@@ -286,6 +286,27 @@ public class DeletedBlockLogImpl
               tx.getTxID(), 0))
             .build();
 
+    for (ContainerReplica replica : replicas) {
+      DatanodeDetails details = replica.getDatanodeDetails();
+      if (!transactionStatusManager.isDuplication(
+          details, updatedTxn.getTxID(), commandStatus)) {
+        transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+        metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
+        metrics.incrProcessedTransaction();
+      }
+    }
+  }
+
+  private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
+      DeletedBlocksTransaction txn,
+      Set<DatanodeDetails> dnList) throws ContainerNotFoundException {
+    ContainerInfo containerInfo = containerManager
+        .getContainer(ContainerID.valueOf(txn.getContainerID()));
+    ReplicationManager replicationManager =
+        scmContext.getScm().getReplicationManager();
+    ContainerHealthResult result = replicationManager
+        .getContainerReplicationHealth(containerInfo, replicas);
+
     // We have made an improvement here, and we expect that all replicas
     // of the Container being sent will be included in the dnList.
     // This change benefits ACK confirmation and improves deletion speed.
@@ -294,7 +315,7 @@ public class DeletedBlockLogImpl
     // feedback to SCM at roughly the same time.
     // This avoids the issue of deletion blocking,
     // where some replicas of a Container are deleted while others do not receive the delete command.
-    long containerId = tx.getContainerID();
+    long containerId = txn.getContainerID();
     for (ContainerReplica replica : replicas) {
       DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
       if (!dnList.contains(datanodeDetails)) {
@@ -302,27 +323,10 @@ public class DeletedBlockLogImpl
         LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
             containerId, dnDetail.getUuid());
         metrics.incrSkippedTransaction();
-        return;
+        return true;
       }
     }
 
-    for (ContainerReplica replica : replicas) {
-      DatanodeDetails details = replica.getDatanodeDetails();
-      if (!transactionStatusManager.isDuplication(
-          details, updatedTxn.getTxID(), commandStatus)) {
-        transactions.addTransactionToDN(details.getUuid(), updatedTxn);
-      }
-    }
-  }
-
-  private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
-      DeletedBlocksTransaction txn) throws ContainerNotFoundException {
-    ContainerInfo containerInfo = containerManager
-        .getContainer(ContainerID.valueOf(txn.getContainerID()));
-    ReplicationManager replicationManager =
-        scmContext.getScm().getReplicationManager();
-    ContainerHealthResult result = replicationManager
-        .getContainerReplicationHealth(containerInfo, replicas);
     return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
@@ -369,11 +373,9 @@ public class DeletedBlockLogImpl
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
-              if (checkInadequateReplica(replicas, txn)) {
+              if (checkInadequateReplica(replicas, txn, dnList)) {
                 continue;
               }
-              metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
-              metrics.incrProcessedTransaction();
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
             }
