@@ -24,6 +24,9 @@ export OM=om1
 export SCM=scm1
 export OZONE_REPLICATION_FACTOR=3
 
+export DATANODE2_REPLICA=0
+export DATANODE5_REPLICA=0
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,7 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_OPTS=
+#suite:balancer
+
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+export OM_SERVICE_ID="om"
+export OM=om1
+export SCM=scm1
+export OZONE_REPLICATION_FACTOR=3
+
+source "$COMPOSE_DIR/../testlib.sh"
+
+start_docker_env 6
+execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v TYPE:EC -v KEYS:7 -v LOWER_LIMIT:1.5 -v UPPER_LIMIT:2.5 balancer/testBalancer.robot
