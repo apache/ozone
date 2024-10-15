@@ -155,8 +155,7 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
 #upload parts
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    1    /tmp/part1
     ${eTag2} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    2    /tmp/part1
-                        Execute                 echo "Part3" > /tmp/part3
-    ${eTag3} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    3    /tmp/part3
+    ${eTag3} =          Upload MPU part    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}    3    /tmp/part2
 
 #complete multipart upload
     ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   {ETag=etag1,PartNumber=1},{ETag=etag2,PartNumber=2}    255
@@ -169,14 +168,14 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     ${result} =         Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey3    ${uploadID}   {ETag=${eTag1},PartNumber=1},{ETag=${eTag3},PartNumber=3}
 
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 /tmp/${PREFIX}-multipartKey3.result
-                        Execute                    cat /tmp/part1 /tmp/part3 > /tmp/${PREFIX}-multipartKey3
+                        Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey3
     Compare files       /tmp/${PREFIX}-multipartKey3         /tmp/${PREFIX}-multipartKey3.result
 
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 /tmp/${PREFIX}-multipartKey3-part1.result
     Compare files       /tmp/part1         /tmp/${PREFIX}-multipartKey3-part1.result
 
-    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part3.result
-    Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part2.result
+    Compare files       /tmp/part2         /tmp/${PREFIX}-multipartKey3-part2.result
 
 Test abort Multipart upload
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey4    0     --storage-class REDUCED_REDUNDANCY
