@@ -28,6 +28,8 @@ import java.util.List;
 @InterfaceAudience.Private
 public interface OMMXBean extends ServiceRuntimeInfo {
 
+  String getNamespace();
+
   String getRpcPort();
 
   List<List<String>> getRatisRoles();

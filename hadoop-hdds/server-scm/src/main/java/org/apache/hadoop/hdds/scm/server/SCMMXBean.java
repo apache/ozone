@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
 @InterfaceAudience.Private
 public interface SCMMXBean extends ServiceRuntimeInfo {
 
+  String getNamespace();
   /**
    * Get the SCM RPC server port that used to listen to datanode requests.
    * @return SCM datanode RPC server port

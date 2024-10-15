@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -73,6 +75,7 @@ import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
@@ -116,8 +119,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
+  private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
@@ -210,6 +212,18 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      @Override
+      public String getNamespace() {
+        String localScmServiceId = conf.getTrimmed(
+            ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
+        if (localScmServiceId == null) {
+          Collection<String> scmServiceIds = conf.getTrimmedStringCollection(OZONE_SCM_SERVICE_IDS_KEY);
+          return String.join(",", scmServiceIds);
+        }
+        return localScmServiceId;
+      }
+    };
     serviceRuntimeInfo.setStartTime();
 
     ratisReporterList = RatisDropwizardExports
