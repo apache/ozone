@@ -69,7 +69,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
-  private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
 
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
@@ -123,7 +122,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
     // TODO: make this injectable for testing...
     this.requestValidations = new RequestValidations()
-        .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
   }
@@ -214,8 +212,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         //  return null, which triggered the findbugs warning.
         //  Added the assertion.
         assert (omClientRequest != null);
-        OMClientRequest finalOmClientRequest = omClientRequest;
-        requestToSubmit = preExecute(finalOmClientRequest);
+        requestToSubmit = preExecute(omClientRequest);
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
