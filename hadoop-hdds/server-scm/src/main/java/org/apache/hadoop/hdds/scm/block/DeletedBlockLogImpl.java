@@ -291,7 +291,6 @@ public class DeletedBlockLogImpl
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(details.getUuid(), updatedTxn);
-        metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         metrics.incrProcessedTransaction();
       }
     }
@@ -322,7 +321,6 @@ public class DeletedBlockLogImpl
         DatanodeDetails dnDetail = replica.getDatanodeDetails();
         LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
             containerId, dnDetail.getUuid());
-        metrics.incrSkippedTransaction();
         return true;
       }
     }
@@ -374,10 +372,12 @@ public class DeletedBlockLogImpl
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
               if (checkInadequateReplica(replicas, txn, dnList)) {
+                metrics.incrSkippedTransaction();
                 continue;
               }
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
+              metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
             }
           } catch (ContainerNotFoundException ex) {
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
