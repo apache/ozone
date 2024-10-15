@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +73,7 @@ public class ContainerBalancerTask implements Runnable {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerTask.class);
+  public static final long ABSENCE_OF_DURATION = -1L;
 
   private NodeManager nodeManager;
   private ContainerManager containerManager;
@@ -266,7 +266,7 @@ public class ContainerBalancerTask implements Runnable {
       }
 
       IterationResult iR = doIteration();
-      saveIterationStatistic(i + 1, iR);
+      saveIterationStatistic(++i, iR);
       metrics.incrementNumIterations(1);
 
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
@@ -391,7 +391,7 @@ public class ContainerBalancerTask implements Runnable {
 
   private long getCurrentIterationDuration() {
     if (currentIterationStarted == null) {
-      return -1L;
+      return ABSENCE_OF_DURATION;
     } else {
       return now().toEpochSecond() - currentIterationStarted.toEpochSecond();
     }

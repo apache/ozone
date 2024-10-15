@@ -69,7 +69,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of iteration.
+   * Get number of iterations.
    * @return iteration number
    */
   public Integer getIterationNumber() {
@@ -85,7 +85,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get size in bytes scheduled to move in iteration.
+   * Get size in bytes scheduled to move in the iteration.
    * @return size in bytes
    */
   public long getSizeScheduledForMove() {
@@ -93,7 +93,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get size in bytes moved in iteration.
+   * Get size in bytes moved in the iteration.
    * @return size in bytes
    */
   public long getDataSizeMoved() {
@@ -101,8 +101,8 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of scheduled containers to move.
-   * @return number of scheduled containers to move
+   * Get number of containers scheduled to move.
+   * @return number of containers scheduled to move
    */
   public long getContainerMovesScheduled() {
     return containerMovesScheduled;

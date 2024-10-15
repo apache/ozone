@@ -168,7 +168,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Increment data size moved in last iteration.
+   * Increment data size moved in the last iteration.
    * @param bytes bytes to add
    */
   public void incrementDataSizeMovedInLatestIteration(long bytes) {
@@ -176,7 +176,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Reset data size moved in last iteration.
+   * Reset data size moved in the last iteration.
    */
   public void resetDataSizeMovedInLatestIteration() {
     dataSizeMovedBytesInLatestIteration.incr(-getDataSizeMovedInLatestIteration());
@@ -228,7 +228,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Moved containers in last iteration.
+   * Moved containers in the last iteration.
    */
   public void resetNumContainerMovesCompletedInLatestIteration() {
     numContainerMovesCompletedInLatestIteration.incr(-getNumContainerMovesCompletedInLatestIteration());

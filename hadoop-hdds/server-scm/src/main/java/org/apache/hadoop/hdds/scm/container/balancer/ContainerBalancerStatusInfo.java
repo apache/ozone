@@ -55,7 +55,7 @@ public class ContainerBalancerStatusInfo {
   }
 
   /**
-   * Map to proto.
+   * Converts an instance into the protobuf compatible object.
    * @return proto representation
    */
   public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo toProto() {
