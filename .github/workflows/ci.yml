@@ -201,6 +201,9 @@ jobs:
             echo "Configurations.md is unchanged, skipping commit and PR creation."
             echo "hashes_differ=false" >> $GITHUB_ENV
           fi
+      - name: Get short commit SHA
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
       - name: Commit and push changes to apache/ozone
         if: env.hashes_differ == 'true'
         env:
@@ -208,10 +211,10 @@ jobs:
         run: |
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
-          git checkout -b config-doc-update-from-$(git rev-parse --short ${{ github.sha }})
+          git checkout -b config-doc-update-from-${{ env.SHORT_SHA }}
           git add hadoop-hdds/docs/content/tools/Configurations.md
           git commit -m "[Auto] Update Configurations.md from ${{ github.sha }}"
-          git push origin HEAD:config-doc-update-from-$(git rev-parse --short ${{ github.sha }})
+          git push origin "HEAD:config-doc-update-from-${{ env.SHORT_SHA }}"
       - name: Create Pull Request in apache/ozone
         if: env.hashes_differ == 'true'
         env:
@@ -221,7 +224,7 @@ jobs:
           BRANCH_NAME: ${{ github.ref_name }}
         run: |
           echo "## What changes were proposed in this pull request?" > pr_body.txt
-          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-$(git rev-parse --short ${{ github.sha }})](https://github.com/apache/ozone/tree/config-doc-update-from-$(git rev-parse --short ${{ github.sha }})) branch after this PR is merged or closed." >> pr_body.txt
+          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-${{ env.SHORT_SHA }}](https://github.com/apache/ozone/tree/config-doc-update-from-${{ env.SHORT_SHA }}) branch after this PR is merged or closed." >> pr_body.txt
           echo "" >> pr_body.txt
           echo "## What is the link to the Apache JIRA?" >> pr_body.txt
 #          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body.txt
@@ -229,7 +232,7 @@ jobs:
           echo "## How was this patch tested?" >> pr_body.txt
           echo "Reviewers should manually verify the correctness of this change." >> pr_body.txt
 
-          gh pr create --base master --head config-doc-update-from-$(git rev-parse --short ${{ github.sha }}) \
+          gh pr create --base master --head config-doc-update-from-${{ env.SHORT_SHA }} \
           --title ". Update Configurations.md page with changes from " \
           --body-file pr_body.txt
       - name: Checkout ozone-site repository
@@ -255,8 +258,8 @@ jobs:
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
           git add "$TARGET_DIR/99-appendix.md"
-          git commit -m "[Auto] Update configurations.md page from ozone $(git rev-parse --short ${{ github.sha }})"
-          git push origin HEAD:config-doc-update-from-$(git rev-parse --short ${{ github.sha }})
+          git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
+          git push origin "HEAD:config-doc-update-from-${{ env.SHORT_SHA }}"
       - name: Create Pull Request in apache/ozone-site
         if: env.hashes_differ == 'true'
         env:
@@ -268,7 +271,7 @@ jobs:
         run: |
           cd ozone-site
           echo "## What changes were proposed in this pull request?" > pr_body1.txt
-          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-$(git rev-parse --short ${{ github.sha }})](https://github.com/apache/ozone/tree/config-doc-update-from-$(git rev-parse --short ${{ github.sha }})) branch after this PR is merged or closed." >> pr_body1.txt
+          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-${{ env.SHORT_SHA }}](https://github.com/apache/ozone/tree/config-doc-update-from-${{ env.SHORT_SHA }}) branch after this PR is merged or closed." >> pr_body1.txt
           echo "" >> pr_body1.txt
           echo "## What is the link to the Apache JIRA?" >> pr_body1.txt
 #          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body1.txt
@@ -276,7 +279,7 @@ jobs:
           echo "## How was this patch tested?" >> pr_body1.txt
           echo "Reviewers should manually verify the correctness of this change." >> pr_body1.txt
           
-          gh pr create --base HDDS-9225-website-v2 --head config-doc-update-from-$(git rev-parse --short ${{ github.sha }}) \
+          gh pr create --base HDDS-9225-website-v2 --head config-doc-update-from-${{ env.SHORT_SHA }} \
           --title ". Update Configurations.md page with changes from" \
           --body-file pr_body1.txt
   compile:
