@@ -105,11 +105,19 @@ public final class ScmConfigKeys {
       "hdds.container.ratis.log.appender.queue.byte-limit";
   public static final String
       HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
+
   public static final String HDDS_CONTAINER_RATIS_LOG_PURGE_GAP =
       "hdds.container.ratis.log.purge.gap";
   // TODO: Set to 1024 once RATIS issue around purge is fixed.
   public static final int HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
       1000000;
+  public static final String HDDS_RATIS_LOG_PURGE_UPTO_INDEX_KEY =
+      "hdds.ratis.log.purge.upto.snapshot.index";
+  public static final boolean HDDS_RATIS_LOG_PURGE_UPTO_INDEX_DEFAULT = true;
+  public static final String HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_KEY =
+      "hdds.ratis.log.purge.preservation.log.num";
+  public static final long HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT = 1000000;
+
   public static final String HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
       "hdds.container.ratis.leader.pending.bytes.limit";
   public static final String

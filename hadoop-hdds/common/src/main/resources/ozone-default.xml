@@ -279,10 +279,30 @@
   </property>
   <property>
     <name>hdds.ratis.snapshot.threshold</name>
-    <value>10000</value>
+    <value>100000</value>
     <tag>OZONE, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
       taken.
+    </description>
+  </property>
+  <property>
+    <name>hdds.ratis.log.purge.upto.snapshot.index</name>
+    <value>true</value>
+    <tag>OZONE, RATIS</tag>
+    <description>
+      Enable/disable Raft server to purge its log up to the snapshot index
+      after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>hdds.ratis.log.purge.preservation.log.num</name>
+    <value>1000000</value>
+    <tag>OZONE, RATIS</tag>
+    <description>
+      The number of latest Raft logs to not be purged after taking snapshot.
+      In Ratis write pipeline, when hdds.ratis.log.purge.upto.snapshot.index is set in datanodes,
+      this configuration set how far behind the "slow" follower log index compared to the leader
+      before the pipeline is eligible be closed due to the notifyInstallSnapshot mechanism.
     </description>
   </property>
   <property>
