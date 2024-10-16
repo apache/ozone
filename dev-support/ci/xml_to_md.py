@@ -36,9 +36,18 @@ def extract_xml_from_jar(jar_path, xml_filename):
           xml_files.append(xml_file.read())
   return xml_files
 
-def parse_xml_file(xml_content):
+def wrap_config_keys_in_description(description, properties):
+  words = description.split()
+  wrapped_words = []
+  for word in words:
+    clean_word = word.strip('.,()')
+    if clean_word in properties:
+      word = f'`{word}`'
+    wrapped_words.append(word)
+  return ' '.join(wrapped_words)
+
+def parse_xml_file(xml_content, properties):
   root = ET.fromstring(xml_content)
-  properties = {}
   for prop in root.findall('property'):
     name = prop.findtext('name')
     if not name:
@@ -46,30 +55,38 @@ def parse_xml_file(xml_content):
     description = prop.findtext('description', '')
     if not description:
       raise ValueError(f"Property '{name}' is missing a description.")
+    tag = prop.findtext('tag')
     properties[name] = Property(
-      name=name,
-      value=prop.findtext('value', ''),
-      tag=prop.findtext('tag', ''),
-      description=' '.join(description.split()).strip()
+      name = name,
+      value = prop.findtext('value', ''),
+      tag = '<br/>'.join(f'`{t}`' for t in tag.split(', ')),
+      description = wrap_config_keys_in_description(
+        ' '.join(description.split()).strip(),
+        properties
+      )
     )
-  return properties
+
 
 def generate_markdown(properties):
-  markdown = f"""
-## Ozone Configuration Keys
-This page provides a comprehensive overview of the configuration keys available in Ozone.
-### Configuration Keys
+  markdown = f"""---
+
+sidebar_label: Appendix
+---
+
+Configuration Key Appendix
+==========================
+
+This page provides a comprehensive overview of all configuration keys available in Ozone.
+
+Configuration Keys
+------------------
+
+| **Name** | **Value** | **Tags** | **Description** |
+|-|-|-|-|
 """
 
   for prop in sorted(properties.values(), key=lambda p: p.name):
-    markdown += f"""
-| **Name**        | `{prop.name}` |
-|:----------------|:----------------------------|
-| **Value**       | {prop.value} |
-| **Tag**         | {prop.tag} |
-| **Description** | {prop.description} |
---------------------------------------------------------------------------------
-"""
+    markdown += f"| `{prop.name}` | {prop.value} | {prop.tag} | {prop.description} |\n"
   return markdown
 
 def main():
@@ -87,7 +104,7 @@ def main():
   )
 
   if not snapshot_dir:
-    raise ValueError("SNAPSHOT directory not found in the specified base path.")
+    raise ValueError("Snapshot directory not found in the specified base path.")
 
   extract_path = os.path.join(snapshot_dir, 'share', 'ozone', 'lib')
   xml_filename = 'ozone-default-generated.xml'
@@ -98,7 +115,7 @@ def main():
       jar_path = os.path.join(extract_path, file_name)
       xml_contents = extract_xml_from_jar(jar_path, xml_filename)
       for xml_content in xml_contents:
-        property_map.update(parse_xml_file(xml_content))
+        parse_xml_file(xml_content, property_map)
 
   markdown_content = generate_markdown(property_map)
 
