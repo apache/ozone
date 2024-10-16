@@ -214,7 +214,7 @@ jobs:
           git checkout -b config-doc-update-from-${{ env.SHORT_SHA }}
           git add hadoop-hdds/docs/content/tools/Configurations.md
           git commit -m "[Auto] Update Configurations.md from ${{ github.sha }}"
-          git push origin "HEAD:config-doc-update-from-${{ env.SHORT_SHA }}"
+          git push origin "config-doc-update-from-${{ env.SHORT_SHA }}"
       - name: Create Pull Request in apache/ozone
         if: env.hashes_differ == 'true'
         env:
@@ -259,7 +259,7 @@ jobs:
           git config --global user.email 'noreply@github.com'
           git add "$TARGET_DIR/99-appendix.md"
           git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
-          git push origin "HEAD:config-doc-update-from-${{ env.SHORT_SHA }}"
+          git push origin "config-doc-update-from-${{ env.SHORT_SHA }}"
       - name: Create Pull Request in apache/ozone-site
         if: env.hashes_differ == 'true'
         env:
