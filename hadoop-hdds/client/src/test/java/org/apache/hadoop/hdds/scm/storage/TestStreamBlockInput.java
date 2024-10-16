@@ -176,7 +176,7 @@ public class TestStreamBlockInput {
     byte[] b = new byte[len];
 
     int numBytesRead = blockStream.read(b, 0, len);
-    assertEquals(blockSize, numBytesRead);
+    assertEquals(len, numBytesRead);
     matchWithInputData(b, 0, len);
 
     // To read block data from index 0 to 225 (len = 225), we need to read
@@ -202,7 +202,7 @@ public class TestStreamBlockInput {
     // boundaries).
     byte[] b = new byte[30];
     int numBytesRead = blockStream.read(b, 0, 30);
-    assertEquals(blockSize, numBytesRead);
+    assertEquals(30, numBytesRead);
     matchWithInputData(b, 25, 30);
     matchWithInputData(blockStream.getReadByteBuffers(), 20, 40);
 
@@ -225,7 +225,7 @@ public class TestStreamBlockInput {
     seekAndVerify(25);
     b = new byte[15];
     numBytesRead = blockStream.read(b, 0, 15);
-    assertEquals(blockSize, numBytesRead);
+    assertEquals(15, numBytesRead);
     matchWithInputData(b, 25, 15);
   }
 
