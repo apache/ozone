@@ -85,6 +85,7 @@ import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestR
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
 import static org.apache.hadoop.ozone.recon.ReconUtils.extractKeysFromTable;
+import static org.apache.hadoop.ozone.recon.ReconUtils.validateStartPrefix;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
@@ -447,13 +448,13 @@ public class OMDBInsightEndpoint {
       keysFound = getPendingForDeletionKeyInfo(limit, prevKey, startPrefix, deletedKeyInsightInfo);
 
     } catch (IllegalArgumentException e) {
-      LOG.debug("Invalid startPrefix provided: {}", startPrefix, e);
+      LOG.error("Invalid startPrefix provided: {}", startPrefix, e);
       return createBadRequestResponse("Invalid startPrefix: " + e.getMessage());
     } catch (IOException e) {
-      LOG.debug("I/O error while searching deleted keys in OM DB", e);
+      LOG.error("I/O error while searching deleted keys in OM DB", e);
       return createInternalServerErrorResponse("Error searching deleted keys in OM DB: " + e.getMessage());
     } catch (Exception e) {
-      LOG.debug("Unexpected error occurred while searching deleted keys", e);
+      LOG.error("Unexpected error occurred while searching deleted keys", e);
       return createInternalServerErrorResponse("Unexpected error: " + e.getMessage());
     }
 
@@ -1301,20 +1302,6 @@ public class OMDBInsightEndpoint {
         OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE)));
     // Calculate the total number of deleted directories
     dirSummary.put("totalDeletedDirectories", deletedDirCount);
-  }
-
-  private boolean validateStartPrefix(String startPrefix) {
-
-    // Ensure startPrefix starts with '/' for non-empty values
-    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
-
-    // Split the path to ensure it's at least at the bucket level (volume/bucket).
-    String[] pathComponents = startPrefix.split("/");
-    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
-      return false; // Invalid if not at bucket level or deeper
-    }
-
-    return true;
   }
 
   private String createPath(OmKeyInfo omKeyInfo) {

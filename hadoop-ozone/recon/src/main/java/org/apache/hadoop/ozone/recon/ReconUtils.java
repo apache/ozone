@@ -600,6 +600,20 @@ public class ReconUtils {
     }
   }
 
+  public static boolean validateStartPrefix(String startPrefix) {
+
+    // Ensure startPrefix starts with '/' for non-empty values
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path to ensure it's at least at the bucket level (volume/bucket).
+    String[] pathComponents = startPrefix.split("/");
+    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+      return false; // Invalid if not at bucket level or deeper
+    }
+
+    return true;
+  }
+
   /**
    * Retrieves keys from the specified table based on pagination and prefix filtering.
    * This method handles different scenarios based on the presence of {@code startPrefix}
