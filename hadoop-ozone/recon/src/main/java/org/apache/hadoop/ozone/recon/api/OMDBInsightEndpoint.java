@@ -440,7 +440,7 @@ public class OMDBInsightEndpoint {
 
     try {
       // Validate startPrefix if it's provided
-      if (!validateStartPrefix(startPrefix)) {
+      if (isNotBlank(startPrefix) && !validateStartPrefix(startPrefix)) {
         return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
 
