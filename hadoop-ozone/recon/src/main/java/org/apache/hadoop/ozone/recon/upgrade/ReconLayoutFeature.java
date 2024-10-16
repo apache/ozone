@@ -19,24 +19,31 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import org.reflections.Reflections;
+
+import java.util.EnumMap;
+import java.util.Optional;
+import java.util.Set;
+
 /**
  * Enum representing Recon layout features with their version, description,
  * and associated upgrade action to be executed during an upgrade.
  */
 public enum ReconLayoutFeature {
-  INITIAL_VERSION(0, "Initial Layout Version", new InitialLayoutUpgradeAction()),
-  FEATURE_1(1, "Description for Feature 1", new Feature1UpgradeAction()),
-  FEATURE_2(2, "Description for Feature 2", new Feature2UpgradeAction()),
-  FEATURE_3(3, "Description for Feature 3", new Feature3UpgradeAction());
+  // Represents the starting point for Recon's layout versioning system.
+  INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
+
+  FEATURE_1(1, "Description for Feature 1"),
+  FEATURE_2(2, "Description for Feature 2"),
+  FEATURE_3(3, "Description for Feature 3");
 
   private final int version;
   private final String description;
-  private final ReconUpgradeAction upgradeAction;
+  private final EnumMap<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions = new EnumMap<>(ReconUpgradeAction.UpgradeActionType.class);
 
-  ReconLayoutFeature(int version, String description, ReconUpgradeAction upgradeAction) {
+  ReconLayoutFeature(final int version, String description) {
     this.version = version;
     this.description = description;
-    this.upgradeAction = upgradeAction;
   }
 
   public int getVersion() {
@@ -47,7 +54,53 @@ public enum ReconLayoutFeature {
     return description;
   }
 
-  public ReconUpgradeAction getUpgradeAction() {
-    return upgradeAction;
+  /**
+   * Retrieves the upgrade action for the specified {@link ReconUpgradeAction.UpgradeActionType}.
+   *
+   * @param type The type of the upgrade action (e.g., AUTO_FINALIZE).
+   * @return An {@link Optional} containing the upgrade action if present.
+   */
+  public Optional<ReconUpgradeAction> getAction(ReconUpgradeAction.UpgradeActionType type) {
+    return Optional.ofNullable(actions.get(type));
+  }
+
+  /**
+   * Associates a given upgrade action with a specific upgrade phase for this feature.
+   *
+   * @param type The phase/type of the upgrade action.
+   * @param action The upgrade action to associate with this feature.
+   */
+  public void addAction(ReconUpgradeAction.UpgradeActionType type, ReconUpgradeAction action) {
+    actions.put(type, action);
+  }
+
+  /**
+   * Scans the classpath for all classes annotated with {@link UpgradeActionRecon}
+   * and registers their upgrade actions for the corresponding feature and phase.
+   * This method dynamically loads and registers all upgrade actions based on their
+   * annotations.
+   */
+  public static void registerUpgradeActions() {
+    Reflections reflections = new Reflections("org.apache.hadoop.ozone.recon.upgrade");
+    Set<Class<?>> actionClasses = reflections.getTypesAnnotatedWith(UpgradeActionRecon.class);
+
+    for (Class<?> actionClass : actionClasses) {
+      try {
+        ReconUpgradeAction action = (ReconUpgradeAction) actionClass.getDeclaredConstructor().newInstance();
+        UpgradeActionRecon annotation = actionClass.getAnnotation(UpgradeActionRecon.class);
+        annotation.feature().addAction(annotation.type(), action);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to register upgrade action: " + actionClass.getSimpleName(), e);
+      }
+    }
+  }
+
+  /**
+   * Returns the list of all layout feature values.
+   *
+   * @return An array of all {@link ReconLayoutFeature} values.
+   */
+  public static ReconLayoutFeature[] getValues() {
+    return values();
   }
 }

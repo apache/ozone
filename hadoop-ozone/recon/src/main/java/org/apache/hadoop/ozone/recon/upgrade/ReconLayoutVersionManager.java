@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -35,27 +36,20 @@ import java.util.stream.Collectors;
  */
 public class ReconLayoutVersionManager {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReconLayoutVersionManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ReconLayoutVersionManager.class);
 
-  // Current Metadata Layout Version (MLV) of the Recon service
+  private final ReconSchemaVersionTableManager schemaVersionTableManager;
+
+  // Metadata Layout Version (MLV) of the Recon Metadata on disk
   private int currentMLV;
   // Software Layout Version (SLV) of the Recon service
   private final int currentSLV;
-  private final ReconSchemaVersionTableManager schemaVersionTableManager;
 
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager) {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.currentSLV = determineSLV();
-  }
-
-  public int getCurrentMLV() {
-    return currentMLV;
-  }
-
-  public int getCurrentSLV() {
-    return currentSLV;
+    ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
   }
 
   /**
@@ -71,7 +65,7 @@ public class ReconLayoutVersionManager {
    * @return The Software Layout Version (SLV).
    */
   private int determineSLV() {
-    return Arrays.stream(ReconLayoutFeature.values())
+    return Arrays.stream(ReconLayoutFeature.getValues())
         .mapToInt(ReconLayoutFeature::getVersion)
         .max()
         .orElse(0); // Default to 0 if no features are defined
@@ -87,13 +81,16 @@ public class ReconLayoutVersionManager {
 
     for (ReconLayoutFeature feature : featuresToFinalize) {
       try {
-        // Execute the upgrade action for this feature
-        feature.getUpgradeAction().execute();
-        // Update the MLV in the database after successful execution
-        updateSchemaVersion(feature.getVersion());
-        LOG.info("Feature " + feature.getVersion() + " finalized successfully.");
+        // Fetch only the AUTO_FINALIZE action for the feature
+        Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE);
+        if (action.isPresent()) {
+          // Execute the upgrade action & update the schema version in the DB
+          action.get().execute();
+          updateSchemaVersion(feature.getVersion());
+          LOG.info("Feature {} finalized successfully.", feature.getVersion());
+        }
       } catch (Exception e) {
-        LOG.info("Failed to finalize feature " + feature.getVersion() + ": " + e.getMessage());
+        LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
         break;
       }
     }
@@ -101,7 +98,6 @@ public class ReconLayoutVersionManager {
 
   /**
    * Returns a list of ReconLayoutFeature objects that are registered for finalization.
-   * @return List of ReconLayoutFeature objects that are registered for finalization.
    */
   protected List<ReconLayoutFeature> getRegisteredFeatures() {
     List<ReconLayoutFeature> allFeatures =
@@ -139,4 +135,13 @@ public class ReconLayoutVersionManager {
     schemaVersionTableManager.updateSchemaVersion(newVersion);
     LOG.info("MLV updated to: " + newVersion);
   }
+
+  public int getCurrentMLV() {
+    return currentMLV;
+  }
+
+  public int getCurrentSLV() {
+    return currentSLV;
+  }
+
 }

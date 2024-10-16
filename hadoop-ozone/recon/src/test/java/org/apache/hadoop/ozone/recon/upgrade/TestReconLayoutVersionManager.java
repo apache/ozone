@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
@@ -39,6 +40,7 @@ public class TestReconLayoutVersionManager {
   private ReconSchemaVersionTableManager schemaVersionTableManager;
   private ReconLayoutVersionManager layoutVersionManager;
   private static MockedStatic<ReconLayoutFeature> mockedEnum;
+  private static MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
 
   @BeforeEach
   public void setUp() {
@@ -47,16 +49,18 @@ public class TestReconLayoutVersionManager {
 
     // Mocking ReconLayoutFeature.values() to return custom enum instances
     mockedEnum = mockStatic(ReconLayoutFeature.class);
+
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
-    when(feature1.getUpgradeAction()).thenReturn(() -> {
-      // No-op for testing
-    });
+    ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action1));
+
     ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
     when(feature2.getVersion()).thenReturn(2);
-    when(feature2.getUpgradeAction()).thenReturn(() -> {
-      // No-op for testing
-    });
+    ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
+    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action2));
 
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
@@ -68,6 +72,9 @@ public class TestReconLayoutVersionManager {
   public void tearDown() {
     // Close the static mock after each test to deregister it
     mockedEnum.close();
+    if (mockedEnumUpgradeActionType != null) {
+      mockedEnumUpgradeActionType.close();
+    }
   }
 
   /**
@@ -137,7 +144,8 @@ public class TestReconLayoutVersionManager {
 
     // Simulate an exception being thrown during the upgrade action execution
     doThrow(new RuntimeException("Upgrade failed")).when(action1).execute();
-    when(feature1.getUpgradeAction()).thenReturn(action1);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action1));
 
     // Mock the static values method to return the custom feature
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1});
@@ -161,17 +169,20 @@ public class TestReconLayoutVersionManager {
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
-    when(feature1.getUpgradeAction()).thenReturn(action1);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action1));
 
     ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
     when(feature2.getVersion()).thenReturn(2);
     ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
-    when(feature2.getUpgradeAction()).thenReturn(action2);
+    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action2));
 
     ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
     when(feature3.getVersion()).thenReturn(3);
     ReconUpgradeAction action3 = mock(ReconUpgradeAction.class);
-    when(feature3.getUpgradeAction()).thenReturn(action3);
+    when(feature3.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action3));
 
     // Mock the static values method to return custom features in a jumbled order
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature2, feature3, feature1});

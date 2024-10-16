@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,5 +23,29 @@ package org.apache.hadoop.ozone.recon.upgrade;
  * ReconUpgradeAction is an interface for executing upgrade actions in Recon.
  */
 public interface ReconUpgradeAction {
+
+  /**
+   * Defines the different phases during which upgrade actions can be executed.
+   * Each action type corresponds to a specific point in the upgrade process:
+   *
+   * - AUTO_FINALIZE: This action is executed automatically during the startup
+   *   of Recon when it finalizes the layout upgrade. It ensures that all necessary
+   *   upgrades or schema changes are applied to bring the system in sync with
+   *   the latest version.
+   */
+  enum UpgradeActionType {
+    AUTO_FINALIZE,
+    // For testing purpose only will remove this before merge
+    TEST_ACTION
+  }
+
+  /**
+   * Execute the upgrade action.
+   */
   void execute() throws Exception;
+
+  /**
+   * Provides the type of upgrade phase (e.g., AUTO_FINALIZE).
+   */
+  UpgradeActionType getType();
 }
