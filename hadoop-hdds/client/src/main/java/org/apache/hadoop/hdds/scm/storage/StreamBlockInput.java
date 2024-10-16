@@ -83,6 +83,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private int bufferIndex;
   private long blockPosition = -1;
   private List<ByteBuffer> buffers;
+  // Checks if the StreamBlockInput has already read data from the container.
   private boolean allocated = false;
   private long bufferOffsetWrtBlockData;
   private long buffersSize;

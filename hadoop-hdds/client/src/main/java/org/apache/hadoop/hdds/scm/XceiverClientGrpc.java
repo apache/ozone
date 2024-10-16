@@ -110,12 +110,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Constructs a client that can communicate with the Container framework on
    * data nodes via DatanodeClientProtocol.
    *
-   * @param pipeline     - Pipeline that defines the machines.
-   * @param config       -- Ozone Config
+   * @param pipeline - Pipeline that defines the machines.
+   * @param config   -- Ozone Config
    * @param trustManager - a {@link ClientTrustManager} with proper CA handling.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-                           ClientTrustManager trustManager) {
+      ClientTrustManager trustManager) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -444,7 +444,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
         if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
-          responseProto = sendCommandAsyncReadOnly(request, dn).getResponse().get();
+          responseProto = sendCommandReadBlock(request, dn).getResponse().get();
         } else {
           responseProto = sendCommandAsync(request, dn).getResponse().get();
         }
@@ -624,7 +624,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  public XceiverClientReply sendCommandAsyncReadOnly(
+  public XceiverClientReply sendCommandReadBlock(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
 

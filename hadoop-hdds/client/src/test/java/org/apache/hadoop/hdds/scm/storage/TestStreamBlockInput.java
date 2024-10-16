@@ -165,7 +165,8 @@ public class TestStreamBlockInput {
   @Test
   public void testFullChunkRead() throws Exception {
     byte[] b = new byte[blockSize];
-    blockStream.read(b, 0, blockSize);
+    int numBytesRead = blockStream.read(b, 0, blockSize);
+    assertEquals(blockSize, numBytesRead);
     matchWithInputData(b, 0, blockSize);
   }
 
@@ -174,8 +175,8 @@ public class TestStreamBlockInput {
     int len = blockSize / 2;
     byte[] b = new byte[len];
 
-    blockStream.read(b, 0, len);
-
+    int numBytesRead = blockStream.read(b, 0, len);
+    assertEquals(blockSize, numBytesRead);
     matchWithInputData(b, 0, len);
 
     // To read block data from index 0 to 225 (len = 225), we need to read
@@ -200,7 +201,8 @@ public class TestStreamBlockInput {
     // copying chunk data from index 20 to 59 into the buffers (checksum
     // boundaries).
     byte[] b = new byte[30];
-    blockStream.read(b, 0, 30);
+    int numBytesRead = blockStream.read(b, 0, 30);
+    assertEquals(blockSize, numBytesRead);
     matchWithInputData(b, 25, 30);
     matchWithInputData(blockStream.getReadByteBuffers(), 20, 40);
 
@@ -222,7 +224,8 @@ public class TestStreamBlockInput {
     // released and hence chunkPosition updated with current position of chunk.
     seekAndVerify(25);
     b = new byte[15];
-    blockStream.read(b, 0, 15);
+    numBytesRead = blockStream.read(b, 0, 15);
+    assertEquals(blockSize, numBytesRead);
     matchWithInputData(b, 25, 15);
   }
 
@@ -231,19 +234,22 @@ public class TestStreamBlockInput {
     // Seek to a position and read data
     seekAndVerify(50);
     byte[] b1 = new byte[20];
-    blockStream.read(b1, 0, 20);
+    int numBytesRead = blockStream.read(b1, 0, 20);
+    assertEquals(20, numBytesRead);
     matchWithInputData(b1, 50, 20);
 
     // Next read should start from the position of the last read + 1 i.e. 70
     byte[] b2 = new byte[20];
-    blockStream.read(b2, 0, 20);
+    numBytesRead = blockStream.read(b2, 0, 20);
+    assertEquals(20, numBytesRead);
     matchWithInputData(b2, 70, 20);
   }
 
   @Test
   public void testUnbuffered() throws Exception {
     byte[] b1 = new byte[20];
-    blockStream.read(b1, 0, 20);
+    int numBytesRead = blockStream.read(b1, 0, 20);
+    assertEquals(20, numBytesRead);
     matchWithInputData(b1, 0, 20);
 
     blockStream.unbuffer();
@@ -252,7 +258,8 @@ public class TestStreamBlockInput {
 
     // Next read should start from the position of the last read + 1 i.e. 20
     byte[] b2 = new byte[20];
-    blockStream.read(b2, 0, 20);
+    numBytesRead = blockStream.read(b2, 0, 20);
+    assertEquals(20, numBytesRead);
     matchWithInputData(b2, 20, 20);
   }
 
