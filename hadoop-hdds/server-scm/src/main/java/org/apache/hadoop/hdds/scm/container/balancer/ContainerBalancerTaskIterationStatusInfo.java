@@ -69,7 +69,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of iterations.
+   * Get the number of iterations.
    * @return iteration number
    */
   public Integer getIterationNumber() {
@@ -77,7 +77,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get iteration result.
+   * Get the iteration result.
    * @return iteration result
    */
   public String getIterationResult() {
@@ -101,7 +101,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of containers scheduled to move.
+   * Get the number of containers scheduled to move.
    * @return number of containers scheduled to move
    */
   public long getContainerMovesScheduled() {
@@ -109,7 +109,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of successfully moved containers.
+   * Get the number of successfully moved containers.
    * @return number of successfully moved containers
    */
   public long getContainerMovesCompleted() {
@@ -117,7 +117,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of unsuccessfully moved containers.
+   * Get the number of unsuccessfully moved containers.
    * @return number of unsuccessfully moved containers
    */
   public long getContainerMovesFailed() {
@@ -125,7 +125,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get number of moved with timeout containers.
+   * Get the number of moved with timeout containers.
    * @return number of moved with timeout containers
    */
   public long getContainerMovesTimeout() {
@@ -133,7 +133,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get nodeId to size entering from node map.
+   * Get a map of the id node and the data size moved to the node.
    * @return nodeId to size entering from node map
    */
   public Map<UUID, Long> getSizeEnteringNodes() {
@@ -141,7 +141,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get nodeId to size leaving from node map.
+   * Get a map of the id node and the data size moved from the node.
    * @return nodeId to size leaving from node map
    */
   public Map<UUID, Long> getSizeLeavingNodes() {
@@ -149,7 +149,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get iteration duration
+   * Get iteration duration.
    * @return iteration duration
    */
   public long getIterationDuration() {

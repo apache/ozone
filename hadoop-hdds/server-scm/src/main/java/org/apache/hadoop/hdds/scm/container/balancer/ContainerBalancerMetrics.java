@@ -135,7 +135,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Reset number of containers scheduled to move in last iteration.
+   * Reset the number of containers scheduled to move in the last iteration.
    */
   public void resetNumContainerMovesScheduledInLatestIteration() {
     numContainerMovesScheduledInLatestIteration.incr(
@@ -228,7 +228,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Moved containers in the last iteration.
+   * Reset the number of containers moved in the last iteration.
    */
   public void resetNumContainerMovesCompletedInLatestIteration() {
     numContainerMovesCompletedInLatestIteration.incr(-getNumContainerMovesCompletedInLatestIteration());
@@ -244,7 +244,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Increment number timeouted container moves.
+   * Increase the number of containers that are transferred and finished with the timeout.
    */
   public void incrementNumContainerMovesTimeoutInLatestIteration(
       long valueToAdd) {
@@ -252,7 +252,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Reset number timeouted container moves.
+   * Reset the number of containers that are transferred and finished with the timeout.
    */
   public void resetNumContainerMovesTimeoutInLatestIteration() {
     numContainerMovesTimeoutInLatestIteration.incr(-getNumContainerMovesTimeoutInLatestIteration());
