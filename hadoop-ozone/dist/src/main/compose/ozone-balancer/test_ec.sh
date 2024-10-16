@@ -24,7 +24,8 @@ export OM=om1
 export SCM=scm1
 export OZONE_REPLICATION_FACTOR=3
 
+# shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env 6
+start_docker_env
 execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v TYPE:EC -v KEYS:7 -v LOWER_LIMIT:1.5 -v UPPER_LIMIT:2.5 balancer/testBalancer.robot
