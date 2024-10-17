@@ -350,6 +350,7 @@ public class DeletedBlockLogImpl
                 .getCommandStatusByTxId(dnList.stream().
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
+        metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
@@ -377,7 +378,8 @@ public class DeletedBlockLogImpl
               }
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
-              metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
+            } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
+              metrics.incrSkippedTransaction();
             }
           } catch (ContainerNotFoundException ex) {
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
