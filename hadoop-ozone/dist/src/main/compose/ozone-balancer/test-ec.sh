@@ -17,7 +17,7 @@
 
 #suite:balancer
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 export OM_SERVICE_ID="om"
 export OM=om1
@@ -27,7 +27,5 @@ export OZONE_REPLICATION_FACTOR=3
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-# We need 4 dataNodes in this tests
-start_docker_env 4
-
-execute_robot_test ${OM} balancer/testBalancer.robot
+start_docker_env
+execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v TYPE:EC -v KEYS:7 -v LOWER_LIMIT:1.5 -v UPPER_LIMIT:2.5 -N ozone-balancer-EC balancer/testBalancer.robot
