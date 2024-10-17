@@ -95,6 +95,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
+    <classpath.skip>true</classpath.skip>
+
     <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
 
@@ -1703,6 +1705,38 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </pluginManagement>
 
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-classpath-descriptor</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+              <prefix>$HDDS_LIB_JARS_DIR</prefix>
+              <outputFilterFile>true</outputFilterFile>
+              <includeScope>runtime</includeScope>
+              <skip>${classpath.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-jars</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/share/ozone/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+              <skip>${classpath.skip}</skip>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <artifactId>maven-clean-plugin</artifactId>
         <configuration>
