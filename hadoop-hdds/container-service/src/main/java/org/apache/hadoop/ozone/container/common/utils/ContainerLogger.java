@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 /**
  * Utility class defining methods to write to the datanode container log.
@@ -91,10 +91,7 @@ public final class ContainerLogger {
    */
   public static void logUnhealthy(ContainerData containerData,
       ScanResult reason) {
-    String message = reason.getFailureType() + " for file " +
-        reason.getUnhealthyFile() +
-        ". Message: " + reason.getException().getMessage();
-    LOG.error(getMessage(containerData, message));
+    LOG.error(getMessage(containerData, reason.toString()));
   }
 
   /**

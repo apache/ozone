@@ -126,6 +126,7 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
+
   private final ContainerChecksumTreeManager checksumTreeManager;
   private ScheduledExecutorService dbCompactionExecutorService;
 
@@ -384,7 +385,7 @@ public class OzoneContainer {
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
       BackgroundContainerDataScanner s =
-          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v, checksumTreeManager);
       s.start();
       dataScanners.add(s);
       backgroundScanners.add(s);
