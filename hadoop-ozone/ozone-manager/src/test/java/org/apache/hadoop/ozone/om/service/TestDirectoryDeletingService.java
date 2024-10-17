@@ -211,6 +211,6 @@ public class TestDirectoryDeletingService {
           "base: " + delDirCnt[0] + ", new: " + delDirCnt[1]);
       delDirCnt[0] =  delDirCnt[1];
       return dirDeletingService.getDeletedDirsCount() >= dirCreatesCount;
-    }, 500, 300000);
+    }, 100, 300000);
   }
 }

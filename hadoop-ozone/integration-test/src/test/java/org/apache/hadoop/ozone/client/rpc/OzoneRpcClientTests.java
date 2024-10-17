@@ -4877,6 +4877,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  @Unhealthy("HDDS-11415 To be removed as not applicable with new flow")
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
     assumeThat(getCluster().getOzoneManager().isRatisEnabled()).isTrue();
