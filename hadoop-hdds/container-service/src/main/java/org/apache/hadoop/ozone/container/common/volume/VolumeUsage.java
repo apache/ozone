@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -222,7 +223,7 @@ public class VolumeUsage {
       if (words.length < 2) {
         LOG.error("Reserved space should be configured in a pair, but current value is {}",
             reserve);
-        continue;
+        throw new ConfigurationException("Reserved space should be configured in a pair");
       }
 
       try {
