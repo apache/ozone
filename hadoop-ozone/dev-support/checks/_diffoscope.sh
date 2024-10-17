@@ -14,5 +14,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Helper script to compare jars reported by maven-artifact-plugin
+
+set -e -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "${DIR}"/_build.sh install "$@"
+cd "$DIR/../../.." || exit 1
+
+BASE_DIR="$(pwd -P)"
+: ${OUTPUT_LOG:="${BASE_DIR}/target/repro/output.log"}
+
+for jar in $(grep -o "investigate with diffoscope [^ ]*\.jar [^ ]*\.jar" "${OUTPUT_LOG}" | awk '{ print $NF }'); do
+  jarname=$(basename "$jar")
+  if [[ ! -e "$jar" ]]; then
+    echo "$jar does not exist"
+    continue
+  fi
+
+  ref=$(find target/reference -name "$jarname")
+  if [[ -z "$ref" ]]; then
+    ref=$(find ~/.m2/repository -name "$jarname")
+  fi
+
+  if [[ ! -e "$ref" ]]; then
+    echo "Reference not found for: $jarname"
+    continue
+  fi
+
+  diffoscope "$ref" "$jar"
+done

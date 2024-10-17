@@ -44,8 +44,6 @@ public final class HddsVersionInfo {
     System.out.println(
         "Source code repository " + HDDS_VERSION_INFO.getUrl() + " -r " +
             HDDS_VERSION_INFO.getRevision());
-    System.out.println("Compiled by " + HDDS_VERSION_INFO.getUser() + " on "
-        + HDDS_VERSION_INFO.getDate());
     System.out.println(
         "Compiled with protoc " + HDDS_VERSION_INFO.getHadoopProtoc2Version() +
             ", " + HDDS_VERSION_INFO.getGrpcProtocVersion() +
