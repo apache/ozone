@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +75,7 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    ScanResult result = container.scanMetaData();
+    MetadataScanResult result = container.scanMetaData();
     if (result.isDeleted()) {
       LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
       return;

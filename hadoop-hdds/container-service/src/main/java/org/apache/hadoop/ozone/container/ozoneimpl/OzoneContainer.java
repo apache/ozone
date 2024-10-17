@@ -126,7 +126,6 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
-  private final ContainerChecksumTreeManager checksumManager;
 
   private final ContainerChecksumTreeManager checksumTreeManager;
   private ScheduledExecutorService dbCompactionExecutorService;
@@ -249,7 +248,6 @@ public class OzoneContainer {
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    checksumManager = new ContainerChecksumTreeManager(config);
     int blockDeletingServiceWorkerSize = config
         .getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
             OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
@@ -387,7 +385,7 @@ public class OzoneContainer {
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
       BackgroundContainerDataScanner s =
-          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v, checksumManager);
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v, checksumTreeManager);
       s.start();
       dataScanners.add(s);
       backgroundScanners.add(s);
