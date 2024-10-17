@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -32,6 +34,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEF
  * Replication configuration for any ReplicationType with all the required
  * parameters..
  */
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.NAME,
+    include = JsonTypeInfo.As.PROPERTY,
+    property = "typeOfReplicationConfig"
+)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = ECReplicationConfig.class, name = "ec"),
+    @JsonSubTypes.Type(value = RatisReplicationConfig.class, name = "ratis")
+})
 public interface ReplicationConfig {
 
   /**

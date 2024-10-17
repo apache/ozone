@@ -89,6 +89,21 @@ public class OzoneAcl {
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
 
+  /**
+   * Dummy constructor to support Jackson utilities for converting between json string and OzoneAcl object.
+   */
+  public OzoneAcl() {
+    this.name = "name";
+    this.type = ACLIdentityType.USER;
+    this.aclScope = AclScope.ACCESS;
+    this.aclBits = 0;
+
+    this.toStringMethod = MemoizedSupplier.valueOf(() -> getType() + ":" + getName() + ":"
+        + ACLType.getACLString(BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer())) + "[" + getAclScope() + "]");
+    this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
+        BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
+  }
+
 
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
