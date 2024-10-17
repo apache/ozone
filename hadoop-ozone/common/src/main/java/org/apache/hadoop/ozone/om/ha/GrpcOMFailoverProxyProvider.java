@@ -23,6 +23,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -41,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import io.grpc.StatusRuntimeException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,10 +63,16 @@ public class GrpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
+  private final UserGroupInformation ugi;
+  private final long protocolVer;
+
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
+                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
     super(configuration, omServiceId, protocol);
+    this.ugi = ugi;
+    this.protocolVer = RPC.getProtocolVersion(protocol);
   }
 
   @Override
@@ -116,9 +126,35 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   private T createOMProxy() throws IOException {
     InetSocketAddress addr = new InetSocketAddress(0);
+    return createOmProxy(addr);
+  }
+
+  /**
+   * Get the protocol proxy for provided address.
+   * @param address An instance of {@link InetSocketAddress} which contains the address to connect
+   * @return the proxy connection to the address and the set of methods supported by the server at the address
+   * @throws IOException if any error occurs while trying to get the proxy
+   */
+  private T createOmProxy(InetSocketAddress address) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
-    return (T) RPC.getProxy(getInterface(), 0, addr, hadoopConf);
+
+    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
+    RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
+
+    // Ensure we do not attempt retry on the same OM in case of exceptions
+    RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
+
+    return (T) RPC.getProtocolProxy(
+        getInterface(),
+        protocolVer,
+        address,
+        ugi,
+        hadoopConf,
+        NetUtils.getDefaultSocketFactory(hadoopConf),
+        (int) OmUtils.getOMClientRpcTimeOut(getConf()),
+        connectionRetryPolicy
+    ).getProxy();
   }
 
   /**
