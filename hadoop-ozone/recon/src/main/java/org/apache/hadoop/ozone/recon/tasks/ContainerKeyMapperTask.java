@@ -57,7 +57,7 @@ import com.google.inject.Inject;
 
 /**
  * Class to iterate over the OM DB and populate the Recon container DB with
- * the container -> Key reverse mapping.
+ * the container -&gt; Key reverse mapping.
  */
 public class ContainerKeyMapperTask implements ReconOmTask {
 
@@ -81,8 +81,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Read Key -> ContainerId data from OM snapshot DB and write reverse map
-   * (container, key) -> count to Recon Container DB.
+   * Read Key -&gt; ContainerId data from OM snapshot DB and write reverse map
+   * (container, key) -&gt; count to Recon Container DB.
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {

@@ -83,6 +83,7 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -233,7 +234,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // cache with FIFO eviction, and if element not found, this needs
     // to be obtained from disk for slow follower
     stateMachineDataCache = new ResourceCache<>(
-        (index, data) -> ((ByteString)data).size(),
+        (index, data) -> data.size(),
         pendingRequestsBytesLimit,
         (p) -> {
           if (p.wasEvicted()) {
@@ -704,9 +705,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     return chunkExecutors.get(i);
   }
 
-  /*
-   * writeStateMachineData calls are not synchronized with each other
-   * and also with applyTransaction.
+  /**
+   * {@link #writeStateMachineData}
+   * calls are not synchronized with each other
+   * and also with {@code applyTransaction(TransactionContext)}.
    */
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
@@ -824,7 +826,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * This method is used by the Leader to read state machine date for sending appendEntries to followers.
+   * This method is used by the Leader to read state machine data for sending appendEntries to followers.
    * It will first get the data from {@link #stateMachineDataCache}.
    * If the data is not in the cache, it will read from the file by dispatching a command
    *
@@ -1161,8 +1163,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void notifyFollowerSlowness(RoleInfoProto roleInfoProto) {
-    ratisServer.handleNodeSlowness(gid, roleInfoProto);
+  public void notifyFollowerSlowness(RoleInfoProto roleInfoProto, RaftPeer follower) {
+    ratisServer.handleFollowerSlowness(gid, roleInfoProto, follower);
   }
 
   @Override
@@ -1197,7 +1199,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       try {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid,
-            "Ratis group removed");
+            "Ratis group removed. Group id: " + gid);
       } catch (IOException e) {
         LOG.debug("Failed to quasi-close container {}", cid);
       }

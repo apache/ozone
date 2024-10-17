@@ -33,9 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import jakarta.annotation.Nonnull;
 import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
@@ -73,11 +71,7 @@ public class DNContainerOperationClient implements AutoCloseable {
       throws IOException {
     ClientTrustManager trustManager = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider localCaCerts =
-          () -> HAUtils.buildCAX509List(certificateClient, conf);
-      CACertificateProvider remoteCacerts =
-          () -> HAUtils.buildCAX509List(null, conf);
-      trustManager = new ClientTrustManager(remoteCacerts, localCaCerts);
+      trustManager = certificateClient.createClientTrustManager();
     }
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     return new XceiverClientManager(conf,

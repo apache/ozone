@@ -48,12 +48,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
-    DIRECTORY_TABLE, FILE_TABLE})
+    DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
@@ -77,6 +78,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
     this.openKeyInfoMap = openKeyInfoMap;
   }
 
+  public OMDirectoriesPurgeResponseWithFSO(OMResponse omResponse) {
+    super(omResponse);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager metadataManager,
       BatchOperation batchOp) throws IOException {
@@ -86,10 +91,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
               .getOzoneManager().getOmSnapshotManager();
 
       try (ReferenceCounted<OmSnapshot>
-          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(
-              fromSnapshotInfo.getVolumeName(),
-              fromSnapshotInfo.getBucketName(),
-              fromSnapshotInfo.getName())) {
+          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(fromSnapshotInfo.getSnapshotId())) {
         OmSnapshot fromSnapshot = rcFromSnapshotInfo.get();
         DBStore fromSnapshotStore = fromSnapshot.getMetadataManager()
             .getStore();
@@ -100,6 +102,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, fromSnapshotInfo.getTableKey(), fromSnapshotInfo);
     } else {
       processPaths(metadataManager, batchOp);
     }

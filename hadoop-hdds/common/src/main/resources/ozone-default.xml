@@ -861,6 +861,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.chunk.read.mapped.buffer.max.count</name>
+    <value>0</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default max count of memory mapped buffers allowed for a DN.
+      Default 0 means no mapped buffers allowed for data read.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
@@ -3407,14 +3416,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.list.trash.keys.max</name>
-    <value>1000</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      The maximum number of keys to return for a list trash request.
-    </description>
-  </property>
-  <property>
     <name>ozone.http.basedir</name>
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
@@ -3739,6 +3740,15 @@
     <description>
       The time interval between successive SnapshotDirectoryCleaningService
       thread run.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deep.cleaning.enabled</name>
+    <value>false</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Flag to enable/disable snapshot deep cleaning.
     </description>
   </property>
 
@@ -4225,11 +4235,26 @@
   </property>
 
   <property>
+    <name>ozone.hbase.enhancements.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When set to false, server-side HBase enhancement-related Ozone (experimental) features
+      are disabled (not allowed to be enabled) regardless of whether those configs are set.
+
+      Here is the list of configs and values overridden when this config is set to false:
+      1. ozone.fs.hsync.enabled = false
+
+      A warning message will be printed if any of the above configs are overridden by this.
+    </description>
+  </property>
+  <property>
     <name>ozone.fs.hsync.enabled</name>
     <value>false</value>
-    <tag>OZONE, CLIENT</tag>
+    <tag>OZONE, CLIENT, OM</tag>
     <description>
-      Enable hsync/hflush. By default they are disabled.
+      Enable hsync/hflush on the Ozone Manager and/or client side. Disabled by default.
+      Can be enabled only when ozone.hbase.enhancements.allowed = true
     </description>
   </property>
   <property>

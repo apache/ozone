@@ -61,7 +61,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
-  private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
   private @Metric MutableCounterLong numKeyHSyncs;
@@ -120,7 +119,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
-  private @Metric MutableCounterLong numTrashKeyListFails;
   private @Metric MutableCounterLong numVolumeListFails;
   private @Metric MutableCounterLong numKeyCommitFails;
   private @Metric MutableCounterLong numBlockAllocationFails;
@@ -418,11 +416,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
-  }
-
-  public void incNumTrashKeyLists() {
-    numKeyOps.incr();
-    numTrashKeyLists.incr();
   }
 
   public void incNumVolumeLists() {
@@ -836,10 +829,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyListFails.incr();
   }
 
-  public void incNumTrashKeyListFails() {
-    numTrashKeyListFails.incr();
-  }
-
   public void incNumVolumeListFails() {
     numVolumeListFails.incr();
   }
@@ -995,11 +984,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
-  public long getNumTrashKeyLists() {
-    return numTrashKeyLists.value();
-  }
-
-  @VisibleForTesting
   public long getNumGetServiceLists() {
     return numGetServiceLists.value();
   }
@@ -1097,11 +1081,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumKeyListFails() {
     return numKeyListFails.value();
-  }
-
-  @VisibleForTesting
-  public long getNumTrashKeyListFails() {
-    return numTrashKeyListFails.value();
   }
 
   @VisibleForTesting

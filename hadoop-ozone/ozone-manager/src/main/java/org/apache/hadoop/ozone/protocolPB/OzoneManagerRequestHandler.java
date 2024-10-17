@@ -63,7 +63,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -113,8 +112,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
@@ -133,7 +130,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServerDefaultsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
@@ -237,11 +233,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysLightResponse listKeysLightResponse = listKeysLight(
             request.getListKeysRequest());
         responseBuilder.setListKeysLightResponse(listKeysLightResponse);
-        break;
-      case ListTrash:
-        ListTrashResponse listTrashResponse = listTrash(
-            request.getListTrashRequest(), request.getVersion());
-        responseBuilder.setListTrashResponse(listTrashResponse);
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
@@ -384,11 +375,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getSnapshotInfo(request.getSnapshotInfoRequest());
         responseBuilder.setSnapshotInfoResponse(snapshotInfoResponse);
         break;
-      case GetServerDefaults:
-        responseBuilder.setServerDefaultsResponse(
-            ServerDefaultsResponse.newBuilder()
-                .setServerDefaults(impl.getServerDefaults().getProtobuf())
-                .build());
+      case GetQuotaRepairStatus:
+        OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse quotaRepairStatusRsp =
+            getQuotaRepairStatus(request.getGetQuotaRepairStatusRequest());
+        responseBuilder.setGetQuotaRepairStatusResponse(quotaRepairStatusRsp);
+        break;
+      case StartQuotaRepair:
+        OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepairRsp =
+            startQuotaRepair(request.getStartQuotaRepairRequest());
+        responseBuilder.setStartQuotaRepairResponse(startQuotaRepairRsp);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -833,26 +828,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       }
     }
     return resp;
-  }
-
-  private ListTrashResponse listTrash(ListTrashRequest request,
-      int clientVersion) throws IOException {
-
-    ListTrashResponse.Builder resp =
-        ListTrashResponse.newBuilder();
-
-    List<RepeatedOmKeyInfo> deletedKeys = impl.listTrash(
-        request.getVolumeName(),
-        request.getBucketName(),
-        request.getStartKeyName(),
-        request.getKeyPrefix(),
-        request.getMaxKeys());
-
-    for (RepeatedOmKeyInfo key: deletedKeys) {
-      resp.addDeletedKeys(key.getProto(false, clientVersion));
-    }
-
-    return resp.build();
   }
 
   @RequestFeatureValidator(
@@ -1548,5 +1523,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throw new IllegalArgumentException("Unexpected safe mode action " +
           safeMode);
     }
+  }
+
+  private OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse getQuotaRepairStatus(
+      OzoneManagerProtocolProtos.GetQuotaRepairStatusRequest req) throws IOException {
+    return OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse.newBuilder()
+        .setStatus(impl.getQuotaRepairStatus())
+        .build();
+  }
+  private OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepair(
+      OzoneManagerProtocolProtos.StartQuotaRepairRequest req) throws IOException {
+    impl.startQuotaRepair(req.getBucketsList());
+    return OzoneManagerProtocolProtos.StartQuotaRepairResponse.newBuilder().build();
   }
 }

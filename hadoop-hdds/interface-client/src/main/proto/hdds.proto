@@ -191,6 +191,7 @@ message DatanodeUsageInfoProto {
     optional int64 containerCount = 5;
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
+    optional int64 pipelineCount = 8;
 }
 
 /**

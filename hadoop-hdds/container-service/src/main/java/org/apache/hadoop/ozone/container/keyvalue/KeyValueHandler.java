@@ -137,6 +137,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
@@ -595,9 +596,13 @@ public class KeyValueHandler extends Handler {
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        // in EC, we will be doing empty put block.
-        // So, let's flush only when there are any chunks
-        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty()) {
+        // There are two cases where client sends empty put block with eof.
+        // (1) An EC empty file. In this case, the block/chunk file does not exist,
+        //     so no need to flush/close the file.
+        // (2) Ratis output stream in incremental chunk list mode may send empty put block
+        //     to close the block, in which case we need to flush/close the file.
+        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty() ||
+            blockData.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST)) {
           chunkManager.finishWriteChunks(kvContainer, blockData);
         }
         endOfBlock = true;
@@ -992,6 +997,9 @@ public class KeyValueHandler extends Handler {
         // of order.
         blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
         boolean eob = writeChunk.getBlock().getEof();
+        if (eob) {
+          chunkManager.finishWriteChunks(kvContainer, blockData);
+        }
         blockManager.putBlock(kvContainer, blockData, eob);
         blockDataProto = blockData.getProtoBufMessage();
         final long numBytes = blockDataProto.getSerializedSize();
@@ -1013,6 +1021,58 @@ public class KeyValueHandler extends Handler {
     }
 
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  /**
+   * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
+   *
+   */
+  public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
+                                           ChunkBuffer data, KeyValueContainer kvContainer)
+      throws IOException {
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(chunkInfo);
+    Preconditions.checkNotNull(data);
+    long writeChunkStartTime = Time.monotonicNowNanos();
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
+    }
+
+    DispatcherContext dispatcherContext = DispatcherContext.getHandleWriteChunk();
+    chunkManager.writeChunk(kvContainer, blockID, chunkInfo, data,
+        dispatcherContext);
+
+    // Increment write stats for WriteChunk after write.
+    metrics.incClosedContainerBytesStats(Type.WriteChunk, chunkInfo.getLen());
+    metrics.incContainerOpsLatencies(Type.WriteChunk, Time.monotonicNowNanos() - writeChunkStartTime);
+  }
+
+  /**
+   * Handle Put Block operation for closed container. Calls BlockManager to process the request.
+   *
+   */
+  public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
+                                          BlockData blockData, long blockCommitSequenceId)
+      throws IOException {
+    Preconditions.checkNotNull(kvContainer);
+    Preconditions.checkNotNull(blockData);
+    long startTime = Time.monotonicNowNanos();
+
+    if (!checkContainerClose(kvContainer)) {
+      throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
+          " is not in closed state, Container state is " + kvContainer.getContainerState());
+    }
+    blockData.setChunks(chunkInfos);
+    // To be set from the Replica's BCSId
+    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+
+    blockManager.putBlock(kvContainer, blockData, false);
+    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
+    final long numBytes = blockDataProto.getSerializedSize();
+    // Increment write stats for PutBlock after write.
+    metrics.incClosedContainerBytesStats(Type.PutBlock, numBytes);
+    metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
   }
 
   /**
@@ -1189,6 +1249,19 @@ public class KeyValueHandler extends Handler {
     String msg = "Requested operation not allowed as ContainerState is " +
         containerState;
     throw new StorageContainerException(msg, result);
+  }
+
+  /**
+   * Check if container is Closed.
+   * @param kvContainer
+   */
+  private boolean checkContainerClose(KeyValueContainer kvContainer) {
+
+    final State containerState = kvContainer.getContainerState();
+    if (containerState == State.QUASI_CLOSED || containerState == State.CLOSED || containerState == State.UNHEALTHY) {
+      return true;
+    }
+    return false;
   }
 
   @Override

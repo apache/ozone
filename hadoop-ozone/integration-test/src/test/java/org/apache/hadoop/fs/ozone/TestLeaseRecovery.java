@@ -120,6 +120,8 @@ public class TestLeaseRecovery {
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);

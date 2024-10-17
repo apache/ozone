@@ -32,7 +32,7 @@ public class KeyOutputStreamSemaphore {
   private final Semaphore requestSemaphore;
 
   KeyOutputStreamSemaphore(int maxConcurrentWritePerKey) {
-    LOG.info("Initializing semaphore with maxConcurrentWritePerKey = {}", maxConcurrentWritePerKey);
+    LOG.debug("Initializing semaphore with maxConcurrentWritePerKey = {}", maxConcurrentWritePerKey);
     if (maxConcurrentWritePerKey > 0) {
       requestSemaphore = new Semaphore(maxConcurrentWritePerKey);
     } else if (maxConcurrentWritePerKey == 0) {
