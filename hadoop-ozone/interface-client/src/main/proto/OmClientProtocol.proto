@@ -1638,6 +1638,7 @@ message ServiceInfo {
     optional OMRoleInfo omRole = 4;
     optional int32 OMVersion = 5 [default = 0];
     optional FsServerDefaultsProto serverDefaults = 6;
+    optional uint64 supportedFeatureBitmap = 7;
 }
 
 message MultipartInfoInitiateRequest {

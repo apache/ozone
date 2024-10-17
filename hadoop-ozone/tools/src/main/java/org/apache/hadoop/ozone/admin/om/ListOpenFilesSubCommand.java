@@ -117,7 +117,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         parent.createOmClient(omServiceId, omHost, false);
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     final OzoneManagerVersion omVersion = RpcClient.getOmVersion(serviceInfoEx);
-    if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+    final long omSupportedFeatureBitmap = RpcClient.getOMSupportedFeatureBitmap(serviceInfoEx);
+    if (RpcClient.isOmFeatureSupported(omSupportedFeatureBitmap, omVersion, OzoneManagerVersion.HBASE_SUPPORT)) {
       System.err.println("Error: This command requires OzoneManager version "
           + OzoneManagerVersion.HBASE_SUPPORT.name() + " or later.");
       return null;

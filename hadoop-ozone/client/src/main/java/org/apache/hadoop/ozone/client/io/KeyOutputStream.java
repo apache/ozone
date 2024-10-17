@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -113,6 +114,7 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
   private ContainerClientMetrics clientMetrics;
   private OzoneManagerVersion ozoneManagerVersion;
+  private long omSupportedFeatureBitmap;
   private final Lock writeLock = new ReentrantLock();
   private final Condition retryHandlingCondition = writeLock.newCondition();
 
@@ -191,6 +193,7 @@ public class KeyOutputStream extends OutputStream
     this.streamBufferArgs = b.getStreamBufferArgs();
     this.clientMetrics = b.getClientMetrics();
     this.ozoneManagerVersion = b.ozoneManagerVersion;
+    this.omSupportedFeatureBitmap = b.omSupportedFeatureBitmap;
   }
 
   /**
@@ -540,10 +543,11 @@ public class KeyOutputStream extends OutputStream
         throw new UnsupportedOperationException("The replication factor = "
             + replication.getRequiredNodes() + " <= 1");
       }
-      if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
-        throw new UnsupportedOperationException("Hsync API requires OM version "
-            + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
-            + ozoneManagerVersion);
+      if (RpcClient.isOmFeatureSupported(
+              omSupportedFeatureBitmap, ozoneManagerVersion, OzoneManagerVersion.HBASE_SUPPORT)) {
+        throw new UnsupportedOperationException("Hsync API requires OM feature "
+            + OzoneManagerVersion.HBASE_SUPPORT + ". Current OM feature "
+            + omSupportedFeatureBitmap);
       }
       checkNotClosed();
       final long hsyncPos = writeOffset;
@@ -707,6 +711,7 @@ public class KeyOutputStream extends OutputStream
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
     private OzoneManagerVersion ozoneManagerVersion;
+    private long omSupportedFeatureBitmap;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -831,6 +836,11 @@ public class KeyOutputStream extends OutputStream
 
     public Builder setOmVersion(OzoneManagerVersion omVersion) {
       this.ozoneManagerVersion = omVersion;
+      return this;
+    }
+
+    public Builder setOmSupportedFeatureBitmap(long featureBitmap) {
+      omSupportedFeatureBitmap = featureBitmap;
       return this;
     }
 

@@ -55,6 +55,11 @@ public final class ServiceInfo {
   private OzoneManagerVersion omVersion;
 
   /**
+   * Bitmap for supported versions.
+   */
+  private long supportedFeatureBitmap;
+
+  /**
    * List of ports the service listens to.
    */
   private Map<ServicePort.Type, Integer> ports;
@@ -72,30 +77,17 @@ public final class ServiceInfo {
    * @param nodeType type of node/service
    * @param hostname hostname of the service
    * @param portList list of ports the service listens to
-   */
-  private ServiceInfo(NodeType nodeType,
-                      String hostname,
-                      List<ServicePort> portList,
-                      OzoneManagerVersion omVersion,
-                      OMRoleInfo omRole) {
-    this(nodeType, hostname, portList, omVersion, omRole, null);
-  }
-
-  /**
-   * Constructs the ServiceInfo for the {@code nodeType}.
-   * @param nodeType type of node/service
-   * @param hostname hostname of the service
-   * @param portList list of ports the service listens to
    * @param omVersion Om Version
    * @param omRole OM role Ino
-   * @param keyProviderUri KMS provider URI
+   * @param serverDefaults server defaults
+   * @param supportedFeatureBitmap bitmap of supported feature
    */
   private ServiceInfo(NodeType nodeType,
                       String hostname,
                       List<ServicePort> portList,
                       OzoneManagerVersion omVersion,
                       OMRoleInfo omRole,
-                      OzoneFsServerDefaults serverDefaults) {
+                      OzoneFsServerDefaults serverDefaults, long supportedFeatureBitmap) {
     Preconditions.checkNotNull(nodeType);
     Preconditions.checkNotNull(hostname);
     this.nodeType = nodeType;
@@ -107,6 +99,7 @@ public final class ServiceInfo {
     }
     this.omRoleInfo = omRole;
     this.serverDefaults = serverDefaults;
+    this.supportedFeatureBitmap = supportedFeatureBitmap;
   }
 
   /**
@@ -203,6 +196,7 @@ public final class ServiceInfo {
     if (serverDefaults != null) {
       builder.setServerDefaults(serverDefaults.getProtobuf());
     }
+    builder.setSupportedFeatureBitmap(supportedFeatureBitmap);
     return builder.build();
   }
 
@@ -220,7 +214,8 @@ public final class ServiceInfo {
         OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
         serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null,
         serviceInfo.hasServerDefaults() ? OzoneFsServerDefaults.getFromProtobuf(
-            serviceInfo.getServerDefaults()) : null);
+            serviceInfo.getServerDefaults()) : null,
+            serviceInfo.getSupportedFeatureBitmap());
   }
 
   /**
@@ -241,6 +236,7 @@ public final class ServiceInfo {
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
     private OzoneManagerVersion omVersion;
+    private long supportedFeatureBitmap;
     private OzoneFsServerDefaults serverDefaults;
 
     /**
@@ -300,6 +296,11 @@ public final class ServiceInfo {
       return this;
     }
 
+    public Builder setSupportedFeatureBitmap(long featureBitmap) {
+      supportedFeatureBitmap = featureBitmap;
+      return this;
+    }
+
     /**
      * Builds and returns {@link ServiceInfo} with the set values.
      * @return {@link ServiceInfo}
@@ -310,7 +311,8 @@ public final class ServiceInfo {
           portList,
           omVersion,
           omRoleInfo,
-          serverDefaults);
+          serverDefaults,
+          supportedFeatureBitmap);
     }
   }
 

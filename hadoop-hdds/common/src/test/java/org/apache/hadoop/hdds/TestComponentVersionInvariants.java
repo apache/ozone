@@ -26,6 +26,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -92,5 +94,27 @@ public class TestComponentVersionInvariants {
       assertEquals(values[i].toProtoValue(), startValue++);
     }
     assertEquals(values.length, ++startValue);
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testSupportedFeatureBitmapIncludesAllVersions(
+          ComponentVersion[] values) {
+    if (values[0] instanceof OzoneManagerVersion) {
+      long expectedBitmap = 0L;
+      for (ComponentVersion version : values) {
+        int versionValue = version.toProtoValue();
+        if (versionValue >= 0) { // Ignore FUTURE_VERSION (-1)
+          assertTrue(OzoneManagerVersion.isOmFeatureSupported(
+                  OzoneManagerVersion.getSupportedFeatureBitmap(), (OzoneManagerVersion) version));
+          expectedBitmap |= (1L << versionValue);
+        } else {
+          assertFalse(OzoneManagerVersion.isOmFeatureSupported(
+                  OzoneManagerVersion.getSupportedFeatureBitmap(), (OzoneManagerVersion) version));
+        }
+      }
+      assertEquals(expectedBitmap, OzoneManagerVersion.getSupportedFeatureBitmap(),
+              "The SUPPORTED_FEATURE_BITMAP should correctly represent all supported features.");
+    }
   }
 }
