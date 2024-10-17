@@ -40,7 +40,7 @@ public final class ContainerBalancerMetrics {
       " in the latest iteration.")
   private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
-  @Metric(about = "Amount of bytes that Container Balancer moved in the latest iteration.")
+  @Metric(about = "Amount of bytes that the Container Balancer moved in the latest iteration.")
   private MutableCounterLong dataSizeMovedBytesInLatestIteration;
 
   @Metric(about = "Number of completed container moves performed by " +
@@ -143,7 +143,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Gets the amount of data moved by Container Balancer in the latest iteration.
+   * Retrieves the amount of data moved by the Container Balancer in the latest iteration.
    * @return size in GB
    */
   public long getDataSizeMovedGBInLatestIteration() {
@@ -160,7 +160,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Gets the amount of data moved by Container Balancer in the latest iteration.
+   * Retrieves the amount of data moved by the Container Balancer in the latest iteration.
    * @return size in bytes
    */
   public long getDataSizeMovedInLatestIteration() {
@@ -168,7 +168,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Increment data size moved in the last iteration.
+   * Increment the amount of data moved in the last iteration.
    * @param bytes bytes to add
    */
   public void incrementDataSizeMovedInLatestIteration(long bytes) {
@@ -176,7 +176,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Reset data size moved in the last iteration.
+   * Reset the amount of data moved in the last iteration.
    */
   public void resetDataSizeMovedInLatestIteration() {
     dataSizeMovedBytesInLatestIteration.incr(-getDataSizeMovedInLatestIteration());
@@ -244,7 +244,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Increase the number of containers that are transferred and finished with the timeout.
+   * Increase the number of containers that are transferred and completed with the timeout.
    */
   public void incrementNumContainerMovesTimeoutInLatestIteration(
       long valueToAdd) {
@@ -252,7 +252,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Reset the number of containers that are transferred and finished with the timeout.
+   * Reset the number of containers that are transferred and completed with the timeout.
    */
   public void resetNumContainerMovesTimeoutInLatestIteration() {
     numContainerMovesTimeoutInLatestIteration.incr(-getNumContainerMovesTimeoutInLatestIteration());

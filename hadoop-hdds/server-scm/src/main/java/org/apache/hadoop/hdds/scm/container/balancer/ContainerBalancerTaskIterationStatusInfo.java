@@ -85,7 +85,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get size in bytes scheduled to move in the iteration.
+   * Get the size of the bytes that are scheduled to move in the iteration.
    * @return size in bytes
    */
   public long getSizeScheduledForMove() {
@@ -93,7 +93,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get size in bytes moved in the iteration.
+   * Get the size of the bytes that were moved in the iteration.
    * @return size in bytes
    */
   public long getDataSizeMoved() {
@@ -117,7 +117,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get the number of unsuccessfully moved containers.
+   * Get the number of containers that were not moved successfully.
    * @return number of unsuccessfully moved containers
    */
   public long getContainerMovesFailed() {
@@ -125,7 +125,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get the number of moved with timeout containers.
+   * Get the number of containers moved with a timeout.
    * @return number of moved with timeout containers
    */
   public long getContainerMovesTimeout() {
@@ -133,7 +133,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get a map of the id node and the data size moved to the node.
+   * Get a map of the node IDs and the corresponding data sizes moved to each node.
    * @return nodeId to size entering from node map
    */
   public Map<UUID, Long> getSizeEnteringNodes() {
@@ -141,7 +141,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get a map of the id node and the data size moved from the node.
+   * Get a map of the node IDs and the corresponding data sizes moved from each node.
    * @return nodeId to size leaving from node map
    */
   public Map<UUID, Long> getSizeLeavingNodes() {
@@ -149,7 +149,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Get iteration duration.
+   * Get the iteration duration.
    * @return iteration duration
    */
   public long getIterationDuration() {
@@ -157,7 +157,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Map to proto.
+   * Converts an instance into the protobuf compatible object.
    * @return proto representation
    */
   public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo toProto() {
@@ -181,7 +181,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
-   * Map to proto node transfer info.
+   * Converts an instance into the protobuf compatible object.
    * @param nodes node id to node traffic size
    * @return node transfer info proto representation
    */
