@@ -284,9 +284,7 @@ public final class ContainerTestUtils {
    * Construct an unhealthy scan result to use for testing purposes.
    */
   public static DataScanResult getUnhealthyDataScanResult() {
-    ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CHUNK,
-        new File(""), new IOException("Fake data corruption failure for testing"));
-    return DataScanResult.fromErrors(Collections.singletonList(error), new ContainerMerkleTree());
+    return DataScanResult.fromErrors(Collections.singletonList(getDataScanError()), new ContainerMerkleTree());
   }
 
   public static MetadataScanResult getHealthyMetadataScanResult() {
@@ -294,12 +292,26 @@ public final class ContainerTestUtils {
   }
 
   /**
+   * Construct a generic scan error that can be used for testing.
+   */
+  public static ContainerScanError getDataScanError() {
+    return new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CHUNK, new File(""),
+        new IOException("Fake data corruption failure for testing"));
+  }
+
+  /**
+   * Construct a generic scan error that can be used for testing.
+   */
+  public static ContainerScanError getMetadataScanError() {
+    return new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE, new File(""),
+        new IOException("Fake metadata corruption failure for testing"));
+  }
+
+  /**
    * Construct an unhealthy scan result to use for testing purposes.
    */
   public static MetadataScanResult getUnhealthyMetadataScanResult() {
-    ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE,
-        new File(""), new IOException("Fake metadata corruption failure for testing"));
-    return DataScanResult.fromErrors(Collections.singletonList(error));
+    return DataScanResult.fromErrors(Collections.singletonList(getMetadataScanError()));
   }
 
   public static KeyValueContainer addContainerToDeletedDir(
