@@ -375,7 +375,7 @@ class TestContainerReplication {
             // Reading the Stripe 2 from the pre initialized inputStream
             inputStream.read(readData, firstReadLen, size - firstReadLen);
             // Asserting there was a failure in the first read chunk.
-            Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
+            Assertions.assertEquals(ImmutableMap.of(1, 3), failedReadChunkCountMap);
             Assertions.assertArrayEquals(readData, originalData);
           }
         }
