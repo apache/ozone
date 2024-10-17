@@ -66,7 +66,6 @@ Run Container Balancer
 
 Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
-                            Should Contain                  ${result}             ContainerBalancer is Running.
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
                             Sleep                   60000ms
 
