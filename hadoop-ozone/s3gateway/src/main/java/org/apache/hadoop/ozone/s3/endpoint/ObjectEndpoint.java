@@ -316,7 +316,7 @@ public class ObjectEndpoint extends EndpointBase {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          putLength = IOUtils.copyLarge(digestInputStream, output);
+          putLength = IOUtils.copy(digestInputStream, output, getIOBufferSize(length));
           eTag = DatatypeConverter.printHexBinary(
                   digestInputStream.getMessageDigest().digest())
               .toLowerCase();
@@ -439,7 +439,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
         StreamingOutput output = dest -> {
           try (OzoneInputStream key = keyDetails.getContent()) {
-            long readLength = IOUtils.copyLarge(key, dest);
+            long readLength = IOUtils.copy(key, dest, getIOBufferSize(keyDetails.getDataSize()));
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }
@@ -463,7 +463,7 @@ public class ObjectEndpoint extends EndpointBase {
           try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
             ozoneInputStream.seek(startOffset);
             long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
-                copyLength, new byte[bufferSize]);
+                copyLength, new byte[getIOBufferSize(copyLength)]);
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }
@@ -971,7 +971,7 @@ public class ObjectEndpoint extends EndpointBase {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(
-                  sourceObject, ozoneOutputStream, 0, length);
+                  sourceObject, ozoneOutputStream, 0, length, new byte[getIOBufferSize(length)]);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
@@ -982,7 +982,7 @@ public class ObjectEndpoint extends EndpointBase {
                     partNumber, uploadID)) {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
+              copyLength = IOUtils.copy(sourceObject, ozoneOutputStream, getIOBufferSize(length));
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
@@ -998,7 +998,7 @@ public class ObjectEndpoint extends EndpointBase {
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream);
+          putLength = IOUtils.copy(digestInputStream, ozoneOutputStream, getIOBufferSize(length));
           byte[] digest = digestInputStream.getMessageDigest().digest();
           ozoneOutputStream.getMetadata()
               .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
@@ -1152,7 +1152,7 @@ public class ObjectEndpoint extends EndpointBase {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
-        copyLength = IOUtils.copyLarge(src, dest);
+        copyLength = IOUtils.copy(src, dest, getIOBufferSize(srcKeyLen));
         String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(ETAG, eTag);
       }
@@ -1357,4 +1357,17 @@ public class ObjectEndpoint extends EndpointBase {
     return E_TAG_PROVIDER.get();
   }
 
+  private int getIOBufferSize(long fileLength) {
+    if (bufferSize == 0) {
+      // this is mainly for unit tests as init() will not be called in the unit tests
+      LOG.warn("buffer size is set to {}", IOUtils.DEFAULT_BUFFER_SIZE);
+      bufferSize = IOUtils.DEFAULT_BUFFER_SIZE;
+    }
+    if (fileLength == 0) {
+      // for empty file
+      return bufferSize;
+    } else {
+      return fileLength < bufferSize ? (int) fileLength : bufferSize;
+    }
+  }
 }
