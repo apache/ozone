@@ -56,6 +56,8 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.io.BackgroundIOAnalyzer;
+import org.apache.hadoop.ozone.container.io.IOAnalyzerConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -126,6 +128,7 @@ public class OzoneContainer {
   private DatanodeDetails datanodeDetails;
   private StateContext context;
   private ScheduledExecutorService dbCompactionExecutorService;
+  private BackgroundIOAnalyzer ioAnalyzer;
 
   private final ContainerMetrics metrics;
 
@@ -284,6 +287,10 @@ public class OzoneContainer {
 
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
+
+    IOAnalyzerConfiguration c = config.getObject(
+        IOAnalyzerConfiguration.class);
+    ioAnalyzer = new BackgroundIOAnalyzer(c);
   }
 
   /**
@@ -513,6 +520,7 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
+    ioAnalyzer.shutdown();
   }
 
   public void handleVolumeFailures() {
