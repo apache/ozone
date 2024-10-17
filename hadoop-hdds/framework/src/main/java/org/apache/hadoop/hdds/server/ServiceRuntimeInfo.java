@@ -34,7 +34,7 @@ package org.apache.hadoop.hdds.server;
 public interface ServiceRuntimeInfo {
 
   /**
-   * Gets the namespace of Hadoop.
+   * Gets the namespace of Ozone.
    *
    * @return the namespace
    */
