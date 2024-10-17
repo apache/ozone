@@ -27,7 +27,7 @@ ${SCM}              scm
 
 ${OM_URL}           http://om:9874
 ${RECON_URL}        http://recon:9888
-${S3G_URL}          http://s3g:9878
+${S3G_URL}          http://s3g:19878
 ${SCM_URL}          http://${SCM}:9876
 
 @{BASE_URLS}        ${OM_URL}    ${RECON_URL}    ${S3G_URL}    ${SCM_URL}

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,7 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.s3secret;
 
-window.onload = function () {
-    document.getElementById('s3gurl').innerHTML = window.location.origin;
-};
+import org.glassfish.jersey.server.ResourceConfig;
+
+/**
+ * JaxRS resource definition.
+ */
+public class Application extends ResourceConfig {
+  public Application() {
+    packages("org.apache.hadoop.ozone.s3secret");
+  }
+}

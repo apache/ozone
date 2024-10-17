@@ -172,6 +172,20 @@ Generate random prefix
     ${random} =          Generate Ozone String
                          Set Global Variable  ${PREFIX}  ${random}
 
+# Verify object put by listing and getting it
+Put object to bucket
+    [arguments]    ${bucket}    ${key}    ${path}
+
+    Execute AWSS3ApiCli    put-object --bucket ${bucket} --key ${key} --body ${path}
+
+    ${result} =    Execute AWSS3ApiCli    list-objects --bucket ${bucket}
+    Should contain    ${result}    ${key}
+
+    Execute AWSS3ApiCli    get-object --bucket ${bucket} --key ${key} ${path}.verify
+    Compare files          ${path}    ${path}.verify
+
+    [teardown]    Remove File    ${path}.verify
+
 Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
