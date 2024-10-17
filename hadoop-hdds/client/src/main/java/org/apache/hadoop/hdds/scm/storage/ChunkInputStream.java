@@ -64,15 +64,15 @@ public class ChunkInputStream extends InputStream
   private final BlockID blockID;
   private ContainerProtos.DatanodeBlockID datanodeBlockID;
   private final XceiverClientFactory xceiverClientFactory;
-  private XceiverClientSpi xceiverClient;
+  protected XceiverClientSpi xceiverClient;
   private final Supplier<Pipeline> pipelineSupplier;
-  private final boolean verifyChecksum;
-  private boolean allocated = false;
+  protected final boolean verifyChecksum;
+  protected boolean allocated = false;
   // Buffers to store the chunk data read from the DN container
-  private ByteBuffer[] buffers;
+  protected ByteBuffer[] buffers;
 
   // Index of the buffers corresponding to the current position of the buffers
-  private int bufferIndex;
+  protected int bufferIndex;
   // bufferOffsets[i] stores the index of the first data byte in buffer i
   // (buffers.get(i)) w.r.t first byte in the buffers.
   // Let's say each buffer has a capacity of 40 bytes. The bufferOffset for
@@ -80,27 +80,27 @@ public class ChunkInputStream extends InputStream
   // in buffers. BufferOffset for the 2nd buffer would be 40 as bytes 0-39
   // would be stored in buffer 0. Hence, bufferOffsets[0] = 0,
   // bufferOffsets[1] = 40, bufferOffsets[2] = 80, etc.
-  private long[] bufferOffsets = null;
+  protected long[] bufferOffsets = null;
 
   // The offset of the current data residing in the buffers w.r.t the start
   // of chunk data
-  private long bufferOffsetWrtChunkData;
+  protected long bufferOffsetWrtChunkData;
 
   // Index of the first buffer which has not been released
-  private int firstUnreleasedBufferIndex = 0;
+  protected int firstUnreleasedBufferIndex = 0;
 
   // The number of bytes of chunk data residing in the buffers currently
-  private long buffersSize;
+  protected long buffersSize;
 
   // Position of the ChunkInputStream is maintained by this variable (if a
   // seek is performed. This position is w.r.t to the chunk only and not the
   // block or key. This variable is also set before attempting a read to enable
   // retry.  Once the chunk is read, this variable is reset.
-  private long chunkPosition = -1;
+  protected long chunkPosition = -1;
 
-  private final Supplier<Token<?>> tokenSupplier;
+  protected final Supplier<Token<?>> tokenSupplier;
 
-  private static final int EOF = -1;
+  protected static final int EOF = -1;
   private final List<Validator> validators;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
@@ -414,7 +414,7 @@ public class ChunkInputStream extends InputStream
     adjustBufferPosition(startByteIndex - bufferOffsetWrtChunkData);
   }
 
-  private void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
+  protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
       throws IOException {
     buffers = readChunk(readChunkInfo);
     buffersSize = readChunkInfo.getLen();
