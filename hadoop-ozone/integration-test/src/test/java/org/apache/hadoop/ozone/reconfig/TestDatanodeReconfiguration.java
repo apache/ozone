@@ -33,7 +33,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_OUTOFSERVICE_FACTOR_KEY;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_QUEUE_LIMIT;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_ZEROCOPY_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -51,6 +54,9 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
         .add(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX)
         .add(OZONE_BLOCK_DELETING_SERVICE_WORKERS)
         .add(REPLICATION_STREAMS_LIMIT_KEY)
+        .add(REPLICATION_OUTOFSERVICE_FACTOR_KEY)
+        .add(REPLICATION_ZEROCOPY_ENABLE_KEY)
+        .add(REPLICATION_QUEUE_LIMIT)
         .addAll(new DatanodeConfiguration().reconfigurableProperties())
         .build();
 
