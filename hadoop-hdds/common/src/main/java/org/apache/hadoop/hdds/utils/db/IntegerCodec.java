@@ -37,6 +37,11 @@ public final class IntegerCodec implements Codec<Integer> {
   }
 
   @Override
+  public Class<Integer> getTypeClass() {
+    return Integer.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

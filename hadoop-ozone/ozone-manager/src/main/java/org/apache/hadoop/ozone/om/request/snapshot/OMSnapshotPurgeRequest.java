@@ -107,9 +107,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
               "Snapshot purge request.", snapTableKey);
           continue;
         }
-
-        SnapshotInfo nextSnapshot =
-            SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
+        SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
         SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null
             : SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, nextSnapshot);
         SnapshotInfo previousSnapshot = SnapshotUtils.getPreviousSnapshot(ozoneManager,

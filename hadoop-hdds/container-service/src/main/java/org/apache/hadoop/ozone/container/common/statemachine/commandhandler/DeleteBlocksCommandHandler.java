@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -91,7 +93,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ContainerSet containerSet;
   private final ConfigurationSource conf;
   private int invocationCount;
-  private long totalTime;
   private final ThreadPoolExecutor executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
@@ -99,6 +100,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final BlockDeletingServiceMetrics blockDeleteMetrics;
   private final long tryLockTimeoutMs;
   private final Map<String, SchemaHandler> schemaHandlers;
+  private final MutableRate opsLatencyMs;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, DatanodeConfiguration dnConf,
@@ -121,6 +123,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
+    MetricsRegistry registry = new MetricsRegistry(
+        DeleteBlocksCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteBlocksCommand + "Ms");
     long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
     handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
@@ -403,7 +408,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
-      totalTime += endTime - startTime;
+      this.opsLatencyMs.add(endTime - startTime);
       invocationCount++;
     }
   }
@@ -666,15 +671,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    if (invocationCount > 0) {
-      return totalTime / invocationCount;
-    }
-    return 0;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override

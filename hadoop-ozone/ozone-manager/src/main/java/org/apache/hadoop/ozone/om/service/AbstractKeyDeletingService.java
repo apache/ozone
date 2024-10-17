@@ -87,9 +87,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
-  private static final ClientId CLIENT_ID = ClientId.randomId();
+
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
+  private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -284,10 +285,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (expectedPreviousSnapshotId != null) {
       expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
     }
-
-    if (expectedPreviousSnapshotId != null) {
-      purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID);
-    }
+    purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
 
     // Add keys to PurgeKeysRequest bucket wise.
     for (Map.Entry<Pair<String, String>, List<String>> entry : purgeKeysMapPerBucket.entrySet()) {
@@ -329,13 +327,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.PurgeKeys)
         .setPurgeKeysRequest(purgeKeysRequest)
-        .setClientId(CLIENT_ID.toString())
+        .setClientId(clientId.toString())
         .build();
 
     // Submit PurgeKeys request to OM
     try {
       OzoneManagerProtocolProtos.OMResponse omResponse = OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest,
-          CLIENT_ID, runCount.get());
+          clientId, runCount.get());
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
@@ -366,8 +364,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     map.get(volumeBucketPair).add(objectKey);
   }
 
-  protected OzoneManagerProtocolProtos.OMResponse submitPurgePaths(
-      List<PurgePathRequest> requests, String snapTableKey, UUID expectedPreviousSnapshotId) {
+  protected OzoneManagerProtocolProtos.OMResponse submitPurgePaths(List<PurgePathRequest> requests,
+                                                                   String snapTableKey,
+                                                                   UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -387,12 +386,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
             .setPurgeDirectoriesRequest(purgeDirRequest)
-            .setClientId(CLIENT_ID.toString())
+            .setClientId(clientId.toString())
             .build();
 
     // Submit Purge paths request to OM
     try {
-      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.get());
+      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -494,10 +493,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> optimizeDirDeletesAndSubmitRequest(
-      long remainNum, long dirNum, long subDirNum, long subFileNum, List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<PurgePathRequest> purgePathRequestList, String snapTableKey, long startTime, int remainingBufLimit,
-      KeyManager keyManager,
+  public Pair<Long, Optional<OzoneManagerProtocolProtos.OMResponse>> optimizeDirDeletesAndSubmitRequest(long remainNum,
+      long dirNum, long subDirNum, long subFileNum,
+      List<Pair<String, OmKeyInfo>> allSubDirList,
+      List<PurgePathRequest> purgePathRequestList,
+      String snapTableKey, long startTime,
+      int remainingBufLimit, KeyManager keyManager,
       CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> subDirPurgeChecker,
       CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> fileDeletionChecker,
       UUID expectedPreviousSnapshotId) {
@@ -530,9 +531,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         remainNum = remainNum - requestVal.getDeletedSubFilesCount();
         remainNum = remainNum - requestVal.getMarkDeletedSubDirsCount();
         // Count up the purgeDeletedDir, subDirs and subFiles
-        requestVal.getDeletedDir();
         if (requestVal.hasDeletedDir() && !requestVal.getDeletedDir().isEmpty()) {
           subdirDelNum++;
+          remainNum--;
         }
         subDirNum += requestVal.getMarkDeletedSubDirsCount();
         subFileNum += requestVal.getDeletedSubFilesCount();
@@ -868,10 +869,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
         .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
-        .setClientId(CLIENT_ID.toString())
+        .setClientId(clientId.toString())
         .build();
     try {
-      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, CLIENT_ID, getRunCount().get());
+      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
     } catch (ServiceException e) {
       LOG.error("Failed to submit set snapshot property request", e);
     }

@@ -179,8 +179,7 @@ public class TestLegacyReplicationManager {
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     PipelineManager pipelineManager = mock(PipelineManager.class);
     when(pipelineManager.containsPipeline(any(PipelineID.class)))
         .thenReturn(true);
@@ -277,8 +276,7 @@ public class TestLegacyReplicationManager {
 
     SCMHAManager scmHAManager = SCMHAManagerStub
         .getInstance(true, new SCMDBTransactionBufferImpl());
-    dbStore = DBStoreBuilder.createDBStore(
-      config, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
 
     LegacyReplicationManager legacyRM = new LegacyReplicationManager(
         config, containerManager, ratisContainerPlacementPolicy, eventQueue,

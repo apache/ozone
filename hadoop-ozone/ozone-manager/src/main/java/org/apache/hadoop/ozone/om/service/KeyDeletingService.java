@@ -157,7 +157,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements BackgroundTask {
+  private final class KeyDeletingTask implements BackgroundTask {
 
     private OzoneManagerProtocolProtos.SetSnapshotPropertyRequest getSetSnapshotRequestUpdatingExclusiveSize(
         Map<String, Long> exclusiveSizeMap, Map<String, Long> exclusiveReplicatedSizeMap, String prevSnapshotKeyTable) {
@@ -201,8 +201,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager())
             .getSnapshotChainManager();
         // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
-        // snapshotId since AOS could process multiple buckets in one iteration. While using path previous snapshot
-        // Id for a snapshot since it would process only one bucket.
+        // snapshotId since AOS could process multiple buckets in one iteration. While using path
+        // previous snapshotId for a snapshot since it would process only one bucket.
         UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
             snapshotChainManager.getLatestGlobalSnapshotId() :
             SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);

@@ -150,7 +150,6 @@ enum Type {
   RenameSnapshot = 131;
   ListOpenFiles = 132;
   QuotaRepair = 133;
-  GetServerDefaults = 134;
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
   SnapshotMoveTableKeys = 137;
@@ -293,11 +292,10 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
-  optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
-  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests     = 135;
-  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 136;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 136;
 }
 
 message OMResponse {
@@ -425,7 +423,6 @@ message OMResponse {
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
-  optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
   optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
   optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
@@ -1385,7 +1382,6 @@ message PurgeKeysRequest {
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 4;
   repeated string renamedKeys = 5;
-
 }
 
 message PurgeKeysResponse {
@@ -1643,6 +1639,7 @@ message ServiceInfo {
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
     optional int32 OMVersion = 5 [default = 0];
+    optional FsServerDefaultsProto serverDefaults = 6;
 }
 
 message MultipartInfoInitiateRequest {
@@ -2244,15 +2241,8 @@ message BucketQuotaCount {
 message QuotaRepairResponse {
 }
 
-message ServerDefaultsRequest {
-}
-
 message FsServerDefaultsProto {
   optional string keyProviderUri = 1;
-}
-
-message ServerDefaultsResponse {
-  required FsServerDefaultsProto serverDefaults = 1;
 }
 
 message GetQuotaRepairStatusRequest {

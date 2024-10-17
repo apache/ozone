@@ -20,11 +20,13 @@ package org.apache.hadoop.hdds.recon;
 
 /**
  * This class contains constants for Recon related configuration keys used in
- * SCM & Datanode.
+ * SCM and Datanode.
  */
 public final class ReconConfigKeys {
 
   /**
+   * This class contains constants for Recon related configuration keys used in
+   * SCM and Datanode.
    * Never constructed.
    */
   private ReconConfigKeys() {
@@ -71,7 +73,7 @@ public final class ReconConfigKeys {
    * Recon administrator users delimited by a comma.
    * This is the list of users who can access admin only information from recon.
    * Users defined in
-   * {@link org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS}
+   * {@link org.apache.hadoop.ozone.OzoneConfigKeys#OZONE_ADMINISTRATORS}
    * will always be able to access all recon information regardless of this
    * setting.
    */

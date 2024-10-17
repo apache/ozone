@@ -27,7 +27,7 @@ import java.util.Objects;
 
 /**
  * An {@link OutputStream} first write data to a buffer up to the capacity.
- * Then, select {@link Underlying} by the number of bytes written.
+ * Then, select {@code Underlying} by the number of bytes written.
  * When {@link #flush()}, {@link #hflush()}, {@link #hsync()}
  * or {@link #close()} is invoked,
  * it will force flushing the buffer and {@link OutputStream} selection.

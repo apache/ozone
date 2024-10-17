@@ -43,8 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -62,6 +64,84 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
+    SnapshotMoveTableKeysRequest moveTableKeysRequest = getOmRequest().getSnapshotMoveTableKeysRequest();
+    SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        snapshotChainManager, fromProtobuf(moveTableKeysRequest.getFromSnapshotID()));
+    String bucketKeyPrefix = omMetadataManager.getBucketKeyPrefix(fromSnapshot.getVolumeName(),
+        fromSnapshot.getBucketName());
+    String bucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
+        fromSnapshot.getBucketName());
+
+    Set<String> keys = new HashSet<>();
+    List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(moveTableKeysRequest.getDeletedKeysList().size());
+
+    //validate deleted key starts with bucket prefix.[/<volName>/<bucketName>/]
+    for (SnapshotMoveKeyInfos deletedKey : moveTableKeysRequest.getDeletedKeysList()) {
+      // Filter only deleted keys with at least one keyInfo per key.
+      if (!deletedKey.getKeyInfosList().isEmpty()) {
+        deletedKeys.add(deletedKey);
+        if (!deletedKey.getKey().startsWith(bucketKeyPrefix)) {
+          throw new OMException("Deleted Key: " + deletedKey + " doesn't start with prefix " + bucketKeyPrefix,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+        if (keys.contains(deletedKey.getKey())) {
+          throw new OMException("Duplicate Deleted Key: " + deletedKey + " in request",
+              OMException.ResultCodes.INVALID_REQUEST);
+        } else {
+          keys.add(deletedKey.getKey());
+        }
+      }
+    }
+
+    keys.clear();
+    List<HddsProtos.KeyValue> renamedKeysList = new ArrayList<>(moveTableKeysRequest.getRenamedKeysList().size());
+    //validate rename key starts with bucket prefix.[/<volName>/<bucketName>/]
+    for (HddsProtos.KeyValue renamedKey : moveTableKeysRequest.getRenamedKeysList()) {
+      if (renamedKey.hasKey() && renamedKey.hasValue()) {
+        renamedKeysList.add(renamedKey);
+        if (!renamedKey.getKey().startsWith(bucketKeyPrefix)) {
+          throw new OMException("Rename Key: " + renamedKey + " doesn't start with prefix " + bucketKeyPrefix,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+        if (keys.contains(renamedKey.getKey())) {
+          throw new OMException("Duplicate rename Key: " + renamedKey + " in request",
+              OMException.ResultCodes.INVALID_REQUEST);
+        } else {
+          keys.add(renamedKey.getKey());
+        }
+      }
+    }
+    keys.clear();
+
+    // Filter only deleted dirs with only one keyInfo per key.
+    List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(moveTableKeysRequest.getDeletedDirsList().size());
+    //validate deleted key starts with bucket FSO path prefix.[/<volId>/<bucketId>/]
+    for (SnapshotMoveKeyInfos deletedDir : moveTableKeysRequest.getDeletedDirsList()) {
+      // Filter deleted directories with exactly one keyInfo per key.
+      if (deletedDir.getKeyInfosList().size() == 1) {
+        deletedDirs.add(deletedDir);
+        if (!deletedDir.getKey().startsWith(bucketKeyPrefixFSO)) {
+          throw new OMException("Deleted dir: " + deletedDir + " doesn't start with prefix " +
+              bucketKeyPrefixFSO, OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+        if (keys.contains(deletedDir.getKey())) {
+          throw new OMException("Duplicate deleted dir Key: " + deletedDir + " in request",
+              OMException.ResultCodes.INVALID_REQUEST);
+        } else {
+          keys.add(deletedDir.getKey());
+        }
+      }
+    }
+    return getOmRequest().toBuilder().setSnapshotMoveTableKeysRequest(
+        moveTableKeysRequest.toBuilder().clearDeletedDirs().clearDeletedKeys().clearRenamedKeys()
+            .addAllDeletedKeys(deletedKeys).addAllDeletedDirs(deletedDirs)
+            .addAllRenamedKeys(renamedKeysList).build()).build();
+  }
+
+  @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
@@ -74,26 +154,14 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     try {
       SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
           snapshotChainManager, fromProtobuf(moveTableKeysRequest.getFromSnapshotID()));
-      // If there is no Non-Deleted Snapshot move the
-      // keys to Active Object Store.
+      // If there is no snapshot in the chain after the current snapshot move the keys to Active Object Store.
       SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
 
       // If next snapshot is not active then ignore move. Since this could be a redundant operations.
       if (nextSnapshot != null && nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         throw new OMException("Next snapshot : " + nextSnapshot + " in chain is not active.",
-            OMException.ResultCodes.INVALID_REQUEST);
+            OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
       }
-
-      // Filter only deleted keys with atlest one keyInfo per key.
-      List<SnapshotMoveKeyInfos> deletedKeys =
-          moveTableKeysRequest.getDeletedKeysList().stream()
-              .filter(snapshotMoveKeyInfos -> !snapshotMoveKeyInfos.getKeyInfosList().isEmpty())
-              .collect(Collectors.toList());
-      List<HddsProtos.KeyValue> renamedKeysList = moveTableKeysRequest.getRenamedKeysList();
-      // Filter only deleted dirs with only one keyInfo per key.
-      List<SnapshotMoveKeyInfos> deletedDirs = moveTableKeysRequest.getDeletedDirsList().stream()
-          .filter(snapshotMoveKeyInfos -> snapshotMoveKeyInfos.getKeyInfosList().size() == 1)
-          .collect(Collectors.toList());
 
       // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
       fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
@@ -105,11 +173,11 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
             CacheValue.get(termIndex.getIndex(), nextSnapshot));
       }
       omClientResponse = new OMSnapshotMoveTableKeysResponse(omResponse.build(), fromSnapshot, nextSnapshot,
-          deletedKeys, deletedDirs, renamedKeysList);
+          moveTableKeysRequest.getDeletedKeysList(), moveTableKeysRequest.getDeletedDirsList(),
+          moveTableKeysRequest.getRenamedKeysList());
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveTableKeysResponse(createErrorOMResponse(omResponse, ex));
     }
-
     return omClientResponse;
   }
 }

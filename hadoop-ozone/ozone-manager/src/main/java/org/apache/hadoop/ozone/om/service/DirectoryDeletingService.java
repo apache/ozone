@@ -141,7 +141,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return queue;
   }
 
-  private class DirDeletingTask implements BackgroundTask {
+  private final class DirDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {
@@ -251,6 +251,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             if (purgePathRequest.getDeletedDir() != null
                 && !purgePathRequest.getDeletedDir().isEmpty()) {
               dirNum++;
+              remainNum--;
             }
             subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
             subFileNum += purgePathRequest.getDeletedSubFilesCount();

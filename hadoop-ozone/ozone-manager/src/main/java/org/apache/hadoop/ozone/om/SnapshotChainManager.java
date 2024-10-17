@@ -176,9 +176,6 @@ public class SnapshotChainManager {
       // for node removal
       UUID next = globalSnapshotChain.get(snapshotID).getNextSnapshotId();
       UUID prev = globalSnapshotChain.get(snapshotID).getPreviousSnapshotId();
-      if (snapshotID.equals(oldestGlobalSnapshotId)) {
-        oldestGlobalSnapshotId = next;
-      }
       if (prev != null && !globalSnapshotChain.containsKey(prev)) {
         throw new IOException(String.format(
             "Global snapshot chain corruption. " +
@@ -203,6 +200,9 @@ public class SnapshotChainManager {
       // remove from latest list if necessary
       if (latestGlobalSnapshotId.equals(snapshotID)) {
         latestGlobalSnapshotId = prev;
+      }
+      if (snapshotID.equals(oldestGlobalSnapshotId)) {
+        oldestGlobalSnapshotId = next;
       }
       return true;
     } else {
@@ -403,19 +403,20 @@ public class SnapshotChainManager {
       private UUID currentSnapshotId = reverse ? getLatestGlobalSnapshotId() : getOldestGlobalSnapshotId();
       @Override
       public boolean hasNext() {
-        try {
-          return reverse ? hasPreviousGlobalSnapshot(currentSnapshotId) : hasNextGlobalSnapshot(currentSnapshotId);
-        } catch (IOException e) {
-          return false;
-        }
+        return currentSnapshotId != null;
       }
 
       @Override
       public UUID next() {
         try {
           UUID prevSnapshotId = currentSnapshotId;
-          currentSnapshotId =
-              reverse ? previousGlobalSnapshot(currentSnapshotId) : nextGlobalSnapshot(currentSnapshotId);
+          if (reverse && hasPreviousGlobalSnapshot(currentSnapshotId) ||
+              !reverse && hasNextGlobalSnapshot(currentSnapshotId)) {
+            currentSnapshotId =
+                reverse ? previousGlobalSnapshot(currentSnapshotId) : nextGlobalSnapshot(currentSnapshotId);
+          } else {
+            currentSnapshotId = null;
+          }
           return prevSnapshotId;
         } catch (IOException e) {
           throw new UncheckedIOException("Error while getting next snapshot for " + currentSnapshotId, e);

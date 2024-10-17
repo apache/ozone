@@ -23,7 +23,6 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -54,7 +53,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -98,16 +96,16 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private MultiLocks<UUID> snapshotIdLocks;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
-      OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
+                                 OzoneManager ozoneManager)
       throws IOException {
     super(SnapshotDeletingService.class.getSimpleName(), interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, scmClient);
+        serviceTimeout, ozoneManager, null);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
-    this.snapshotChainManager = omMetadataManager.getSnapshotChainManager();
+    this.chainManager = omMetadataManager.getSnapshotChainManager();
     this.successRunCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.conf = ozoneManager.getConfiguration();
@@ -139,26 +137,24 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       try {
         int remaining = keyLimitPerTask;
-        Iterator<UUID> iterator = snapshotChainManager.iterator(true);
-        List<SnapshotInfo> snapshotsToBePurged = new ArrayList<>();
+        Iterator<UUID> iterator = chainManager.iterator(true);
+        List<String> snapshotsToBePurged = new ArrayList<>();
         long snapshotLimit = snapshotDeletionPerTask;
-        while (iterator.hasNext() && snapshotLimit > 0) {
-          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotChainManager, iterator.next());
-          // Only Iterate in deleted snapshot & only if all the changes have been flushed into disk & snapshots have
-          // been deep cleaned.
+        while (iterator.hasNext() && snapshotLimit > 0 && remaining > 0) {
+          SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
-
-          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, snapInfo);
-          SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
-              snapshotChainManager, snapInfo);
+          LOG.info("Started Snapshot Deletion Processing for snapshot : {}", snapInfo.getTableKey());
+          SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
           if (nextSnapshot != null &&
               nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
             continue;
           }
+          SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
+              snapshotChainManager, snapInfo);
 
           // Wait for the next iteration if the next snapshot or next to next snapshot is still not deep cleaned
           // since purge transaction will add entries and it could be processed by mistake.
@@ -187,43 +183,36 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
-              try {
-                submitSnapshotMoveDeletedKeys(
-                    snapInfo,
-                    deletedKeyEntries.stream().map(kv -> {
-                      try {
-                        return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey()).addAllKeyInfos(kv.getValue()
-                            .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT_VERSION))
-                            .collect(Collectors.toList())).build();
-                      } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                      }
-                    }).collect(Collectors.toList()),
-                    renameEntries.stream().map(kv -> {
-                      try {
-                        return HddsProtos.KeyValue.newBuilder().setKey(kv.getKey()).setValue(kv.getValue()).build();
-                      } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                      }
-                    }).collect(Collectors.toList()),
-                    deletedDirEntries.stream()
-                    .map(kv -> {
-                      try {
-                        return SnapshotMoveKeyInfos.newBuilder().setKey(kv.getKey())
-                            .addKeyInfos(kv.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build();
-                      } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                      }
-                    }).collect(Collectors.toList()));
-                remaining -= moveCount;
-              } catch (UncheckedIOException e) {
-                throw e.getCause();
+              List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
+              List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(deletedDirEntries.size());
+              List<HddsProtos.KeyValue> renameKeys = new ArrayList<>(renameEntries.size());
+
+              // Convert deletedKeyEntries to SnapshotMoveKeyInfos.
+              for (Table.KeyValue<String, List<OmKeyInfo>> deletedEntry : deletedKeyEntries) {
+                deletedKeys.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedEntry.getKey())
+                    .addAllKeyInfos(deletedEntry.getValue()
+                        .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT_VERSION))
+                        .collect(Collectors.toList())).build());
               }
+
+              // Convert deletedDirEntries to SnapshotMoveKeyInfos.
+              for (Table.KeyValue<String, OmKeyInfo> deletedDirEntry : deletedDirEntries) {
+                deletedDirs.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedDirEntry.getKey())
+                    .addKeyInfos(deletedDirEntry.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build());
+              }
+
+              // Convert renamedEntries to KeyValue.
+              for (Table.KeyValue<String, String> renameEntry : renameEntries) {
+                renameKeys.add(HddsProtos.KeyValue.newBuilder().setKey(renameEntry.getKey())
+                    .setValue(renameEntry.getValue()).build());
+              }
+              submitSnapshotMoveDeletedKeys(snapInfo, deletedKeys, renameKeys, deletedDirs);
+              remaining -= moveCount;
             } else {
-              snapshotsToBePurged.add(snapInfo);
+              snapshotsToBePurged.add(snapInfo.getTableKey());
             }
           } finally {
             snapshotIdLocks.releaseLock();
@@ -232,8 +221,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           snapshotLimit--;
         }
         if (!snapshotsToBePurged.isEmpty()) {
-          submitSnapshotPurgeRequest(snapshotsToBePurged.stream().map(SnapshotInfo::getTableKey)
-              .collect(Collectors.toList()));
+          submitSnapshotPurgeRequest(snapshotsToBePurged);
         }
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
@@ -258,12 +246,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        List<SnapshotMoveKeyInfos> deletedKeys, List<HddsProtos.KeyValue> renamedList,
-        List<SnapshotMoveKeyInfos> dirsToMove) {
+    private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
+                                               List<SnapshotMoveKeyInfos> deletedKeys,
+                                               List<HddsProtos.KeyValue> renamedList,
+                                               List<SnapshotMoveKeyInfos> dirsToMove) {
 
       SnapshotMoveTableKeysRequest.Builder moveDeletedKeysBuilder = SnapshotMoveTableKeysRequest.newBuilder()
-              .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
+          .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
 
       SnapshotMoveTableKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
           .addAllDeletedKeys(deletedKeys)
@@ -285,7 +274,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
 
       OMRequest omRequest = OMRequest.newBuilder()
-          .setCmdType(Type.SnapshotMoveDeletedKeys)
+          .setCmdType(Type.SnapshotMoveTableKeys)
           .setSnapshotMoveTableKeysRequest(moveDeletedKeys)
           .setClientId(clientId.toString())
           .build();
@@ -295,22 +284,27 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    public void submitRequest(OMRequest omRequest) {
+    private void submitRequest(OMRequest omRequest) {
       try {
         OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get());
       } catch (ServiceException e) {
-        LOG.error("Snapshot Deleting request failed. " +
-            "Will retry at next run.", e);
+        LOG.error("Request: {} fired by SnapshotDeletingService failed. Will retry in the next run", omRequest, e);
       }
     }
   }
 
+  /**
+   * Checks if a given snapshot has been deleted and all the changes made to snapshot have been flushed to disk.
+   * @param snapInfo SnapshotInfo corresponding to the snapshot.
+   * @return true if the snapshot is still active or changes to snapshot have not been flushed to disk otherwise false.
+   * @throws IOException
+   */
   @VisibleForTesting
   boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo) throws IOException {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
     return snapshotStatus != SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED ||
-        OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)
-        && isSnapshotDeepCleaned(snapInfo);
+        !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)
+        || !isSnapshotDeepCleaned(snapInfo);
   }
   private boolean isSnapshotDeepCleaned(SnapshotInfo snapInfo) {
     return (!snapInfo.getDeepClean() || !snapInfo.getDeepCleanedDeletedDir());

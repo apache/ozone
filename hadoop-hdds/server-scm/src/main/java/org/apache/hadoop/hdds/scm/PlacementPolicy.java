@@ -73,7 +73,7 @@ public interface PlacementPolicy {
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas: Map of replicas with value signifying if
+   * @param replicas Map of replicas with value signifying if
    *                  replica can be copied
    */
   Set<ContainerReplica> replicasToCopyToFixMisreplication(
@@ -82,8 +82,8 @@ public interface PlacementPolicy {
   /**
    * Given a set of replicas of a container which are overreplicated,
    * return a set of replicas to delete to fix overreplication.
-   * @param replicas: Set of existing replicas of the container
-   * @param expectedCountPerUniqueReplica: Replication factor of each
+   * @param replicas Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica Replication factor of each
    *                                     unique replica
    */
   Set<ContainerReplica> replicasToRemoveToFixOverreplication(

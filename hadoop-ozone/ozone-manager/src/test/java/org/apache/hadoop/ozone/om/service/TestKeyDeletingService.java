@@ -39,13 +39,17 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -57,10 +61,13 @@ import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,12 +88,16 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -132,6 +143,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         1, TimeUnit.SECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         200, TimeUnit.MILLISECONDS);
+    conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setQuietMode(false);
   }
 
@@ -286,6 +298,115 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     /*
+     * Create key k1
+     * Create snap1
+     * Rename k1 to k2
+     * Delete k2
+     * Wait for KeyDeletingService to start processing deleted key k2
+     * Create snap2 by making the KeyDeletingService thread wait till snap2 is flushed
+     * Resume KeyDeletingService thread.
+     * Read k1 from snap1.
+     */
+    @Test
+    public void testAOSKeyDeletingWithSnapshotCreateParallelExecution()
+        throws Exception {
+      Table<String, SnapshotInfo> snapshotInfoTable =
+          om.getMetadataManager().getSnapshotInfoTable();
+      Table<String, RepeatedOmKeyInfo> deletedTable =
+          om.getMetadataManager().getDeletedTable();
+      Table<String, String> renameTable = om.getMetadataManager().getSnapshotRenamedTable();
+
+      // Suspend KeyDeletingService
+      keyDeletingService.suspend();
+      SnapshotDeletingService snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+      snapshotDeletingService.suspend();
+      GenericTestUtils.waitFor(() -> !keyDeletingService.isRunningOnAOS(), 1000, 10000);
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      OzoneManager ozoneManager = Mockito.spy(om);
+      OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
+      KeyManager km = Mockito.spy(new KeyManagerImpl(ozoneManager, ozoneManager.getScmClient(), conf,
+          om.getPerfMetrics()));
+      when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> {
+        return omSnapshotManager;
+      });
+      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, km, 10000,
+          100000, conf, false);
+      service.shutdown();
+      final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
+      final long initialDeletedCount = metadataManager.countRowsInTable(deletedTable);
+      final long initialRenameCount = metadataManager.countRowsInTable(renameTable);
+      // Create Volume and Buckets
+      createVolumeAndBucket(volumeName, bucketName, false);
+      OmKeyArgs args = createAndCommitKey(volumeName, bucketName,
+          "key1", 3);
+      String snap1 = uniqueObjectName("snap");
+      String snap2 = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, snap1);
+      KeyInfoWithVolumeContext keyInfo = writeClient.getKeyInfo(args, false);
+      AtomicLong objectId = new AtomicLong(keyInfo.getKeyInfo().getObjectID());
+      renameKey(volumeName, bucketName, "key1", "key2");
+      deleteKey(volumeName, bucketName, "key2");
+      assertTableRowCount(deletedTable, initialDeletedCount + 1, metadataManager);
+      assertTableRowCount(renameTable, initialRenameCount + 1, metadataManager);
+
+      String[] deletePathKey = {metadataManager.getOzoneDeletePathKey(objectId.get(),
+          metadataManager.getOzoneKey(volumeName,
+          bucketName, "key2"))};
+      assertNotNull(deletedTable.get(deletePathKey[0]));
+      Mockito.doAnswer(i -> {
+        writeClient.createSnapshot(volumeName, bucketName, snap2);
+        GenericTestUtils.waitFor(() -> {
+          try {
+            SnapshotInfo snapshotInfo = writeClient.getSnapshotInfo(volumeName, bucketName, snap2);
+            return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 100000);
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return renameTable.get(metadataManager.getRenameKey(volumeName, bucketName, objectId.get())) == null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 10000);
+        return i.callRealMethod();
+      }).when(omSnapshotManager).getSnapshot(ArgumentMatchers.eq(volumeName), ArgumentMatchers.eq(bucketName),
+          ArgumentMatchers.eq(snap1));
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
+      doAnswer(i -> {
+        PendingKeysDeletion pendingKeysDeletion = (PendingKeysDeletion) i.callRealMethod();
+        for (BlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
+          Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
+        }
+        return pendingKeysDeletion;
+      }).when(km).getPendingDeletionKeys(anyInt());
+      service.runPeriodicalTaskNow();
+      service.runPeriodicalTaskNow();
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
+      // Create Key3
+      OmKeyArgs args2 = createAndCommitKey(volumeName, bucketName,
+          "key3", 3);
+      keyInfo = writeClient.getKeyInfo(args2, false);
+      objectId.set(keyInfo.getKeyInfo().getObjectID());
+      // Rename Key3 to key4
+      renameKey(volumeName, bucketName, "key3", "key4");
+      // Delete Key4
+      deleteKey(volumeName, bucketName, "key4");
+      deletePathKey[0] = metadataManager.getOzoneDeletePathKey(objectId.get(), metadataManager.getOzoneKey(volumeName,
+          bucketName, "key4"));
+      // Delete snapshot
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      // Run KDS and ensure key4 doesn't get purged since snap2 has not been deleted.
+      service.runPeriodicalTaskNow();
+      writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      snapshotDeletingService.resume();
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount, metadataManager);
+      keyDeletingService.resume();
+    }
+
+    /*
      * Create Snap1
      * Create 10 keys
      * Create Snap2
@@ -396,68 +517,68 @@ class TestKeyDeletingService extends OzoneTestBase {
       final long initialDeletedCount = metadataManager.countRowsInTable(deletedTable);
       final long initialRenamedCount = metadataManager.countRowsInTable(renamedTable);
 
-      final String volumeName = getTestName();
-      final String bucketName = uniqueObjectName("bucket");
+      final String testVolumeName = getTestName();
+      final String testBucketName = uniqueObjectName("bucket");
       final String keyName = uniqueObjectName("key");
 
       // Create Volume and Buckets
-      createVolumeAndBucket(volumeName, bucketName, false);
+      createVolumeAndBucket(testVolumeName, testBucketName, false);
 
       // Create 3 keys
       for (int i = 1; i <= 3; i++) {
-        createAndCommitKey(volumeName, bucketName, keyName + i, 3);
+        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
       }
       assertTableRowCount(keyTable, initialKeyCount + 3, metadataManager);
 
       // Create Snapshot1
       String snap1 = uniqueObjectName("snap");
-      writeClient.createSnapshot(volumeName, bucketName, snap1);
+      writeClient.createSnapshot(testVolumeName, testBucketName, snap1);
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
       assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
 
       // Create 2 keys
       for (int i = 4; i <= 5; i++) {
-        createAndCommitKey(volumeName, bucketName, keyName + i, 3);
+        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
       }
       // Delete a key, rename 2 keys. We will be using this to test
       // how we handle renamed key for exclusive size calculation.
-      renameKey(volumeName, bucketName, keyName + 1, "renamedKey1");
-      renameKey(volumeName, bucketName, keyName + 2, "renamedKey2");
-      deleteKey(volumeName, bucketName, keyName + 3);
+      renameKey(testVolumeName, testBucketName, keyName + 1, "renamedKey1");
+      renameKey(testVolumeName, testBucketName, keyName + 2, "renamedKey2");
+      deleteKey(testVolumeName, testBucketName, keyName + 3);
       assertTableRowCount(deletedTable, initialDeletedCount + 1, metadataManager);
       assertTableRowCount(renamedTable, initialRenamedCount + 2, metadataManager);
 
       // Create Snapshot2
       String snap2 = uniqueObjectName("snap");
-      writeClient.createSnapshot(volumeName, bucketName, snap2);
+      writeClient.createSnapshot(testVolumeName, testBucketName, snap2);
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
       assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
 
       // Create 2 keys
       for (int i = 6; i <= 7; i++) {
-        createAndCommitKey(volumeName, bucketName, keyName + i, 3);
+        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
       }
 
-      deleteKey(volumeName, bucketName, "renamedKey1");
-      deleteKey(volumeName, bucketName, keyName + 4);
+      deleteKey(testVolumeName, testBucketName, "renamedKey1");
+      deleteKey(testVolumeName, testBucketName, keyName + 4);
       // Do a second rename of already renamedKey2
-      renameKey(volumeName, bucketName, "renamedKey2", "renamedKey22");
+      renameKey(testVolumeName, testBucketName, "renamedKey2", "renamedKey22");
       assertTableRowCount(deletedTable, initialDeletedCount + 2, metadataManager);
       assertTableRowCount(renamedTable, initialRenamedCount + 1, metadataManager);
 
       // Create Snapshot3
       String snap3 = uniqueObjectName("snap");
-      writeClient.createSnapshot(volumeName, bucketName, snap3);
+      writeClient.createSnapshot(testVolumeName, testBucketName, snap3);
       // Delete 4 keys
-      deleteKey(volumeName, bucketName, "renamedKey22");
+      deleteKey(testVolumeName, testBucketName, "renamedKey22");
       for (int i = 5; i <= 7; i++) {
-        deleteKey(volumeName, bucketName, keyName + i);
+        deleteKey(testVolumeName, testBucketName, keyName + i);
       }
 
       // Create Snapshot4
       String snap4 = uniqueObjectName("snap");
-      writeClient.createSnapshot(volumeName, bucketName, snap4);
-      createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 3);
+      writeClient.createSnapshot(testVolumeName, testBucketName, snap4);
+      createAndCommitKey(testVolumeName, testBucketName, uniqueObjectName("key"), 3);
 
       long prevKdsRunCount = getRunCount();
       keyDeletingService.resume();
@@ -468,6 +589,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           .put(snap3, 2000L)
           .put(snap4, 0L)
           .build();
+      System.out.println(expectedSize);
 
       // Let KeyDeletingService to run for some iterations
       GenericTestUtils.waitFor(
@@ -480,8 +602,10 @@ class TestKeyDeletingService extends OzoneTestBase {
         while (iterator.hasNext()) {
           Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
           String snapshotName = snapshotEntry.getValue().getName();
+
           Long expected = expectedSize.getOrDefault(snapshotName, 0L);
           assertNotNull(expected);
+          System.out.println(snapshotName);
           assertEquals(expected, snapshotEntry.getValue().getExclusiveSize());
           // Since for the test we are using RATIS/THREE
           assertEquals(expected * 3, snapshotEntry.getValue().getExclusiveReplicatedSize());

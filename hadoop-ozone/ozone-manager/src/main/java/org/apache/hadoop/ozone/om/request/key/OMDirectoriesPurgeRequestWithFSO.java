@@ -94,7 +94,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             expectedPreviousSnapshotId);
       }
     } catch (IOException e) {
-      LOG.error("Error occured while performing OMDirectoriesPurge. ", e);
+      LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {

@@ -25,7 +25,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import java.io.IOException;
 
 /**
- * Codec for parsing {@link ContainerProtos.ChunkInfoList} objects from data
+ * Codec for parsing {@link org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfoList}
+ * objects from data
  * that may have been written using schema version one. Before upgrading
  * schema versions, deleted block IDs were stored with a duplicate copy of
  * their ID as the value in the database. After upgrading the code, any
@@ -54,6 +55,11 @@ public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
 
   private SchemaOneChunkInfoListCodec() {
     // singleton
+  }
+
+  @Override
+  public Class<ChunkInfoList> getTypeClass() {
+    return ChunkInfoList.class;
   }
 
   @Override

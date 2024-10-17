@@ -458,7 +458,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
    * @param omMetrics        om metrics
    * @param exception        exception trace
    * @param omKeyInfo        omKeyInfo
-   * @param result           result
    * @param result           stores the result of the execution
    */
   @SuppressWarnings("parameternumber")

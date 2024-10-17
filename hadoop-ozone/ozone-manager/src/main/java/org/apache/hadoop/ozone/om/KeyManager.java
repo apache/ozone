@@ -50,7 +50,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Start key manager.
    *
    * @param configuration
-   * @throws IOException
    */
   void start(OzoneConfiguration configuration);
 
@@ -269,17 +268,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs() throws IOException;
-
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
-  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int count)
+  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)
       throws IOException {
-    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(count);
+    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(size);
     try (TableIterator<String, ? extends  Table.KeyValue<String, OmKeyInfo>> iterator =
-             getPendingDeletionDirs(volume, bucket)) {
-      while (deletedDirEntries.size() < count && iterator.hasNext()) {
+             getDeletedDirEntries(volume, bucket)) {
+      while (deletedDirEntries.size() < size && iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         deletedDirEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
       }

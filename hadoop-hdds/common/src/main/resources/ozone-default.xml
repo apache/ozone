@@ -161,6 +161,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.list.max.count</name>
+    <value>4096</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>The max number of containers info could be included in
+      response of ListContainer request.</description>
+  </property>
+  <property>
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -1570,7 +1577,7 @@
 
   <property>
     <name>hdds.datanode.metadata.rocksdb.cache.size</name>
-    <value>64MB</value>
+    <value>1GB</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
     <description>
         Size of the block metadata cache shared among RocksDB instances on each
@@ -3745,7 +3752,7 @@
 
   <property>
     <name>ozone.snapshot.deep.cleaning.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
       Flag to enable/disable snapshot deep cleaning.

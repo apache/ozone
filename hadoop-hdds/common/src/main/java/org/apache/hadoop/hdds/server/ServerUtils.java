@@ -131,7 +131,7 @@ public final class ServerUtils {
    * Fall back to OZONE_METADATA_DIRS if not defined.
    *
    * @param conf
-   * @return
+   * @return File
    */
   public static File getScmDbDir(ConfigurationSource conf) {
     File metadataDir = getDirectoryFromConfig(conf,
