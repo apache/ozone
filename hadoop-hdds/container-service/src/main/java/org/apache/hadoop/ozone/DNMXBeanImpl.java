@@ -29,8 +29,4 @@ public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
       VersionInfo versionInfo) {
     super(versionInfo);
   }
-
-  public String getNamespace() {
-    return "";
-  }
 }

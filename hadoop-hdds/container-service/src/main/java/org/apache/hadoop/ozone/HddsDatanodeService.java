@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +40,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -215,13 +214,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
       @Override
       public String getNamespace() {
-        String localScmServiceId = conf.getTrimmed(
-            ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
-        if (localScmServiceId == null) {
-          Collection<String> scmServiceIds = conf.getTrimmedStringCollection(OZONE_SCM_SERVICE_IDS_KEY);
-          return String.join(",", scmServiceIds);
-        }
-        return localScmServiceId;
+        return SCMHAUtils.getScmServiceId(conf);
       }
     };
     serviceRuntimeInfo.setStartTime();
