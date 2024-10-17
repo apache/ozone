@@ -17,7 +17,7 @@
 <h1>Overview</h1>
 <table class="table table-bordered table-striped">
     <tbody>
-    <tr>
+    <tr ng-if="$ctrl.jmx.Namespace && $ctrl.jmx.Namespace !== ''">
         <th>Namespace:</th>
         <td>{{$ctrl.jmx.Namespace}}</td>
     </tr>
