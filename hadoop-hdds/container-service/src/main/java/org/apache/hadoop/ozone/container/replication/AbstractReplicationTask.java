@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 
@@ -47,7 +48,18 @@ public abstract class AbstractReplicationTask {
 
   private final long containerId;
 
-  private final Instant queued;
+  private final Clock clock;
+
+  /**
+   * The time when the task enters the queue.
+   */
+  private Instant queued;
+
+  /**
+   * The time the task waits in the queue.
+   * The unit is milliseconds.
+   */
+  private long queuedTime;
 
   private final long deadlineMsSinceEpoch;
 
@@ -56,6 +68,11 @@ public abstract class AbstractReplicationTask {
   private ReplicationCommandPriority priority = NORMAL;
 
   private boolean shouldOnlyRunOnInServiceDatanodes = true;
+
+  /**
+   * Counter for the transferred bytes.
+   */
+  private long transferredBytes;
 
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
@@ -68,7 +85,36 @@ public abstract class AbstractReplicationTask {
     this.containerId = containerID;
     this.deadlineMsSinceEpoch = deadlineMsSinceEpoch;
     this.term = term;
+    this.clock = clock;
     queued = Instant.now(clock);
+  }
+
+  /**
+   * Gets the amount of data transmitted during the task's execution.
+   * The unit is bytes.
+   */
+  public long getTransferredBytes() {
+    return transferredBytes;
+  }
+
+  public void setTransferredBytes(long bytes) {
+    this.transferredBytes += bytes;
+  }
+
+  public void enterQueue() {
+    this.queued = Instant.now(clock);
+  }
+
+  public void exitQueue() {
+    Instant newPoint = Instant.now(clock);
+    this.queuedTime = Duration.between(this.queued, newPoint).toMillis();
+  }
+
+  /**
+   * Gets the time the Task has been waiting in the queue, in milliseconds.
+   */
+  public long getQueuedTime() {
+    return this.queuedTime;
   }
   
   protected abstract String getMetricName();
@@ -160,6 +206,9 @@ public abstract class AbstractReplicationTask {
         .append(getCommandForDebug());
     if (getStatus() == Status.QUEUED) {
       sb.append(", queued at ").append(getQueued());
+    }
+    if (transferredBytes > 0) {
+      sb.append(", transferred " + transferredBytes + " bytes");
     }
     return sb.toString();
   }
