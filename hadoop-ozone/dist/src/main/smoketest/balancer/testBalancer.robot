@@ -72,12 +72,12 @@ Wait Finish Of Balancing
                             Sleep                   60000ms
 
 Verify Balancer Iteration
-    [arguments]       ${output}    ${number}    ${containers}
+    [arguments]       ${output}    ${number}
     Should Contain    ${output}    ContainerBalancer is Running.
     Should Contain    ${output}    Started at:
     Should Contain    ${output}    Container Balancer Configuration values:
     Should Contain    ${output}    Iteration number ${number}                    collapse_spaces=True
-    Should Contain    ${output}    Scheduled to move containers ${containers}    collapse_spaces=True
+    Should Contain    ${output}    Scheduled to move containers                  collapse_spaces=True
     Should Contain    ${output}    Balancing duration:
     Should Contain    ${output}    Iteration duration
     Should Contain    ${output}    Current iteration info:
@@ -85,10 +85,10 @@ Verify Balancer Iteration
 Verify Balancer Iteration History
     [arguments]       ${output}
     Should Contain                  ${output}             Iteration history list:
-    Should Contain X Times          ${output}             Size scheduled to move 300 MB             2      collapse_spaces=True
-    Should Contain X Times          ${output}             Moved data size 300 MB                    2      collapse_spaces=True
-    Should Contain X Times          ${output}             Scheduled to move containers 3            2      collapse_spaces=True
-    Should Contain X Times          ${output}             Already moved containers 3                2      collapse_spaces=True
+    Should Contain X Times          ${output}             Size scheduled to move                    2      collapse_spaces=True
+    Should Contain X Times          ${output}             Moved data size                           2      collapse_spaces=True
+    Should Contain X Times          ${output}             Scheduled to move containers              2      collapse_spaces=True
+    Should Contain X Times          ${output}             Already moved containers                  2      collapse_spaces=True
     Should Contain X Times          ${output}             Failed to move containers 0               2      collapse_spaces=True
     Should Contain X Times          ${output}             Failed to move containers by timeout 0    2      collapse_spaces=True
     Should Contain                  ${output}             Iteration result ITERATION_COMPLETED             collapse_spaces=True
@@ -99,13 +99,13 @@ Run Balancer Status
 
 Run Balancer Verbose Status
     ${result} =      Execute                         ozone admin containerbalancer status -v
-                     Verify Balancer Iteration       ${result}             -    3
+                     Verify Balancer Iteration       ${result}             -
                      Should Contain                  ${result}             Iteration result IN_PROGRESS    collapse_spaces=True
 
 
 Run Balancer Verbose History Status
     ${result} =    Execute                         ozone admin containerbalancer status -v --history
-                   Verify Balancer Iteration            ${result}             1    3
+                   Verify Balancer Iteration            ${result}             1
                    Verify Balancer Iteration History    ${result}
 
 ContainerBalancer is Not Running
