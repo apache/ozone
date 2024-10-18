@@ -221,8 +221,6 @@ public class VolumeUsage {
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
       if (words.length < 2) {
-        LOG.error("Reserved space should be configured in a pair, but current value is {}",
-            reserve);
         throw new ConfigurationException("Reserved space should be configured in a pair");
       }
 

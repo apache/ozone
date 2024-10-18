@@ -166,14 +166,17 @@ public class TestReservedVolumeSpace {
     long reservedFromVolume2 = hddsVolume2.getVolumeInfo().get()
             .getReservedInBytes();
     assertEquals(getExpectedDefaultReserved(hddsVolume2), reservedFromVolume2);
+  }
 
-    OzoneConfiguration conf3 = new OzoneConfiguration();
+  @Test
+  public void testInvalidConfigThrowsException() {
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    conf3.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, "15GB");
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, "15GB");
 
-    assertThrows(ConfigurationException.class, () -> {
-      HddsVolume hddsVolume3 = volumeBuilder.conf(conf3).build();
-      return null;
+    ConfigurationException thrown = assertThrows(ConfigurationException.class, () -> {
+      HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
+        return null;
     });
   }
 
