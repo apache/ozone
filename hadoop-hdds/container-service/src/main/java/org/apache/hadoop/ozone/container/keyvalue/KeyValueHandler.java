@@ -1395,6 +1395,7 @@ public class KeyValueHandler extends Handler {
                 .setOffset(adjustedChunkOffset)
                 .setLen(adjustedChunkLen).build());
         BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+        BlockUtils.verifyBCSId(kvContainer, blockID);
         data = getChunkManager().readChunk(
             kvContainer, blockID, chunkInfo, dispatcherContext);
 
