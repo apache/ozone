@@ -29,6 +29,7 @@ import { MismatchKeys } from '@/v2/types/insights.types';
 
 const size = filesize.partial({ standard: 'iec' });
 
+//-----Types------
 type ExpandedKeyTableProps = {
   loading: boolean;
   data: MismatchKeys[];
@@ -72,6 +73,7 @@ const COLUMNS: ColumnsType<MismatchKeys> = [
   }
 ];
 
+//-----Components------
 const ExpandedKeyTable: React.FC<ExpandedKeyTableProps> = ({
   loading,
   data,

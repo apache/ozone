@@ -31,10 +31,12 @@ import { MenuProps } from 'antd/es/menu';
 import { FilterFilled } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
+import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { getFormattedTime } from '@/v2/utils/momentUtils';
+import { useDebounce } from '@/v2/hooks/debounce.hook';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import { OpenKeys, OpenKeysResponse } from '@/v2/types/insights.types';
@@ -47,6 +49,7 @@ type OpenKeysTableProps = {
   handleLimitChange: (arg0: ValueType<Option, false>) => void;
 }
 
+//-----Components------
 const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
   limit,
   paginationConfig,
@@ -54,8 +57,16 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
 }) => {
   const [loading, setLoading] = React.useState<boolean>(false);
   const [data, setData] = React.useState<OpenKeys[]>();
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
 
   const cancelSignal = React.useRef<AbortController>();
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  function filterData(data: OpenKeys[] | undefined) {
+    return data?.filter(
+      (data: OpenKeys) => data.path.includes(debouncedSearch)
+    );
+  }
 
   function fetchOpenKeys(isFso: boolean) {
     setLoading(true);
@@ -179,9 +190,16 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
             placeholder='Limit'
             onChange={handleLimitChange} />
         </div>
+        <Search
+          disabled={(data?.length ?? 0) < 1}
+          searchInput={searchTerm}
+          onSearchChange={
+            (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+          }
+          onChange={() => { }} />
       </div>
       <Table
-        dataSource={data}
+        dataSource={filterData(data)}
         columns={COLUMNS}
         loading={loading}
         rowKey='key'

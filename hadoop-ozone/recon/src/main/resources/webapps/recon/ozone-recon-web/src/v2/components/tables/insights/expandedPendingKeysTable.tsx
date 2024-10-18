@@ -63,7 +63,6 @@ const COLUMNS: ColumnsType<DeletePendingKey> = [{
   }
 }]
 
-
 //--------Component--------
 const ExpandedPendingKeysTable: React.FC<ExpandedPendingKeysTableProps> = ({
   data,

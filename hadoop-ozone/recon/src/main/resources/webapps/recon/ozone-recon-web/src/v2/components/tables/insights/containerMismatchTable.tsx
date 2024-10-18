@@ -34,9 +34,11 @@ import {
 import { FilterFilled } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
+import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import { useDebounce } from '@/v2/hooks/debounce.hook';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
@@ -44,7 +46,6 @@ import {
   MismatchContainersResponse,
   Pipelines
 } from '@/v2/types/insights.types';
-
 
 
 //-----Types-----
@@ -56,7 +57,7 @@ type ContainerMismatchTableProps = {
   onRowExpand: (arg0: boolean, arg1: any) => void;
 }
 
-
+//-----Components------
 const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
   paginationConfig,
   limit,
@@ -67,8 +68,10 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
 
   const [loading, setLoading] = React.useState<boolean>(false);
   const [data, setData] = React.useState<Container[]>();
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
 
   const cancelSignal = React.useRef<AbortController>();
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
   const handleExistAtChange: FilterMenuProps['onClick'] = ({ key }) => {
     if (key === 'OM') {
@@ -76,6 +79,12 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
     } else {
       fetchMismatchContainers('OM');
     }
+  }
+
+  function filterData(data: Container[] | undefined) {
+    return data?.filter(
+      (data: Container) => data.containerId.toString().includes(debouncedSearch)
+    );
   }
 
   const COLUMNS: ColumnsType<Container> = [
@@ -170,6 +179,13 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
             placeholder='Limit'
             onChange={handleLimitChange} />
         </div>
+        <Search
+          disabled={(data?.length ?? 0) < 1}
+          searchInput={searchTerm}
+          onSearchChange={
+            (e: React.ChangeEvent<HTMLInputElement>) =>  setSearchTerm(e.target.value)
+          }
+          onChange={() => {}}/>
       </div>
       <Table
         expandable={{
@@ -177,7 +193,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
           expandedRowRender: expandedRowRender,
           onExpand: onRowExpand
         }}
-        dataSource={data}
+        dataSource={filterData(data)}
         columns={COLUMNS}
         loading={loading}
         pagination={paginationConfig}

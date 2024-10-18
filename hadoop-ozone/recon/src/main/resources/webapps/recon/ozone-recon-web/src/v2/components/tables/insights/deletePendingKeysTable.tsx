@@ -24,10 +24,12 @@ import Table, {
 } from 'antd/es/table';
 import { ValueType } from 'react-select';
 
+import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import ExpandedPendingKeysTable from '@/v2/components/tables/insights/expandedPendingKeysTable';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
+import { useDebounce } from '@/v2/hooks/debounce.hook';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
@@ -88,8 +90,16 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
 }) => {
   const [loading, setLoading] = React.useState<boolean>(false);
   const [data, setData] = React.useState<DeletePendingKeysColumns[]>();
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
 
   const cancelSignal = React.useRef<AbortController>();
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  function filterData(data: DeletePendingKeysColumns[] | undefined) {
+    return data?.filter(
+      (data: DeletePendingKeysColumns) => data.keyName.includes(debouncedSearch)
+    );
+  }
 
   function expandedRowRender(record: DeletePendingKeysColumns) {
     console.log(expandedDeletePendingKeys);
@@ -157,13 +167,20 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
             placeholder='Limit'
             onChange={handleLimitChange} />
         </div>
+        <Search
+          disabled={(data?.length ?? 0) < 1}
+          searchInput={searchTerm}
+          onSearchChange={
+            (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+          }
+          onChange={() => { }} />
       </div>
       <Table
         expandable={{
           expandRowByClick: true,
           expandedRowRender: expandedRowRender
         }}
-        dataSource={data}
+        dataSource={filterData(data)}
         columns={COLUMNS}
         loading={loading}
         pagination={paginationConfig}

@@ -24,20 +24,24 @@ import Table, {
 } from 'antd/es/table';
 import { ValueType } from 'react-select';
 
+import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { getFormattedTime } from '@/v2/utils/momentUtils';
+import { useDebounce } from '@/v2/hooks/debounce.hook';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import { DeletedDirInfo } from '@/v2/types/insights.types';
 
+//-----Types------
 type DeletePendingDirTableProps = {
   paginationConfig: TablePaginationConfig
   limit: Option;
   handleLimitChange: (arg0: ValueType<Option, false>) => void;
 }
 
+//-----Constants------
 const COLUMNS: ColumnsType<DeletedDirInfo> = [{
   title: 'Directory Name',
   dataIndex: 'key',
@@ -63,6 +67,7 @@ const COLUMNS: ColumnsType<DeletedDirInfo> = [{
   render: (dataSize: number) => byteToSize(dataSize, 1)
 }];
 
+//-----Components------
 const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
   limit,
   paginationConfig,
@@ -71,8 +76,16 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
 
   const [loading, setLoading] = React.useState<boolean>(false);
   const [data, setData] = React.useState<DeletedDirInfo[]>();
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
 
   const cancelSignal = React.useRef<AbortController>();
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  function filterData(data: DeletedDirInfo[] | undefined) {
+    return data?.filter(
+      (data: DeletedDirInfo) => data.key.includes(debouncedSearch)
+    );
+  }
 
   function loadData() {
     setLoading(true);
@@ -107,10 +120,17 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
           placeholder='Limit'
           onChange={handleLimitChange} />
       </div>
+      <Search
+        disabled={(data?.length ?? 0) < 1}
+        searchInput={searchTerm}
+        onSearchChange={
+          (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+        }
+        onChange={() => { }} />
     </div>
     <Table
       loading={loading}
-      dataSource={data}
+      dataSource={filterData(data)}
       columns={COLUMNS}
       pagination={paginationConfig}
       rowKey='key'
