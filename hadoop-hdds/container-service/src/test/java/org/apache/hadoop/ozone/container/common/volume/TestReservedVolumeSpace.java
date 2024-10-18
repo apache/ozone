@@ -176,7 +176,7 @@ public class TestReservedVolumeSpace {
 
     ConfigurationException thrown = assertThrows(ConfigurationException.class, () -> {
       HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
-        return null;
+      return null;
     });
   }
 
