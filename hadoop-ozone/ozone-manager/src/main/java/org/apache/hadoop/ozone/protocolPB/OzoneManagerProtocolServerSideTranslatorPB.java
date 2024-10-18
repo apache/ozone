@@ -23,16 +23,19 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.sun.corba.se.pept.protocol.ClientInvocationInfo;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -40,6 +43,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -57,7 +61,11 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.ClientInvocationId;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -215,6 +223,28 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         //  Added the assertion.
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
+
+        ClientInvocationId clientInvocationId = ClientInvocationId.valueOf(
+            ClientId.valueOf(UUID.nameUUIDFromBytes(ProtobufRpcEngine.Server.getClientId())),
+            ProtobufRpcEngine.Server.getCallId());
+        RetryCache.Entry cacheEntry =
+            omRatisServer.getServerDivision().getRetryCache().getIfPresent(clientInvocationId);
+        // if this request has been executed before, return the cached result.
+        if (cacheEntry != null) {
+          if (cacheEntry.getReplyFuture().isDone()) {
+            RaftClientReply raftClientReply;
+            try {
+              raftClientReply = cacheEntry.getReplyFuture().get();
+            } catch (ExecutionException ex) {
+              throw new ServiceException(ex.getMessage(), ex);
+            } catch (InterruptedException ex) {
+              Thread.currentThread().interrupt();
+              throw new ServiceException(ex.getMessage(), ex);
+            }
+            return OMRatisHelper.getOMResponseFromRaftClientReply(raftClientReply);
+          }
+        }
+
         requestToSubmit = preExecute(finalOmClientRequest);
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
