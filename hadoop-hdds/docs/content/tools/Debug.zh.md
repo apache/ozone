@@ -20,7 +20,7 @@ summary: Ozone Debug 命令可用于所有与调试相关的任务。
   limitations under the License.
 -->
 
-Ozone Debug 命令 (`ozone debug`) 是旨在帮助调试并获取臭氧各种成分的更多信息的工具集合。
+Ozone Debug 命令 (`ozone debug`) 是开发人员工具的集合，旨在帮助调试并获取 Ozone 各个组件的更多信息。
 
 ```bash
 $ ozone debug --help 
@@ -51,7 +51,9 @@ Developer tools for Ozone Debug operations
 
 ## ozone debug ldb
 
-此调试命令有助于解析提供给该命令的任何数据库。下面是用法：
+Ozone 大量使用 RocksDB 来存储元数据。该工具有助于解析属于 Ozone Roles 的 RocksDB 的内容。
+支持的数据库：Ozone Manager (om.db)、StorageContainerManager (scm.db)、Datanode/Container (container.db)
+下面是用法：
 
 ```bash
 $ ozone debug ldb --help

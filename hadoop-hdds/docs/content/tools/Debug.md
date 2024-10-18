@@ -20,7 +20,7 @@ summary: Ozone Debug command can be used for all the debugging related tasks.
   limitations under the License.
 -->
 
-Ozone Debug command (`ozone debug`) is a collection of tools intended to help in debugging and get more information of various components of ozone.
+Ozone Debug command (`ozone debug`) is a collection of developer tools intended to help in debugging and get more information of various components of ozone.
 
 ```bash
 $ ozone debug --help 
@@ -57,7 +57,9 @@ For more detailed usage see the output of `--help` for each of the subcommands.
 
 ## ozone debug ldb
 
-This debug command helps to parse any db given to the command. Below is the usage:
+Ozone heavily uses RocksDB for storing metadata. This tool helps parse the contents of RocksDB belonging to Ozone Roles.
+Supported DB's : Ozone Manager (om.db) , StorageContainerManager (scm.db),  Datanode/Container (container.db)
+Below is the usage:
 
 ```bash
 $ ozone debug ldb --help
