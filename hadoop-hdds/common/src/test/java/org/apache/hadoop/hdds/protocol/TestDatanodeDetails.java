@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.hdds.protocol;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS;
@@ -48,21 +52,36 @@ public class TestDatanodeDetails {
         subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     assertPorts(protoV1, ALL_PORTS);
   }
+  @Test
+  void testRequiredPortsProto() {
+    DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
+    Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
+        .collect(Collectors.toSet());
+    HddsProtos.DatanodeDetailsProto proto =
+        subject.toProto(subject.getCurrentVersion(), requiredPorts);
+    assertPorts(proto, ImmutableSet.copyOf(requiredPorts));
+
+    HddsProtos.DatanodeDetailsProto ioPortProto =
+        subject.toProto(subject.getCurrentVersion(), Name.IO_PORTS);
+    assertPorts(ioPortProto, ImmutableSet.copyOf(Name.IO_PORTS));
+  }
 
   @Test
   public void testNewBuilderCurrentVersion() {
     // test that if the current version is not set (Ozone 1.4.0 and earlier),
     // it falls back to SEPARATE_RATIS_PORTS_AVAILABLE
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
+        .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
     assertEquals(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
     protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue());
+        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
     assertEquals(DatanodeVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
   }
