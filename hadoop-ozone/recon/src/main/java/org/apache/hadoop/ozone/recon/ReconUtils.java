@@ -32,13 +32,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.TimeZone;
-import java.util.Date;
-import java.util.Set;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -651,6 +645,12 @@ public class ReconUtils {
       throws IOException {
 
     Map<String, T> matchedKeys = new LinkedHashMap<>();
+
+    // Null check for the table to prevent NPE during omMetaManager initialization
+    if (table == null) {
+      log.error("Table object is null. omMetaManager might still be initializing.");
+      return Collections.emptyMap();
+    }
 
     // If limit = 0, return an empty result set
     if (limit == 0 || limit < -1) {
