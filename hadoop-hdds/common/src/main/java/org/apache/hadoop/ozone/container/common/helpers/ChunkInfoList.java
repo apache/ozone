@@ -27,7 +27,7 @@ import java.util.List;
 
 /**
  * Helper class to convert between protobuf lists and Java lists of
- * {@link ContainerProtos.ChunkInfo} objects.
+ * {@link org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo} objects.
  * <p>
  * This class is immutable.
  */
@@ -36,6 +36,7 @@ public class ChunkInfoList {
       Proto3Codec.get(ContainerProtos.ChunkInfoList.getDefaultInstance()),
       ChunkInfoList::getFromProtoBuf,
       ChunkInfoList::getProtoBufMessage,
+      ChunkInfoList.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<ChunkInfoList> getCodec() {
@@ -49,7 +50,7 @@ public class ChunkInfoList {
   }
 
   /**
-   * @return A new {@link ChunkInfoList} created from protobuf data.
+   * @return A new {@link #ChunkInfoList} created from protobuf data.
    */
   public static ChunkInfoList getFromProtoBuf(
           ContainerProtos.ChunkInfoList chunksProto) {

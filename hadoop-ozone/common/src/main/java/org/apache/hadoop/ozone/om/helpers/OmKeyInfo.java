@@ -65,7 +65,8 @@ public final class OmKeyInfo extends WithParentObjectId
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        OmKeyInfo.class);
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
@@ -360,7 +361,6 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param updateTime if true, updates modification time.
    * @param keepOldVersions if false, old blocks won't be kept
    *                        and the new block versions will always be 0
-   * @throws IOException
    */
   public synchronized long addNewVersion(
       List<OmKeyLocationInfo> newLocationList, boolean updateTime,
@@ -628,7 +628,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   /**
    * For network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(int clientVersion) {
     return getProtobuf(false, clientVersion);
@@ -660,7 +660,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    *
    * @param ignorePipeline true for persist to DB, false for network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     return getProtobuf(ignorePipeline, null, clientVersion, false);

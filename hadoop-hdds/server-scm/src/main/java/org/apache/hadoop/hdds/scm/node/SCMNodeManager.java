@@ -146,6 +146,8 @@ public class SCMNodeManager implements NodeManager {
   private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
   private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
   private static final String TOTALCAPACITY = "CAPACITY";
+  private static final String DNUUID = "UUID";
+  private static final String VERSION = "VERSION";
   /**
    * Constructs SCM machine Manager.
    */
@@ -447,6 +449,11 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+        } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          LOG.info("Update the version for registered datanode = {}, " +
+              "oldVersion = {}, newVersion = {}.",
+              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -506,6 +513,18 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return ipChanged || hostNameChanged;
+  }
+
+  /**
+   * Check if the version has been updated.
+   *
+   * @param oldVersion datanode oldVersion
+   * @param newVersion datanode newVersion
+   * @return true means replacement is needed, while false means replacement is not needed.
+   */
+  private boolean isVersionChange(String oldVersion, String newVersion) {
+    final boolean versionChanged = !Objects.equals(oldVersion, newVersion);
+    return versionChanged;
   }
 
   /**
@@ -982,6 +1001,7 @@ public class SCMNodeManager implements NodeManager {
     DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
+      usageInfo.setPipelineCount(getPipeLineCount(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1135,6 +1155,8 @@ public class SCMNodeManager implements NodeManager {
       String nonScmUsedPerc = storagePercentage[1];
       map.put(USEDSPACEPERCENT,
           "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      map.put(DNUUID, dni.getUuidString());
+      map.put(VERSION, dni.getVersion());
       nodes.put(hostName, map);
     }
     return nodes;
@@ -1144,7 +1166,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage capacity of the DataNode node.
    * @param storageReports Calculate the storage capacity corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String calculateStorageCapacity(
       List<StorageReportProto> storageReports) {
@@ -1192,7 +1213,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage usage percentage of a DataNode node.
    * @param storageReports Calculate the storage percentage corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String[] calculateStoragePercentage(
       List<StorageReportProto> storageReports) {
@@ -1608,6 +1628,11 @@ public class SCMNodeManager implements NodeManager {
   public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
+  }
+
+  public int getPipeLineCount(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getPipelinesCount(datanodeDetails);
   }
 
   @Override

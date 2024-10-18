@@ -50,145 +50,115 @@ import java.util.Map;
 /**
  * Class defines the structure and types of the om.db.
  */
-public class OMDBDefinition extends DBDefinition.WithMap {
+public final class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.DELETED_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    RepeatedOmKeyInfo.class,
                     RepeatedOmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo>
       USER_TABLE = new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.USER_TABLE,
-          String.class,
           StringCodec.get(),
-          PersistedUserVolumeInfo.class,
           Proto2Codec.get(PersistedUserVolumeInfo.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>
             VOLUME_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.VOLUME_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmVolumeArgs.class,
                     OmVolumeArgs.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_KEY_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.OPEN_KEY_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmKeyInfo.class,
                     OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             KEY_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.KEY_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmKeyInfo.class,
                     OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmBucketInfo>
             BUCKET_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.BUCKET_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmBucketInfo.class,
                     OmBucketInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmMultipartKeyInfo>
             MULTIPART_INFO_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.MULTIPARTINFO_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmMultipartKeyInfo.class,
                     OmMultipartKeyInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmPrefixInfo>
             PREFIX_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.PREFIX_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmPrefixInfo.class,
                     OmPrefixInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<OzoneTokenIdentifier, Long>
             DTOKEN_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE,
-                    OzoneTokenIdentifier.class,
                     TokenIdentifierCodec.get(),
-                    Long.class,
                     LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, S3SecretValue>
             S3_SECRET_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.S3_SECRET_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    S3SecretValue.class,
                     S3SecretValue.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
             TRANSACTION_INFO_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    TransactionInfo.class,
                     TransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDirectoryInfo>
             DIRECTORY_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.DIRECTORY_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmDirectoryInfo.class,
                     OmDirectoryInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             FILE_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.FILE_TABLE,
-                    String.class,
                     StringCodec.get(),
-                    OmKeyInfo.class,
                     OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_FILE_TABLE =
             new DBColumnFamilyDefinition<>(
                   OmMetadataManagerImpl.OPEN_FILE_TABLE,
-                  String.class,
                   StringCodec.get(),
-                  OmKeyInfo.class,
                   OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
       DELETED_DIR_TABLE =
       new DBColumnFamilyDefinition<>(OmMetadataManagerImpl.DELETED_DIR_TABLE,
-          String.class, StringCodec.get(), OmKeyInfo.class,
+          StringCodec.get(),
           OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, String>
       META_TABLE = new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.META_TABLE,
-          String.class,
           StringCodec.get(),
-          String.class,
           StringCodec.get());
 
   // Tables for multi-tenancy
@@ -197,27 +167,26 @@ public class OMDBDefinition extends DBDefinition.WithMap {
             TENANT_ACCESS_ID_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
-                    String.class,  // accessId
+                    // accessId
                     StringCodec.get(),
-                    OmDBAccessIdInfo.class,  // tenantId, secret, principal
+                    // tenantId, secret, principal
                     OmDBAccessIdInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo>
             PRINCIPAL_TO_ACCESS_IDS_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
-                    String.class,  // User principal
+                    // User principal
                     StringCodec.get(),
-                    OmDBUserPrincipalInfo.class,  // List of accessIds
+                    // List of accessIds
                     OmDBUserPrincipalInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBTenantState>
             TENANT_STATE_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_STATE_TABLE,
-                    String.class,  // tenantId (tenant name)
+                    // tenantId (tenant name)
                     StringCodec.get(),
-                    OmDBTenantState.class,
                     OmDBTenantState.getCodec());
 
   // End tables for S3 multi-tenancy
@@ -226,18 +195,15 @@ public class OMDBDefinition extends DBDefinition.WithMap {
       SNAPSHOT_INFO_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
-          String.class,  // snapshot path
+          // snapshot path
           StringCodec.get(),
-          SnapshotInfo.class,
           SnapshotInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, CompactionLogEntry>
       COMPACTION_LOG_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.COMPACTION_LOG_TABLE,
-          String.class,
           StringCodec.get(),
-          CompactionLogEntry.class,
           CompactionLogEntry.getCodec());
 
   /**
@@ -254,9 +220,9 @@ public class OMDBDefinition extends DBDefinition.WithMap {
       SNAPSHOT_RENAMED_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE,
-          String.class,  // /volumeName/bucketName/objectID
+          // /volumeName/bucketName/objectID
           StringCodec.get(),
-          String.class, // path to key in prev snapshot's key(file)/dir Table.
+          // path to key in prev snapshot's key(file)/dir Table.
           StringCodec.get());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
@@ -284,7 +250,13 @@ public class OMDBDefinition extends DBDefinition.WithMap {
           USER_TABLE,
           VOLUME_TABLE);
 
-  public OMDBDefinition() {
+  private static final OMDBDefinition INSTANCE = new OMDBDefinition();
+
+  public static OMDBDefinition get() {
+    return INSTANCE;
+  }
+
+  private OMDBDefinition() {
     super(COLUMN_FAMILIES);
   }
 

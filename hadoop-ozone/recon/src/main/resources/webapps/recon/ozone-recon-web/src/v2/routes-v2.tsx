@@ -20,6 +20,10 @@ import { lazy } from 'react';
 const Overview = lazy(() => import('@/v2/pages/overview/overview'));
 const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
 const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
+const Datanodes = lazy(() => import('@/v2/pages/datanodes/datanodes'));
+const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
+const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
+const Containers = lazy(() => import('@/v2/pages/containers/containers'));
 
 export const routesV2 = [
   {
@@ -33,5 +37,21 @@ export const routesV2 = [
   {
     path: '/Buckets',
     component: Buckets
+  },
+  {
+    path: '/Datanodes',
+    component: Datanodes
+  },
+  {
+    path: '/Pipelines',
+    component: Pipelines
+  },
+  {
+    path: '/DiskUsage',
+    component: DiskUsage
+  },
+  {
+    path: '/Containers',
+    component: Containers
   }
 ];

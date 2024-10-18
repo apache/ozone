@@ -20,6 +20,7 @@ import React from 'react';
 import { Input, Select } from 'antd';
 
 import { Option } from '@/v2/components/select/singleSelect';
+import { DownOutlined } from '@ant-design/icons';
 
 // ------------- Types -------------- //
 type SearchProps = {
@@ -51,6 +52,7 @@ const Search: React.FC<SearchProps> = ({
   const selectFilter = searchColumn
     ? (<Select
       disabled={disabled}
+      suffixIcon={(searchOptions.length > 1) ? <DownOutlined/> : null}
       defaultValue={searchColumn}
       options={searchOptions}
       onChange={onChange} />)

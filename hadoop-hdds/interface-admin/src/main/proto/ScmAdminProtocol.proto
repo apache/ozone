@@ -296,6 +296,7 @@ message SCMListContainerRequestProto {
 
 message SCMListContainerResponseProto {
   repeated ContainerInfoProto containers = 1;
+  optional int64 containerCount = 2;
 }
 
 message SCMDeleteContainerRequestProto {

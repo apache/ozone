@@ -179,7 +179,7 @@ public class TestDBStoreBuilder {
     String sampleTableName = "sampleTable";
     final DBColumnFamilyDefinition<String, Long> sampleTable =
         new DBColumnFamilyDefinition<>(sampleTableName,
-            String.class, StringCodec.get(), Long.class, LongCodec.get());
+            StringCodec.get(), LongCodec.get());
     final DBDefinition sampleDB = new DBDefinition.WithMap(
         DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       {
@@ -250,8 +250,8 @@ public class TestDBStoreBuilder {
 
     String sampleTableName = "sampleTable";
     final DBColumnFamilyDefinition<String, Long> sampleTable =
-        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-            StringCodec.get(), Long.class, LongCodec.get());
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            StringCodec.get(), LongCodec.get());
     final DBDefinition sampleDB = new DBDefinition.WithMap(
         DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
