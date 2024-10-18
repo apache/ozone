@@ -23,14 +23,14 @@ summary: Ozone Debug command can be used for all the debugging related tasks.
 Ozone Debug command (`ozone debug`) is a collection of developer tools intended to help in debugging and get more information of various components of ozone.
 
 ```bash
-$ ozone debug --help 
 Usage: ozone debug [-hV] [--verbose] [-conf=<configurationPath>]
                    [-D=<String=String>]... [COMMAND]
 Developer tools for Ozone Debug operations
       -conf=<configurationPath>
-
+                  path to the ozone configuration file
   -D, --set=<String=String>
-
+                  Map of (configuration_key,configuration_value) for any 
+                    configuration overrides
   -h, --help      Show this help message and exit.
   -V, --version   Print version information and exit.
       --verbose   More verbose output. Show the stack trace of the errors.
@@ -62,8 +62,6 @@ Supported DB's : Ozone Manager (om.db) , StorageContainerManager (scm.db),  Data
 Below is the usage:
 
 ```bash
-$ ozone debug ldb --help
-Missing required option: '--db=<dbPath>'
 Usage: ozone debug ldb --db=<dbPath> [COMMAND]
 Parse rocksdb file content
       --db=<dbPath>   Database File Path
@@ -101,8 +99,6 @@ move
 `scan` command parses a particular column family of a rocksdb provided and prints the records.
 
 ```bash
-$ ozone debug ldb --db=/path/to/any/db/scm.db scan --help
-Missing required option: '--column_family=<tableName>'
 Usage: ozone debug ldb scan [--compact] [--count] [--with-keys]
                             [--batch-size=<batchSize>] --cf=<tableName>
                             [--cid=<containerId>] [-d=<dnDBSchemaVersion>]

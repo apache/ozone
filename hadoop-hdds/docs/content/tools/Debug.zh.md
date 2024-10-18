@@ -23,14 +23,13 @@ summary: Ozone Debug 命令可用于所有与调试相关的任务。
 Ozone Debug 命令 (`ozone debug`) 是开发人员工具的集合，旨在帮助调试并获取 Ozone 各个组件的更多信息。
 
 ```bash
-$ ozone debug --help 
 Usage: ozone debug [-hV] [--verbose] [-conf=<configurationPath>]
                    [-D=<String=String>]... [COMMAND]
 Developer tools for Ozone Debug operations
       -conf=<configurationPath>
-
+                  path to the ozone configuration file
   -D, --set=<String=String>
-
+                  a map of (configuration_key,configuration_value) for any overrides
   -h, --help      Show this help message and exit.
   -V, --version   Print version information and exit.
       --verbose   More verbose output. Show the stack trace of the errors.
@@ -51,13 +50,11 @@ Developer tools for Ozone Debug operations
 
 ## ozone debug ldb
 
-Ozone 大量使用 RocksDB 来存储元数据。该工具有助于解析属于 Ozone Roles 的 RocksDB 的内容。
+Ozone 大量使用 RocksDB 来存储元数据。该工具帮助解析各个Ozone Roles 的 RocksDB 数据内容。
 支持的数据库：Ozone Manager (om.db)、StorageContainerManager (scm.db)、Datanode/Container (container.db)
 下面是用法：
 
 ```bash
-$ ozone debug ldb --help
-Missing required option: '--db=<dbPath>'
 Usage: ozone debug ldb --db=<dbPath> [COMMAND]
 Parse rocksdb file content
       --db=<dbPath>   Database File Path
@@ -95,8 +92,6 @@ move
 `scan` 命令解析提供的 rocksdb 的特定列族并打印记录。
 
 ```bash
-$ ozone debug ldb --db=/path/to/any/db/scm.db scan --help
-Missing required option: '--column_family=<tableName>'
 Usage: ozone debug ldb scan [--compact] [--count] [--with-keys]
                             [--batch-size=<batchSize>] --cf=<tableName>
                             [--cid=<containerId>] [-d=<dnDBSchemaVersion>]
