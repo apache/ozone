@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -382,13 +381,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto1 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk1").setScmUsed(10000).setRemaining(5400)
             .setCapacity(25000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto2 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk2").setScmUsed(25000).setRemaining(10000)
             .setCapacity(50000)
             .setStorageUuid(UUID.randomUUID().toString())
@@ -413,13 +412,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto3 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
             .setCapacity(50000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto4 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
             .setCapacity(80000)
             .setStorageUuid(UUID.randomUUID().toString())
@@ -445,13 +444,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto5 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
             .setCapacity(50000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto6 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+        StorageReportProto.newBuilder().setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
             .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
             .setCapacity(80000)
             .setStorageUuid(UUID.randomUUID().toString())

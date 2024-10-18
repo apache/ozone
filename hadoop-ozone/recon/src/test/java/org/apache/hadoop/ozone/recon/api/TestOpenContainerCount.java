@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -306,7 +305,7 @@ public class TestOpenContainerCount {
 
     StorageReportProto storageReportProto1 =
             StorageReportProto.newBuilder()
-                    .setStorageType(StorageTypeProto.DISK)
+                    .setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
                     .setStorageLocation("/disk1")
                     .setScmUsed(10 * OzoneConsts.GB)
                     .setRemaining(90 * OzoneConsts.GB)
@@ -316,7 +315,7 @@ public class TestOpenContainerCount {
 
     StorageReportProto storageReportProto2 =
             StorageReportProto.newBuilder()
-                    .setStorageType(StorageTypeProto.DISK)
+                    .setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE)
                     .setStorageLocation("/disk2")
                     .setScmUsed(10 * OzoneConsts.GB)
                     .setRemaining(90 * OzoneConsts.GB)
