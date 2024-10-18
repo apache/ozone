@@ -39,6 +39,7 @@ import java.util.Scanner;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import static org.apache.hadoop.ozone.OFSPath.OFS_MOUNT_TMP_VOLUMENAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
@@ -86,7 +87,7 @@ public class DeleteBucketHandler extends BucketHandler {
         }
       }
       OzoneBucket bucket = vol.getBucket(bucketName);
-      if (bucket.getBucketLayout().equals(OBJECT_STORE)) {
+      if (bucket.getBucketLayout().equals(OBJECT_STORE) || vol.getName().equals(OFS_MOUNT_TMP_VOLUMENAME)) {
         deleteOBSBucketRecursive(vol, bucket);
       } else {
         deleteFSBucketRecursive(vol, bucket);
