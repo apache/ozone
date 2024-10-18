@@ -828,10 +828,13 @@ public final class HddsTestUtils {
    */
   public static List<ContainerInfo> getContainerInfo(int numContainers) {
     List<ContainerInfo> containerInfoList = new ArrayList<>();
+    RatisReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
           .setContainerID(RandomUtils.nextLong())
+          .setReplicationConfig(ratisReplicationConfig)
           .build());
     }
     return containerInfoList;
