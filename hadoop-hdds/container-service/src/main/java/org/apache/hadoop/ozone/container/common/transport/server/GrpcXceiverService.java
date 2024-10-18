@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -108,9 +109,13 @@ public class GrpcXceiverService extends
       @Override
       public void onNext(ContainerCommandRequestProto request) {
         try {
-          ContainerCommandResponseProto resp =
-              dispatcher.dispatch(request, null);
-          responseObserver.onNext(resp);
+          if (request.getCmdType() == Type.ReadBlock) {
+            dispatcher.streamDataReadOnly(request, responseObserver, null);
+          } else {
+            ContainerCommandResponseProto resp =
+                dispatcher.dispatch(request, null);
+            responseObserver.onNext(resp);
+          }
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
                     + " ContainerCommandRequestProto {}", request, e);
@@ -133,7 +138,7 @@ public class GrpcXceiverService extends
       @Override
       public void onCompleted() {
         if (isClosed.compareAndSet(false, true)) {
-          LOG.debug("ContainerCommand send completed");
+          LOG.info("ContainerCommand send completed");
           responseObserver.onCompleted();
         }
       }
