@@ -181,7 +181,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(9, result.getRepeatedOmKeyInfoList().size());
 
     response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/vola/nonexistentbucket");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -200,7 +200,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(5, result.getRepeatedOmKeyInfoList().size());
 
     response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb1/nonexistentdir");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -224,7 +224,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Test with non-existent key
     response = omdbInsightEndpoint.getDeletedKeyInfo(1, "", "/volb/bucketb1/nonexistentfile");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(),
         response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -242,7 +242,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
     response = omdbInsightEndpoint.getDeletedKeyInfo(10, "",
         "/volb/bucketb1/dir1/nonexistentfile");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(),
         response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -269,13 +269,13 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(1, result.getRepeatedOmKeyInfoList().size());
 
     response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11/dirc111/nonexistentfile");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
 
     response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volc/bucketc1/dirc1/dirc11/nonexistentfile");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -372,7 +372,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testSearchInEmptyBucket() throws IOException {
     Response response = omdbInsightEndpoint.getDeletedKeyInfo(20, "", "/volb/bucketb2");
-    assertEquals(404, response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");

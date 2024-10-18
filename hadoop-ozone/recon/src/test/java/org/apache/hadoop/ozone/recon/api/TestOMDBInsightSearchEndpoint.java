@@ -219,7 +219,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Test with bucket that does not exist
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/nonexistentbucket", 20, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -262,7 +262,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Test with non-existent directory
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/nonexistentdir", 20, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -310,13 +310,13 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Test with non-existent key
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/nonexistentfile", 1, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
 
     response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/nonexistentfile", 1, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -342,14 +342,14 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Test for unknown file in fso bucket
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira1/unknownfile", 10, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
 
     // Test for unknown file in fso bucket
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira2/unknownfile", 10, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -400,14 +400,14 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Search for a non existant file under each nested directory
     response = omdbInsightSearchEndpoint.searchOpenKeys(
         "/vola/bucketa1/dira3/dira31/dira32/dira33/nonexistentfile", 20, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
 
     response = omdbInsightSearchEndpoint.searchOpenKeys(
         "/vola/bucketa1/dira3/dira31/dira32/nonexistentfile", 20, "");
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
@@ -505,7 +505,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   public void testSearchInEmptyBucket() throws IOException {
     // Search in empty bucket bucketb2
     Response response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb2", 20, "");
-    assertEquals(404, response.getStatus());
+    assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");

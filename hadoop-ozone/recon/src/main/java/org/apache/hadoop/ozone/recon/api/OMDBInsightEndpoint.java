@@ -986,7 +986,7 @@ public class OMDBInsightEndpoint {
         limit, false, "");
     Response response = getListKeysResponse(paramInfo);
     if ((response.getStatus() != Response.Status.OK.getStatusCode()) &&
-        (response.getStatus() != Response.Status.NOT_FOUND.getStatusCode())) {
+        (response.getStatus() != Response.Status.NO_CONTENT.getStatusCode())) {
       return response;
     }
     if (response.getEntity() instanceof ListKeysResponse) {
