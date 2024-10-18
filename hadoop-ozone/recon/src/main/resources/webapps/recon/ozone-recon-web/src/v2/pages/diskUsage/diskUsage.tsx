@@ -27,7 +27,7 @@ import {
 import { ValueType } from 'react-select';
 
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
-import DUPieChart from '@/v2/components/duPieChart/duPieChart';
+import DUPieChart from '@/v2/components/plots/duPieChart';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
 import { showDataFetchError } from '@/utils/common';
