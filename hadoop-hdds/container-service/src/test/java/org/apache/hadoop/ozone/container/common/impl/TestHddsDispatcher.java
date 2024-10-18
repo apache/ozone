@@ -713,12 +713,12 @@ public class TestHddsDispatcher {
 
         @Override
         public void verify(ContainerCommandRequestProtoOrBuilder cmd,
-            String user, String encodedToken) {
+            String encodedToken) {
           verify();
         }
 
         @Override
-        public void verify(String user, Token<?> token,
+        public void verify(Token<?> token,
             ContainerCommandRequestProtoOrBuilder cmd) {
           verify();
         }

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -72,14 +73,18 @@ import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_READ_THREADPOOL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.getPerfMetrics;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +106,7 @@ public class SCMBlockProtocolServer implements
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       protocolMessageMetrics;
+  private final SCMPerformanceMetrics perfMetrics;
 
   /**
    * The RPC server that listens to requests from block service clients.
@@ -109,9 +115,12 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.conf = conf;
+    this.perfMetrics = getPerfMetrics();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
+    final int readThreads = conf.getInt(OZONE_SCM_BLOCK_READ_THREADPOOL_KEY,
+        OZONE_SCM_BLOCK_READ_THREADPOOL_DEFAULT);
 
     RPC.setProtocolEngine(conf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -137,7 +146,8 @@ public class SCMBlockProtocolServer implements
             scmBlockAddress,
             ScmBlockLocationProtocolPB.class,
             blockProtoPbService,
-            handlerCount);
+            handlerCount,
+            readThreads);
     blockRpcAddress =
         updateRPCListenAddress(
             conf, scm.getScmNodeDetails().getBlockProtocolServerAddressKey(),
@@ -262,12 +272,15 @@ public class SCMBlockProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
+    long startNanos = Time.monotonicNowNanos();
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
+      perfMetrics.updateDeleteKeySuccessStats(startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
     } catch (IOException ioe) {
       e = ioe;
+      perfMetrics.updateDeleteKeyFailureStats(startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {

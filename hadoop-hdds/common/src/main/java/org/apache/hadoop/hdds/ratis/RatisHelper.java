@@ -32,6 +32,7 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -61,6 +61,7 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
+import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -242,6 +243,12 @@ public final class RatisHelper {
       ConfigurationSource conf) {
     return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
+  }
+
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClientNoRetry(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
+        RetryPolicies.noRetry(), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
@@ -443,8 +450,8 @@ public final class RatisHelper {
 
   private static boolean datanodeUseHostName() {
     return CONF.getBoolean(
-            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,

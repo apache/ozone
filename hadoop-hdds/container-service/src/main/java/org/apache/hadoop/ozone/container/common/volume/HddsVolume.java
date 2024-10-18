@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,7 +199,7 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * Delete all files under
-   * <volume>/hdds/<cluster-id>/tmp/deleted-containers.
+   * volume/hdds/cluster-id/tmp/deleted-containers.
    * This is the directory where containers are moved when they are deleted
    * from the system, but before being removed from the filesystem. This
    * makes the deletion atomic.
@@ -274,15 +275,6 @@ public class HddsVolume extends StorageVolume {
       LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
           "{}", getStorageDir(), dbFile);
       return VolumeCheckResult.FAILED;
-    }
-
-    // TODO HDDS-8784 trigger compaction outside of volume check. Then the
-    //  exception can be removed.
-    if (df.autoCompactionSmallSstFile()) {
-      // Calculate number of files per level and size per level
-      RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
-          dbFile.getAbsolutePath(), getConf());
-      rawDB.getStore().compactionIfNeeded();
     }
 
     return VolumeCheckResult.HEALTHY;
@@ -469,5 +461,21 @@ public class HddsVolume extends StorageVolume {
     dbLoadFailure.set(false);
     LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
         getStorageID());
+  }
+
+  public void compactDb() {
+    File dbFile = new File(getDbParentDir(), CONTAINER_DB_NAME);
+    String dbFilePath = dbFile.getAbsolutePath();
+    try {
+      // Calculate number of files per level and size per level
+      RawDB rawDB =
+          DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
+      long start = Time.monotonicNowNanos();
+      rawDB.getStore().compactionIfNeeded();
+      volumeInfoMetrics.dbCompactTimesNanoSecondsIncr(
+          Time.monotonicNowNanos() - start);
+    } catch (Exception e) {
+      LOG.warn("compact rocksdb error in {}", dbFilePath, e);
+    }
   }
 }

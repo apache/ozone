@@ -26,6 +26,7 @@ import java.io.Writer;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -56,7 +57,7 @@ public final class DatanodeIdYaml {
   }
 
   /**
-   * Creates a yaml file using DatnodeDetails. This method expects the path
+   * Creates a yaml file using DatanodeDetails. This method expects the path
    * validation to be performed by the caller.
    *
    * @param datanodeDetails {@link DatanodeDetails}
@@ -238,8 +239,9 @@ public final class DatanodeIdYaml {
         = new DatanodeLayoutStorage(conf, datanodeDetails.getUuidString());
 
     Map<String, Integer> portDetails = new LinkedHashMap<>();
-    if (!CollectionUtils.isEmpty(datanodeDetails.getPorts())) {
-      for (DatanodeDetails.Port port : datanodeDetails.getPorts()) {
+    final List<DatanodeDetails.Port> ports = datanodeDetails.getPorts();
+    if (!CollectionUtils.isEmpty(ports)) {
+      for (DatanodeDetails.Port port : ports) {
         Field f = null;
         try {
           f = DatanodeDetails.Port.Name.class

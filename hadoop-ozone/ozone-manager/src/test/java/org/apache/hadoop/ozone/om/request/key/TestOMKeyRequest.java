@@ -27,7 +27,11 @@ import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -40,9 +44,15 @@ import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -70,6 +80,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.Time;
+import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
@@ -101,6 +112,7 @@ public class TestOMKeyRequest {
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
+  protected StorageContainerLocationProtocol scmContainerLocationProtocol;
   protected OMPerformanceMetrics metrics;
 
   protected static final long CONTAINER_ID = 1000L;
@@ -121,15 +133,18 @@ public class TestOMKeyRequest {
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
+    metrics = OMPerformanceMetrics.register();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
+    ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
+    when(ozoneManager.getPerfMetrics()).thenReturn(metrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
@@ -163,6 +178,9 @@ public class TestOMKeyRequest {
     when(ozoneManager.getOMServiceId()).thenReturn(
         UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
+    scmContainerLocationProtocol = Mockito.mock(StorageContainerLocationProtocol.class);
+    when(scmClient.getContainerClient()).thenReturn(scmContainerLocationProtocol);
+
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     when(ozoneManager.getAccessAuthorizer())
         .thenReturn(new OzoneNativeAuthorizer());
@@ -203,6 +221,9 @@ public class TestOMKeyRequest {
           return allocatedBlocks;
         });
 
+    ContainerWithPipeline containerWithPipeline =
+        new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline);
+    when(scmContainerLocationProtocol.getContainerWithPipeline(anyLong())).thenReturn(containerWithPipeline);
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
@@ -223,7 +244,7 @@ public class TestOMKeyRequest {
         .thenReturn(bucket);
     when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(bucket);
-    OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
+    OmSnapshotManager omSnapshotManager = Mockito.spy(new OmSnapshotManager(ozoneManager));
     when(ozoneManager.getOmSnapshotManager())
         .thenReturn(omSnapshotManager);
 
@@ -271,4 +292,34 @@ public class TestOMKeyRequest {
     omMetrics.unRegister();
     framework().clearInlineMocks();
   }
+
+  /**
+   * Create snapshot and checkpoint directory.
+   */
+  protected SnapshotInfo createSnapshot(String snapshotName) throws Exception {
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
+    BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation();
+    OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
+        .createSnapshotRequest(volumeName, bucketName, snapshotName);
+    // Pre-Execute OMSnapshotCreateRequest.
+    OMSnapshotCreateRequest omSnapshotCreateRequest =
+        TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
+
+    // validateAndUpdateCache OMSnapshotCreateResponse.
+    OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
+    // Add to batch and commit to DB.
+    omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    batchOperation.close();
+
+    String key = SnapshotInfo.getTableKey(volumeName,
+        bucketName, snapshotName);
+    SnapshotInfo snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable().get(key);
+    assertNotNull(snapshotInfo);
+    return snapshotInfo;
+  }
+
 }

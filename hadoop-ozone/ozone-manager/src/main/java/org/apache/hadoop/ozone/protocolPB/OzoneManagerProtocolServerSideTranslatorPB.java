@@ -20,7 +20,7 @@ import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServe
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -218,6 +219,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
+          OMAuditLogger.log(omClientRequest.getAuditBuilder());
           omClientRequest.handleRequestFailure(ozoneManager);
         }
         return createErrorResponse(request, ex);
@@ -296,7 +298,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       } else {
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
-        request = omClientRequest.preExecute(ozoneManager);
+        try {
+          request = omClientRequest.preExecute(ozoneManager);
+        } catch (IOException ex) {
+          // log only when audit build is complete as required
+          OMAuditLogger.log(omClientRequest.getAuditBuilder());
+          throw ex;
+        }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
         omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);
       }

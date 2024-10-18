@@ -34,6 +34,7 @@ public final class OmDBAccessIdInfo {
       Proto2Codec.get(ExtendedUserAccessIdInfo.getDefaultInstance()),
       OmDBAccessIdInfo::getFromProtobuf,
       OmDBAccessIdInfo::getProtobuf,
+      OmDBAccessIdInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<OmDBAccessIdInfo> getCodec() {

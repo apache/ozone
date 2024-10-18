@@ -119,7 +119,7 @@ public final class OmUtils {
    * Return list of OM addresses by service ids - when HA is enabled.
    *
    * @param conf {@link ConfigurationSource}
-   * @return {service.id -> [{@link InetSocketAddress}]}
+   * @return {service.id -&gt; [{@link InetSocketAddress}]}
    */
   public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
       ConfigurationSource conf) {
@@ -243,7 +243,12 @@ public final class OmUtils {
     case ListKeys:
     case ListKeysLight:
     case ListTrash:
+      // ListTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
     case ServiceList:
+    case ListOpenFiles:
     case ListMultiPartUploadParts:
     case GetFileStatus:
     case LookupFile:
@@ -273,6 +278,8 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
+    case GetQuotaRepairStatus:
+    case StartQuotaRepair:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -302,6 +309,10 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
     case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
@@ -321,11 +332,13 @@ public final class OmUtils {
     case DeleteSnapshot:
     case RenameSnapshot:
     case SnapshotMoveDeletedKeys:
+    case SnapshotMoveTableKeys:
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
+    case QuotaRepair:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -355,13 +368,36 @@ public final class OmUtils {
       String omServiceId) {
     String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
     Collection<String> nodeIds = conf.getTrimmedStringCollection(nodeIdsKey);
-    String decommNodesKey = ConfUtils.addKeySuffixes(
-        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
-    Collection<String> decommNodeIds = conf.getTrimmedStringCollection(
-        decommNodesKey);
-    nodeIds.removeAll(decommNodeIds);
+    String decommissionNodesKeyWithServiceIdSuffix =
+        ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
+            omServiceId);
+    Collection<String> decommissionedNodeIds =
+        getDecommissionedNodeIds(conf, decommissionNodesKeyWithServiceIdSuffix);
+    nodeIds.removeAll(decommissionedNodeIds);
 
     return nodeIds;
+  }
+
+  /**
+   * Returns a collection of configured nodeId's that are to be decommissioned.
+   * Aggregate results from both config keys - with and without serviceId
+   * suffix. If ozone.om.service.ids contains a single service ID, then a config
+   * key without suffix defaults to nodeID associated with that serviceID.
+   */
+  public static Collection<String> getDecommissionedNodeIds(
+      ConfigurationSource conf,
+      String decommissionedNodesKeyWithServiceIdSuffix) {
+    HashSet<String> serviceIds = new HashSet<>(
+        conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+    HashSet<String> decommissionedNodeIds = new HashSet<>(
+        conf.getTrimmedStringCollection(
+            decommissionedNodesKeyWithServiceIdSuffix));
+    // If only one serviceID is configured, also check property without prefix
+    if (decommissionedNodeIds.isEmpty() && serviceIds.size() == 1) {
+      decommissionedNodeIds.addAll(
+          conf.getTrimmedStringCollection(OZONE_OM_DECOMMISSIONED_NODES_KEY));
+    }
+    return decommissionedNodeIds;
   }
 
   /**
@@ -377,6 +413,7 @@ public final class OmUtils {
 
     nodeIds.addAll(conf.getTrimmedStringCollection(nodeIdsKey));
     nodeIds.addAll(conf.getTrimmedStringCollection(decommNodesKey));
+    nodeIds.addAll(conf.getTrimmedStringCollection(OZONE_OM_DECOMMISSIONED_NODES_KEY));
 
     return nodeIds;
   }
@@ -498,7 +535,7 @@ public final class OmUtils {
   public static void validateVolumeName(String volumeName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName, isStrictS3);
+      HddsClientUtils.verifyResourceName(volumeName, "volume", isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid volume name: " + volumeName,
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -511,7 +548,7 @@ public final class OmUtils {
   public static void validateBucketName(String bucketName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName, isStrictS3);
+      HddsClientUtils.verifyResourceName(bucketName, "bucket", isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);
@@ -547,9 +584,9 @@ public final class OmUtils {
       return;
     }
     try {
-      HddsClientUtils.verifyResourceName(snapshotName);
+      HddsClientUtils.verifyResourceName(snapshotName, "snapshot");
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid snapshot name: " + snapshotName,
+      throw new OMException("Invalid snapshot name: " + snapshotName + "\n" + e.getMessage(),
           OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
     }
   }
@@ -670,7 +707,7 @@ public final class OmUtils {
    * Look at 'ozone.om.internal.service.id' first. If configured, return that.
    * If the above is not configured, look at 'ozone.om.service.ids'.
    * If count(ozone.om.service.ids) == 1, return that id.
-   * If count(ozone.om.service.ids) > 1 throw exception
+   * If count(ozone.om.service.ids) &gt; 1 throw exception
    * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
    * @param conf configuration
    * @return OM service ID.
@@ -819,10 +856,9 @@ public final class OmUtils {
     } else {
       omNodeIds = OmUtils.getActiveOMNodeIds(conf, omServiceId);
     }
-    Collection<String> decommissionedNodeIds = conf.getTrimmedStringCollection(
+    Collection<String> decommissionedNodeIds = getDecommissionedNodeIds(conf,
             ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
                     omServiceId));
-
     if (omNodeIds.isEmpty()) {
       // If there are no nodeIds present, return empty list
       return Collections.emptyList();
@@ -832,6 +868,12 @@ public final class OmUtils {
       try {
         OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
             conf, omServiceId, nodeId);
+        if (omNodeDetails == null) {
+          LOG.error(
+              "There is no OM configuration for node ID {} in ozone-site.xml.",
+              nodeId);
+          continue;
+        }
         if (decommissionedNodeIds.contains(omNodeDetails.getNodeId())) {
           omNodeDetails.setDecommissioningState();
         }

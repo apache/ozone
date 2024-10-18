@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.function.Function;
+
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -38,10 +40,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 
@@ -211,6 +215,28 @@ public final class ContainerCommandResponseBuilders {
   }
 
   /**
+   * Gets a response for the WriteChunk RPC.
+   * @param msg - ContainerCommandRequestProto
+   * @return - ContainerCommandResponseProto
+   */
+  public static ContainerCommandResponseProto getWriteChunkResponseSuccess(
+      ContainerCommandRequestProto msg, BlockData blockData) {
+
+    WriteChunkResponseProto.Builder writeChunk =
+        WriteChunkResponseProto.newBuilder();
+    if (blockData != null) {
+      writeChunk.setCommittedBlockLength(
+          getCommittedBlockLengthResponseBuilder(
+              blockData.getSize(), blockData.getBlockID()));
+
+    }
+    return getSuccessResponseBuilder(msg)
+        .setCmdType(Type.WriteChunk)
+        .setWriteChunk(writeChunk)
+        .build();
+  }
+
+  /**
    * Gets a response to the read small file call.
    * @param request - Msg
    * @param dataBuffers  - Data
@@ -304,6 +330,43 @@ public final class ContainerCommandResponseBuilders {
 
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getFinalizeBlockResponse(
+      ContainerCommandRequestProto msg, BlockData data) {
+
+    ContainerProtos.FinalizeBlockResponseProto.Builder blockData =
+        ContainerProtos.FinalizeBlockResponseProto.newBuilder()
+        .setBlockData(data);
+
+    return getSuccessResponseBuilder(msg)
+        .setFinalizeBlock(blockData)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getEchoResponse(
+      ContainerCommandRequestProto msg) {
+
+    ContainerProtos.EchoRequestProto echoRequest = msg.getEcho();
+    int responsePayload = echoRequest.getPayloadSizeResp();
+
+    int sleepTimeMs = echoRequest.getSleepTimeMs();
+    try {
+      if (sleepTimeMs > 0) {
+        Thread.sleep(sleepTimeMs);
+      }
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    ContainerProtos.EchoResponseProto.Builder echo =
+        ContainerProtos.EchoResponseProto
+            .newBuilder()
+            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.nextBytes(responsePayload)));
+
+    return getSuccessResponseBuilder(msg)
+        .setEcho(echo)
         .build();
   }
 

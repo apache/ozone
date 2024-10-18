@@ -472,15 +472,17 @@ public final class OMFileRequest {
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String fileName, String keyName, long trxnLogIndex) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     if (omFileInfo != null) {
-      // New key format for the openFileTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
-      // keyName field stores only the leaf node name, which is 'file1'.
-      omFileInfo.setKeyName(fileName);
+      // keyName field stores full path, which is '/a/b/c/d/e/file1'.
+      // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
+      // (Full key path is required in commit key request)
+      omFileInfo.setKeyName(keyName);
+      // fileName will contain only the leaf(file1) which is actual file name.
       omFileInfo.setFileName(fileName);
       table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
     } else {
@@ -690,7 +692,7 @@ public final class OMFileRequest {
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext() && 
+      } else if (!elements.hasNext() &&
           (!keyName.endsWith(PATH_SEPARATOR_STR))) {
         // If the requested keyName contains "/" at the end then we need to
         // just check the directory table.
@@ -751,6 +753,7 @@ public final class OMFileRequest {
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setOwnerName(dirInfo.getOwner())
         .build();
   }
 
@@ -1047,7 +1050,7 @@ public final class OMFileRequest {
    * @param volumeName        - volume name.
    * @param bucketName        - bucket name.
    * @param keyName           - key name.
-   * @return
+   * @return {@code long}
    * @throws IOException
    */
   public static long getParentId(OMMetadataManager omMetadataManager,

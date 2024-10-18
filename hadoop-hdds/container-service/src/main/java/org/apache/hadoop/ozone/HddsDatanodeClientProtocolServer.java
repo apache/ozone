@@ -42,6 +42,8 @@ import java.net.InetSocketAddress;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_RPC;
 
@@ -106,6 +108,8 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
 
     final int handlerCount = conf.getInt(HDDS_DATANODE_HANDLER_COUNT_KEY,
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);
+    final int readThreads = conf.getInt(HDDS_DATANODE_READ_THREADPOOL_KEY,
+        HDDS_DATANODE_READ_THREADPOOL_DEFAULT);
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
     BlockingService reconfigureService = ReconfigureProtocolProtos
@@ -113,7 +117,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
             reconfigureServerProtocol);
 
     return preserveThreadName(() -> startRpcServer(configuration, rpcAddress,
-        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount));
+        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads));
   }
 
   /**
@@ -130,7 +134,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
   private RPC.Server startRpcServer(
       Configuration configuration, InetSocketAddress addr,
       Class<?> protocol, BlockingService instance,
-      int handlerCount)
+      int handlerCount, int readThreads)
       throws IOException {
     return new RPC.Builder(configuration)
         .setProtocol(protocol)
@@ -138,6 +142,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         .setBindAddress(addr.getHostString())
         .setPort(addr.getPort())
         .setNumHandlers(handlerCount)
+        .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
         .build();

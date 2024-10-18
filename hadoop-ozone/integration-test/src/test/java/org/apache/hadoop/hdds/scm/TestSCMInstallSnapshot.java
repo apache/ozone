@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ozone.test.tag.Flaky;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -126,19 +125,17 @@ public class TestSCMInstallSnapshot {
   }
 
   @Test
-  @Flaky("HDDS-6116")
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    DBStore db = HAUtils
-        .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
-            checkpoint.getCheckpointLocation().getFileName().toString(),
-            new SCMDBDefinition());
+    final Path location = checkpoint.getCheckpointLocation();
+    final DBStore db = HAUtils.loadDB(conf, location.getParent().toFile(),
+        location.getFileName().toString(), SCMDBDefinition.get());
     // Hack the transaction index in the checkpoint so as to ensure the
     // checkpointed transaction index is higher than when it was downloaded
     // from.
     assertNotNull(db);
-    HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
+    HAUtils.getTransactionInfoTable(db, SCMDBDefinition.get())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(10, 100));
     db.close();
     ContainerID cid =

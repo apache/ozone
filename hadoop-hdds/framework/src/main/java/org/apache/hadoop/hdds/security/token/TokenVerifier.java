@@ -42,18 +42,16 @@ public interface TokenVerifier {
    * Verify if {@code token} is valid to allow execution of {@code cmd} for
    * {@code user}.
    *
-   * @param user user of the request
    * @param token the token to verify
    * @param cmd container command
    * @throws SCMSecurityException if token verification fails.
    */
-  void verify(String user, Token<?> token,
+  void verify(Token<?> token,
       ContainerCommandRequestProtoOrBuilder cmd)
       throws SCMSecurityException;
 
-  /** Same as {@link #verify(String, Token,
-   * ContainerCommandRequestProtoOrBuilder)}, but with encoded token. */
-  default void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
+  /** Same as {@link #verify}, but with encoded token. */
+  default void verify(ContainerCommandRequestProtoOrBuilder cmd,
       String encodedToken) throws SCMSecurityException {
 
     if (Strings.isNullOrEmpty(encodedToken)) {
@@ -68,7 +66,7 @@ public interface TokenVerifier {
       throw new BlockTokenException("Failed to decode token : " + encodedToken);
     }
 
-    verify(user, token, cmd);
+    verify(token, cmd);
   }
 
   /** Create appropriate token verifier based on the configuration. */

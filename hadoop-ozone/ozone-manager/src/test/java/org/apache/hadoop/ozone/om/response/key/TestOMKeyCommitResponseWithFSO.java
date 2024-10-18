@@ -44,7 +44,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync, OmKeyInfo newOpenKeyInfo)
           throws IOException {
     assertNotNull(omBucketInfo);
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
@@ -57,7 +57,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync);
+        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync, newOpenKeyInfo, null, null);
   }
 
   @Nonnull

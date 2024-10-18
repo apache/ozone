@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -44,13 +45,14 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
       StringCodec.get(),
       TransactionInfo::valueOf,
       TransactionInfo::toString,
+      TransactionInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<TransactionInfo> getCodec() {
     return CODEC;
   }
 
-  private static TransactionInfo valueOf(String transactionInfo) {
+  public static TransactionInfo valueOf(String transactionInfo) {
     final String[] tInfo = transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
     Preconditions.checkArgument(tInfo.length == 2,
         "Unexpected split length: %s in \"%s\"", tInfo.length, transactionInfo);
@@ -162,7 +164,15 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
    */
   public static TransactionInfo readTransactionInfo(
       DBStoreHAManager metadataManager) throws IOException {
-    return metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    return metadataManager.getTransactionInfoTable().getSkipCache(TRANSACTION_INFO_KEY);
+  }
+
+  public ByteString toByteString() throws IOException {
+    return ByteString.copyFrom(getCodec().toPersistedFormat(this));
+  }
+
+  public static TransactionInfo fromByteString(ByteString byteString) throws IOException {
+    return byteString == null ? null : getCodec().fromPersistedFormat(byteString.toByteArray());
   }
 
   public SnapshotInfo toSnapshotInfo() {

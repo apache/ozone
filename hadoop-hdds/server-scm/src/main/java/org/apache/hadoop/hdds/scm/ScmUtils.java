@@ -23,10 +23,8 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.safemode.Precheck;
 
 import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
@@ -39,7 +37,6 @@ import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -73,30 +70,6 @@ public final class ScmUtils {
       .getLogger(ScmUtils.class);
 
   private ScmUtils() {
-  }
-
-  /**
-   * Perform all prechecks for given scm operation.
-   *
-   * @param operation
-   * @param preChecks prechecks to be performed
-   */
-  public static void preCheck(ScmOps operation, Precheck... preChecks)
-      throws SCMException {
-    for (Precheck preCheck : preChecks) {
-      preCheck.check(operation);
-    }
-  }
-
-  /**
-   * Create SCM directory file based on given path.
-   */
-  public static File createSCMDir(String dirPath) {
-    File dirFile = new File(dirPath);
-    if (!dirFile.mkdirs() && !dirFile.exists()) {
-      throw new IllegalArgumentException("Unable to create path: " + dirFile);
-    }
-    return dirFile;
   }
 
   public static InetSocketAddress getScmBlockProtocolServerAddress(

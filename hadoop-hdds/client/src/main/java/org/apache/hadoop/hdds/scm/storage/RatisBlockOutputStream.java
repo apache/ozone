@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
@@ -73,6 +72,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
   @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
       BlockID blockID,
+      long blockSize,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
@@ -81,7 +81,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
-    super(blockID, xceiverClientManager, pipeline,
+    super(blockID, blockSize, xceiverClientManager, pipeline,
         bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
@@ -102,9 +102,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  XceiverClientReply sendWatchForCommit(boolean bufferFull) throws IOException {
-    return bufferFull ? commitWatcher.watchOnFirstIndex()
-        : commitWatcher.watchOnLastIndex();
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long index) {
+    return commitWatcher.watchForCommitAsync(index);
   }
 
   @Override
@@ -113,13 +112,11 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
-    commitWatcher.putFlushFuture(flushPos, flushFuture);
-  }
-
-  @Override
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    commitWatcher.waitOnFlushFutures();
+  void waitOnFlushFuture() throws InterruptedException, ExecutionException {
+    CompletableFuture<Void> flushFuture = getLastFlushFuture();
+    if (flushFuture != null) {
+      flushFuture.get();
+    }
   }
 
   @Override
@@ -135,10 +132,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
   @Override
   public void hsync() throws IOException {
     if (!isClosed()) {
-      if (getBufferPool() != null && getBufferPool().getSize() > 0) {
-        handleFlush(false);
-      }
-      waitForFlushAndCommit(false);
+      handleFlush(false);
     }
   }
 }

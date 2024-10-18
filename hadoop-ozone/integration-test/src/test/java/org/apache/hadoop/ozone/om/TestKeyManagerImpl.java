@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -171,6 +172,7 @@ public class TestKeyManagerImpl {
   private static final String VERSIONED_BUCKET_NAME = "versionedbucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
+  private static OzoneClient rpcClient;
   private static OzoneManager om;
 
   @BeforeAll
@@ -219,6 +221,7 @@ public class TestKeyManagerImpl {
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
+    rpcClient = omTestManagers.getRpcClient();
 
     mockContainerClient();
 
@@ -235,6 +238,8 @@ public class TestKeyManagerImpl {
 
   @AfterAll
   public static void cleanup() throws Exception {
+    writeClient.close();
+    rpcClient.close();
     scm.stop();
     scm.join();
     om.stop();
@@ -252,10 +257,11 @@ public class TestKeyManagerImpl {
   public void cleanupTest() throws IOException {
     mockContainerClient();
     org.apache.hadoop.fs.Path volumePath = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, VOLUME_NAME);
-    FileSystem fs = FileSystem.get(conf);
-    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET_NAME), true);
-    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET2_NAME), true);
-    fs.delete(new org.apache.hadoop.fs.Path(volumePath, VERSIONED_BUCKET_NAME), true);
+    try (FileSystem fs = FileSystem.get(conf)) {
+      fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET_NAME), true);
+      fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET2_NAME), true);
+      fs.delete(new org.apache.hadoop.fs.Path(volumePath, VERSIONED_BUCKET_NAME), true);
+    }
   }
 
   private static void mockContainerClient() {
@@ -1694,7 +1700,8 @@ public class TestKeyManagerImpl {
             StandaloneReplicationConfig.getInstance(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
-        .setVolumeName(VOLUME_NAME);
+        .setVolumeName(VOLUME_NAME)
+        .setOwnerName(ugi.getShortUserName());
   }
 
   private RequestContext currentUserReads() throws IOException {

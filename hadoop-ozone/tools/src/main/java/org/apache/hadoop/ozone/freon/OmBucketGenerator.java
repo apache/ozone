@@ -58,6 +58,11 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private Timer bucketCreationTimer;
 
   @Override
+  public boolean allowDuration() {
+    return false;
+  }
+
+  @Override
   public Void call() throws Exception {
 
     init();

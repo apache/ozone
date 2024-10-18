@@ -18,6 +18,7 @@ Documentation       HttpFS gateway test with curl commands
 Library             Process
 Library             String
 Library             BuiltIn
+Library             OperatingSystem
 Resource            operations.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
@@ -61,10 +62,10 @@ Create second bucket
     Should contain  ${bucket.stdout}   true
 
 Create local testfile
-    Create file       testfile
+    Create File       ${TEMP_DIR}/testfile    "Hello world!"
 
 Create testfile
-    ${file} =       Execute create file command     ${volume}/buck1/testfile     testfile
+    ${file} =       Execute create file command     ${volume}/buck1/testfile     ${TEMP_DIR}/testfile
     Should contain     ${file.stdout}     http://httpfs:14000/webhdfs/v1/${volume}/buck1/testfile
 
 Read file
@@ -104,16 +105,6 @@ Get content summary of directory
 Get quota usage of directory
     ${usage} =      Execute curl command    ${volume}          GETQUOTAUSAGE      ${EMPTY}
     Should contain  ${usage.stdout}    QuotaUsage          "fileAndDirectoryCount":3
-
-Get home directory
-    ${home} =       Execute curl command    ${EMPTY}          GETHOMEDIRECTORY      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
-    Should contain  ${home.stdout}     "Path":"\\/user\\/${user}"
-
-Get trash root
-    ${trash} =      Execute curl command    ${volume}/buck1/testfile          GETTRASHROOT      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
-    Should contain  ${trash.stdout}    "Path":"\\/${volume}\\/buck1\\/.Trash\\/${user}"
 
 # Missing functionality, not working yet.
 # Set permission of bucket

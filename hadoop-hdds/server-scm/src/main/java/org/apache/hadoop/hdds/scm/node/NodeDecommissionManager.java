@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -254,12 +254,7 @@ public class NodeDecommissionManager {
    * @return True if port is used by the datanode. False otherwise.
    */
   private boolean validateDNPortMatch(int port, DatanodeDetails dn) {
-    for (DatanodeDetails.Port p : dn.getPorts()) {
-      if (p.getValue() == port) {
-        return true;
-      }
-    }
-    return false;
+    return dn.hasPort(port);
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm, ContainerManager cm,
@@ -278,8 +273,8 @@ public class NodeDecommissionManager {
     );
 
     useHostnames = config.getBoolean(
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
     long monitorInterval = config.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
@@ -327,7 +322,6 @@ public class NodeDecommissionManager {
       boolean decommissionPossible = checkIfDecommissionPossible(dns, errors);
       if (!decommissionPossible) {
         LOG.error("Cannot decommission nodes as sufficient node are not available.");
-        errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
         return errors;
       }
     } else {
@@ -436,10 +430,11 @@ public class NodeDecommissionManager {
           }
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
           if ((inServiceTotal - numDecom) < reqNodes) {
-            LOG.info("Cannot decommission nodes. Tried to decommission {} nodes of which valid nodes = {}. " +
-                    "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
-                    "Failing due to datanode : {}, container : {}",
-                dns.size(), numDecom, inServiceTotal, reqNodes, dn, cid);
+            String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
+                " nodes of which " + numDecom + " nodes were valid. Cluster has " + inServiceTotal +
+                " IN-SERVICE nodes, " + reqNodes + " of which are required for minimum replication. ";
+            LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
+            errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;
           }
         }
@@ -495,7 +490,6 @@ public class NodeDecommissionManager {
       boolean maintenancePossible = checkIfMaintenancePossible(dns, errors);
       if (!maintenancePossible) {
         LOG.error("Cannot put nodes to maintenance as sufficient node are not available.");
-        errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
         return errors;
       }
     } else {
@@ -600,11 +594,11 @@ public class NodeDecommissionManager {
             minInService = maintenanceReplicaMinimum;
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
-            LOG.info("Cannot enter nodes into maintenance. Tried to start maintenance for {} nodes " +
-                    "of which valid nodes = {}. " +
-                    "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
-                    "Failing due to datanode : {}, container : {}",
-                dns.size(), numMaintenance, inServiceTotal, minInService, dn, cid);
+            String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
+                " nodes of which " + numMaintenance + " nodes were valid. Cluster has " + inServiceTotal +
+                " IN-SERVICE nodes, " + minInService + " of which are required for minimum replication. ";
+            LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
+            errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;
           }
         }

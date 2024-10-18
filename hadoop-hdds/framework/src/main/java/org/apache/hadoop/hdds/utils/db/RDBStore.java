@@ -163,7 +163,7 @@ public class RDBStore implements DBStore {
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
             compactionLogTableCF.getHandle());
         // Set activeRocksDB in differ to access compaction log CF.
-        rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb().get());
+        rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb());
         // Load all previous compaction logs
         rocksDBCheckpointDiffer.loadAllCompactionLogs();
       }
@@ -336,6 +336,14 @@ public class RDBStore implements DBStore {
       this.flushDB();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
+  }
+
+  @Override
+  public DBCheckpoint getCheckpoint(String parentPath, boolean flush) throws IOException {
+    if (flush) {
+      this.flushDB();
+    }
+    return checkPointManager.createCheckpoint(parentPath, null);
   }
 
   public DBCheckpoint getSnapshot(String name) throws IOException {

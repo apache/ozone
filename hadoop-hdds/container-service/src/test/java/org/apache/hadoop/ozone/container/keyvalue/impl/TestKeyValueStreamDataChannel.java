@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
-import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.Buffers;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.WriteMethod;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
@@ -70,7 +70,7 @@ public class TestKeyValueStreamDataChannel {
   public static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueStreamDataChannel.class);
 
-  static final ContainerCommandRequestProto PUT_BLOCK_PROTO
+  private static final ContainerCommandRequestProto PUT_BLOCK_PROTO
       = ContainerCommandRequestProto.newBuilder()
       .setCmdType(Type.PutBlock)
       .setPutBlock(PutBlockRequestProto.newBuilder().setBlockData(
@@ -78,6 +78,7 @@ public class TestKeyValueStreamDataChannel {
               .setContainerID(222).setLocalID(333).build()).build()))
       .setDatanodeUuid("datanodeId")
       .setContainerID(111L)
+      .setVersion(ClientVersion.CURRENT.toProtoValue())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
   static {

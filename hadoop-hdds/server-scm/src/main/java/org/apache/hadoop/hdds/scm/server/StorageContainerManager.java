@@ -50,11 +50,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
-import org.apache.hadoop.hdds.scm.security.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -146,6 +146,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
@@ -170,6 +171,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
@@ -203,12 +205,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EX
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
@@ -236,7 +236,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM metrics.
    */
   private static SCMMetrics metrics;
+  private static SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
+  private final NettyMetrics nettyMetrics;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -367,6 +369,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
+    initPerfMetrics();
 
     boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
@@ -456,6 +459,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   private void initializeEventHandlers() {
@@ -503,8 +507,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, configuration);
-    CRLStatusReportHandler crlStatusReportHandler =
-        new CRLStatusReportHandler(certificateStore, configuration);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -577,7 +579,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
     scmNodeManager.registerSendCommandNotify(
         SCMCommandProto.Type.deleteBlocksCommand,
@@ -608,7 +609,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf        HDDS configuration
    * @param configurator SCM configurator
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(
       OzoneConfiguration conf, SCMConfigurator configurator)
@@ -621,7 +623,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf        HDDS configuration
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -879,8 +882,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     certificateStore =
         new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
-            .setRatisServer(scmHAManager.getRatisServer())
-            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
+            .setRatisServer(scmHAManager.getRatisServer()).build();
 
 
     final CertificateServer scmCertificateServer;
@@ -957,16 +959,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // and ratis server initialized with statemachine. We need to do only
     // for primary scm, for other bootstrapped scm's certificates will be
     // persisted via ratis.
-    if (certificateStore.getCertificateByID(certSerial,
-        VALID_CERTS) == null) {
+    if (certificateStore.getCertificateByID(certSerial) == null) {
       LOG.info("Storing sub-ca certificate serialId {} on primary SCM",
           certSerial);
       certificateStore.storeValidScmCertificate(
           certSerial, scmCertificateClient.getCertificate());
     }
     X509Certificate rootCACert = scmCertificateClient.getCACertificate();
-    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber(),
-        VALID_CERTS) == null) {
+    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber()) == null) {
       LOG.info("Storing root certificate serialId {}",
           rootCACert.getSerialNumber());
       certificateStore.storeValidScmCertificate(
@@ -1076,19 +1076,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  long getLastSequenceIdForCRL() throws IOException {
-    Long sequenceId =
-        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY);
-    // If the CRL_SEQUENCE_ID_KEY does not exist in DB return 0 so that new
-    // CRL requests can have sequence id starting from 1.
-    if (sequenceId == null) {
-      return 0L;
-    }
-    // If there exists a last sequence id in the DB, the new incoming
-    // CRL requests must have sequence ids greater than the one stored in the DB
-    return sequenceId;
-  }
-
   /**
    * Builds a message for logging startup information about an RPC server.
    *
@@ -1119,7 +1106,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       InetSocketAddress addr,
       Class<?> protocol,
       BlockingService instance,
-      int handlerCount)
+      int handlerCount,
+      int readThreads)
       throws IOException {
 
     RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
@@ -1128,6 +1116,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setBindAddress(addr.getHostString())
         .setPort(addr.getPort())
         .setNumHandlers(handlerCount)
+        .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
         .build());
@@ -1429,6 +1418,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
+  /**
+   * Initialize SCMPerformance metrics.
+   */
+  public static void initPerfMetrics() {
+    perfMetrics = SCMPerformanceMetrics.create();
+  }
+  /**
+   * Return SCMPerformance metrics instance.
+   */
+  public static SCMPerformanceMetrics getPerfMetrics() {
+    return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
+  }
 
   public SCMStorageConfig getScmStorageConfig() {
     return scmStorageConfig;
@@ -1615,14 +1616,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
       List<String> pemEncodedCerts =
-          scmCertificateClient.listCA();
-
+          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
         X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
             cert, CertificateCodec::toIOException);
-        if (certificateStore.getCertificateByID(
-            x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
+        if (certificateStore.getCertificateByID(x509Certificate.getSerialNumber()) == null) {
           LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
                   "{}", x509Certificate.getSerialNumber(),
               scmStorageConfig.getScmId());
@@ -1716,6 +1715,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+
+    nettyMetrics.unregister();
+    if (perfMetrics != null) {
+      perfMetrics.unRegister();
     }
 
     unregisterMXBean();
@@ -1983,6 +1987,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmSafeModeManager.getInSafeMode();
   }
 
+  @Override
+  public boolean isSafeModeExitForceful() {
+    return scmSafeModeManager.isForceExitSafeMode();
+  }
+
   /**
    * Returns EventPublisher.
    */
@@ -2015,7 +2024,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Force SCM out of safe mode.
    */
   public boolean exitSafeMode() {
-    scmSafeModeManager.exitSafeMode(eventQueue);
+    scmSafeModeManager.exitSafeMode(eventQueue, true);
     return true;
   }
 
@@ -2114,6 +2123,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHAMetrics;
   }
 
+  public SCMContainerPlacementMetrics getPlacementMetrics() {
+    return placementMetrics;
+  }
+
   public ContainerTokenGenerator getContainerTokenGenerator() {
     return containerTokenMgr != null
         ? containerTokenMgr
@@ -2121,10 +2134,54 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisRoles() {
+  public List<List<String>> getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
-    return server != null ?
-        HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
+
+    // If Ratis is disabled
+    if (server == null) {
+      return getRatisRolesException("Ratis is disabled");
+    }
+
+    // To attempt to find the SCM Leader,
+    // and if the Leader is not found
+    // return Leader is not found message.
+    RaftServer.Division division = server.getDivision();
+    RaftPeerId leaderId = division.getInfo().getLeaderId();
+    if (leaderId == null) {
+      return getRatisRolesException("No leader found");
+    }
+
+    // If the SCMRatisServer is stopped, return a service stopped message.
+    if (server.isStopped()) {
+      return getRatisRolesException("Server is shutting down");
+    }
+
+    // Attempt to retrieve role information.
+    try {
+      List<String> ratisRoles = server.getRatisRoles();
+      List<List<String>> result = new ArrayList<>();
+      for (String role : ratisRoles) {
+        String[] roleArr = role.split(":");
+        List<String> scmInfo = new ArrayList<>();
+        // Host Name
+        scmInfo.add(roleArr[0]);
+        // Node ID
+        scmInfo.add(roleArr[3]);
+        // Ratis Port
+        scmInfo.add(roleArr[1]);
+        // Role
+        scmInfo.add(roleArr[2]);
+        result.add(scmInfo);
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("Failed to getRatisRoles.", e);
+      return getRatisRolesException("Exception Occurred, " + e.getMessage());
+    }
+  }
+
+  private static List<List<String>> getRatisRolesException(String exceptionString) {
+    return Collections.singletonList(Collections.singletonList(exceptionString));
   }
 
   /**

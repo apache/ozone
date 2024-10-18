@@ -32,6 +32,7 @@ import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.security.token.Token;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -70,7 +71,6 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
    * @param blockInfo The blockInfo representing the block.
    * @param pipeline The pipeline to be used for reading the block
    * @param token The block Access Token
-   * @param verifyChecksum Whether to verify checksums or not.
    * @param xceiverFactory Factory to create the xceiver in the client
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
@@ -80,13 +80,13 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     if (repConfig.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
     } else {
-      return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
+      return new BlockInputStream(blockInfo,
           pipeline, token, xceiverFactory, refreshFunction,
           config);
     }

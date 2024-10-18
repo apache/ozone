@@ -234,7 +234,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /* Optimize ugi lookup for RPC operations to avoid a trip through
    * UGI.getCurrentUser which is synch'ed.
    */
-  private UserGroupInformation getRemoteUser() throws IOException {
+  protected UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
@@ -611,7 +611,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Get FileEncryptionInfoProto from KeyArgs.
    * @param keyArgs
-   * @return
+   * @return FileEncryptionInfo
    */
   protected FileEncryptionInfo getFileEncryptionInfo(KeyArgs keyArgs) {
     FileEncryptionInfo encryptionInfo = null;
@@ -623,7 +623,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
-   * @paran metadataManager
+   * @param metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
@@ -775,10 +775,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
-      // Clear the old one when the key is overwritten.
       dbKeyInfo.getMetadata().clear();
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
+
+      // Construct a new tags from KeyArgs
+      // Clear the old one when the key is overwritten
+      dbKeyInfo.getTags().clear();
+      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getTagsList()));
+
+      if (keyArgs.hasExpectedDataGeneration()) {
+        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+      }
 
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
@@ -821,7 +830,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
                 keyArgs, omBucketInfo, omPathInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
+            .addAllTags(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getTagsList()))
             .setUpdateID(transactionLogIndex)
+            .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
@@ -899,7 +911,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   protected String getDBMultipartOpenKey(String volumeName, String bucketName,

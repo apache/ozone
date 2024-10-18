@@ -58,8 +58,8 @@ public interface BlockManager {
    * @return Block Data.
    * @throws IOException when BcsId is unknown or mismatched
    */
-  BlockData getBlock(Container container, BlockID blockID)
-      throws IOException;
+  BlockData getBlock(Container container, BlockID blockID) throws IOException;
+
 
   /**
    * Deletes an existing block.
@@ -91,10 +91,16 @@ public interface BlockManager {
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;
 
+  void finalizeBlock(Container container, BlockID blockId)
+      throws IOException;
+
   int getDefaultReadBufferCapacity();
 
   /** @return the threshold to read using memory mapped buffers. */
   int getReadMappedBufferThreshold();
+
+  /** @return the max count of memory mapped buffers to read. */
+  int getReadMappedBufferMaxCount();
 
   /**
    * Shutdown ContainerManager.

@@ -83,6 +83,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -172,6 +173,10 @@ abstract class AbstractOzoneFileSystemTest {
   private String bucketName;
   private Trash trash;
   private OMMetrics omMetrics;
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void init() throws Exception {
@@ -182,7 +187,10 @@ abstract class AbstractOzoneFileSystemTest {
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (!bucketLayout.equals(FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
@@ -217,6 +225,10 @@ abstract class AbstractOzoneFileSystemTest {
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
+
+    userO3fs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<OzoneFileSystem>)()
+            -> (OzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterAll
@@ -256,6 +268,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(fsRoot + "user/" + USER1),
+        userO3fs.getHomeDirectory());
   }
 
   @Test
@@ -391,7 +409,7 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   private void checkInvalidPath(Path path) {
-    InvalidPathException pathException = assertThrows(
+    InvalidPathException pathException = GenericTestUtils.assertThrows(
         InvalidPathException.class, () -> fs.create(path, false)
     );
     assertThat(pathException.getMessage()).contains("Invalid path Name");
@@ -624,6 +642,100 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testObjectOwner() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1 create file /file1
+      // user2 create directory /dir1
+      // user3 create file /dir1/file2
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[] {"user1"});
+      UserGroupInformation user2 = UserGroupInformation
+          .createUserForTesting("user2", new String[] {"user2"});
+      UserGroupInformation user3 = UserGroupInformation
+          .createUserForTesting("user3", new String[] {"user3"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      assertEquals(user2.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      assertEquals(user3.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
+  public void testObjectProxyUser() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1ProxyUser create file /file1
+      // user2ProxyUser create directory /dir1
+      // user3ProxyUser create file /dir1/file2
+      String proxyUserName = "proxyuser";
+      UserGroupInformation proxyuser = UserGroupInformation
+          .createUserForTesting(proxyUserName, new String[] {"user1"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+
+      UserGroupInformation user1ProxyUser =
+          UserGroupInformation.createProxyUser("user1", proxyuser);
+      UserGroupInformation user2ProxyUser =
+          UserGroupInformation.createProxyUser("user2", proxyuser);
+      UserGroupInformation user3ProxyUser =
+          UserGroupInformation.createProxyUser("user3", proxyuser);
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1ProxyUser.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      assertEquals(user2ProxyUser.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      assertEquals(user3ProxyUser.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
   public void testListStatusWithIntermediateDir() throws Exception {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
@@ -635,6 +747,7 @@ abstract class AbstractOzoneFileSystemTest {
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
         .build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);
@@ -671,6 +784,8 @@ abstract class AbstractOzoneFileSystemTest {
             .setAcls(Collections.emptyList())
             .setReplicationConfig(new ECReplicationConfig(3, 2))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
@@ -1716,12 +1831,14 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, linkBucket1Name, linksVolume);
 
-    try {
-      FileSystem.get(URI.create(rootPath), cluster.getConf());
-      fail("Should throw Exception due to loop in Link Buckets");
+    try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
+        cluster.getConf())) {
+      fail("Should throw Exception due to loop in Link Buckets" +
+          " while initialising fs with URI " + fileSystem.getUri());
     } catch (OMException oe) {
       // Expected exception
-      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS, oe.getResult());
+      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
     } finally {
       volume.deleteBucket(linkBucket1Name);
       volume.deleteBucket(linkBucket2Name);
@@ -1739,13 +1856,17 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath2 = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, danglingLinkBucketName, linksVolume);
 
+    FileSystem fileSystem = null;
     try {
-      FileSystem.get(URI.create(rootPath2), cluster.getConf());
+      fileSystem = FileSystem.get(URI.create(rootPath2), cluster.getConf());
     } catch (OMException oe) {
       // Expected exception
       fail("Should not throw Exception and show orphan buckets");
     } finally {
       volume.deleteBucket(danglingLinkBucketName);
+      if (fileSystem != null) {
+        fileSystem.close();
+      }
     }
   }
 
@@ -2115,7 +2236,8 @@ abstract class AbstractOzoneFileSystemTest {
       OzoneConfiguration config = new OzoneConfiguration(fs.getConf());
       config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
-      IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> FileSystem.get(config));
+      IllegalArgumentException e = GenericTestUtils.assertThrows(IllegalArgumentException.class,
+              () -> FileSystem.get(config));
       assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
     }
   }
@@ -2154,4 +2276,26 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(value, statistics.getLong(key).longValue());
   }
 
+  @Test
+  void testSnapshotRead() throws Exception {
+    // Init data
+    Path snapPath1 = fs.createSnapshot(new Path("/"), "snap1");
+
+    Path file1 = new Path("/key1");
+    Path file2 = new Path("/key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snapPath2 = fs.createSnapshot(new Path("/"), "snap2");
+
+    Path file3 = new Path("/key3");
+    ContractTestUtils.touch(fs, file3);
+    Path snapPath3 = fs.createSnapshot(new Path("/"), "snap3");
+
+    FileStatus[] f1 = fs.listStatus(snapPath1);
+    FileStatus[] f2 = fs.listStatus(snapPath2);
+    FileStatus[] f3 = fs.listStatus(snapPath3);
+    assertEquals(0, f1.length);
+    assertEquals(2, f2.length);
+    assertEquals(3, f3.length);
+  }
 }

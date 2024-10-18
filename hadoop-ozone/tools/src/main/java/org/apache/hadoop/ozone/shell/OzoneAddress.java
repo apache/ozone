@@ -39,6 +39,7 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.http.client.utils.URIBuilder;
 
@@ -157,21 +158,23 @@ public class OzoneAddress {
             ozoneURI.getPort(), conf);
       }
     } else { // When host is not specified
-
-      Collection<String> omServiceIds = conf.getTrimmedStringCollection(
-          OZONE_OM_SERVICE_IDS_KEY);
-
-      if (omServiceIds.size() > 1) {
-        throw new OzoneClientException("Service ID or host name must not"
-            + " be omitted when multiple ozone.om.service.ids is defined.");
-      } else if (omServiceIds.size() == 1) {
-        client = createRpcClientFromServiceId(omServiceIds.iterator().next(),
-            conf);
+      String localOmServiceId = conf.getTrimmed(OZONE_OM_INTERNAL_SERVICE_ID);
+      if (localOmServiceId == null) {
+        Collection<String> omServiceIds = conf.getTrimmedStringCollection(
+            OZONE_OM_SERVICE_IDS_KEY);
+        if (omServiceIds.size() > 1) {
+          throw new OzoneClientException("Service ID or host name must not"
+              + " be omitted when multiple ozone.om.service.ids is defined.");
+        } else if (omServiceIds.size() == 1) {
+          client = createRpcClientFromServiceId(omServiceIds.iterator().next(),
+              conf);
+        } else {
+          client = createRpcClient(conf);
+        }
       } else {
-        client = createRpcClient(conf);
+        client = createRpcClientFromServiceId(localOmServiceId, conf);
       }
     }
-
     return client;
   }
 
@@ -194,7 +197,7 @@ public class OzoneAddress {
     if (omServiceID != null) {
       // OM HA cluster
       if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
-        return OzoneClientFactory.getRpcClient(omServiceID, conf);
+        return createRpcClientFromServiceId(omServiceID, conf);
       } else {
         throw new OzoneClientException("Service ID specified does not match" +
             " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
@@ -202,8 +205,12 @@ public class OzoneAddress {
             serviceIds);
       }
     } else if (serviceIds.size() > 1) {
-      // If multiple om service ids are there,
+      // If multiple om service ids are there and default value isn't set,
       // throw an error "om service ID must not be omitted"
+      String localOmServiceId = conf.getTrimmed(OZONE_OM_INTERNAL_SERVICE_ID);
+      if (!localOmServiceId.isEmpty()) {
+        return createRpcClientFromServiceId(localOmServiceId, conf);
+      }
       throw new OzoneClientException("Service ID must not"
           + " be omitted when cluster has multiple OM Services." +
           "  Configured " + OZONE_OM_SERVICE_IDS_KEY + " are "
@@ -211,7 +218,7 @@ public class OzoneAddress {
     }
     // for non-HA cluster and HA cluster with only 1 service ID
     // get service ID from configurations
-    return OzoneClientFactory.getRpcClient(conf);
+    return createRpcClient(conf);
   }
 
   /**

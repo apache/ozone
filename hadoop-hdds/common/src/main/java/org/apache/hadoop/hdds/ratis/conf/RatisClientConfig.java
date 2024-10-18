@@ -86,7 +86,9 @@ public class RatisClientConfig {
         description =
         "The timeout duration for ratis client watch request. "
             + "Timeout for the watch API in Ratis client to acknowledge a "
-            + "particular request getting replayed to all servers.")
+            + "particular request getting replayed to all servers. "
+            + "It is highly recommended for the timeout duration to be strictly longer than "
+            + "Ratis server watch timeout (hdds.ratis.raft.server.watch.timeout)")
     private Duration rpcWatchRequestTimeout = Duration.ofSeconds(180);
 
     public Duration getRpcWatchRequestTimeout() {
@@ -96,6 +98,24 @@ public class RatisClientConfig {
     public void setRpcWatchRequestTimeout(Duration duration) {
       rpcWatchRequestTimeout = duration;
     }
+  }
+
+  @Config(key = "client.request.watch.type",
+      defaultValue = "ALL_COMMITTED",
+      type = ConfigType.STRING,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Desired replication level when Ozone client's Raft client calls watch(), " +
+          "ALL_COMMITTED or MAJORITY_COMMITTED. MAJORITY_COMMITTED increases write performance by reducing watch() " +
+          "latency when an Ozone datanode is slow in a pipeline, at the cost of potential read latency increasing " +
+          "due to read retries to different datanodes.")
+  private String watchType;
+
+  public String getWatchType() {
+    return watchType;
+  }
+
+  public void setWatchType(String type) {
+    watchType = type;
   }
 
   @Config(key = "client.request.write.timeout",
@@ -181,6 +201,21 @@ public class RatisClientConfig {
 
   public void setExponentialPolicyMaxSleep(Duration duration) {
     exponentialPolicyMaxSleep = duration;
+  }
+
+  @Config(key = "client.exponential.backoff.max.retries",
+      defaultValue =  "2147483647",
+      type = ConfigType.INT,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Client's max retry value for the exponential backoff policy.")
+  private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
+
+  public int getExponentialPolicyMaxRetries() {
+    return exponentialPolicyMaxRetries;
+  }
+
+  public void setExponentialPolicyMaxRetries(int retry) {
+    exponentialPolicyMaxRetries = retry;
   }
 
   @Config(key = "client.retrylimited.retry.interval",

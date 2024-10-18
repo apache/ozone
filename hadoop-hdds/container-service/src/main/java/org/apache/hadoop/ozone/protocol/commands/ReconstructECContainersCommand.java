@@ -41,12 +41,12 @@ public class ReconstructECContainersCommand
   private final long containerID;
   private final List<DatanodeDetailsAndReplicaIndex> sources;
   private final List<DatanodeDetails> targetDatanodes;
-  private final byte[] missingContainerIndexes;
+  private final ByteString missingContainerIndexes;
   private final ECReplicationConfig ecReplicationConfig;
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sources,
-      List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
+      List<DatanodeDetails> targetDatanodes, ByteString missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
     this(containerID, sources, targetDatanodes, missingContainerIndexes,
         ecReplicationConfig, HddsIdFactory.getLongId());
@@ -54,16 +54,15 @@ public class ReconstructECContainersCommand
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
-      List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
+      List<DatanodeDetails> targetDatanodes, ByteString missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig, long id) {
     super(id);
     this.containerID = containerID;
     this.sources = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
-    this.missingContainerIndexes =
-        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
+    this.missingContainerIndexes = missingContainerIndexes;
     this.ecReplicationConfig = ecReplicationConfig;
-    if (targetDatanodes.size() != missingContainerIndexes.length) {
+    if (targetDatanodes.size() != missingContainerIndexes.size()) {
       throw new IllegalArgumentException("Number of target datanodes and " +
           "container indexes should be same");
     }
@@ -85,13 +84,9 @@ public class ReconstructECContainersCommand
     for (DatanodeDetails dd : targetDatanodes) {
       builder.addTargets(dd.getProtoBufMessage());
     }
-    builder.setMissingContainerIndexes(getByteString(missingContainerIndexes));
+    builder.setMissingContainerIndexes(missingContainerIndexes);
     builder.setEcReplicationConfig(ecReplicationConfig.toProto());
     return builder.build();
-  }
-
-  public static ByteString getByteString(byte[] bytes) {
-    return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
   public static ReconstructECContainersCommand getFromProtobuf(
@@ -108,7 +103,7 @@ public class ReconstructECContainersCommand
 
     return new ReconstructECContainersCommand(protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
-        protoMessage.getMissingContainerIndexes().toByteArray(),
+        protoMessage.getMissingContainerIndexes(),
         new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
         protoMessage.getCmdId());
   }
@@ -125,9 +120,8 @@ public class ReconstructECContainersCommand
     return targetDatanodes;
   }
 
-  public byte[] getMissingContainerIndexes() {
-    return Arrays
-        .copyOf(missingContainerIndexes, missingContainerIndexes.length);
+  public ByteString getMissingContainerIndexes() {
+    return missingContainerIndexes;
   }
 
   public ECReplicationConfig getEcReplicationConfig() {
@@ -146,7 +140,7 @@ public class ReconstructECContainersCommand
             .collect(Collectors.joining(", "))).append("]")
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
-            Arrays.toString(missingContainerIndexes));
+            Arrays.toString(missingContainerIndexes.toByteArray()));
     return sb.toString();
   }
   /**
