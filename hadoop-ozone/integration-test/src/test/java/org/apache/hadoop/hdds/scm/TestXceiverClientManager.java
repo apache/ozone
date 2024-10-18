@@ -21,6 +21,7 @@ import com.google.common.cache.Cache;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,7 +49,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for XceiverClientManager caching and eviction.
@@ -276,6 +279,39 @@ public class TestXceiverClientManager {
       // cleanup
       clientManager.releaseClient(client1SecondRef, false);
       clientManager.releaseClient(client2, false);
+    }
+  }
+
+  @Test
+  public void testShortCircuitClient() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String metaDir = GenericTestUtils.getTempPath(
+        TestXceiverClientManager.class.getName() + UUID.randomUUID());
+    DomainSocketFactory domainSocketFactory = mock(DomainSocketFactory.class);
+    when(domainSocketFactory.isServiceReady()).thenReturn(true);
+    conf.set(HDDS_METADATA_DIR_NAME, metaDir);
+
+    ClientTrustManager trustManager = mock(ClientTrustManager.class);
+    try (XceiverClientManager clientManager = new XceiverClientManager(conf,
+        conf.getObject(ScmClientConfig.class), trustManager)) {
+
+      ContainerWithPipeline container1 = storageContainerLocationClient
+          .allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client1 = clientManager.acquireClientForReadData(container1.getPipeline(), true);
+      assertEquals(1, client1.getRefcount());
+      assertTrue(client1 instanceof XceiverClientShortCircuit);
+      XceiverClientSpi client2 = clientManager.acquireClientForReadData(container1.getPipeline(), true);
+      assertTrue(client2 instanceof XceiverClientShortCircuit);
+      assertEquals(2, client2.getRefcount());
+      assertEquals(2, client1.getRefcount());
+      assertEquals(client1, client2);
+      clientManager.releaseClient(client1, true);
+      clientManager.releaseClient(client2, true);
+      // client is still kept in the cache, for create a domain socket connection is expensive.
+      assertEquals(1, clientManager.getClientCache().size());
     }
   }
 }
