@@ -17,6 +17,10 @@
 <h1>Overview</h1>
 <table class="table table-bordered table-striped">
     <tbody>
+    <tr ng-if="$ctrl.jmx.Namespace && $ctrl.jmx.Namespace !== ''">
+        <th>Namespace:</th>
+        <td>{{$ctrl.jmx.Namespace}}</td>
+    </tr>
     <tr>
         <th>Started:</th>
         <td>{{$ctrl.jmx.StartedTimeInMillis | date : 'medium'}}</td>
