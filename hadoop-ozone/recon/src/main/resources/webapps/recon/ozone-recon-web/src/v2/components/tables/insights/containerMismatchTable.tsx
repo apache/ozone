@@ -32,18 +32,19 @@ import {
   MenuProps as FilterMenuProps
 } from 'antd/es/menu';
 import { FilterFilled } from '@ant-design/icons';
+import { ValueType } from 'react-select';
 
+import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
   Container,
   MismatchContainersResponse,
   Pipelines
 } from '@/v2/types/insights.types';
-import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
-import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { ValueType } from 'react-select';
+
 
 
 //-----Types-----
@@ -157,7 +158,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
     return (() => {
       cancelSignal.current && cancelSignal.current.abort();
     })
-  }, [limit]);
+  }, [limit.value]);
 
   return (
     <>
@@ -181,7 +182,8 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
         loading={loading}
         pagination={paginationConfig}
         rowKey='containerId'
-        locale={{ filterTitle: '' }} />
+        locale={{ filterTitle: '' }}
+        scroll={{ x: 'max-content' }}  />
     </>
   )
 }

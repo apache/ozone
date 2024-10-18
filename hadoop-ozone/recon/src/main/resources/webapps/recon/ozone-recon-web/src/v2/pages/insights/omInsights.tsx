@@ -20,8 +20,11 @@ import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
 import { Option } from '@/v2/components/select/singleSelect';
 import ContainerMismatchTable from '@/v2/components/tables/insights/containerMismatchTable';
+import DeletedContainerKeysTable from '@/v2/components/tables/insights/deletedContainerKeysTable';
+import DeletePendingDirTable from '@/v2/components/tables/insights/deletePendingDirsTable';
 import DeletePendingKeysTable from '@/v2/components/tables/insights/deletePendingKeysTable';
 import ExpandedKeyTable from '@/v2/components/tables/insights/expandedKeyTable';
+import OpenKeysTable from '@/v2/components/tables/insights/openKeysTable';
 import { Container, ExpandedRow, ExpandedRowState, MismatchContainersResponse, MismatchKeys, MismatchKeysResponse } from '@/v2/types/insights.types';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { Tabs, Tooltip } from 'antd';
@@ -111,16 +114,21 @@ const OMDBInsights: React.FC<{}> = () => {
               paginationConfig={paginationConfig}
               expandedRowRender={expandedRowRender}
               onRowExpand={onRowExpandClick}
+              handleLimitChange={handleLimitChange} />
+          </Tabs.TabPane>
+          <Tabs.TabPane key='2' tab='Open Keys'>
+            <OpenKeysTable
+              limit={selectedLimit}
+              paginationConfig={paginationConfig}
               handleLimitChange={handleLimitChange}/>
           </Tabs.TabPane>
-          <Tabs.TabPane key='2' tab='Open Keys'></Tabs.TabPane>
           <Tabs.TabPane key='3' tab={
             <label>
               Keys Pending for Deletion
               <Tooltip
                 placement='right'
                 title='Keys that are pending for deletion'>
-                <InfoCircleOutlined style={{ marginLeft: '10px' }}/>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
               </Tooltip>
             </label>
           }>
@@ -129,7 +137,29 @@ const OMDBInsights: React.FC<{}> = () => {
               paginationConfig={paginationConfig}
               handleLimitChange={handleLimitChange} />
           </Tabs.TabPane>
-          <Tabs.TabPane key='4' tab=''></Tabs.TabPane>
+          <Tabs.TabPane key='4' tab={
+            <label>
+              Deleted Container Keys
+              <Tooltip
+                placement='right'
+                title='Keys mapped to Containers in DELETED state SCM.'>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
+              </Tooltip>
+            </label>
+          }>
+            <DeletedContainerKeysTable
+              limit={selectedLimit}
+              paginationConfig={paginationConfig}
+              handleLimitChange={handleLimitChange}
+              onRowExpand={onRowExpandClick}
+              expandedRowRender={expandedRowRender} />
+          </Tabs.TabPane>
+          <Tabs.TabPane key='5' tab='Directories Pending for Deletion'>
+            <DeletePendingDirTable
+              limit={selectedLimit}
+              paginationConfig={paginationConfig}
+              handleLimitChange={handleLimitChange} />
+          </Tabs.TabPane>
         </Tabs>
       </div>
     </div>

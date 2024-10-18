@@ -22,17 +22,18 @@ import Table, {
   ColumnsType,
   TablePaginationConfig
 } from 'antd/es/table';
+import { ValueType } from 'react-select';
 
+import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
+import ExpandedPendingKeysTable from '@/v2/components/tables/insights/expandedPendingKeysTable';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
+import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
+
 import {
   DeletePendingKey,
   DeletePendingKeysResponse
 } from '@/v2/types/insights.types';
-import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { ValueType } from 'react-select';
-import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
-import ExpandedPendingKeysTable from '@/v2/components/tables/insights/expandedPendingKeysTable';
 
 //-----Types------
 type DeletePendingKeysTableProps = {
@@ -105,7 +106,7 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
   function fetchDeletePendingKeys() {
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
-      `/api/v1/keys/deletePending?limit=${limit}`,
+      `/api/v1/keys/deletePending?limit=${limit.value}`,
       cancelSignal.current
     );
     cancelSignal.current = controller;
@@ -144,7 +145,7 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
     return (() => {
       cancelSignal.current && cancelSignal.current.abort();
     })
-  }, [limit]);
+  }, [limit.value]);
 
   return (
     <>
@@ -166,7 +167,9 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
         columns={COLUMNS}
         loading={loading}
         pagination={paginationConfig}
-        rowKey='keyName' />
+        rowKey='keyName'
+        locale={{ filterTitle: '' }}
+        scroll={{ x: 'max-content' }} />
     </>
   )
 }

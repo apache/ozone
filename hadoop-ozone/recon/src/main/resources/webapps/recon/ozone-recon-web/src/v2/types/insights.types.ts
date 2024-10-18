@@ -127,7 +127,7 @@ export type OpenKeysResponse = {
   replicatedDataSize: number;
   unreplicatedDataSize: number;
   fso?: OpenKeys[];
-  nonFso?: OpenKeys[];
+  nonFSO?: OpenKeys[];
 }
 
 //Keys pending deletion
@@ -165,6 +165,27 @@ export type DeletePendingKeysResponse = {
   deletedKeyInfo: {
     omKeyInfoList: DeletePendingKey[]
   }[];
+}
+
+//Directories Pending for Deletion
+export type DeletedDirInfo = {
+  key: string;
+  path: string;
+  inStateSince: number;
+  size: number;
+  replicatedSize: number;
+  replicationInfo: ReplicationConfig;
+  creationTime: number;
+  modificationTime: number;
+  isKey: boolean;
+}
+
+export type DeletedDirReponse = {
+  lastKey: string;
+  replicatedDataSize: number;
+  unreplicatedDataSize: number;
+  deletedDirInfo: DeletedDirInfo[];
+  status: string;
 }
 
 export type ExpandedRow = {

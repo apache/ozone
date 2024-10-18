@@ -18,16 +18,29 @@
 
 import React from 'react';
 import { AxiosError } from 'axios';
-import { Container, DeletedContainerKeysResponse, Pipelines } from '@/v2/types/insights.types';
-import Table, { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import Table, {
+  ColumnsType,
+  TablePaginationConfig
+} from 'antd/es/table';
+import { ValueType } from 'react-select';
+
+import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
+import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
+
+import {
+  Container,
+  DeletedContainerKeysResponse,
+  Pipelines
+} from '@/v2/types/insights.types';
 
 //------Types-------
 type DeletedContainerKeysTableProps = {
   paginationConfig: TablePaginationConfig;
-  limit: string;
-  onRowExpand: () => void;
+  limit: Option;
+  handleLimitChange: (arg0: ValueType<Option, false>) => void;
+  onRowExpand: (arg0: boolean, arg1: any) => void;
   expandedRowRender: (arg0: any) => JSX.Element;
 }
 
@@ -63,10 +76,11 @@ const COLUMNS: ColumnsType<Container> = [
 
 //-----Components------
 const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
-  expandedRowRender,
-  onRowExpand,
+  limit,
   paginationConfig,
-  limit = '1000'
+  handleLimitChange,
+  onRowExpand,
+  expandedRowRender
 }) => {
 
   const [loading, setLoading] = React.useState<boolean>(false);
@@ -76,7 +90,7 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
 
   function fetchDeletedKeys() {
     const { request, controller } = AxiosGetHelper(
-      `/api/v1/containers/mismatch/deleted?limit=${limit}`,
+      `/api/v1/containers/mismatch/deleted?limit=${limit.value}`,
       cancelSignal.current
     )
     cancelSignal.current = controller;
@@ -95,25 +109,37 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
   React.useEffect(() => {
     fetchDeletedKeys();
 
-    return(() => {
+    return (() => {
       cancelSignal.current && cancelSignal.current.abort();
     })
-  }, []);
+  }, [limit.value]);
 
 
   return (
-    <Table
-      expandable={{
-        expandRowByClick: true,
-        expandedRowRender: expandedRowRender,
-        onExpand: onRowExpand
-      }}
-      dataSource={data}
-      columns={COLUMNS}
-      loading={loading}
-      pagination={paginationConfig}
-      rowKey='containerId'
-      locale={{ filterTitle: '' }} />
+    <>
+      <div className='table-header-section'>
+        <div className='table-filter-section'>
+          <SingleSelect
+            options={LIMIT_OPTIONS}
+            defaultValue={limit}
+            placeholder='Limit'
+            onChange={handleLimitChange} />
+        </div>
+      </div>
+      <Table
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: expandedRowRender,
+          onExpand: onRowExpand
+        }}
+        dataSource={data}
+        columns={COLUMNS}
+        loading={loading}
+        pagination={paginationConfig}
+        rowKey='containerId'
+        locale={{ filterTitle: '' }}
+        scroll={{ x: 'max-content' }} />
+    </>
   )
 }
 
