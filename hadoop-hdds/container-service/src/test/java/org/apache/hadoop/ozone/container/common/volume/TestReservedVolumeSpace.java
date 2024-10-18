@@ -38,6 +38,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FRE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 import static org.apache.ozone.test.GenericTestUtils.assertThrows;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -168,15 +169,16 @@ public class TestReservedVolumeSpace {
     assertEquals(getExpectedDefaultReserved(hddsVolume2), reservedFromVolume2);
   }
 
-  @Test()
+  @Test
   public void testInvalidConfigThrowsException() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, "15GB");
 
-    assertThrows(ConfigurationException.class, () -> {
-      HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
+    ConfigurationException exception = assertThrows(ConfigurationException.class, () -> {
+      volumeBuilder.conf(conf).build();
       return null;
     });
+    assertTrue(exception.getMessage().contains("Reserved space should be configured in a pair"));
   }
 
   @Test

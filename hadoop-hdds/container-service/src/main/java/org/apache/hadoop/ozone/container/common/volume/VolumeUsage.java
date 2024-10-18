@@ -221,7 +221,8 @@ public class VolumeUsage {
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
       if (words.length < 2) {
-        throw new ConfigurationException("Reserved space should be configured in a pair");
+        throw new ConfigurationException("hdds.datanode.dir.du.reserved - " +
+                "Reserved space should be configured in a pair, but current value is " + reserve);
       }
 
       try {
