@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -33,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -902,7 +902,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
         .setScmUsed(0)
         .setFailed(false)
         .setRemaining(100 * OzoneConsts.TB)
-        .setStorageType(StorageTypeProto.DISK);
+        .setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE);
     return srb.build();
   }
 
@@ -914,7 +914,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
         .setScmUsed(0)
         .setFailed(false)
         .setRemaining(100 * OzoneConsts.GB)
-        .setStorageType(StorageTypeProto.DISK);
+        .setStorageTypeProto(HddsProtos.StorageType.DISK_TYPE);
     return mrb.build();
   }
 
