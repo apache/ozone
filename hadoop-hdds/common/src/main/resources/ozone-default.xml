@@ -296,7 +296,7 @@
   </property>
   <property>
     <name>hdds.container.ratis.num.write.chunk.threads.per.volume</name>
-    <value>10</value>
+    <value>20</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Maximum number of threads in the thread pool that Datanode
       will use for writing replicated chunks.
@@ -307,7 +307,7 @@
   <property>
     <name>hdds.container.ratis.leader.pending.bytes.limit
 </name>
-    <value>1GB</value>
+    <value>4GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Limit on the total bytes of pending requests after which
       leader starts rejecting requests from client.
@@ -324,7 +324,7 @@
   </property>
   <property>
     <name>hdds.container.ratis.num.container.op.executors</name>
-    <value>10</value>
+    <value>20</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Number of executors that will be used by Ratis to execute
       container ops.(10 by default).
