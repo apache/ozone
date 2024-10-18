@@ -29,6 +29,8 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.stream.Collectors;
 
 /**
@@ -75,7 +77,8 @@ public class ReportSubcommand extends ScmSubcommand {
     if (epochMs == 0) {
       epochMs = Instant.now().toEpochMilli();
     }
-    Instant reportTime = Instant.ofEpochSecond(epochMs / 1000);
+    LocalDateTime reportTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(epochMs / 1000),
+        ZoneId.systemDefault());
     outputHeading("Container Summary Report generated at " + reportTime);
   }
 
@@ -117,7 +120,7 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void blankLine() {
-    System.out.print("\n");
+    output("\n");
   }
 
   private void output(String s) {
@@ -127,8 +130,8 @@ public class ReportSubcommand extends ScmSubcommand {
   private void outputHeading(String s) {
     output(s);
     for (int i = 0; i < s.length(); i++) {
-      System.out.print("=");
+      output("=");
     }
-    System.out.print("\n");
+    output("\n");
   }
 }
