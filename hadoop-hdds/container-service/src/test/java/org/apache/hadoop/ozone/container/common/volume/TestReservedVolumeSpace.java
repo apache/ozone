@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -36,6 +37,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FRE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
+import static org.apache.ozone.test.GenericTestUtils.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -164,6 +166,15 @@ public class TestReservedVolumeSpace {
     long reservedFromVolume2 = hddsVolume2.getVolumeInfo().get()
             .getReservedInBytes();
     assertEquals(getExpectedDefaultReserved(hddsVolume2), reservedFromVolume2);
+
+    OzoneConfiguration conf3 = new OzoneConfiguration();
+
+    conf3.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, "15GB");
+
+    assertThrows(ConfigurationException.class, () -> {
+      HddsVolume hddsVolume3 = volumeBuilder.conf(conf3).build();
+      return null;
+    });
   }
 
   @Test
