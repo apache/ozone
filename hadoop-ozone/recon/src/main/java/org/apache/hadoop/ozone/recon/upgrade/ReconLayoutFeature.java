@@ -39,7 +39,8 @@ public enum ReconLayoutFeature {
 
   private final int version;
   private final String description;
-  private final EnumMap<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions = new EnumMap<>(ReconUpgradeAction.UpgradeActionType.class);
+  private final EnumMap<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions =
+      new EnumMap<>(ReconUpgradeAction.UpgradeActionType.class);
 
   ReconLayoutFeature(final int version, String description) {
     this.version = version;
@@ -101,6 +102,6 @@ public enum ReconLayoutFeature {
    * @return An array of all {@link ReconLayoutFeature} values.
    */
   public static ReconLayoutFeature[] getValues() {
-    return values();
+    return ReconLayoutFeature.values();
   }
 }

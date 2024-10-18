@@ -210,4 +210,63 @@ public class TestReconLayoutVersionManager {
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
   }
 
+  /**
+   * Tests the scenario where the first two features are finalized,
+   * and then a third feature is introduced. Ensures that only the
+   * newly introduced feature is finalized while the previously
+   * finalized features are skipped.
+   */
+  @Test
+  public void testFinalizingNewFeatureWithoutReFinalizingPreviousFeatures() throws Exception {
+    // Step 1: Finalize the first two features.
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(0);
+
+    // Mock the first two features.
+    ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
+    when(feature1.getVersion()).thenReturn(1);
+    ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action1));
+
+    ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
+    when(feature2.getVersion()).thenReturn(2);
+    ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
+    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action2));
+
+    mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
+
+    // Finalize the first two features.
+    layoutVersionManager.finalizeLayoutFeatures();
+
+    // Verify that the schema versions for the first two features were updated.
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2);
+
+    // Step 2: Introduce a new feature (Feature 3).
+    ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
+    when(feature3.getVersion()).thenReturn(3);
+    ReconUpgradeAction action3 = mock(ReconUpgradeAction.class);
+    when(feature3.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE))
+        .thenReturn(Optional.of(action3));
+
+    mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2, feature3});
+
+    // Update schema version to simulate that features 1 and 2 have already been finalized.
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
+
+    // Finalize again, but only feature 3 should be finalized.
+    layoutVersionManager.finalizeLayoutFeatures();
+
+    // Verify that the schema version for feature 3 was updated.
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);
+
+    // Verify that action1 and action2 were not executed again.
+    verify(action1, times(1)).execute();  // Still should have been executed only once
+    verify(action2, times(1)).execute();  // Still should have been executed only once
+
+    // Verify that the upgrade action for feature 3 was executed.
+    verify(action3, times(1)).execute();
+  }
+
 }
