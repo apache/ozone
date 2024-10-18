@@ -34,12 +34,7 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.*;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -1598,7 +1593,6 @@ public class RpcClient implements ClientProtocol {
 
       Pipeline pipelineBefore = locationInfo.getPipeline();
       List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
-
       for (DatanodeDetails dn : datanodes) {
         List<DatanodeDetails> nodes = new ArrayList<>();
         nodes.add(dn);
@@ -1627,7 +1621,7 @@ public class RpcClient implements ClientProtocol {
             .setVolumeName(keyInfo.getVolumeName())
             .setBucketName(keyInfo.getBucketName())
             .setKeyName(keyInfo.getKeyName())
-            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions())
+            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions()) // configure the getKeyLocationVersions with a proper length of a block size
             .setDataSize(keyInfo.getDataSize())
             .setCreationTime(keyInfo.getCreationTime())
             .setModificationTime(keyInfo.getModificationTime())
@@ -1640,9 +1634,13 @@ public class RpcClient implements ClientProtocol {
             .setFileChecksum(keyInfo.getFileChecksum())
             .setOwnerName(keyInfo.getOwnerName())
             .build();
+
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
-
+        if (dnKeyInfo.getReplicationConfig() instanceof ECReplicationConfig) {
+          dnKeyInfo.setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+        }
+        //
         blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
       }
 
