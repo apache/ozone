@@ -1394,6 +1394,7 @@ public class KeyValueHandler extends Handler {
             ContainerProtos.ChunkInfo.newBuilder(chunk)
                 .setOffset(adjustedChunkOffset)
                 .setLen(adjustedChunkLen).build());
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
         data = getChunkManager().readChunk(
             kvContainer, blockID, chunkInfo, dispatcherContext);
 
