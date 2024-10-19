@@ -105,6 +105,12 @@ public class TestBackgroundContainerDataScanner extends
   }
 
   @Test
+  public void testTotalRunTimes() {
+    scanner.runIteration();
+    assertTrue(scanner.getMetrics().getTotalRunTimes() > 0);
+  }
+
+  @Test
   @Override
   public void testScannerMetricsUnregisters() {
     String name = scanner.getMetrics().getName();

@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MutableCounterInt;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 
 /**
@@ -42,6 +43,8 @@ public abstract class AbstractContainerScannerMetrics {
   private MutableGaugeInt numUnHealthyContainers;
   @Metric("number of iterations of scanner completed since the restart")
   private MutableCounterInt numScanIterations;
+  @Metric("total time that the container scanned has been running, in milliseconds.")
+  private MutableCounterLong totalRunTimes;
 
   public AbstractContainerScannerMetrics(String name, MetricsSystem ms) {
     this.name = name;
@@ -56,6 +59,10 @@ public abstract class AbstractContainerScannerMetrics {
     numContainersScanned.incr();
   }
 
+  public void incNumContainersScanned(int delta) {
+    numContainersScanned.incr(delta);
+  }
+
   public void resetNumContainersScanned() {
     numContainersScanned.decr(getNumContainersScanned());
   }
@@ -68,6 +75,10 @@ public abstract class AbstractContainerScannerMetrics {
     numUnHealthyContainers.incr();
   }
 
+  public void incNumUnHealthyContainers(int delta) {
+    numUnHealthyContainers.incr(delta);
+  }
+
   public void resetNumUnhealthyContainers() {
     numUnHealthyContainers.decr(getNumUnHealthyContainers());
   }
@@ -78,6 +89,14 @@ public abstract class AbstractContainerScannerMetrics {
 
   public void incNumScanIterations() {
     numScanIterations.incr();
+  }
+
+  public long getTotalRunTimes() {
+    return totalRunTimes.value();
+  }
+
+  public void incTotalRunTimes(long runTime) {
+    totalRunTimes.incr(runTime);
   }
 
   public void unregister() {
