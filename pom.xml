@@ -67,7 +67,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
 
     <hadoop2.version>2.10.2</hadoop2.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.1</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
