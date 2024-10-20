@@ -38,7 +38,7 @@ import java.util.Collection;
  * Config based utilities for Ozone S3.
  */
 public final class OzoneS3ConfigUtils {
-  static final Logger LOG = LoggerFactory.getLogger(OzoneS3ConfigUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneS3ConfigUtils.class);
 
   private OzoneS3ConfigUtils() { }
 
@@ -52,17 +52,17 @@ public final class OzoneS3ConfigUtils {
    * defaults to ozone.administrators value.
    */
   public static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf) throws IOException {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS);
+    Collection<String> ozoneAdmins = conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS);
 
-    if (ozAdmins == null || ozAdmins.isEmpty()) {
-      ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    if (ozoneAdmins == null || ozoneAdmins.isEmpty()) {
+      ozoneAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
     }
     String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
+    if (!ozoneAdmins.contains(omSPN)) {
+      ozoneAdmins.add(omSPN);
     }
 
-    return ozAdmins;
+    return ozoneAdmins;
   }
 
   /**
@@ -112,22 +112,11 @@ public final class OzoneS3ConfigUtils {
   /**
    * Check if the provided user is an S3 administrator.
    * @param user An instance of {@link UserGroupInformation} with information about the user to verify
-   * @param s3Admins An instance of {@link OzoneAdmins} containing information
-   *                 of the S3 administrator users and groups in the system
-   * @return {@code true} if the provided user is an S3 administrator else {@code false}
-   */
-  public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneAdmins s3Admins) {
-    return null != user && s3Admins.isAdmin(user);
-  }
-
-  /**
-   * Check if the provided user is an S3 administrator.
-   * @param user An instance of {@link UserGroupInformation} with information about the user to verify
    * @param conf An instance of {@link OzoneConfiguration} being used
    * @return {@code true} if the provided user is an S3 administrator else {@code false}
    */
   public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneConfiguration conf) {
     OzoneAdmins s3Admins = getS3Admins(conf);
-    return isS3Admin(user, s3Admins);
+    return (null != user && s3Admins.isAdmin(user));
   }
 }

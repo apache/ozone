@@ -50,6 +50,7 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
+    System.out.println("Requested User Principal is: " + userPrincipal.getName());
     if (null != userPrincipal) {
       UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
       if (!OzoneS3ConfigUtils.isS3Admin(user, conf)) {

@@ -118,7 +118,7 @@ class TestSecretGenerate {
 
     Response response = endpoint.generate();
 
-    assertEquals(FORBIDDEN.getStatusCode(), response.getStatus());
+    assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
   }
 
   @Test
@@ -126,7 +126,7 @@ class TestSecretGenerate {
     setupSecurityContext(true);
     hasSecretAlready();
 
-    Response response = endpoint.generate();
+    Response response = endpoint.generate(ADMIN_USER_NAME);
 
     assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
     assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
