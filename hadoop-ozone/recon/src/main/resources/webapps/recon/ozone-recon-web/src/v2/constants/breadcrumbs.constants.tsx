@@ -16,20 +16,19 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
+type BreadcrumbNameMap = {
   [path: string]: string;
 }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
+export const breadcrumbNameMap: BreadcrumbNameMap = {
   '/Overview': 'Overview',
   '/Volumes': 'Volumes',
   '/Buckets': 'Buckets',
   '/Datanodes': 'Datanodes',
   '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
   '/Containers': 'Containers',
   '/Insights': 'Insights',
   '/DiskUsage': 'Disk Usage',
   '/Heatmap': 'Heatmap',
-  '/Om': 'Om'
+  '/OmInsights': 'OM DB Insights'
 };
