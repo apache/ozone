@@ -27,18 +27,13 @@ import org.mockito.Mock;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 /**
  * This class is to test S3 configuration based utils.
  */
 class TestOzoneS3ConfigUtils {
-
-  @Mock
-  UserGroupInformation ugi;
 
   @Test
   void testS3AdminExtraction() throws IOException {
