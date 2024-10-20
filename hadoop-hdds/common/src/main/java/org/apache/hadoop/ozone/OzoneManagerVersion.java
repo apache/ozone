@@ -55,9 +55,25 @@ public enum OzoneManagerVersion implements ComponentVersion {
   private static final Map<Integer, OzoneManagerVersion> BY_PROTO_VALUE =
       Arrays.stream(values())
           .collect(toMap(OzoneManagerVersion::toProtoValue, identity()));
-
+  private static final long SUPPORTED_FEATURE_BITMAP = calculateVersionBitmap();
   private final int version;
   private final String description;
+
+  /**
+   * This is limited to 63 because the version bitmap is stored in a `long` type,
+   * which has 64 bits. One bit is reserved for each version number, starting from 0.
+   * Therefore, the highest representable version number is 63.
+   */
+  public static final int MAX_SUPPORTED_VERSION = 63;
+
+  static {
+    for (OzoneManagerVersion version : OzoneManagerVersion.values()) {
+      if (version.toProtoValue() > MAX_SUPPORTED_VERSION) {
+        throw new IllegalStateException(
+                "Version " + version + " exceeds the maximum supported version: " + MAX_SUPPORTED_VERSION);
+      }
+    }
+  }
 
   OzoneManagerVersion(int version, String description) {
     this.version = version;
@@ -81,5 +97,45 @@ public enum OzoneManagerVersion implements ComponentVersion {
   private static OzoneManagerVersion latest() {
     OzoneManagerVersion[] versions = OzoneManagerVersion.values();
     return versions[versions.length - 2];
+  }
+
+  /**
+   * Checks if the given feature version is supported by the OM Service.
+   *
+   * @param omFeatureBitmap The feature bitmap from the remote OM.
+   * @param checkedFeature  The feature to check.
+   * @return true if the feature is supported, false otherwise.
+   */
+  public static boolean isOmFeatureSupported(long omFeatureBitmap, OzoneManagerVersion checkedFeature) {
+    if (checkedFeature.toProtoValue() < 0) {
+      return false;
+    }
+    return (omFeatureBitmap & (1L << checkedFeature .toProtoValue())) != 0;
+  }
+
+  /**
+   * Get the current bitmap representing supported features.
+   *
+   * @return The bitmap of supported features.
+   */
+  public static long getSupportedFeatureBitmap() {
+    return SUPPORTED_FEATURE_BITMAP;
+  }
+
+  /**
+   * Calculate the version bitmap. Each bit position corresponds to a version.
+   * Example: Version 0 -> bit 0, Version 1 -> bit 1, etc.
+   * Note:
+   * - Uses a 64-bit `long`, supporting versions 0 to 63.
+   * - Versions beyond 63 are not supported.
+   */
+  private static long calculateVersionBitmap() {
+    long bitmap = 0L;
+    for (OzoneManagerVersion version : values()) {
+      if (version.version >= 0) { // Ignore FUTURE_VERSION (-1)
+        bitmap |= (1L << version.version);
+      }
+    }
+    return bitmap;
   }
 }
