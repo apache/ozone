@@ -591,7 +591,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<VolumeFailureInfo> getVolumeFailureInfos() throws IOException {
-    List<VolumeFailureInfo> volumeFailureInfoList = Collections.emptyList();
+    List<VolumeFailureInfo> volumeFailureInfoList = new ArrayList<>();
     List<VolumeFailureInfoProto> volumeFailureInfos =
         storageContainerLocationClient.getVolumeFailureInfos();
     for (VolumeFailureInfoProto volumeFailureInfoProto : volumeFailureInfos) {

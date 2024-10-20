@@ -1523,7 +1523,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<VolumeFailureInfoProto> getVolumeFailureInfos() throws IOException {
-    List<VolumeFailureInfoProto> volumeFailureInfos = Collections.emptyList();
+    List<VolumeFailureInfoProto> volumeFailureInfos = new ArrayList<>();
     NodeManager scmNodeManager = scm.getScmNodeManager();
     List<DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
     for (DatanodeDetails detail : allNodes) {
@@ -1532,7 +1532,11 @@ public class SCMClientProtocolServer implements
       if (dnVolumeFailureInfos != null && dnVolumeFailureInfos.size() > 0) {
         LOG.debug("DN({} / {}) has {} failureVolume.", detail.getHostName(),
             detail.getUuid(), dnVolumeFailureInfos.size());
-        volumeFailureInfos.addAll(dnVolumeFailureInfos);
+        for (VolumeFailureInfoProto volumeFailureInfoProto : dnVolumeFailureInfos) {
+          LOG.debug("VolumeName {} : {}", volumeFailureInfoProto.getVolumeName(),
+              volumeFailureInfoProto.getCapacityLost());
+          volumeFailureInfos.add(volumeFailureInfoProto);
+        }
       }
     }
     return volumeFailureInfos;

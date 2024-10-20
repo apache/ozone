@@ -167,12 +167,15 @@ public class DatanodeInfo extends DatanodeDetails {
     // so we can directly retrieve it when querying.
     List<VolumeFailureInfoProto> volumeFailureInfoLists = Collections.emptyList();
     for (StorageReportProto report : reports) {
-      if (report.hasFailed() && report.hasFailed()) {
+      if (report.hasFailed() && report.getFailed()) {
         String storageLocation = report.getStorageLocation();
         long capacity = report.getCapacity();
         String node = getHostName();
         String ipAddress = getIpAddress();
-        long failureDate = report.getFailureDate();
+        long failureDate = -1;
+        if(report.hasFailureDate()) {
+          failureDate = report.getFailureDate();
+        }
         VolumeFailureInfoProto volumeFailure =
             VolumeFailureInfoProto.newBuilder().
             setNode(node + "(" + ipAddress + ")").
