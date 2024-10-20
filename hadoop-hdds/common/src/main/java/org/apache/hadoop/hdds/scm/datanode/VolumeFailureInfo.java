@@ -35,9 +35,10 @@ public class VolumeFailureInfo implements Comparable<VolumeFailureInfo> {
   private long capacityLost;
 
   private static final Codec<VolumeFailureInfo> CODEC = new DelegatedCodec<>(
-       Proto2Codec.get(HddsProtos.VolumeFailureInfoProto.getDefaultInstance()),
-       VolumeFailureInfo::fromProtobuf,
-       VolumeFailureInfo::getProtobuf);
+      Proto2Codec.get(HddsProtos.VolumeFailureInfoProto.getDefaultInstance()),
+      VolumeFailureInfo::fromProtobuf,
+      VolumeFailureInfo::getProtobuf,
+      VolumeFailureInfo.class);
 
   public static Codec<VolumeFailureInfo> getCodec() {
     return CODEC;
