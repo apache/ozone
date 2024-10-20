@@ -110,7 +110,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
@@ -439,8 +439,7 @@ public final class OzoneManagerRatisUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-    return HAUtils
-        .getTrxnInfoFromCheckpoint(conf, dbPath, new OMDBDefinition());
+    return HAUtils.getTrxnInfoFromCheckpoint(conf, dbPath, OMDBDefinition.get());
   }
 
   /**
@@ -485,7 +484,7 @@ public final class OzoneManagerRatisUtils {
           OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       snapshotDir = Paths.get(metaDirPath.getPath(),
-          OM_RATIS_SNAPSHOT_DIR).toString();
+          OZONE_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }

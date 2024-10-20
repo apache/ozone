@@ -45,6 +45,7 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
       StringCodec.get(),
       TransactionInfo::valueOf,
       TransactionInfo::toString,
+      TransactionInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<TransactionInfo> getCodec() {

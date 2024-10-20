@@ -689,7 +689,7 @@ public class TestKeyValueContainer {
 
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
-      long defaultCacheSize = 64 * OzoneConsts.MB;
+      long defaultCacheSize = OzoneConsts.GB;
       long cacheSize = Long.parseLong(store
           .getProperty("rocksdb.block-cache-capacity"));
       assertEquals(defaultCacheSize, cacheSize);

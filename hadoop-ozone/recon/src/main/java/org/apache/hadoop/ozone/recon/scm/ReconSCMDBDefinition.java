@@ -32,27 +32,27 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 /**
  * Recon SCM db file for ozone.
  */
-public class ReconSCMDBDefinition extends SCMDBDefinition {
+public final class ReconSCMDBDefinition extends SCMDBDefinition {
   private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
       StringCodec.get(), UUID::fromString, UUID::toString,
-      DelegatedCodec.CopyType.SHALLOW);
+      UUID.class, DelegatedCodec.CopyType.SHALLOW);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 
-  public static final DBColumnFamilyDefinition<UUID, DatanodeDetails>
-      NODES =
-      new DBColumnFamilyDefinition<UUID, DatanodeDetails>(
-          "nodes",
-          UUID.class,
-          UUID_CODEC,
-          DatanodeDetails.class,
-          DatanodeDetails.getCodec());
+  public static final DBColumnFamilyDefinition<UUID, DatanodeDetails> NODES
+      = new DBColumnFamilyDefinition<>("nodes", UUID_CODEC, DatanodeDetails.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-          new SCMDBDefinition().getMap(), NODES);
+          SCMDBDefinition.get().getMap(), NODES);
 
-  public ReconSCMDBDefinition() {
+  private static final ReconSCMDBDefinition INSTANCE = new ReconSCMDBDefinition();
+
+  public static ReconSCMDBDefinition get() {
+    return INSTANCE;
+  }
+
+  private ReconSCMDBDefinition() {
     super(COLUMN_FAMILIES);
   }
 

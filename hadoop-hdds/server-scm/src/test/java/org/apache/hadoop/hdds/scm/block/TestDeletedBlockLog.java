@@ -265,7 +265,7 @@ public class TestDeletedBlockLog {
       List<DeleteBlockTransactionResult> transactionResults)
       throws IOException {
     commitTransactions(transactionResults,
-        dnList.toArray(new DatanodeDetails[3]));
+        dnList.toArray(new DatanodeDetails[0]));
   }
 
   private void commitTransactions(

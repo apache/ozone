@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
 
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -74,6 +75,8 @@ public class TestOMSortDatanodes {
       "edge1", "/rack1"
   );
 
+  private static OzoneClient ozoneClient;
+
   @BeforeAll
   public static void setup() throws Exception {
     config = new OzoneConfiguration();
@@ -109,11 +112,15 @@ public class TestOMSortDatanodes {
         = new OmTestManagers(config, scm.getBlockProtocolServer(),
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
+    ozoneClient = omTestManagers.getRpcClient();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
   }
 
   @AfterAll
   public static void cleanup() throws Exception {
+    if (ozoneClient != null) {
+      ozoneClient.close();
+    }
     if (scm != null) {
       scm.stop();
       scm.join();

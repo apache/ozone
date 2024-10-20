@@ -104,7 +104,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   public void start(OzoneConfiguration config)
       throws IOException {
     if (this.store == null) {
-      SCMDBDefinition scmdbDefinition = new SCMDBDefinition();
+      final SCMDBDefinition scmdbDefinition = SCMDBDefinition.get();
       File metaDir = HAUtils.getMetaDir(scmdbDefinition, configuration);
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence

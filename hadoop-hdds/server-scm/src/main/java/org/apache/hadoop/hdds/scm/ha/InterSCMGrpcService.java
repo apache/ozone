@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
-
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointRequestProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointResponseProto;
@@ -52,12 +51,11 @@ public class InterSCMGrpcService extends
   private final Table<String, TransactionInfo> transactionInfoTable;
 
   InterSCMGrpcService(final StorageContainerManager scm) throws IOException {
-    Preconditions.checkNotNull(scm);
+    Objects.requireNonNull(scm, "scm");
     this.scm = scm;
     this.transactionInfoTable = HAUtils.getTransactionInfoTable(
-        scm.getScmMetadataStore().getStore(), new SCMDBDefinition());
-    provider =
-        new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
+        scm.getScmMetadataStore().getStore(), SCMDBDefinition.get());
+    this.provider = new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
   }
 
   @Override
@@ -67,7 +65,7 @@ public class InterSCMGrpcService extends
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       TransactionInfo transactionInfo =
           transactionInfoTable.get(TRANSACTION_INFO_KEY);
-      Preconditions.checkNotNull(transactionInfo);
+      Objects.requireNonNull(transactionInfo, "transactionInfo");
       SCMGrpcOutputStream outputStream =
           new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
               BUFFER_SIZE);

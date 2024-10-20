@@ -43,12 +43,6 @@ public class ServiceRuntimeInfoImpl implements ServiceRuntimeInfo {
   }
 
   @Override
-  public String getCompileInfo() {
-    return versionInfo.getDate() + " by " + versionInfo.getUser() + " from "
-        + versionInfo.getBranch();
-  }
-
-  @Override
   public long getStartedTimeInMillis() {
     return startedTimeInMillis;
   }

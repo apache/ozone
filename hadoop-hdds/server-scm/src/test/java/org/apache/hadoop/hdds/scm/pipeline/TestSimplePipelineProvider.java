@@ -60,8 +60,7 @@ public class TestSimplePipelineProvider {
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))

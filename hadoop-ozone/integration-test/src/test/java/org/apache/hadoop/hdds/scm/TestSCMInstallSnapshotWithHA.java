@@ -224,9 +224,8 @@ public class TestSCMInstallSnapshotWithHA {
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    TransactionInfo leaderCheckpointTrxnInfo = HAUtils
-        .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation,
-            new SCMDBDefinition());
+    final TransactionInfo leaderCheckpointTrxnInfo = HAUtils.getTrxnInfoFromCheckpoint(
+        conf, leaderCheckpointLocation, SCMDBDefinition.get());
 
     assertNotNull(leaderCheckpointLocation);
     // Take a backup of the current DB

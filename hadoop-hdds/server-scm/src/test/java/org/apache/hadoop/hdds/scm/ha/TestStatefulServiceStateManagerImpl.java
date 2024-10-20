@@ -49,7 +49,7 @@ public class TestStatefulServiceStateManagerImpl {
   void setup(@TempDir File testDir) throws IOException {
     conf = SCMTestUtils.getConf(testDir);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     statefulServiceConfig =
         SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(dbStore);
     scmhaManager = SCMHAManagerStub.getInstance(true, dbStore);

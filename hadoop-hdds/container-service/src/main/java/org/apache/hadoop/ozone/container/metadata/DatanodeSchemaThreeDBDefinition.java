@@ -59,45 +59,35 @@ public class DatanodeSchemaThreeDBDefinition
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
           "block_data",
-          String.class,
           FixedLengthStringCodec.get(),
-          BlockData.class,
           BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
       new DBColumnFamilyDefinition<>(
           "metadata",
-          String.class,
           FixedLengthStringCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "delete_txns",
-          String.class,
           FixedLengthStringCodec.get(),
-          DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
           "finalize_blocks",
-          String.class,
           FixedLengthStringCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
           "last_chunk_info",
-          String.class,
           FixedLengthStringCodec.get(),
-          BlockData.class,
           BlockData.getCodec());
 
   private static String separator = "";

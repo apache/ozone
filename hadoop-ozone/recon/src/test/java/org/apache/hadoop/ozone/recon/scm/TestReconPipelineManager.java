@@ -94,7 +94,7 @@ public class TestReconPipelineManager {
         temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
-    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMHADBTransactionBufferStub(store));
     scmContext = SCMContext.emptyContext();

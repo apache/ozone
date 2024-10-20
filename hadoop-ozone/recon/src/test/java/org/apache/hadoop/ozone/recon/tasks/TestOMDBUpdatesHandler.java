@@ -68,7 +68,7 @@ public class TestOMDBUpdatesHandler {
 
   private OMMetadataManager omMetadataManager;
   private OMMetadataManager reconOmMetadataManager;
-  private OMDBDefinition omdbDefinition = new OMDBDefinition();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private Random random = new Random();
 
   private OzoneConfiguration createNewTestPath(String folderName)

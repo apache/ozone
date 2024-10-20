@@ -68,8 +68,7 @@ public class TestPipelineStateManagerImpl {
   @BeforeEach
   public void init() throws Exception {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
 
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     NodeManager nodeManager = new MockNodeManager(true, 10);

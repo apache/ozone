@@ -52,6 +52,11 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
   }
 
   @Override
+  public Class<X509Certificate> getTypeClass() {
+    return X509Certificate.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

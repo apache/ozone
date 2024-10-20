@@ -38,6 +38,11 @@ public final class ShortCodec implements Codec<Short> {
   }
 
   @Override
+  public Class<Short> getTypeClass() {
+    return Short.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

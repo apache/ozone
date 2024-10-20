@@ -136,7 +136,7 @@ public class TestPipelineManagerImpl {
     // placement policy (Rack Scatter), so just use the random one.
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
         SCMContainerPlacementRandom.class.getName());
-    dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(true, 20);
     maxPipelineCount = nodeManager.getNodeCount(
         HddsProtos.NodeOperationalState.IN_SERVICE,

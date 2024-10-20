@@ -47,6 +47,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   private final Codec<DELEGATE> delegate;
   private final CheckedFunction<DELEGATE, T, IOException> forward;
   private final CheckedFunction<T, DELEGATE, IOException> backward;
+  private final Class<T> clazz;
   private final CopyType copyType;
 
   /**
@@ -60,18 +61,25 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   public DelegatedCodec(Codec<DELEGATE> delegate,
       CheckedFunction<DELEGATE, T, IOException> forward,
       CheckedFunction<T, DELEGATE, IOException> backward,
-      CopyType copyType) {
+      Class<T> clazz, CopyType copyType) {
     this.delegate = delegate;
     this.forward = forward;
     this.backward = backward;
+    this.clazz = clazz;
     this.copyType = copyType;
   }
 
   /** The same as new DelegatedCodec(delegate, forward, backward, DEEP). */
   public DelegatedCodec(Codec<DELEGATE> delegate,
       CheckedFunction<DELEGATE, T, IOException> forward,
-      CheckedFunction<T, DELEGATE, IOException> backward) {
-    this(delegate, forward, backward, CopyType.DEEP);
+      CheckedFunction<T, DELEGATE, IOException> backward,
+      Class<T> clazz) {
+    this(delegate, forward, backward, clazz, CopyType.DEEP);
+  }
+
+  @Override
+  public Class<T> getTypeClass() {
+    return clazz;
   }
 
   @Override

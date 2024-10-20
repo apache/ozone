@@ -34,6 +34,11 @@ public final class ByteArrayCodec implements Codec<byte[]> {
   }
 
   @Override
+  public Class<byte[]> getTypeClass() {
+    return byte[].class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(byte[] bytes) {
     return bytes;
   }
