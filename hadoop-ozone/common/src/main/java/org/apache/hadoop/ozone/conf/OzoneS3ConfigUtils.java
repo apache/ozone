@@ -112,11 +112,22 @@ public final class OzoneS3ConfigUtils {
   /**
    * Check if the provided user is an S3 administrator.
    * @param user An instance of {@link UserGroupInformation} with information about the user to verify
+   * @param s3Admins An instance of {@link OzoneAdmins} containing information
+   *                 of the S3 administrator users and groups in the system
+   * @return {@code true} if the provided user is an S3 administrator else {@code false}
+   */
+  public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneAdmins s3Admins) {
+    return null != user && s3Admins.isAdmin(user);
+  }
+
+  /**
+   * Check if the provided user is an S3 administrator.
+   * @param user An instance of {@link UserGroupInformation} with information about the user to verify
    * @param conf An instance of {@link OzoneConfiguration} being used
    * @return {@code true} if the provided user is an S3 administrator else {@code false}
    */
   public static boolean isS3Admin(@Nullable UserGroupInformation user, OzoneConfiguration conf) {
     OzoneAdmins s3Admins = getS3Admins(conf);
-    return (null != user && s3Admins.isAdmin(user));
+    return isS3Admin(user, s3Admins);
   }
 }
