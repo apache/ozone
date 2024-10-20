@@ -177,7 +177,7 @@ Verify Container Balancer for RATIS/EC containers
 
     Run Balancer Verbose Status
 
-    Sleep                   90000ms
+    Sleep                   40000ms
 
     Run Balancer Verbose History Status
 
