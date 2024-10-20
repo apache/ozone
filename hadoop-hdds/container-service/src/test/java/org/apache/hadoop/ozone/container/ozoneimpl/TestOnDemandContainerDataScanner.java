@@ -211,6 +211,19 @@ public class TestOnDemandContainerDataScanner extends
     verifyContainerMarkedUnhealthy(deletedContainer, never());
   }
 
+  @Test
+  public void testTotalRunTimes() throws Exception {
+    Container<?> unhealthy = mockKeyValueContainer();
+    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(unhealthy.scanData(
+            any(DataTransferThrottler.class), any(Canceler.class)))
+            .thenReturn(getUnhealthyScanResult());
+    scanContainer(unhealthy);
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    assertTrue(metrics.getTotalRunTimes() > 0);
+  }
+
   /**
    * A datanode will have one on-demand scanner thread for the whole process.
    * When a volume fails, any the containers queued for scanning in that volume
