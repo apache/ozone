@@ -518,17 +518,22 @@ public class TestTableCache {
 
     tableCache.evictCache(epochs);
 
-    assertEquals(2, tableCache.size());
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      assertEquals(2, tableCache.size());
       // no deleted entries
       assertEquals(0, tableCache.getEpochEntries().size());
-    } else {
-      assertEquals(2, tableCache.getEpochEntries().size());
-    }
 
-    assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
-    assertEquals(2,
-        tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+      assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+      assertEquals(2,
+          tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
+    } else {
+      // only key 1 with epoch 4 will remain
+      assertEquals(1, tableCache.size());
+      assertEquals(1, tableCache.getEpochEntries().size());
+
+      // since all epoch till 3 cleared, key 0 will not be there in partial table
+      assertNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+    }
 
     assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
     assertEquals(4,
