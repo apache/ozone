@@ -432,6 +432,14 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY;
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+  public static final String HDDS_RATIS_LOG_PURGE_UPTO_INDEX_KEY =
+      ScmConfigKeys.HDDS_RATIS_LOG_PURGE_UPTO_INDEX_KEY;
+  public static final boolean HDDS_RATIS_LOG_PURGE_UPTO_INDEX_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_LOG_PURGE_UPTO_INDEX_DEFAULT;
+  public static final String HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_KEY =
+      ScmConfigKeys.HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_KEY;
+  public static final long HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT;
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";
