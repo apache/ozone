@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -10,11 +28,14 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 
 import java.io.IOException;
 
+/**
+ * Filter to return deleted directories which are reclaimable based on their presence in previous snapshot in
+ * the snapshot chain.
+ */
 public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
 
   private final OzoneManager ozoneManager;

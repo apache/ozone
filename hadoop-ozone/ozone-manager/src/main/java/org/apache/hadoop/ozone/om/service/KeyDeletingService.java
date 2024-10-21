@@ -223,7 +223,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             omSnapshotManager,
             snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
-                 getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
+                 getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
+                 keyManager.getMetadataManager(), lock)) {
           List<String> renamedTableEntries =
               keyManager.getRenamesKeyEntries(volume, bucket, startKey, renameEntryFilter, remainNum).stream()
               .map(entry -> {

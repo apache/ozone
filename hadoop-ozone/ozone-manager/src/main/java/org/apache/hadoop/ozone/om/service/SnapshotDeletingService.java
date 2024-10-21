@@ -183,7 +183,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true,remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
