@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 
 import java.io.IOException;
 import java.util.Arrays;
