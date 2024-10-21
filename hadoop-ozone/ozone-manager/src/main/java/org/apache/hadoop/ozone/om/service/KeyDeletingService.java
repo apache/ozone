@@ -43,6 +43,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableRenameEntryFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -82,6 +84,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
   private final boolean deepCleanSnapshots;
+  private AtomicBoolean isRunningOnAOS;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -99,6 +102,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.deletedKeyCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
+    this.isRunningOnAOS = new AtomicBoolean(false);
   }
 
   /**
@@ -109,6 +113,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @VisibleForTesting
   public AtomicLong getDeletedKeyCount() {
     return deletedKeyCount;
+  }
+
+  public boolean isRunningOnAOS() {
+    return isRunningOnAOS.get();
   }
 
   @Override
@@ -211,10 +219,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         // Purge deleted Keys in the deletedTable && rename entries in the snapshotRenamedTable which doesn't have a
         // reference in the previous snapshot.
-        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(omSnapshotManager,
+        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(getOzoneManager(),
+            omSnapshotManager,
             snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
-                 omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
+                 getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
           List<String> renamedTableEntries =
               keyManager.getRenamesKeyEntries(volume, bucket, startKey, renameEntryFilter, remainNum).stream()
               .map(entry -> {
@@ -287,7 +296,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
-
+        isRunningOnAOS.set(true);
         int remainNum = keyLimitPerTask;
         try {
           remainNum = processDeletedKeysForStore(null, getOzoneManager().getKeyManager(),
@@ -295,6 +304,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run. on active object store", e);
+        } finally {
+          isRunningOnAOS.set(false);
         }
 
         if (deepCleanSnapshots && remainNum > 0) {

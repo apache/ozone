@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -381,7 +382,8 @@ class TestKeyDeletingService extends OzoneTestBase {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
-      }).when(km).getPendingDeletionKeys(anyInt());
+      }).when(km).getPendingDeletionKeys(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+          Mockito.any(CheckedExceptionOperation.class), anyInt());
       service.runPeriodicalTaskNow();
       service.runPeriodicalTaskNow();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);

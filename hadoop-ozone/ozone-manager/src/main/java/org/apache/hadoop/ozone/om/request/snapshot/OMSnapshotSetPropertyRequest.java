@@ -71,16 +71,16 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     }
 
     if (setSnapshotPropertyRequest.hasSnapshotSize()) {
-      SnapshotSize snapshotSize = setSnapshotPropertyRequest
-          .getSnapshotSize();
-      boolean addToSnapshotSize = snapshotSize.hasAddSize() && snapshotSize.getAddSize();
-      long exclusiveSize = (addToSnapshotSize ? snapInfo.getExclusiveSize() : 0) +
-          snapshotSize.getExclusiveSize();
-      long exclusiveReplicatedSize = (addToSnapshotSize ? snapInfo.getExclusiveReplicatedSize() : 0) +
-          snapshotSize.getExclusiveReplicatedSize();
+      SnapshotSize snapshotSize = setSnapshotPropertyRequest.getSnapshotSize();
       // Set Exclusive size.
-      snapInfo.setExclusiveSize(exclusiveSize);
-      snapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      snapInfo.setExclusiveSize(snapshotSize.getExclusiveSize());
+      snapInfo.setExclusiveReplicatedSize(snapshotSize.getExclusiveReplicatedSize());
+    }
+    if (setSnapshotPropertyRequest.hasSnapshotDirSize()) {
+      SnapshotSize snapshotSize = setSnapshotPropertyRequest.getSnapshotDirSize();
+      // Set Exclusive size.
+      snapInfo.setExclusiveSize(snapshotSize.getExclusiveSize());
+      snapInfo.setExclusiveReplicatedSize(snapshotSize.getExclusiveReplicatedSize());
     }
   }
 

@@ -632,9 +632,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     try (ReferenceCounted<OmSnapshot> snapshot = om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(),
         testBucket.getName(), testBucket.getName() + "snap2")) {
       renamesKeyEntries = snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
-          testBucket.getName(), "", 1000);
+          testBucket.getName(), "", (kv) -> true, 1000);
       deletedKeyEntries = snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
-          testBucket.getName(), "", 1000);
+          testBucket.getName(), "", (kv) -> true, 1000);
       deletedDirEntries = snapshot.get().getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
           testBucket.getName(), 1000);
     }
@@ -669,20 +669,20 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         testBucket.getName(), testBucket.getName() + "snap2")) {
       Assertions.assertEquals(Collections.emptyList(),
           snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
-          testBucket.getName(), "", 1000));
+          testBucket.getName(), "", (kv) -> true, 1000));
       Assertions.assertEquals(Collections.emptyList(),
           snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
-          testBucket.getName(), "", 1000));
+          testBucket.getName(), "", (kv) -> true, 1000));
       Assertions.assertEquals(Collections.emptyList(),
           snapshot.get().getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
           testBucket.getName(), 1000));
     }
     List<Table.KeyValue<String, String>> aosRenamesKeyEntries =
         om.getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
-            testBucket.getName(), "", 1000);
+            testBucket.getName(), "", (kv) -> true, 1000);
     List<Table.KeyValue<String, List<OmKeyInfo>>> aosDeletedKeyEntries =
         om.getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
-            testBucket.getName(), "", 1000);
+            testBucket.getName(), "", (kv) -> true, 1000);
     List<Table.KeyValue<String, OmKeyInfo>> aosDeletedDirEntries =
         om.getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
             testBucket.getName(), 1000);

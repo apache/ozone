@@ -150,7 +150,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
+      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int size)
       throws IOException;
 
   /**
@@ -264,6 +264,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
 
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+      String volume, String bucket) throws IOException;
   /**
    * Returns an iterator for pending deleted directories.
    * @throws IOException

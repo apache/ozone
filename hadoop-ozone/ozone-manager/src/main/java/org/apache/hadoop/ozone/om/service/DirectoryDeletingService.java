@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
@@ -91,6 +93,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final long pathLimitPerTask;
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
+  private AtomicBoolean isRunningOnAOS;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -107,6 +110,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
+    this.isRunningOnAOS = new AtomicBoolean(false);
   }
 
   private boolean shouldRun() {
@@ -115,6 +119,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       return true;
     }
     return getOzoneManager().isLeaderReady() && !suspended.get();
+  }
+
+  public boolean isRunningOnAOS() {
+    return isRunningOnAOS.get();
   }
 
   /**
@@ -209,10 +217,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
         IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
 
-        try (ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(omSnapshotManager,
-            snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
-            ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(omSnapshotManager,
-                snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
+        try (ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(getOzoneManager(),
+            omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock);
+             ReclaimableKeyFilter reclaimableSubFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
+                omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager.getMetadataManager(), lock)) {
           long startTime = Time.monotonicNow();
           while (remainNum > 0 && deletedDirsIterator.hasNext()) {
             pendingDeletedDirInfo = deletedDirsIterator.next();
@@ -297,6 +305,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
         }
+        isRunningOnAOS.set(true);
         getRunCount().incrementAndGet();
         long remainNum = pathLimitPerTask;
         try {
@@ -305,6 +314,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run. on active object store", e);
+        } finally {
+          isRunningOnAOS.set(false);
         }
 
         if (remainNum > 0) {

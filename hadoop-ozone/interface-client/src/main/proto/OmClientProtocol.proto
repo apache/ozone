@@ -2027,7 +2027,6 @@ message SnapshotProperty {
 message SnapshotSize {
   optional uint64 exclusiveSize = 1;
   optional uint64 exclusiveReplicatedSize = 2;
-  optional bool addSize = 3;
 }
 
 message DeleteTenantRequest {

@@ -652,8 +652,7 @@ public class KeyManagerImpl implements KeyManager {
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     final String nextPageStartKey;
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
-            .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
 
@@ -702,81 +701,19 @@ public class KeyManagerImpl implements KeyManager {
     return new PendingKeysDeletion(keyBlocksList, keysToModify, nextPageStartKey);
   }
 
-  @Override
-  public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey,
-      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter,
-      int count) throws IOException {
-    // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
-        .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
-    List<Table.KeyValue<String, String>> renamedEntries = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
-             renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-
-      /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
-         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
-       */
-      if (startKey != null) {
-        renamedKeyIter.seek(startKey);
-      }
-      int currentCount = 0;
-      while (renamedKeyIter.hasNext() && currentCount < count) {
-        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
-        Table.KeyValue<String, String> kv = renamedKeyIter.next();
-        if (kv != null) {
-
-          // Multiple keys with the same path can be queued in one DB entry
-          if (filter.apply(kv)) {
-            renamedEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
-            currentCount++;
-          }
-        }
-      }
-    }
-    return renamedEntries;
-  }
-
-  @Override
-  public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey,
-      CheckedExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
-      int count) throws IOException {
-    // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = Optional.ofNullable(volume).map(vol -> vol.isEmpty() ? null : vol)
-        .map(vol -> metadataManager.getBucketKeyPrefix(vol, bucket));
-    List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries = new ArrayList<>(count);
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-
-      /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
-         prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
-       */
-      if (startKey != null) {
-        delKeyIter.seek(startKey);
-      }
-      int currentCount = 0;
-      while (delKeyIter.hasNext() && currentCount < count) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
-        if (kv != null && filter.apply(kv)) {
-          deletedKeyEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue().cloneOmKeyInfoList()));
-        }
-      }
-    }
-    return deletedKeyEntries;
-  }
-
   private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
           TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
-          Function<V, R> valueFunction, int size) throws IOException {
+          Function<V, R> valueFunction,
+          CheckedExceptionOperation<Table.KeyValue<String, V>, Boolean, IOException> filter,
+          int size) throws IOException {
     List<Table.KeyValue<String, R>> entries = new ArrayList<>();
     /* Seek to the start key if it not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
     if (startKey != null) {
       tableIterator.seek(startKey);
-      tableIterator.seekToFirst();
     }
+
     int currentCount = 0;
     while (tableIterator.hasNext() && currentCount < size) {
       Table.KeyValue<String, V> kv = tableIterator.next();
@@ -802,21 +739,25 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException {
+      String volume, String bucket, String startKey,
+      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter,
+      int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
     }
   }
 
   @Override
   public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException {
+      String volume, String bucket, String startKey,
+      CheckedExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
+      int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, size);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
     }
   }
 
@@ -2132,16 +2073,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs()
-      throws IOException {
-    return this.getPendingDeletionDirs(null, null);
-  }
-
-  @Override
-  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(String volume,
-                                                                                                   String bucket)
-      throws IOException {
-
+  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+      String volume, String bucket) throws IOException {
     // Either both volume & bucket should be null or none of them should be null.
     if (!StringUtils.isBlank(volume) && StringUtils.isBlank(bucket) ||
         StringUtils.isBlank(volume) && !StringUtils.isBlank(bucket)) {

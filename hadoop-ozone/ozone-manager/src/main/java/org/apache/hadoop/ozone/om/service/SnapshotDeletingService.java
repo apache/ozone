@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.MultiLocks;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
@@ -86,7 +87,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   private final OzoneManager ozoneManager;
   private final OmSnapshotManager omSnapshotManager;
-  private final SnapshotChainManager snapshotChainManager;
+  private final SnapshotChainManager chainManager;
   private final AtomicBoolean suspended;
   private final OzoneConfiguration conf;
   private final AtomicLong successRunCount;
@@ -154,12 +155,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             continue;
           }
           SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
-              snapshotChainManager, snapInfo);
+              chainManager, snapInfo);
 
           // Wait for the next iteration if the next snapshot or next to next snapshot is still not deep cleaned
           // since purge transaction will add entries and it could be processed by mistake.
-          if ((nextSnapshot != null && isSnapshotDeepCleaned(nextSnapshot)) ||
-              (nextToNextSnapshot != null && isSnapshotDeepCleaned(nextToNextSnapshot))) {
+          if (isSnapshotNotDeepCleaned(nextSnapshot) || isSnapshotNotDeepCleaned(nextToNextSnapshot)) {
             continue;
           }
           // Acquire write lock on current snapshot and next snapshot in chain.
@@ -183,7 +183,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true,remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
@@ -304,10 +304,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
     return snapshotStatus != SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED ||
         !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)
-        || !isSnapshotDeepCleaned(snapInfo);
+        || isSnapshotNotDeepCleaned(snapInfo);
   }
-  private boolean isSnapshotDeepCleaned(SnapshotInfo snapInfo) {
-    return (!snapInfo.getDeepClean() || !snapInfo.getDeepCleanedDeletedDir());
+
+  @VisibleForTesting
+  boolean isSnapshotNotDeepCleaned(SnapshotInfo snapInfo) {
+    // if snapshot is null it means snapshot doesn't exist, so it means deep cleaned.
+    return snapInfo != null && !(snapInfo.getDeepCleanedDeletedDir() && snapInfo.getDeepClean());
   }
 
   @Override

@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -1417,7 +1416,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
     return !fromKey.isKeyInfoSame(toKey,
         false, false, false, false, true)
-        || !AbstractKeyDeletingService.isBlockLocationInfoSame(
+        || !SnapshotUtils.isBlockLocationInfoSame(
         fromKey, toKey);
   }
 
@@ -1466,7 +1465,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           "OmKeyInfo");
     }
 
-    return AbstractKeyDeletingService.isBlockLocationInfoSame(
+    return SnapshotUtils.isBlockLocationInfoSame(
         (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
   }
 
