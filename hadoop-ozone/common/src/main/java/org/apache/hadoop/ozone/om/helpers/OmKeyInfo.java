@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -54,6 +57,7 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
+@JsonDeserialize(builder = OmKeyInfo.Builder.class)
 public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
@@ -458,6 +462,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
+  @JsonPOJOBuilder(withPrefix = "set")
   public static class Builder extends WithParentObjectId.Builder {
     private String volumeName;
     private String bucketName;
@@ -506,6 +511,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("keyLocationVersions")
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
       if (omKeyLocationInfoList != null) {
@@ -601,6 +607,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("isFile")
     public Builder setFile(boolean isAFile) {
       this.isFile = isAFile;
       return this;
@@ -611,6 +618,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @JsonSetter("tags")
     public Builder addAllTags(Map<String, String> keyTags) {
       tags.putAll(keyTags);
       return this;
