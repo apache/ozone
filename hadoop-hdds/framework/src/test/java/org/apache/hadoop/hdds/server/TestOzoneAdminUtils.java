@@ -16,10 +16,9 @@
  *
  */
 
-package org.apache.hadoop.ozone.conf;
+package org.apache.hadoop.hdds.server;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
@@ -30,16 +29,16 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * This class is to test S3 configuration based utils.
+ * This class is to test the utilities present in the OzoneAdmins class.
  */
-class TestOzoneS3ConfigUtils {
-
+class TestOzoneAdminUtils {
+  // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
   @Test
   void testS3AdminExtraction() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice,bob");
 
-    assertThat(OzoneS3ConfigUtils.getS3AdminsFromConfig(configuration))
+    assertThat(OzoneAdmins.getS3AdminsFromConfig(configuration))
         .containsAll(Arrays.asList("alice", "bob"));
   }
 
@@ -48,7 +47,7 @@ class TestOzoneS3ConfigUtils {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice,bob");
 
-    assertThat(OzoneS3ConfigUtils.getS3AdminsFromConfig(configuration))
+    assertThat(OzoneAdmins.getS3AdminsFromConfig(configuration))
         .containsAll(Arrays.asList("alice", "bob"));
   }
 
@@ -58,7 +57,7 @@ class TestOzoneS3ConfigUtils {
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    assertThat(OzoneS3ConfigUtils.getS3AdminsGroupsFromConfig(configuration))
+    assertThat(OzoneAdmins.getS3AdminsGroupsFromConfig(configuration))
         .containsAll(Arrays.asList("test1", "test2"));
   }
 
@@ -68,7 +67,7 @@ class TestOzoneS3ConfigUtils {
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    assertThat(OzoneS3ConfigUtils.getS3AdminsGroupsFromConfig(configuration))
+    assertThat(OzoneAdmins.getS3AdminsGroupsFromConfig(configuration))
         .containsAll(Arrays.asList("test1", "test2"));
   }
 
@@ -79,7 +78,7 @@ class TestOzoneS3ConfigUtils {
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice");
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS, "test_group");
 
-    OzoneAdmins admins = OzoneS3ConfigUtils.getS3Admins(configuration);
+    OzoneAdmins admins = OzoneAdmins.getS3Admins(configuration);
     UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
         "alice", new String[] {"test_group"});
 
@@ -97,7 +96,7 @@ class TestOzoneS3ConfigUtils {
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice");
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS, "test_group");
 
-    OzoneAdmins admins = OzoneS3ConfigUtils.getS3Admins(configuration);
+    OzoneAdmins admins = OzoneAdmins.getS3Admins(configuration);
     UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
         "alice", new String[] {"test_group"});
 
@@ -111,7 +110,7 @@ class TestOzoneS3ConfigUtils {
 
   @Test
   void testGetS3AdminsWithNoAdmins() {
-    OzoneAdmins admins = OzoneS3ConfigUtils.getS3Admins(new OzoneConfiguration());
+    OzoneAdmins admins = OzoneAdmins.getS3Admins(new OzoneConfiguration());
     UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
         "alice", new String[] {"test_group"});
     assertThat(admins.isAdmin(ugi)).isEqualTo(false);
@@ -129,8 +128,8 @@ class TestOzoneS3ConfigUtils {
     UserGroupInformation ugiGroupOnly = UserGroupInformation.createUserForTesting(
         "bob", new String[] {"test_group"});
 
-    assertThat(OzoneS3ConfigUtils.isS3Admin(ugi, configuration)).isEqualTo(true);
-    assertThat(OzoneS3ConfigUtils.isS3Admin(ugiGroupOnly, configuration)).isEqualTo(true);
+    assertThat(OzoneAdmins.isS3Admin(ugi, configuration)).isEqualTo(true);
+    assertThat(OzoneAdmins.isS3Admin(ugiGroupOnly, configuration)).isEqualTo(true);
   }
 
   @Test
@@ -140,7 +139,7 @@ class TestOzoneS3ConfigUtils {
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice");
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS, "test_group");
 
-    OzoneAdmins admins = OzoneS3ConfigUtils.getS3Admins(configuration);
+    OzoneAdmins admins = OzoneAdmins.getS3Admins(configuration);
     UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
         "alice", new String[] {"test_group"});
     // Test that when a user is present in an admin group but not an Ozone Admin
@@ -154,6 +153,6 @@ class TestOzoneS3ConfigUtils {
   @Test
   void testIsS3AdminForNoUser() {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    assertThat(OzoneS3ConfigUtils.isS3Admin(null, configuration)).isEqualTo(false);
+    assertThat(OzoneAdmins.isS3Admin(null, configuration)).isEqualTo(false);
   }
 }
