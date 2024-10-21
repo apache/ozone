@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,12 +134,13 @@ public class BlockDeletingService extends BackgroundService {
       // We must ensure there is no empty container in this result.
       // The chosen result depends on what container deletion policy is
       // configured.
+      long startTime = Time.monotonicNow();
+      int blocksLimitPerInterval = getBlockLimitPerInterval();
       List<ContainerBlockInfo> containers =
-          chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
+          chooseContainerForBlockDeletion(blocksLimitPerInterval,
               containerDeletionPolicy);
 
-      BackgroundTask
-          containerBlockInfos = null;
+      BackgroundTask containerBlockInfos = null;
       long totalBlocks = 0;
       for (ContainerBlockInfo containerBlockInfo : containers) {
         BlockDeletingTaskBuilder builder =
@@ -153,8 +155,8 @@ public class BlockDeletingService extends BackgroundService {
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.debug("Queued {} blocks from {} containers for deletion",
-            totalBlocks, containers.size());
+        LOG.info("Queued {} blocks from {} containers for deletion, blocksLimit was {}, elapsed time {}ms.",
+            totalBlocks, containers.size(), blocksLimitPerInterval, Time.monotonicNow() - startTime);
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
