@@ -235,6 +235,16 @@ public class ContainerController {
     return containerSet.getContainerIterator(volume);
   }
 
+  /**
+   * Get the number of containers based on the given volume.
+   *
+   * @param volume hdds volume.
+   * @return number of containers.
+   */
+  public long getContainerCount(HddsVolume volume) {
+    return containerSet.containerCount(volume);
+  }
+
   void updateDataScanTimestamp(long containerId, Instant timestamp)
       throws IOException {
     Container container = containerSet.getContainer(containerId);

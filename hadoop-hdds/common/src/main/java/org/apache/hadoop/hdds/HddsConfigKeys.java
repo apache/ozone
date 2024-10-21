@@ -401,4 +401,7 @@ public final class HddsConfigKeys {
       "hdds.datanode.slow.op.warning.threshold";
   public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
       "500ms";
+
+  public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.volume.io.percentiles.intervals.seconds";
 }
