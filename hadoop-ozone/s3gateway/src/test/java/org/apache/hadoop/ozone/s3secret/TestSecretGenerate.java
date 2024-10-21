@@ -40,8 +40,6 @@ import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static javax.ws.rs.core.Response.Status.FORBIDDEN;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.notNull;
@@ -52,7 +50,6 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class TestSecretGenerate {
-  private static final String ADMIN_USER_NAME = "test_admin";
   private static final String USER_NAME = "test";
   private static final String OTHER_USER_NAME = "test2";
   private static final String USER_SECRET = "test_secret";
@@ -78,7 +75,6 @@ class TestSecretGenerate {
   @BeforeEach
   void setUp() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_ADMINISTRATORS, ADMIN_USER_NAME);
     OzoneClient client = new OzoneClientStub(new ObjectStoreStub(conf, proxy));
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
@@ -91,42 +87,23 @@ class TestSecretGenerate {
   }
 
   @Test
-  void testUnauthorizedSecretGeneration() throws IOException {
-    setupSecurityContext(false);
-    hasNoSecretYet();
-
-    Response response = endpoint.generate();
-    assertEquals(FORBIDDEN.getStatusCode(), response.getStatus());
-  }
-
-  @Test
-  void testAuthorizedSecretGeneration() throws IOException {
-    setupSecurityContext(true);
+  void testSecretGenerate() throws IOException {
+    setupSecurityContext();
     hasNoSecretYet();
 
     S3SecretResponse response =
         (S3SecretResponse) endpoint.generate().getEntity();
 
     assertEquals(USER_SECRET, response.getAwsSecret());
-    assertEquals(ADMIN_USER_NAME, response.getAwsAccessKey());
+    assertEquals(USER_NAME, response.getAwsAccessKey());
   }
 
   @Test
-  void testUnauthorizedUserSecretAlreadyExists() throws IOException {
-    setupSecurityContext(false);
+  void testIfSecretAlreadyExists() throws IOException {
+    setupSecurityContext();
     hasSecretAlready();
 
     Response response = endpoint.generate();
-
-    assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
-  }
-
-  @Test
-  void testAuthorizedUserSecretAlreadyExists() throws IOException {
-    setupSecurityContext(true);
-    hasSecretAlready();
-
-    Response response = endpoint.generate(ADMIN_USER_NAME);
 
     assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
     assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
@@ -138,21 +115,13 @@ class TestSecretGenerate {
     hasNoSecretYet();
 
     S3SecretResponse response =
-            (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
+        (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(OTHER_USER_NAME, response.getAwsAccessKey());
   }
 
-  /**
-   * Provides mocking for users and security context.
-   * @param isAdmin Stores whether the user to mock is an admin or not
-   */
-  private void setupSecurityContext(boolean isAdmin) {
-    if (isAdmin) {
-      when(principal.getName()).thenReturn(ADMIN_USER_NAME);
-    } else {
-      when(principal.getName()).thenReturn(USER_NAME);
-    }
+  private void setupSecurityContext() {
+    when(principal.getName()).thenReturn(USER_NAME);
     when(securityContext.getUserPrincipal()).thenReturn(principal);
     when(context.getSecurityContext()).thenReturn(securityContext);
   }
