@@ -31,7 +31,9 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 
 /**
  *
@@ -57,20 +59,32 @@ public class ContainerMetrics {
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
 
-
+  // for remote request
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
+  // for local short-circuit request
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> numLocalOpsArray;
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsLocalBytesArray;
+  private final EnumMap<ContainerProtos.Type, MutableRate> opsLocalLatency;
+  private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLocalLatencyQuantiles;
+  private final EnumMap<ContainerProtos.Type, MutableRate> opsLocalInQueueLatency;
   private MetricsRegistry registry = null;
 
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;
-    MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatQuantiles = new EnumMap<>(ContainerProtos.Type.class);
+
+    this.numLocalOpsArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalBytesArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalLatency = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalLatencyQuantiles = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsLocalInQueueLatency = new EnumMap<>(ContainerProtos.Type.class);
+
     this.registry = new MetricsRegistry("StorageContainerMetrics");
 
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
@@ -80,6 +94,7 @@ public class ContainerMetrics {
           "bytes" + type, "bytes used by " + type + "op", (long) 0));
       opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
 
+      MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
@@ -87,6 +102,25 @@ public class ContainerMetrics {
             "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
+    }
+    List<ContainerProtos.Type> localTypeList = new ArrayList<>();
+    localTypeList.add(ContainerProtos.Type.GetBlock);
+    localTypeList.add(ContainerProtos.Type.Echo);
+    for (ContainerProtos.Type type : localTypeList) {
+      numLocalOpsArray.put(type, registry.newCounter(
+          "numLocal" + type, "number of " + type + " ops", (long) 0));
+      opsLocalBytesArray.put(type, registry.newCounter(
+          "localBytes" + type, "bytes used by " + type + "op", (long) 0));
+      opsLocalLatency.put(type, registry.newRate("localLatency" + type, type + " op"));
+      opsLocalInQueueLatency.put(type, registry.newRate("localInQueueLatency" + type, type + " op"));
+      MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
+      for (int j = 0; j < len; j++) {
+        int interval = intervals[j];
+        String quantileName = "local" + type + "Nanos" + interval + "s";
+        latQuantiles[j] = registry.newQuantiles(quantileName,
+            "latency of Container ops", "ops", "latency", interval);
+      }
+      opsLocalLatencyQuantiles.put(type, latQuantiles);
     }
   }
 
@@ -115,6 +149,22 @@ public class ContainerMetrics {
     for (MutableQuantiles q: opsLatQuantiles.get(type)) {
       q.add(latencyNs);
     }
+  }
+
+  public void incContainerLocalOpsMetrics(ContainerProtos.Type type) {
+    numOps.incr();
+    numLocalOpsArray.get(type).incr();
+  }
+
+  public void incContainerLocalOpsLatencies(ContainerProtos.Type type, long nanoSeconds) {
+    opsLocalLatency.get(type).add(nanoSeconds);
+    for (MutableQuantiles q: opsLocalLatencyQuantiles.get(type)) {
+      q.add(nanoSeconds);
+    }
+  }
+
+  public void incContainerLocalOpsInQueueLatencies(ContainerProtos.Type type, long nanoSeconds) {
+    opsLocalInQueueLatency.get(type).add(nanoSeconds);
   }
 
   public void incContainerBytesStats(ContainerProtos.Type type, long bytes) {

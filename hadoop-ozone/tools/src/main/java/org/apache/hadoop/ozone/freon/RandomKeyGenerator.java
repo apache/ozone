@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -165,6 +166,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
           "Full name --numOfValidateThreads will be removed in later versions.",
       defaultValue = "1")
   private int numOfValidateThreads = 1;
+
+  @Option(names = {"--validate-channel"},
+      description = "grpc or short-circuit.",
+      defaultValue = "grpc")
+  private String validateChannel = "grpc";
 
   @Option(
       names = {"--buffer-size", "--bufferSize"},
@@ -294,6 +300,17 @@ public final class RandomKeyGenerator implements Callable<Void> {
           + HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA + " is set to false.");
       validateWrites = false;
     }
+    if (validateChannel.equalsIgnoreCase("grpc")) {
+      ozoneConfiguration.setBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT, false);
+    } else if (validateChannel.equalsIgnoreCase("short-circuit")){
+      boolean shortCircuit = ozoneConfiguration.getBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT,
+          OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT_DEFAULT);
+      if (!shortCircuit) {
+        LOG.error("Short-circuit read is not enabled");
+        return null;
+      }
+    }
+
     init(ozoneConfiguration);
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -366,11 +383,13 @@ public final class RandomKeyGenerator implements Callable<Void> {
     } else {
       progressbar.shutdown();
     }
+    LOG.info("Data generation is completed");
 
     if (validateExecutor != null) {
       while (!validationQueue.isEmpty()) {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       }
+      LOG.info("Data validation is completed");
       validateExecutor.shutdown();
       validateExecutor.awaitTermination(Integer.MAX_VALUE,
           TimeUnit.MILLISECONDS);
