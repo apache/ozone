@@ -315,6 +315,25 @@
               <rules>
                 <DependencyConvergence>
                   <uniqueVersions>true</uniqueVersions>
+                  <excludes>
+                    <!--
+                      Dependency convergence error for org.codehaus.woodstox:stax2-api
+
+                      +-org.apache.ozone:ozone-common:jar:1.5.0-SNAPSHOT
+                        +-org.apache.ozone:hdds-common:jar:1.5.0-SNAPSHOT:compile
+                          +-org.apache.ozone:hdds-hadoop-dependency-client:jar:1.5.0-SNAPSHOT:compile
+                            +-org.apache.hadoop:hadoop-common:jar:3.3.6:compile
+                              +-org.codehaus.woodstox:stax2-api:jar:4.2.1:compile
+
+                      +-org.apache.ozone:ozone-common:jar:1.5.0-SNAPSHOT
+                        +-org.apache.ozone:hdds-common:jar:1.5.0-SNAPSHOT:compile
+                          +-org.apache.ozone:hdds-hadoop-dependency-client:jar:1.5.0-SNAPSHOT:compile
+                            +-org.apache.hadoop:hadoop-common:jar:3.3.6:compile
+                              +-com.fasterxml.woodstox:woodstox-core:jar:5.4.0:compile
+                                +-org.codehaus.woodstox:stax2-api:jar:4.2:compile
+                    -->
+                    <exclude>org.codehaus.woodstox:stax2-api</exclude>
+                  </excludes>
                 </DependencyConvergence>
               </rules>
             </configuration>
@@ -451,37 +470,6 @@
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>add-classpath-descriptor</id>
-      <activation>
-        <file>
-          <exists>src/main/java</exists>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>add-classpath-descriptor</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>build-classpath</goal>
-                </goals>
-                <configuration>
-                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
-                  <outputFilterFile>true</outputFilterFile>
-                  <includeScope>runtime</includeScope>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>
