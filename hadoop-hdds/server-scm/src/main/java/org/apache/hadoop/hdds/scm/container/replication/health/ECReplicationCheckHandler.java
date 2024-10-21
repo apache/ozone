@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,12 @@ public class ECReplicationCheckHandler extends AbstractCheck {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ECReplicationCheckHandler.class);
+
+  private final ReplicationManagerMetrics metrics;
+
+  public ECReplicationCheckHandler(ReplicationManagerMetrics replicationManagerMetrics) {
+    this.metrics = replicationManagerMetrics;
+  }
 
   @Override
   public boolean handle(ContainerCheckRequest request) {
@@ -67,22 +74,29 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         if (underHealth.isMissing()) {
           report.incrementAndSample(
               ReplicationManagerReport.HealthState.MISSING, containerID);
+          metrics.incrEcMissingContainers();
         } else {
           // A container which is unrecoverable but not missing must have too
           // many unhealthy replicas. Therefore it is UNHEALTHY rather than
           // missing.
           report.incrementAndSample(
               ReplicationManagerReport.HealthState.UNHEALTHY, containerID);
+          metrics.incrEcUnhealthyReplicatedContainers();
         }
         // An EC container can be both unrecoverable and have offline replicas. In this case, we need
         // to report both states as the decommission monitor needs to wait for an extra copy to be
         // made of the offline replica before decommission can complete.
         if (underHealth.hasUnreplicatedOfflineIndexes()) {
           report.incrementAndSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
+          metrics.incrEcUnderReplicatedContainers();
         }
       } else {
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
+        metrics.incrEcUnderReplicatedContainers();
+        if (isCritical(request)) {
+          metrics.incrEcCriticalUnderReplicatedContainers();
+        }
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
@@ -171,6 +185,18 @@ public class ECReplicationCheckHandler extends AbstractCheck {
 
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
+  }
+
+  private boolean isCritical(ContainerCheckRequest request) {
+    ContainerInfo container = request.getContainerInfo();
+    Set<ContainerReplica> replicas = request.getContainerReplicas();
+    List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
+    ECContainerReplicaCount replicaCount =
+        new ECContainerReplicaCount(container, replicas, replicaPendingOps,
+            request.getMaintenanceRedundancy());
+    ECReplicationConfig repConfig =
+        (ECReplicationConfig) container.getReplicationConfig();
+    return replicaCount.unavailableIndexes(true).size() == repConfig.getParity();
   }
 
 }
