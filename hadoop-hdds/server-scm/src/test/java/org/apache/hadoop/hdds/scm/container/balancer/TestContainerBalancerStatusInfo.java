@@ -52,8 +52,8 @@ class TestContainerBalancerStatusInfo {
       assertTrue(is.getContainerMovesCompleted() > 0);
       assertEquals(0, is.getContainerMovesFailed());
       assertEquals(0, is.getContainerMovesTimeout());
-      assertFalse(is.getSizeEnteringNodesGB().isEmpty());
-      assertFalse(is.getSizeLeavingNodesGB().isEmpty());
+      assertFalse(is.getSizeEnteringNodes().isEmpty());
+      assertFalse(is.getSizeLeavingNodes().isEmpty());
     });
 
   }
