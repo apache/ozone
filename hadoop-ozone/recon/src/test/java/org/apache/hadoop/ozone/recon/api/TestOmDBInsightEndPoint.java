@@ -89,6 +89,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -894,11 +895,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
             .get("/sampleVol/bucketOne/key_one");
     assertEquals("key_one", omKeyInfo1.getKeyName());
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
-    assertEquals("key_one",
+    assertEquals("sampleVol/bucketOne/key_one",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
   }
 
@@ -1041,7 +1042,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(2, "", true, true);
+        omdbInsightEndpoint.getOpenKeyInfo(2, "", "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1050,10 +1051,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals(0, keyInsightInfoResp.getFsoKeyInfoList().size());
     assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    assertEquals("key_three",
+    assertEquals("sampleVol/bucketOne/key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
 
-    openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(3, "", true, true);
+    openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(3, "", "", true, true);
     keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1062,7 +1063,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
     assertEquals(3, keyInsightInfoResp.getFsoKeyInfoList().size() +
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    assertEquals("key_three",
+    assertEquals("sampleVol/bucketOne/key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
   }
 
@@ -1104,7 +1105,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // CASE 1 :- Display only FSO keys in response
     // includeFsoKeys=true, includeNonFsoKeys=false
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(10, "", true, false);
+        omdbInsightEndpoint.getOpenKeyInfo(10, "", "", true, false);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1116,7 +1117,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // CASE 2 :- Display only Non-FSO keys in response
     // includeFsoKeys=false, includeNonFsoKeys=true
     openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(10, "", false, true);
+        omdbInsightEndpoint.getOpenKeyInfo(10, "", "", false, true);
     keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
     assertEquals(0,
@@ -1127,7 +1128,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // CASE 3 :- Display both FSO and Non-FSO keys in response
     // includeFsoKeys=true, includeNonFsoKeys=true
     openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(10, "", true, true);
+        omdbInsightEndpoint.getOpenKeyInfo(10, "", "", true, true);
     keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
     assertEquals(4,
@@ -1138,45 +1139,39 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // CASE 4 :- Don't Display both FSO and Non-FSO keys in response
     // includeFsoKeys=false, includeNonFsoKeys=false
     openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(10, "", false, false);
-    keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    assertNotNull(keyInsightInfoResp);
-    assertEquals(0,
-        keyInsightInfoResp.getFsoKeyInfoList().size());
-    assertEquals(0,
-        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+        omdbInsightEndpoint.getOpenKeyInfo(10, "", "", false, false);
+    assertEquals(204, openKeyInfoResp.getStatus());
+    String entity = (String) openKeyInfoResp.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
   }
 
   @Test
   public void testGetOpenKeyInfoPrevKeyParam() throws Exception {
     OmKeyInfo omKeyInfo1 =
-        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+        getOmKeyInfo("sampleVol", "bucketOne", "key_1", true);
     OmKeyInfo omKeyInfo2 =
-        getOmKeyInfo("sampleVol", "bucketOne", "key_two", true);
+        getOmKeyInfo("sampleVol", "bucketOne", "key_2", true);
     OmKeyInfo omKeyInfo3 =
-        getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
+        getOmKeyInfo("sampleVol", "bucketOne", "key_3", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
+        .put("/sampleVol/bucketOne/key_1", omKeyInfo1);
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/bucketOne/key_two", omKeyInfo2);
+        .put("/sampleVol/bucketOne/key_2", omKeyInfo2);
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
+        .put("/sampleVol/bucketOne/key_3", omKeyInfo3);
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "/sampleVol/bucketOne/key_one",
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "/sampleVol/bucketOne/key_1", "",
             true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     assertNotNull(keyInsightInfoResp);
-    assertEquals(1,
-        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals(1, keyInsightInfoResp.getNonFSOKeyInfoList().size());
     assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
-    assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
-        keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    assertEquals("key_three",
-        keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
-    assertEquals("key_two",
-        keyInsightInfoResp.getFsoKeyInfoList().get(0).getPath());
+    assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() + keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals("sampleVol/bucketOne/key_3", keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
+    assertEquals("sampleVol/bucketOne/key_2", keyInsightInfoResp.getFsoKeyInfoList().get(0).getPath());
   }
 
   @Test
