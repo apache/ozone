@@ -45,28 +45,20 @@ public class GrpcXceiverService extends
       LOG = LoggerFactory.getLogger(GrpcXceiverService.class);
 
   private final ContainerDispatcher dispatcher;
-  private final boolean zeroCopyEnabled;
   private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
       zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
           ContainerCommandRequestProto.getDefaultInstance());
 
-  public GrpcXceiverService(ContainerDispatcher dispatcher,
-      boolean zeroCopyEnabled) {
+  public GrpcXceiverService(ContainerDispatcher dispatcher) {
     this.dispatcher = dispatcher;
-    this.zeroCopyEnabled = zeroCopyEnabled;
   }
 
   /**
-   * Bind service with zerocopy marshaller equipped for the `send` API if
-   * zerocopy is enabled.
+   * Bind service with zerocopy marshaller equipped for the `send` API.
    * @return  service definition.
    */
   public ServerServiceDefinition bindServiceWithZeroCopy() {
     ServerServiceDefinition orig = super.bindService();
-    if (!zeroCopyEnabled) {
-      LOG.info("Zerocopy is not enabled.");
-      return orig;
-    }
 
     ServerServiceDefinition.Builder builder =
         ServerServiceDefinition.builder(orig.getServiceDescriptor().getName());
