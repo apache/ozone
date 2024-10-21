@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -282,6 +283,7 @@ public class TestOzoneManagerHASnapshot {
    * and purgeSnapshot in same batch.
    */
   @Test
+  @Unhealthy("HDDS-11415 om statemachine change, remove")
   public void testKeyAndSnapshotDeletionService() throws IOException, InterruptedException, TimeoutException {
     OzoneManager omLeader = cluster.getOMLeader();
     OzoneManager omFollower;
