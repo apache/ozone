@@ -165,6 +165,122 @@ jobs:
           path: |
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
+  build-config-doc:
+    needs:
+      - build
+    if: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' && github.ref_name == 'master' }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Download the source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-bin
+          path: ozone-bin
+      - name: Extract the source tarball
+        run: |
+          mkdir -p ozone-bin/extracted
+          tar -xzf ozone-bin/ozone-*.tar.gz -C ozone-bin/extracted
+      - name: Run the Python script to convert XML properties into Markdown
+        run: python3 dev-support/ci/xml_to_md.py ozone-bin/extracted > hadoop-hdds/docs/content/tools/Configurations.md
+      - name: Check if Configurations.md file has changed
+        id: hash-check
+        run: |
+          HASH_FILES="${{ hashFiles('hadoop-hdds/docs/content/tools/Configurations.md') }}"
+          PREV_HASH="${{ hashFiles('hadoop-hdds/docs/content/tools/Configurations.md@{previous-commit}') }}"
+          if [ "$HASH_FILES" != "$PREV_HASH" ]; then
+            echo "Configurations.md has changed, proceeding to commit and create PRs."
+            echo "hashes_differ=true" >> $GITHUB_ENV
+          else
+            echo "Configurations.md is unchanged, skipping commit and PR creation."
+            echo "hashes_differ=false" >> $GITHUB_ENV
+          fi
+      - name: Get short commit SHA
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
+      - name: Commit and push changes to apache/ozone
+        if: env.hashes_differ == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+        run: |
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'noreply@github.com'
+          git checkout -b config-doc-update-from-${{ env.SHORT_SHA }}
+          git add hadoop-hdds/docs/content/tools/Configurations.md
+          git commit -m "[Auto] Update Configurations.md from ${{ github.sha }}"
+          git push origin config-doc-update-from-${{ env.SHORT_SHA }}
+      - name: Create Pull Request in apache/ozone
+        if: env.hashes_differ == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          echo "## What changes were proposed in this pull request?" > pr_body.txt
+          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-${{ env.SHORT_SHA }}](https://github.com/apache/ozone/tree/config-doc-update-from-${{ env.SHORT_SHA }}) branch after this PR is merged or closed." >> pr_body.txt
+          echo "" >> pr_body.txt
+          echo "## What is the link to the Apache JIRA?" >> pr_body.txt
+#          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body.txt
+          echo "" >> pr_body.txt
+          echo "## How was this patch tested?" >> pr_body.txt
+          echo "Reviewers should manually verify the correctness of this change." >> pr_body.txt
+
+          gh pr create --base master --head config-doc-update-from-${{ env.SHORT_SHA }} \
+          --title ". Update Configurations.md page with changes from " \
+          --body-file pr_body.txt
+      - name: Checkout ozone-site repository
+        if: env.hashes_differ == 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
+          repository: apache/ozone-site
+          ref: 'HDDS-9225-website-v2'
+          path: ozone-site
+      - name: Copy MD file to ozone-site repository
+        if: env.hashes_differ == 'true'
+        run: |
+          TARGET_DIR=$(ls -d ozone-site/docs/*-administrator-guide/*-configuration)
+          echo "TARGET_DIR=${TARGET_DIR#ozone-site/}" >> $GITHUB_ENV
+          cp hadoop-hdds/docs/content/tools/Configurations.md "$TARGET_DIR/99-appendix.md"
+      - name: Commit and push changes to apache/ozone-site
+        if: env.hashes_differ == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+        run: |
+          cd ozone-site
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'noreply@github.com'
+          git add "$TARGET_DIR/99-appendix.md"
+          git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
+          git push origin config-doc-update-from-${{ env.SHORT_SHA }}
+      - name: Create Pull Request in apache/ozone-site
+        if: env.hashes_differ == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          BRANCH_NAME: ${{ github.ref_name }}
+
+        run: |
+          cd ozone-site
+          echo "## What changes were proposed in this pull request?" > pr_body1.txt
+          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-${{ env.SHORT_SHA }}](https://github.com/apache/ozone/tree/config-doc-update-from-${{ env.SHORT_SHA }}) branch after this PR is merged or closed." >> pr_body1.txt
+          echo "" >> pr_body1.txt
+          echo "## What is the link to the Apache JIRA?" >> pr_body1.txt
+#          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body1.txt
+          echo "" >> pr_body1.txt
+          echo "## How was this patch tested?" >> pr_body1.txt
+          echo "Reviewers should manually verify the correctness of this change." >> pr_body1.txt
+          
+          gh pr create --base HDDS-9225-website-v2 --head config-doc-update-from-${{ env.SHORT_SHA }} \
+          --title ". Update Configurations.md page with changes from" \
+          --body-file pr_body1.txt
   compile:
     needs:
       - build-info
