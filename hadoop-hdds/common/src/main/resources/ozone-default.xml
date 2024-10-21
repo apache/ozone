@@ -4537,14 +4537,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.ec.grpc.zerocopy.enabled</name>
-    <value>true</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      Specify if zero-copy should be enabled for EC GRPC protocol.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.max.buckets</name>
     <value>100000</value>
     <tag>OZONE, OM</tag>
