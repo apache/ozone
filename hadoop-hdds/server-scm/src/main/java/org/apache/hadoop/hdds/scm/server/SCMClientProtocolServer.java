@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeFailureInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
@@ -67,7 +68,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -78,6 +81,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -1496,5 +1500,32 @@ public class SCMClientProtocolServer implements
   public String getMetrics(String query) throws IOException {
     FetchMetrics fetchMetrics = new FetchMetrics();
     return fetchMetrics.getMetrics(query);
+  }
+
+  /**
+   * Retrieve all failed disks.
+   *
+   * @return all failed disks.
+   * @throws IOException an I/O exception of some sort has occurred.
+   */
+  @Override
+  public List<VolumeFailureInfoProto> getVolumeFailureInfos() throws IOException {
+    List<VolumeFailureInfoProto> volumeFailureInfos = new ArrayList<>();
+    NodeManager scmNodeManager = scm.getScmNodeManager();
+    List<DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
+    for (DatanodeDetails detail : allNodes) {
+      DatanodeInfo datanodeInfo = (DatanodeInfo) detail;
+      List<VolumeFailureInfoProto> dnVolumeFailureInfos = datanodeInfo.getVolumeFailureInfos();
+      if (dnVolumeFailureInfos != null && dnVolumeFailureInfos.size() > 0) {
+        LOG.debug("DN({} / {}) has {} failureVolume.", detail.getHostName(),
+            detail.getUuid(), dnVolumeFailureInfos.size());
+        for (VolumeFailureInfoProto volumeFailureInfoProto : dnVolumeFailureInfos) {
+          LOG.debug("VolumeName {} : {}", volumeFailureInfoProto.getVolumeName(),
+              volumeFailureInfoProto.getCapacityLost());
+          volumeFailureInfos.add(volumeFailureInfoProto);
+        }
+      }
+    }
+    return volumeFailureInfos;
   }
 }
