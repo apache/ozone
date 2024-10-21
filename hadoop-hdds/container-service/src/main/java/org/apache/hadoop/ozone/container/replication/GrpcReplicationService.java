@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashSet;
 import java.util.Set;
@@ -157,11 +156,7 @@ public class GrpcReplicationService extends
       IOUtils.cleanupWithLogger(LOG, outputStream);
 
       if (copyContainerZeroCopyMessageMarshaller != null) {
-        InputStream popStream =
-            copyContainerZeroCopyMessageMarshaller.popStream(request);
-        if (popStream != null) {
-          IOUtils.cleanupWithLogger(LOG, popStream);
-        }
+        copyContainerZeroCopyMessageMarshaller.release(request);
       }
     }
   }
