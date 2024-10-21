@@ -47,7 +47,8 @@ class DatanodeDeletedBlockTransactions {
     blocksDeleted += tx.getLocalIDCount();
     if (SCMBlockDeletingService.LOG.isDebugEnabled()) {
       SCMBlockDeletingService.LOG
-          .debug("Transaction added: {} <- TX({})", dnID, tx.getTxID());
+          .debug("Transaction added: {} <- TX({}), DN {} <- blocksDeleted Add {}.",
+          dnID, tx.getTxID(), dnID, tx.getLocalIDCount());
     }
   }
 
