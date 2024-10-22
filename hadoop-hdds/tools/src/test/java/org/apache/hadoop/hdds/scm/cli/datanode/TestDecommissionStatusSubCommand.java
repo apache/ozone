@@ -237,14 +237,13 @@ public class TestDecommissionStatusSubCommand {
   }
 
   @Test
-  public void testNodeDecommissionOperationMetrics() throws IOException {
+  public void testNodeContainersReplicationMetrics() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
-    CommandLine c = new CommandLine(cmd);
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("ContainersReplicationMetrics:\\ntransferredBytes:\\s1423644672\\n" +
