@@ -799,7 +799,7 @@ public class TestSnapshotDiffManager {
              mockedSnapshotDeletingService = mockStatic(
                  SnapshotDeletingService.class)) {
       mockedSnapshotDeletingService.when(() ->
-          SnapshotDeletingService.isBlockLocationInfoSame(any(OmKeyInfo.class),
+          SnapshotUtils.isBlockLocationInfoSame(any(OmKeyInfo.class),
               any(OmKeyInfo.class)))
           .thenAnswer(i -> {
             int keyVal = Integer.parseInt(((OmKeyInfo)i.getArgument(0))

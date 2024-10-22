@@ -457,7 +457,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
     KEY_PATH_LOCK((byte) 5, "KEY_PATH_LOCK"), //63
     PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
-    SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"); // = 255
+    SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"), // = 255
+    SNAPSHOT_GC_LOCK((byte) 8, "SNAPSHOT_GC_LOCK");
 
     // level of the resource
     private byte lockLevel;
