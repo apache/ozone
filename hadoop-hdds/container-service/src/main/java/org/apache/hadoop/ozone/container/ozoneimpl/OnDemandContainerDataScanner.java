@@ -23,7 +23,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
+import static org.apache.hadoop.ozone.container.ozoneimpl.AbstractBackgroundContainerScanner.logUnhealthyScanResult;
 
 /**
  * Class for performing on demand scans of containers.
@@ -133,28 +133,30 @@ public final class OnDemandContainerDataScanner {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
 
-      ScanResult result =
-          container.scanData(instance.throttler, instance.canceler);
+      ScanResult result = container.scanData(instance.throttler, instance.canceler);
       // Metrics for skipped containers should not be updated.
-      if (result.getFailureType() == DELETED_CONTAINER) {
-        LOG.error("Container [{}] has been deleted.",
-            containerId, result.getException());
-        return;
-      }
-      if (!result.isHealthy()) {
-        LOG.error("Corruption detected in container [{}]." +
-                "Marking it UNHEALTHY.", containerId, result.getException());
-        boolean containerMarkedUnhealthy = instance.containerController
-            .markContainerUnhealthy(containerId, result);
-        if (containerMarkedUnhealthy) {
-          instance.metrics.incNumUnHealthyContainers();
+      if (result.isDeleted()) {
+        LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
+      } else {
+        if (!result.isHealthy()) {
+          logUnhealthyScanResult(containerId, result, LOG);
+          boolean containerMarkedUnhealthy = instance.containerController
+              .markContainerUnhealthy(containerId, result);
+          if (containerMarkedUnhealthy) {
+            instance.metrics.incNumUnHealthyContainers();
+          }
         }
+        // TODO HDDS-10374 will need to update the merkle tree here as well.
+        instance.metrics.incNumContainersScanned();
       }
 
-      instance.metrics.incNumContainersScanned();
+      // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
       Instant now = Instant.now();
       logScanCompleted(containerData, now);
-      instance.containerController.updateDataScanTimestamp(containerId, now);
+
+      if (!result.isDeleted()) {
+        instance.containerController.updateDataScanTimestamp(containerId, now);
+      }
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);

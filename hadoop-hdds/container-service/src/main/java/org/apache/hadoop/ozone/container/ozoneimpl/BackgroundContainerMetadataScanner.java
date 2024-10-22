@@ -75,10 +75,13 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    Container.ScanResult result = container.scanMetaData();
+    MetadataScanResult result = container.scanMetaData();
+    if (result.isDeleted()) {
+      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
+      return;
+    }
     if (!result.isHealthy()) {
-      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
-          containerID, result.getException());
+      logUnhealthyScanResult(containerID, result, LOG);
       boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
       if (containerMarkedUnhealthy) {
         metrics.incNumUnHealthyContainers();

@@ -62,6 +62,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -940,11 +942,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public ScanResult scanMetaData() throws InterruptedException {
-    long containerId = containerData.getContainerID();
+  public MetadataScanResult scanMetaData() throws InterruptedException {
     KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
+        new KeyValueContainerCheck(config, this);
     return checker.fastCheck();
   }
 
@@ -963,7 +963,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+  public DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
@@ -971,11 +971,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           + containerData.getState());
     }
 
-    long containerId = containerData.getContainerID();
-    KeyValueContainerCheck checker =
-        new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume(), this);
-
+    KeyValueContainerCheck checker = new KeyValueContainerCheck(config, this);
     return checker.fullCheck(throttler, canceler);
   }
 
