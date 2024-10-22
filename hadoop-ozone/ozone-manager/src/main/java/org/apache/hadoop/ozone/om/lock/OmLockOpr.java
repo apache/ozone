@@ -96,10 +96,10 @@ public class OmLockOpr {
     Collections.sort(this.keyNameList);
   }
   public static void init(String threadNamePrefix) {
-    keyLocking = new KeyLocking();
-    volumeLocking = new KeyLocking();
-    snapshotLocking = new KeyLocking();
-    bucketLocking = new KeyLocking();
+    keyLocking = new KeyLocking(102400);
+    volumeLocking = new KeyLocking(1024);
+    snapshotLocking = new KeyLocking(1024);
+    bucketLocking = new KeyLocking(1024);
     prefixLocking = new FSOPrefixLocking(threadNamePrefix);
     lockedObjMap = new ConcurrentHashMap<>();
     // init scheduler to check and monitor

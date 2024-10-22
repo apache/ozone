@@ -69,7 +69,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.info("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+    // LOG.info("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
 

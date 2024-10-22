@@ -59,16 +59,16 @@ public class BucketQuotaResource {
     private AtomicLong incUsedBytes = new AtomicLong();
     private AtomicLong incUsedNamespace = new AtomicLong();
 
-    public void addUsedBytes(long bytes) {
-      incUsedBytes.addAndGet(bytes);
+    public long addUsedBytes(long bytes) {
+      return incUsedBytes.addAndGet(bytes);
     }
 
     public long getUsedBytes() {
       return incUsedBytes.get();
     }
 
-    public void addUsedNamespace(long bytes) {
-      incUsedNamespace.addAndGet(bytes);
+    public long addUsedNamespace(long bytes) {
+      return incUsedNamespace.addAndGet(bytes);
     }
 
     public long getUsedNamespace() {

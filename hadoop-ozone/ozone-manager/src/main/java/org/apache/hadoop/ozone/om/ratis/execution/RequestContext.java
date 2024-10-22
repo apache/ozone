@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.ratis.execution;
 
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OmRequestBase;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -29,6 +30,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 public final class RequestContext {
   private OMRequest request;
   private OMClientRequest clientRequest;
+  private OmRequestBase requestBase;
   private OMResponse response;
   private TermIndex index;
   private CompletableFuture<OMResponse> future;
@@ -83,5 +85,11 @@ public final class RequestContext {
 
   public void setClientRequest(OMClientRequest clientRequest) {
     this.clientRequest = clientRequest;
+  }
+  public void setRequestBase(OmRequestBase requestBase) {
+    this.requestBase = requestBase;
+  }
+  public OmRequestBase getRequestBase() {
+    return requestBase;
   }
 }

@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OmRequestBase;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.OMPersistDbRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -349,6 +350,46 @@ public final class OzoneManagerRatisUtils {
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
+        volumeName, bucketName, omRequest, ozoneManager.getMetadataManager());
+  }
+
+  /**
+   * Create OmRequestBase which encapsulates the OMRequest.
+   * @param omRequest
+   * @return OMClientRequest
+   * @throws IOException
+   */
+  @SuppressWarnings("checkstyle:methodlength")
+  public static OmRequestBase createLeaderClientRequest(
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    // Handling of exception by createClientRequest(OMRequest, OzoneManger):
+    // Either the code will take FSO or non FSO path, both classes has a
+    // validateAndUpdateCache() function which also contains
+    // validateBucketAndVolume() function which validates bucket and volume and
+    // throws necessary exceptions if required. validateAndUpdateCache()
+    // function has catch block which catches the exception if required and
+    // handles it appropriately.
+    Type cmdType = omRequest.getCmdType();
+    OzoneManagerProtocolProtos.KeyArgs keyArgs;
+    String volumeName = "";
+    String bucketName = "";
+
+    switch (cmdType) {
+    case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    default:
+      return null;
+    }
+    return BucketLayoutAwareOMKeyRequestFactory.createLeaderRequest(
         volumeName, bucketName, omRequest, ozoneManager.getMetadataManager());
   }
 

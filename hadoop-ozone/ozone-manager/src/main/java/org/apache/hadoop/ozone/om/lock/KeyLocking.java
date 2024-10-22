@@ -33,13 +33,17 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyLocking {
   private static final Logger LOG = LoggerFactory.getLogger(KeyLocking.class);
-  private static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 10240;
+  private static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 102400;
   private static final long LOCK_TIMEOUT = 10 * 60 * 1000;
-  private Striped<ReadWriteLock> fileStripedLock = Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
+  private final Striped<ReadWriteLock> fileStripedLock;
   private AtomicLong writeLockCount = new AtomicLong();
   private AtomicLong readLockCount = new AtomicLong();
   private AtomicLong failedLockCount = new AtomicLong();
   private AtomicLong failedUnlockCount = new AtomicLong();
+
+  public KeyLocking(int stripLockSize) {
+    fileStripedLock = Striped.readWriteLock(stripLockSize);
+  }
 
   public void lock(List<String> keyList) throws IOException {
     for (String key : keyList) {

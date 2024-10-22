@@ -16,10 +16,14 @@
  */
 package org.apache.hadoop.ozone.om.ratis.execution;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,6 +37,7 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.lock.OmRequestLockUtils;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OmRequestBase;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -43,12 +48,15 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
+
 /**
  * entry for request execution.
  */
 public class OMGateway {
   private static final Logger LOG = LoggerFactory.getLogger(OMGateway.class);
   private final LeaderRequestExecutor leaderExecutor;
+  private final LeaderCompatibleRequestExecutor leaderCompatibleExecutor;
   private final FollowerRequestExecutor followerExecutor;
   private final OzoneManager om;
   private final AtomicLong requestInProgress = new AtomicLong(0);
@@ -58,12 +66,18 @@ public class OMGateway {
    * This makes use of termIndex for init shifted within 54 bits.
    */
   private AtomicLong uniqueIndex = new AtomicLong();
+  private OMGatewayMetrics omGatewayMetrics;
+  private final ScheduledExecutorService executorService;
+  private boolean isAuthorize;
 
   public OMGateway(OzoneManager om) throws IOException {
     this.om = om;
+    omGatewayMetrics = OMGatewayMetrics.create();
     OmLockOpr.init(om.getThreadNamePrefix());
     OmRequestLockUtils.init();
-    this.leaderExecutor = new LeaderRequestExecutor(om, uniqueIndex);
+    isAuthorize = om.getConfiguration().getBoolean("ozone.om.leader.request.is.authorize", true);
+    this.leaderExecutor = new LeaderRequestExecutor(om, uniqueIndex, omGatewayMetrics);
+    this.leaderCompatibleExecutor = new LeaderCompatibleRequestExecutor(om, uniqueIndex);
     this.followerExecutor = new FollowerRequestExecutor(om, uniqueIndex);
     if (om.isLeaderExecutorEnabled() && om.isRatisEnabled()) {
       OzoneManagerRatisServer ratisServer = om.getOmRatisServer();
@@ -83,13 +97,27 @@ public class OMGateway {
     if (om.isLeaderExecutorEnabled()) {
       BucketQuotaResource.instance().enableTrack();
     }
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
+        .setNameFormat(om.getThreadNamePrefix() + "OmGateway-monitor-%d").build();
+    executorService = Executors.newScheduledThreadPool(1, threadFactory);
+    executorService.scheduleWithFixedDelay(() -> monitor(), 1000L, 1000L, TimeUnit.MILLISECONDS);
   }
   public void stop() {
     leaderExecutor.stop();
+    leaderCompatibleExecutor.stop();
     followerExecutor.stop();
     OmLockOpr.stop();
+    executorService.shutdown();
+    omGatewayMetrics.unRegister();
+  }
+  public void monitor() {
+    omGatewayMetrics.getGatewayRequestInProgress().add(requestInProgress.intValue());
   }
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
+    return captureLatencyNs(omGatewayMetrics.getGatewayExecution(), () -> submitInternal(omRequest));
+  }
+  public OMResponse submitInternal(OMRequest omRequest) throws ServiceException {
+    omGatewayMetrics.incRequestCount();
     if (!om.isLeaderReady()) {
       try {
         om.checkLeaderStatus();
@@ -104,21 +132,44 @@ public class OMGateway {
     requestContext.setFuture(new CompletableFuture<>());
     CompletableFuture<OMResponse> f = requestContext.getFuture()
         .whenComplete((r, th) -> handleAfterExecution(requestContext, th));
-    OmLockOpr lockOperation = OmRequestLockUtils.getLockOperation(om, omRequest);
+    OmLockOpr lockOperation = null;
     try {
       // TODO scheduling of request to pool
-      OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, om);
-      lockOperation.lock(om);
-      requestContext.setClientRequest(omClientRequest);
+      ExecutorType executorType = executorSelector(omRequest);
+      if (executorType == ExecutorType.LEADER_OPTIMIZED) {
+        executorType = captureLatencyNs(omGatewayMetrics.getGatewayPreExecute(), () -> {
+          OmRequestBase requestBase = OzoneManagerRatisUtils.createLeaderClientRequest(omRequest, om);
+          if (null != requestBase) {
+            OMRequest request = requestBase.preProcess(om);
+            requestContext.setRequest(request);
+            requestContext.setRequestBase(requestBase);
+            return ExecutorType.LEADER_OPTIMIZED;
+          } else {
+            return ExecutorType.LEADER_COMPATIBLE;
+          }
+        });
+        if (executorType == ExecutorType.LEADER_OPTIMIZED && isAuthorize) {
+          captureLatencyNs(omGatewayMetrics.getGatewayAuthorize(), () -> requestContext.getRequestBase().authorize(om));
+        }
+      }
+      if (executorType == ExecutorType.LEADER_COMPATIBLE) {
+        OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, om);
+        OMRequest request = omClientRequest.preExecute(om);
+        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, om);
+        requestContext.setClientRequest(omClientRequest);
+        requestContext.setRequest(request);
+      }
+      lockOperation = OmRequestLockUtils.getLockOperation(om, requestContext.getRequest());
+      final OmLockOpr tmpLockOpr = lockOperation;
+      captureLatencyNs(omGatewayMetrics.getGatewayLock(), () -> tmpLockOpr.lock(om));
 
-      validate(omRequest);
-      ensurePreviousRequestCompletionForPrepare(omRequest);
+      validate(requestContext.getRequest());
+      ensurePreviousRequestCompletionForPrepare(requestContext.getRequest());
 
       // submit request
-      ExecutorType executorType = executorSelector(omRequest);
       if (executorType == ExecutorType.LEADER_COMPATIBLE) {
-        int idx = Math.abs(leaderExecCurrIdx.getAndIncrement() % leaderExecutor.batchSize());
-        leaderExecutor.submit(idx, requestContext);
+        int idx = Math.abs(leaderExecCurrIdx.getAndIncrement() % leaderCompatibleExecutor.batchSize());
+        leaderCompatibleExecutor.submit(idx, requestContext);
       } else if (executorType == ExecutorType.FOLLOWER) {
         followerExecutor.submit(0, requestContext);
       } else {
@@ -126,7 +177,8 @@ public class OMGateway {
       }
 
       try {
-        return f.get();
+        return captureLatencyNs(omGatewayMetrics.getGatewayRequestResponse(), () -> f.get());
+        //return f.get();
       } catch (ExecutionException ex) {
         if (ex.getCause() != null) {
           throw new ServiceException(ex.getMessage(), ex.getCause());
@@ -144,16 +196,18 @@ public class OMGateway {
       LOG.error("Exception occurred while handling request", e);
       throw new ServiceException(e.getMessage(), e);
     } finally {
-      lockOperation.unlock();
-      Server.Call call = Server.getCurCall().get();
-      if (null != call) {
-        OMLockDetails lockDetails = lockOperation.getLockDetails();
-        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKWAIT,
-            lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKSHARED,
-            lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKEXCLUSIVE,
-            lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+      if (null != lockOperation) {
+        lockOperation.unlock();
+        Server.Call call = Server.getCurCall().get();
+        if (null != call) {
+          OMLockDetails lockDetails = lockOperation.getLockDetails();
+          call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKWAIT,
+              lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+          call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKSHARED,
+              lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
+          call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKEXCLUSIVE,
+              lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+        }
       }
     }
   }
@@ -207,7 +261,7 @@ public class OMGateway {
     if (isLeader) {
       resetUniqueIndex();
     } else {
-      leaderExecutor.disableProcessing();
+      leaderCompatibleExecutor.disableProcessing();
     }
   }
 
@@ -227,11 +281,11 @@ public class OMGateway {
   }
 
   public void executorEnable() throws ServiceException {
-    if (leaderExecutor.isProcessing()) {
+    if (leaderCompatibleExecutor.isProcessing()) {
       return;
     }
     if (requestInProgress.get() == 0) {
-      leaderExecutor.enableProcessing();
+      leaderCompatibleExecutor.enableProcessing();
     } else {
       LOG.warn("Executor is not enabled, previous request {} is still not cleaned", requestInProgress.get());
       String msg = "Request processing is disabled due to error";
@@ -241,9 +295,11 @@ public class OMGateway {
 
   private ExecutorType executorSelector(OMRequest req) {
     switch (req.getCmdType()) {
-    case EchoRPC:
+    case CreateKey:
+    case CommitKey:
       return ExecutorType.LEADER_OPTIMIZED;
     /* cases with Secret manager cache */
+    case EchoRPC:
     case GetS3Secret:
     case SetS3Secret:
     case RevokeS3Secret:

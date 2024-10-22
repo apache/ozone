@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -235,7 +236,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecKeyCreateFailsTotal;
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
-
+  @Metric(about = "request commit request get key")
+  private MutableRate keyCommitGetKeyRate;
+  public MutableRate getKeyCommitGetKeyRate() {
+    return keyCommitGetKeyRate;
+  }
+  @Metric(about = "request commit request get open key")
+  private MutableRate keyCommitGetOpenKeyRate;
+  public MutableRate getKeyCommitGetOpenKeyRate() {
+    return keyCommitGetOpenKeyRate;
+  }
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {

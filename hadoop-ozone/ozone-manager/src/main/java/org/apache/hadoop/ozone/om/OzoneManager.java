@@ -477,6 +477,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
+  private final boolean isLeaderExecutorFlag;
 
   /**
    * OM Startup mode.
@@ -582,6 +583,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
+    this.isLeaderExecutorFlag = configuration.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
 
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
@@ -5053,7 +5056,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean isLeaderExecutorEnabled() {
-    return configuration.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
-        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
+    return isLeaderExecutorFlag;
   }
 }
