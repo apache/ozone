@@ -49,18 +49,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
   private final Map<String, SnapshotInfo> updatedSnapInfos;
-  private final Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos;
 
   public OMSnapshotPurgeResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull List<String> snapshotDbKeys,
-      Map<String, SnapshotInfo> updatedSnapInfos,
-      Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos
+      Map<String, SnapshotInfo> updatedSnapInfos
   ) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
     this.updatedSnapInfos = updatedSnapInfos;
-    this.updatedPreviousAndGlobalSnapInfos = updatedPreviousAndGlobalSnapInfos;
   }
 
   /**
@@ -72,7 +69,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     checkStatusNotOK();
     this.snapshotDbKeys = null;
     this.updatedSnapInfos = null;
-    this.updatedPreviousAndGlobalSnapInfos = null;
   }
 
   @Override
@@ -82,8 +78,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
     updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
-    updateSnapInfo(metadataManager, batchOperation,
-        updatedPreviousAndGlobalSnapInfos);
     for (String dbKey: snapshotDbKeys) {
       // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
       SnapshotInfo snapshotInfo = omMetadataManager
@@ -96,8 +90,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         continue;
       }
 
+      // Remove and close snapshot's RocksDB instance from SnapshotCache.
+      ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager()
+          .invalidateCacheEntry(snapshotInfo.getSnapshotId());
+      // Remove the snapshot from snapshotId to snapshotTableKey map.
+      ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
+          .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
+      // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
   }

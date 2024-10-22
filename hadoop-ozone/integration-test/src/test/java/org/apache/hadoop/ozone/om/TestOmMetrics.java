@@ -338,7 +338,6 @@ public class TestOmMetrics {
     long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
     long initialNumKeyLists = getLongCounter("NumKeyLists", omMetrics);
-    long initialNumTrashKeyLists = getLongCounter("NumTrashKeyLists", omMetrics);
     long initialNumKeys = getLongCounter("NumKeys", omMetrics);
     long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
     long initialNumGetObjectTagging = getLongCounter("NumGetObjectTagging", omMetrics);
@@ -349,7 +348,6 @@ public class TestOmMetrics {
     long initialNumKeyAllocateFails = getLongCounter("NumKeyAllocateFails", omMetrics);
     long initialNumKeyLookupFails = getLongCounter("NumKeyLookupFails", omMetrics);
     long initialNumKeyDeleteFails = getLongCounter("NumKeyDeleteFails", omMetrics);
-    long initialNumTrashKeyListFails = getLongCounter("NumTrashKeyListFails", omMetrics);
     long initialNumInitiateMultipartUploadFails = getLongCounter("NumInitiateMultipartUploadFails", omMetrics);
     long initialNumBlockAllocationFails = getLongCounter("NumBlockAllocationFails", omMetrics);
     long initialNumKeyListFails = getLongCounter("NumKeyListFails", omMetrics);
@@ -362,16 +360,15 @@ public class TestOmMetrics {
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    doKeyOps(keyArgs);
+    doKeyOps(keyArgs); // This will perform 7 different operations on the key
 
     omMetrics = getMetrics("OMMetrics");
 
-    assertEquals(initialNumKeyOps + 11, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 10, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyLists + 1, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 1, getLongCounter("NumTrashKeyLists", omMetrics));
     assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
     assertEquals(initialNumGetObjectTagging + 1, getLongCounter("NumGetObjectTagging", omMetrics));
@@ -418,8 +415,6 @@ public class TestOmMetrics {
     doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
     doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
-    doThrow(exception).when(mockKm).listTrash(
-        any(), any(), any(), any(), anyInt());
     doThrow(exception).when(mockKm).getObjectTagging(any(), any());
     OmMetadataReader omMetadataReader =
         (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
@@ -436,19 +431,17 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeyOps + 40, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 37, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyLists + 3, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 3, getLongCounter("NumTrashKeyLists", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 3, getLongCounter("NumInitiateMultipartUploads", omMetrics));
 
     assertEquals(initialNumKeyAllocateFails + 1, getLongCounter("NumKeyAllocateFails", omMetrics));
     assertEquals(initialNumKeyLookupFails + 1, getLongCounter("NumKeyLookupFails", omMetrics));
     assertEquals(initialNumKeyDeleteFails + 1, getLongCounter("NumKeyDeleteFails", omMetrics));
     assertEquals(initialNumKeyListFails + 1, getLongCounter("NumKeyListFails", omMetrics));
-    assertEquals(initialNumTrashKeyListFails + 1, getLongCounter("NumTrashKeyListFails", omMetrics));
     assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
         "NumInitiateMultipartUploadFails", omMetrics));
     assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
@@ -852,12 +845,6 @@ public class TestOmMetrics {
 
     try {
       ozoneManager.listKeys(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), null, null, 0);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.listTrash(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }

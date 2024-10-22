@@ -37,18 +37,16 @@ import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Generic factory which stores different instances of Type 'T' sharded by
- * a key & version. A single key can be associated with different versions
+ * a key and version. A single key can be associated with different versions
  * of 'T'.
- *
  * Why does this class exist?
  * A typical use case during upgrade is to have multiple versions of a class
  * / method / object and chose them based  on current layout
  * version at runtime. Before finalizing, an older version is typically
  * needed, and after finalize, a newer version is needed. This class serves
  * this purpose in a generic way.
- *
  * For example, we can create a Factory to create multiple versions of
- * OMRequests sharded by Request Type & Layout Version Supported.
+ * OMRequests sharded by Request Type and Layout Version Supported.
  */
 public class LayoutVersionInstanceFactory<T> {
 
@@ -71,7 +69,7 @@ public class LayoutVersionInstanceFactory<T> {
   /**
    * Register an instance with a given factory key (key + version).
    * For safety reasons we dont allow (1) re-registering, (2) registering an
-   * instance with version > SLV.
+   * instance with version &gt; SLV.
    *
    * @param lvm LayoutVersionManager
    * @param key VersionFactoryKey key to associate with instance.
@@ -138,13 +136,15 @@ public class LayoutVersionInstanceFactory<T> {
   }
 
   /**
+   * <pre>
    * From the list of versioned instances for a given "key", this
    * returns the "floor" value corresponding to the given version.
-   * For example, if we have key = "CreateKey",  entry -> [(1, CreateKeyV1),
-   * (3, CreateKeyV2), and if the passed in key = CreateKey & version = 2, we
+   * For example, if we have key = "CreateKey",  entry -&gt; [(1, CreateKeyV1),
+   * (3, CreateKeyV2), and if the passed in key = CreateKey &amp; version = 2, we
    * return CreateKeyV1.
    * Since this is a priority queue based implementation, we use a O(1) peek()
    * lookup to get the current valid version.
+   * </pre>
    * @param lvm LayoutVersionManager
    * @param key Key and Version.
    * @return instance.

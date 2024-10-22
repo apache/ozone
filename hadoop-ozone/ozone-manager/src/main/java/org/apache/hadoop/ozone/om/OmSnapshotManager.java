@@ -41,6 +41,7 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -98,6 +99,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
@@ -674,19 +676,73 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Returns true if the snapshot is in given status.
-   * @param key DB snapshot table key
-   * @param status SnapshotStatus
-   * @return true if the snapshot is in given status, false otherwise
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
+   * @param metadataManager Metadatamanager of Active OM.
+   * @param snapshotTableKey table key corresponding to snapshot in snapshotInfoTable.
+   * @return True if the changes have been flushed to DB otherwise false
+   * @throws IOException
    */
-  public boolean isSnapshotStatus(String key,
-                                  SnapshotInfo.SnapshotStatus status)
+  public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, String snapshotTableKey)
       throws IOException {
-    return getSnapshotInfo(key).getSnapshotStatus().equals(status);
+    // Need this info from cache since the snapshot could have been updated only on cache and not on disk.
+    SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+    return areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
   }
 
-  public SnapshotInfo getSnapshotInfo(String key) throws IOException {
-    return SnapshotUtils.getSnapshotInfo(ozoneManager, key);
+  /**
+   * Checks if the last transaction performed on the snapshot has been flushed to disk.
+   * @param metadataManager Metadatamanager of Active OM.
+   * @param snapshotInfo SnapshotInfo value.
+   * @return True if the changes have been flushed to DB otherwise false. It would return true if the snapshot
+   * provided is null meaning the snapshot doesn't exist.
+   * @throws IOException
+   */
+  public static boolean areSnapshotChangesFlushedToDB(OMMetadataManager metadataManager, SnapshotInfo snapshotInfo)
+      throws IOException {
+    if (snapshotInfo != null) {
+      TransactionInfo snapshotTransactionInfo = snapshotInfo.getLastTransactionInfo() != null ?
+          TransactionInfo.fromByteString(snapshotInfo.getLastTransactionInfo()) : null;
+      TransactionInfo omTransactionInfo = TransactionInfo.readTransactionInfo(metadataManager);
+      // If transactionInfo field is null then return true to keep things backward compatible.
+      return snapshotTransactionInfo == null || omTransactionInfo.compareTo(snapshotTransactionInfo) >= 0;
+    }
+    return true;
+  }
+
+
+  /**
+   * Returns OmSnapshot object and skips active check.
+   * This should only be used for API calls initiated by background service e.g. purgeKeys, purgeSnapshot,
+   * snapshotMoveDeletedKeys, and SetSnapshotProperty.
+   */
+  public ReferenceCounted<OmSnapshot> getSnapshot(UUID snapshotId) throws IOException {
+    return snapshotCache.get(snapshotId);
+  }
+
+  /**
+   * Returns snapshotInfo from cache if it is present in cache, otherwise it checks RocksDB and return value from there.
+   * #################################################
+   * NOTE: THIS SHOULD BE USED BY SNAPSHOT CACHE ONLY.
+   * #################################################
+   * Sometimes, the follower OM node may be lagging that it gets purgeKeys or snapshotMoveDeletedKeys from a Snapshot,
+   * and purgeSnapshot for the same Snapshot one after another. And purgeSnapshot's validateAndUpdateCache gets
+   * executed before doubleBuffer flushes purgeKeys or snapshotMoveDeletedKeys from that Snapshot.
+   * This should not be a case on the leader node because SnapshotDeletingService checks that deletedTable and
+   * deletedDirectoryTable in DB don't have entries for the bucket before it sends a purgeSnapshot on a snapshot.
+   * If that happens, and we just look into the cache, the addToBatch operation will fail when it tries to open
+   * the DB and purgeKeys from the Snapshot because snapshot is already purged from the SnapshotInfoTable cache.
+   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere either in cache or in DB.
+   */
+  private SnapshotInfo getSnapshotInfo(String snapshotKey) throws IOException {
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().get(snapshotKey);
+
+    if (snapshotInfo == null) {
+      snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().getSkipCache(snapshotKey);
+    }
+    if (snapshotInfo == null) {
+      throw new OMException("Snapshot '" + snapshotKey + "' is not found.", INVALID_SNAPSHOT_ERROR);
+    }
+    return snapshotInfo;
   }
 
   public static String getSnapshotPrefix(String snapshotName) {

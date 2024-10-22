@@ -121,6 +121,14 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
+   */
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
+      = false;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
@@ -534,10 +542,6 @@ public final class OzoneConfigKeys {
       "ozone.om.lock.stripes.";
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
-
-  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
-      "ozone.client.list.trash.keys.max";
-  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
 
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 

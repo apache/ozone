@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -104,7 +105,7 @@ public class VersionEndpointTask implements
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
       }
-    } catch (DiskOutOfSpaceException ex) {
+    } catch (DiskOutOfSpaceException | BindException ex) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
       rpcEndPoint.logIfNeeded(ex);

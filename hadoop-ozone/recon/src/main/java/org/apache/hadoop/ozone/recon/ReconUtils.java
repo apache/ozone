@@ -32,11 +32,14 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.List;
-import java.util.TimeZone;
-import java.util.Date;
-import java.util.Set;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -54,6 +57,8 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
@@ -352,7 +357,8 @@ public class ReconUtils {
    * @param url               url to call
    * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
-   * @throws IOException, AuthenticationException While reading the response.
+   * @throws IOException While reading the response,
+   * @throws AuthenticationException
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                         String url, boolean isSpnego)
@@ -569,7 +575,6 @@ public class ReconUtils {
    * @param dateFormat
    * @param timeZone
    * @return the epoch milliseconds representation of the date.
-   * @throws ParseException
    */
   public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
     String localDateFormat = dateFormat;
@@ -594,6 +599,109 @@ public class ReconUtils {
       log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
     }
+  }
+
+  public static boolean validateStartPrefix(String startPrefix) {
+
+    // Ensure startPrefix starts with '/' for non-empty values
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path to ensure it's at least at the bucket level (volume/bucket).
+    String[] pathComponents = startPrefix.split("/");
+    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+      return false; // Invalid if not at bucket level or deeper
+    }
+
+    return true;
+  }
+
+  /**
+   * Retrieves keys from the specified table based on pagination and prefix filtering.
+   * This method handles different scenarios based on the presence of {@code startPrefix}
+   * and {@code prevKey}, enabling efficient key retrieval from the table.
+   *
+   * The method handles the following cases:
+   *
+   * 1. {@code prevKey} provided, {@code startPrefix} empty:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent records up to the limit.
+   *
+   * 2. {@code prevKey} empty, {@code startPrefix} empty:
+   *    - Iterates from the beginning of the table, retrieving all records up to the limit.
+   *
+   * 3. {@code startPrefix} provided, {@code prevKey} empty:
+   *    - Seeks to the first key matching {@code startPrefix} and returns all matching keys up to the limit.
+   *
+   * 4. {@code startPrefix} provided, {@code prevKey} provided:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix},
+   *      up to the limit.
+   *
+   * This method also handles the following {@code limit} scenarios:
+   * - If {@code limit == 0} or {@code limit < -1}, no records are returned.
+   * - If {@code limit == -1}, all records are returned.
+   * - For positive {@code limit}, it retrieves records up to the specified {@code limit}.
+   *
+   * @param table       The table to retrieve keys from.
+   * @param startPrefix The search prefix to match keys against.
+   * @param limit       The maximum number of keys to retrieve.
+   * @param prevKey     The key to start after for the next set of records.
+   * @return A map of keys and their corresponding {@code OmKeyInfo} or {@code RepeatedOmKeyInfo} objects.
+   * @throws IOException If there are problems accessing the table.
+   */
+  public static <T> Map<String, T> extractKeysFromTable(
+      Table<String, T> table, String startPrefix, int limit, String prevKey)
+      throws IOException {
+
+    Map<String, T> matchedKeys = new LinkedHashMap<>();
+
+    // Null check for the table to prevent NPE during omMetaManager initialization
+    if (table == null) {
+      log.error("Table object is null. omMetaManager might still be initializing.");
+      return Collections.emptyMap();
+    }
+
+    // If limit = 0, return an empty result set
+    if (limit == 0 || limit < -1) {
+      return matchedKeys;
+    }
+
+    // If limit = -1, set it to Integer.MAX_VALUE to return all records
+    int actualLimit = (limit == -1) ? Integer.MAX_VALUE : limit;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
+
+      // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
+      if (!prevKey.isEmpty()) {
+        keyIter.seek(prevKey);
+        if (keyIter.hasNext()) {
+          keyIter.next();  // Skip the previous key record
+        }
+      } else if (!startPrefix.isEmpty()) {
+        // Scenario 3: startPrefix is provided but prevKey is empty, so seek to startPrefix
+        keyIter.seek(startPrefix);
+      }
+
+      // Scenario 2: Both startPrefix and prevKey are empty (iterate from the start of the table)
+      // No seeking needed; just start iterating from the first record in the table
+      // This is implicit in the following loop, as the iterator will start from the beginning
+
+      // Iterate through the keys while adhering to the limit (if the limit is not zero)
+      while (keyIter.hasNext() && matchedKeys.size() < actualLimit) {
+        Table.KeyValue<String, T> entry = keyIter.next();
+        String dbKey = entry.getKey();
+
+        // Scenario 3 & 4: If startPrefix is provided, ensure the key matches startPrefix
+        if (!startPrefix.isEmpty() && !dbKey.startsWith(startPrefix)) {
+          break;  // If the key no longer matches the prefix, exit the loop
+        }
+
+        // Add the valid key-value pair to the results
+        matchedKeys.put(dbKey, entry.getValue());
+      }
+    } catch (IOException exception) {
+      log.error("Error retrieving keys from table for path: {}", startPrefix, exception);
+      throw exception;
+    }
+    return matchedKeys;
   }
 
   /**
