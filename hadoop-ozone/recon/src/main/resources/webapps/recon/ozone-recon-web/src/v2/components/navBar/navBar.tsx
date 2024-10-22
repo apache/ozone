@@ -125,10 +125,10 @@ const NavBar: React.FC<NavBarProps> = ({
         <span>Insights</span>
         <Link to='/Insights' />
       </Menu.Item>
-      <Menu.Item key='/OmInsights'
+      <Menu.Item key='/Om'
         icon={<DatabaseOutlined />}>
         <span>OM DB Insights</span>
-        <Link to='/OmInsights' />
+        <Link to='/Om' />
       </Menu.Item>
     </Menu.SubMenu>
   ), (

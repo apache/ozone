@@ -41,6 +41,7 @@ import {
 } from '@/v2/types/insights.types';
 
 import './insights.less';
+import { useLocation } from 'react-router-dom';
 
 
 const OMDBInsights: React.FC<{}> = () => {
@@ -53,6 +54,7 @@ const OMDBInsights: React.FC<{}> = () => {
   });
 
   const rowExpandSignal = React.useRef<AbortController>();
+  const {state: { activeTab } = {}} = useLocation<Record<string, any>>();
 
   const paginationConfig: TablePaginationConfig = {
     showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total}`
@@ -117,7 +119,7 @@ const OMDBInsights: React.FC<{}> = () => {
     </div>
     <div style={{ padding: '24px' }}>
       <div className='content-div'>
-        <Tabs defaultActiveKey='1'>
+        <Tabs defaultActiveKey={activeTab ?? '1'}>
           <Tabs.TabPane key='1' tab={
             <label>
               Container Mismatch Info

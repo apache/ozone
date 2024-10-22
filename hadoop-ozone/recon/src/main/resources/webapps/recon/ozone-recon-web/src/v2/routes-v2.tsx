@@ -61,7 +61,7 @@ export const routesV2 = [
     component: Insights
   },
   {
-    path: '/OmInsights',
+    path: '/Om',
     component: OMDBInsights
   }
 ];

@@ -30,5 +30,5 @@ export const breadcrumbNameMap: BreadcrumbNameMap = {
   '/Insights': 'Insights',
   '/DiskUsage': 'Disk Usage',
   '/Heatmap': 'Heatmap',
-  '/OmInsights': 'OM DB Insights'
+  '/Om': 'OM DB Insights'
 };

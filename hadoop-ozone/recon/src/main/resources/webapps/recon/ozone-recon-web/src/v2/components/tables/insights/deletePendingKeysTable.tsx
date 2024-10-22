@@ -102,7 +102,6 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
   }
 
   function expandedRowRender(record: DeletePendingKeysColumns) {
-    console.log(expandedDeletePendingKeys);
     const filteredData = expandedDeletePendingKeys?.flatMap((info) => (
       info.omKeyInfoList?.filter((key) => key.keyName === record.keyName)
     ));
@@ -125,7 +124,7 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
       const deletePendingKeys: DeletePendingKeysResponse = response?.data;
       let deletedKeyData = [];
       // Sum up the data size and organize related key information
-      deletedKeyData = deletePendingKeys?.deletedKeyInfo.flatMap((keyInfo) => {
+      deletedKeyData = deletePendingKeys?.deletedKeyInfo?.flatMap((keyInfo) => {
         expandedDeletePendingKeys.push(keyInfo);
         let count = 0;
         let item: DeletePendingKey = keyInfo.omKeyInfoList?.reduce((obj, curr) => {

@@ -485,7 +485,8 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '2'}} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
@@ -524,7 +525,8 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '3'}} />
           </Col>
         </Row>
       </div>
