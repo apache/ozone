@@ -17,7 +17,12 @@
  */
 package org.hadoop.ozone.recon.codegen;
 
-import org.hadoop.ozone.recon.schema.*;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
+import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;

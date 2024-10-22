@@ -20,17 +20,26 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
-import org.junit.jupiter.api.*;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+
 
 /**
  * Tests for ReconLayoutVersionManager.
@@ -39,8 +48,8 @@ public class TestReconLayoutVersionManager {
 
   private ReconSchemaVersionTableManager schemaVersionTableManager;
   private ReconLayoutVersionManager layoutVersionManager;
-  private static MockedStatic<ReconLayoutFeature> mockedEnum;
-  private static MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
+  private MockedStatic<ReconLayoutFeature> mockedEnum;
+  private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
 
   @BeforeEach
   public void setUp() {
@@ -49,6 +58,7 @@ public class TestReconLayoutVersionManager {
 
     // Mocking ReconLayoutFeature.values() to return custom enum instances
     mockedEnum = mockStatic(ReconLayoutFeature.class);
+    mockedEnumUpgradeActionType = mockStatic(ReconUpgradeAction.UpgradeActionType.class);
 
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);

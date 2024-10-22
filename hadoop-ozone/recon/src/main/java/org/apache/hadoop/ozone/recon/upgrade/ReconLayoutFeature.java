@@ -31,11 +31,7 @@ import java.util.Set;
  */
 public enum ReconLayoutFeature {
   // Represents the starting point for Recon's layout versioning system.
-  INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
-
-  FEATURE_1(1, "Description for Feature 1"),
-  FEATURE_2(2, "Description for Feature 2"),
-  FEATURE_3(3, "Description for Feature 3");
+  INITIAL_VERSION(0, "Recon Layout Versioning Introduction");
 
   private final int version;
   private final String description;
