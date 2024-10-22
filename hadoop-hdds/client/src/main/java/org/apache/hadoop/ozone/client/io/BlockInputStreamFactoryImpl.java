@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -37,6 +39,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
 
 /**
  * Factory class to create various BlockStream instances.
@@ -85,11 +89,27 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
+    } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
+      return new StreamBlockInput(
+          blockInfo.getBlockID(), blockInfo.getLength(),
+          pipeline, token, xceiverFactory, refreshFunction, config);
     } else {
       return new BlockInputStream(blockInfo,
           pipeline, token, xceiverFactory, refreshFunction,
           config);
     }
+  }
+
+  private boolean allDataNodesSupportStreamBlock(Pipeline pipeline) {
+    // return true only if all DataNodes in the pipeline are on a version
+    // that supports for reading a block by streaming chunks..
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (dn.getCurrentVersion() <
+          STREAM_BLOCK_SUPPORT.toProtoValue()) {
+        return false;
+      }
+    }
+    return true;
   }
 
 }
