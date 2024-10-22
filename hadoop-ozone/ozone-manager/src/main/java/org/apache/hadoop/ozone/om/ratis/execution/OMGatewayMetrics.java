@@ -53,6 +53,12 @@ public class OMGatewayMetrics {
   @Metric(about = "request gateway request at any time captured per sec")
   private MutableRate gatewayRequestInProgress;  
   private @Metric MutableCounterLong requestCount;
+  @Metric(about = "request gateway merge call count")
+  private MutableCounterLong gatewayMergeCombineCount;
+  @Metric(about = "request gateway merge combine count")
+  private MutableCounterLong gatewayMergeCallCount;
+  @Metric(about = "request gateway merge overflow count")
+  private MutableCounterLong gatewayMergeOverflowCount;
 
   public OMGatewayMetrics() {
   }
@@ -112,5 +118,17 @@ public class OMGatewayMetrics {
 
   public MutableRate getGatewayMergeWait() {
     return gatewayMergeWait;
+  }
+
+  public void incRequestMergeCombineCount(int size) {
+    gatewayMergeCombineCount.incr(size);
+  }
+
+  public void incRequestMergeCallCount() {
+    gatewayMergeCallCount.incr();
+  }
+
+  public void incRequestMergeOverflowCount() {
+    gatewayMergeOverflowCount.incr();
   }
 }

@@ -73,6 +73,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles CommitKey request.
@@ -183,7 +184,12 @@ public class OMKeyCommitRequest extends OmRequestBase {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      OmKeyInfo keyToDelete = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+      OmKeyInfo keyToDelete = null;
+      if (ozoneManager.getConfiguration().getBoolean("ozone.om.leader.commit.request.old.key.get", true)) {
+        keyToDelete = captureLatencyNs(omMetrics.getKeyCommitGetKeyRate(),
+            () -> omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey));
+      }
+      // OmKeyInfo keyToDelete = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
       long writerClientId = commitKeyRequest.getClientID();
       boolean isSameHsyncKey = false;
       boolean isOverwrittenHsyncKey = false;
@@ -205,7 +211,8 @@ public class OMKeyCommitRequest extends OmRequestBase {
         writerClientId = Long.parseLong(clientId);
       }
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, writerClientId);
-      omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+      omKeyInfo = captureLatencyNs(omMetrics.getKeyCommitGetOpenKeyRate(),
+          () -> omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey));
       if (omKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +

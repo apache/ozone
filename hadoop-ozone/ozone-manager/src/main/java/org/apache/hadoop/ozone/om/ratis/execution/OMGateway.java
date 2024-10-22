@@ -68,12 +68,14 @@ public class OMGateway {
   private AtomicLong uniqueIndex = new AtomicLong();
   private OMGatewayMetrics omGatewayMetrics;
   private final ScheduledExecutorService executorService;
+  private boolean isAuthorize;
 
   public OMGateway(OzoneManager om) throws IOException {
     this.om = om;
     omGatewayMetrics = OMGatewayMetrics.create();
     OmLockOpr.init(om.getThreadNamePrefix());
     OmRequestLockUtils.init();
+    isAuthorize = om.getConfiguration().getBoolean("ozone.om.leader.request.is.authorize", true);
     this.leaderExecutor = new LeaderRequestExecutor(om, uniqueIndex, omGatewayMetrics);
     this.leaderCompatibleExecutor = new LeaderCompatibleRequestExecutor(om, uniqueIndex);
     this.followerExecutor = new FollowerRequestExecutor(om, uniqueIndex);
@@ -138,27 +140,31 @@ public class OMGateway {
         executorType = captureLatencyNs(omGatewayMetrics.getGatewayPreExecute(), () -> {
           OmRequestBase requestBase = OzoneManagerRatisUtils.createLeaderClientRequest(omRequest, om);
           if (null != requestBase) {
-            requestBase.preProcess(om);
+            OMRequest request = requestBase.preProcess(om);
+            requestContext.setRequest(request);
             requestContext.setRequestBase(requestBase);
             return ExecutorType.LEADER_OPTIMIZED;
           } else {
             return ExecutorType.LEADER_COMPATIBLE;
           }
         });
-        if (executorType == ExecutorType.LEADER_OPTIMIZED) {
+        if (executorType == ExecutorType.LEADER_OPTIMIZED && isAuthorize) {
           captureLatencyNs(omGatewayMetrics.getGatewayAuthorize(), () -> requestContext.getRequestBase().authorize(om));
         }
       }
       if (executorType == ExecutorType.LEADER_COMPATIBLE) {
         OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, om);
+        OMRequest request = omClientRequest.preExecute(om);
+        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, om);
         requestContext.setClientRequest(omClientRequest);
+        requestContext.setRequest(request);
       }
-      lockOperation = OmRequestLockUtils.getLockOperation(om, omRequest);
+      lockOperation = OmRequestLockUtils.getLockOperation(om, requestContext.getRequest());
       final OmLockOpr tmpLockOpr = lockOperation;
       captureLatencyNs(omGatewayMetrics.getGatewayLock(), () -> tmpLockOpr.lock(om));
 
-      validate(omRequest);
-      ensurePreviousRequestCompletionForPrepare(omRequest);
+      validate(requestContext.getRequest());
+      ensurePreviousRequestCompletionForPrepare(requestContext.getRequest());
 
       // submit request
       if (executorType == ExecutorType.LEADER_COMPATIBLE) {

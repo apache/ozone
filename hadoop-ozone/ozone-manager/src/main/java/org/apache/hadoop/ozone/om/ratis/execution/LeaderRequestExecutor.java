@@ -152,6 +152,10 @@ public class LeaderRequestExecutor {
   }
 
   private void mergeSubmit(RequestContext ctx) throws InterruptedException {
+    if (mergeTaskPoolSize == 0) {
+      requestMergeCommand(Collections.singletonList(ctx), this::ratisSubmit);
+      return;
+    }
     int nxtIndex = Math.abs(mergeCurrentPool.getAndIncrement() % mergeTaskPoolSize);
     requestMerger.submit(nxtIndex, ctx);
   }
@@ -221,6 +225,8 @@ public class LeaderRequestExecutor {
     OzoneManagerProtocolProtos.PersistDbRequest.Builder reqBuilder
         = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
     long size = 0;
+    omGatewayMetrics.incRequestMergeCombineCount(ctxs.size());
+    omGatewayMetrics.incRequestMergeCallCount();
     for (RequestContext ctx : ctxs) {
       DbChangesRecorder recorder = ctx.getRequestBase().changeRecorder();
       int tmpSize = 0;
@@ -235,6 +241,7 @@ public class LeaderRequestExecutor {
         // send current batched request
         appendBucketQuotaChanges(reqBuilder, bucketChangeMap);
         prepareAndSendRequest(sendList, reqBuilder, nxtPool);
+        omGatewayMetrics.incRequestMergeOverflowCount();
 
         // reinit and continue
         reqBuilder = OzoneManagerProtocolProtos.PersistDbRequest.newBuilder();
@@ -272,6 +279,10 @@ public class LeaderRequestExecutor {
 
   private void ratisSubmit(RatisContext ctx) throws InterruptedException {
     // follow simple strategy to submit to ratis for next set of merge request
+    if (ratisTaskPoolSize == 0) {
+      ratisCommand(Collections.singletonList(ctx), null);
+      return;
+    }
     int nxtIndex = Math.abs(ratisCurrentPool.getAndIncrement() % ratisTaskPoolSize);
     ratisSubmitter.submit(nxtIndex, ctx);
   }
