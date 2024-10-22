@@ -16,8 +16,13 @@
  * limitations under the License.
  */
 
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
-import { showDataFetchError } from '@/utils/common';
+import React from 'react';
+import { AxiosError } from 'axios';
+import { ValueType } from 'react-select';
+import { Tabs, Tooltip } from 'antd';
+import { TablePaginationConfig } from 'antd/es/table';
+import { InfoCircleOutlined } from '@ant-design/icons';
+
 import { Option } from '@/v2/components/select/singleSelect';
 import ContainerMismatchTable from '@/v2/components/tables/insights/containerMismatchTable';
 import DeletedContainerKeysTable from '@/v2/components/tables/insights/deletedContainerKeysTable';
@@ -25,13 +30,18 @@ import DeletePendingDirTable from '@/v2/components/tables/insights/deletePending
 import DeletePendingKeysTable from '@/v2/components/tables/insights/deletePendingKeysTable';
 import ExpandedKeyTable from '@/v2/components/tables/insights/expandedKeyTable';
 import OpenKeysTable from '@/v2/components/tables/insights/openKeysTable';
-import { Container, ExpandedRow, ExpandedRowState, MismatchContainersResponse, MismatchKeys, MismatchKeysResponse } from '@/v2/types/insights.types';
-import { InfoCircleOutlined } from '@ant-design/icons';
-import { Tabs, Tooltip } from 'antd';
-import { TablePaginationConfig } from 'antd/es/table';
-import { AxiosError } from 'axios';
-import React, { useState } from 'react';
-import { ValueType } from 'react-select';
+import { showDataFetchError } from '@/utils/common';
+import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+
+import {
+  Container,
+  ExpandedRow,
+  ExpandedRowState,
+  MismatchKeysResponse
+} from '@/v2/types/insights.types';
+
+import './insights.less';
+
 
 const OMDBInsights: React.FC<{}> = () => {
 
@@ -108,7 +118,16 @@ const OMDBInsights: React.FC<{}> = () => {
     <div style={{ padding: '24px' }}>
       <div className='content-div'>
         <Tabs defaultActiveKey='1'>
-          <Tabs.TabPane key='1' tab='Container Mismatch Info'>
+          <Tabs.TabPane key='1' tab={
+            <label>
+              Container Mismatch Info
+              <Tooltip
+                placement='right'
+                title='Containers which are present in OM and missing in SCM or vice-versa'>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
+              </Tooltip>
+            </label>
+          }>
             <ContainerMismatchTable
               limit={selectedLimit}
               paginationConfig={paginationConfig}
@@ -116,11 +135,20 @@ const OMDBInsights: React.FC<{}> = () => {
               onRowExpand={onRowExpandClick}
               handleLimitChange={handleLimitChange} />
           </Tabs.TabPane>
-          <Tabs.TabPane key='2' tab='Open Keys'>
+          <Tabs.TabPane key='2' tab={
+            <label>
+              Open Keys
+              <Tooltip
+                placement='right'
+                title='Keys which are not yet committed but currently being written'>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
+              </Tooltip>
+            </label>
+          }>
             <OpenKeysTable
               limit={selectedLimit}
               paginationConfig={paginationConfig}
-              handleLimitChange={handleLimitChange}/>
+              handleLimitChange={handleLimitChange} />
           </Tabs.TabPane>
           <Tabs.TabPane key='3' tab={
             <label>
@@ -154,7 +182,16 @@ const OMDBInsights: React.FC<{}> = () => {
               onRowExpand={onRowExpandClick}
               expandedRowRender={expandedRowRender} />
           </Tabs.TabPane>
-          <Tabs.TabPane key='5' tab='Directories Pending for Deletion'>
+          <Tabs.TabPane key='5' tab={
+            <label>
+              Directories Pending for Deletion
+              <Tooltip
+                placement='right'
+                title='Directories that are pending for deletion.'>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
+              </Tooltip>
+            </label>
+          }>
             <DeletePendingDirTable
               limit={selectedLimit}
               paginationConfig={paginationConfig}

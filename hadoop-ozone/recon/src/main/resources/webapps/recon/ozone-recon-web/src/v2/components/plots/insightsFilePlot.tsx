@@ -94,9 +94,15 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
     let filteredData = fileCountResponse;
     const selectedVolumeValues = new Set(selectedVolumes.map(option => option.value));
     const selectedBucketValues = new Set(selectedBuckets.map(option => option.value));
-    if (selectedVolumes.length > 0) {
+    if (selectedVolumes.length >= 0) {
       // Not all volumes are selected, need to filter based on the selected values
       filteredData = filteredData.filter(data => selectedVolumeValues.has(data.volume));
+
+      // We have selected a volume but all the buckets are deselected
+      if (selectedVolumes.length === 1 && selectedBuckets.length === 0) {
+        // Since no buckets are selected there is no data
+        filteredData = [];
+      }
     }
     if (selectedBuckets.length > 0) {
       // Not all buckcets are selected, filter based on the selected values
