@@ -14,7 +14,9 @@
 # limitations under the License.
 name: Test Ozone Site PR
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - website-pr-test
 
 jobs:
   update-ozone-site:
