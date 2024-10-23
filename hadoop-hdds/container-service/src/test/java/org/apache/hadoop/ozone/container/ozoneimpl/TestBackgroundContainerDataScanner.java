@@ -144,12 +144,12 @@ public class TestBackgroundContainerDataScanner extends
     when(unhealthy1.scanMetaData()).thenReturn(ScanResult.healthy());
     when(unhealthy1.scanData(any(DataTransferThrottler.class),
         any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
-      @Override
-      public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
-        Thread.sleep(200);
-        return getUnhealthyScanResult();
-      }
-    });
+          @Override
+          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Thread.sleep(200);
+            return getUnhealthyScanResult();
+          }
+        });
     setContainers(unhealthy1);
     scanner.runIteration();
     assertEquals(2, metrics.getNumScanIterations());
@@ -161,12 +161,12 @@ public class TestBackgroundContainerDataScanner extends
     when(unhealthy2.scanMetaData()).thenReturn(ScanResult.healthy());
     when(unhealthy2.scanData(any(DataTransferThrottler.class),
         any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
-      @Override
-      public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
-        Thread.sleep(300);
-        return getUnhealthyScanResult();
-      }
-    });
+          @Override
+          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Thread.sleep(300);
+            return getUnhealthyScanResult();
+          }
+        });
     setContainers(unhealthy2);
     scanner.runIteration();
     assertEquals(3, metrics.getNumScanIterations());

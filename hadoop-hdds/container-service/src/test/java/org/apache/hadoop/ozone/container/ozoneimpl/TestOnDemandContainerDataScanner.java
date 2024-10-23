@@ -177,6 +177,7 @@ public class TestOnDemandContainerDataScanner extends
     // the number of scanned containers
     assertEquals(1, metrics.getNumUnHealthyContainers());
     assertEquals(2, metrics.getNumContainersScanned());
+    assertTrue(metrics.getTotalRunTime() > 0);
   }
 
   @Test
@@ -209,19 +210,6 @@ public class TestOnDemandContainerDataScanner extends
     // Deleted containers should not be marked unhealthy
     scanContainer(deletedContainer);
     verifyContainerMarkedUnhealthy(deletedContainer, never());
-  }
-
-  @Test
-  public void testTotalRunTime() throws Exception {
-    Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
-    when(unhealthy.scanData(
-        any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(getUnhealthyScanResult());
-    scanContainer(unhealthy);
-    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
-    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
-    assertTrue(metrics.getTotalRunTime() > 0);
   }
 
   /**
