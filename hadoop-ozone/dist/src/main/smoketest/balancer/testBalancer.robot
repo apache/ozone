@@ -16,6 +16,7 @@
 *** Settings ***
 Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
+Library             String
 Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
@@ -35,7 +36,7 @@ Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Execute                 ozone sh volume create /${VOLUME}
-    Execute                 ozone sh bucket create /${VOLUME}/${BUCKET}
+    Execute                 ozone sh bucket create --replication ${REPLICATION} --type ${TYPE} /${VOLUME}/${BUCKET}
 
 
 Datanode In Maintenance Mode
@@ -63,10 +64,42 @@ Datanode Recommission is Finished
 Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
+
+Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
                             Should Contain                  ${result}             ContainerBalancer is Running.
-                            Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
+                            Wait Until Keyword Succeeds      6min    10sec    ContainerBalancer is Not Running
                             Sleep                   60000ms
+
+Verify Verbose Balancer Status
+    [arguments]    ${output}
+
+    Should Contain    ${output}    ContainerBalancer is Running.
+    Should Contain    ${output}    Started at:
+    Should Contain    ${output}    Container Balancer Configuration values:
+
+Verify Balancer Iteration
+    [arguments]    ${output}    ${number}    ${status}    ${containers}
+
+    Should Contain    ${output}    Iteration number                                   ${number}
+    Should Contain    ${output}    Iteration result                                   ${status}
+    Should Contain    ${output}    Scheduled to move containers                       ${containers}
+
+Run Balancer Status
+    ${result} =      Execute                         ozone admin containerbalancer status
+                     Should Contain                  ${result}             ContainerBalancer is Running.
+
+Run Balancer Verbose Status
+    ${result} =      Execute                         ozone admin containerbalancer status -v
+                     Verify Verbose Balancer Status    ${result}
+                     Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
+                     Should Contain                  ${result}             Current iteration info:
+
+Run Balancer Verbose History Status
+    ${result} =    Execute                         ozone admin containerbalancer status -v --history
+                   Verify Verbose Balancer Status          ${result}
+                   Verify Balancer Iteration    ${result}    1    IN_PROGRESS    3
+                   Should Contain                  ${result}             Iteration history list:
 
 ContainerBalancer is Not Running
     ${result} =         Execute          ozone admin containerbalancer status
@@ -79,7 +112,7 @@ Create Multiple Keys
             ${fileName} =           Set Variable            file-${INDEX}.txt
             ${key} =    Set Variable    /${VOLUME}/${BUCKET}/${fileName}
             LOG             ${fileName}
-            Create Key    ${key}    ${file}
+            Create Key    ${key}    ${file}    --replication=${REPLICATION} --type=${TYPE}
             Key Should Match Local File    ${key}      ${file}
     END
 
@@ -94,14 +127,14 @@ Get Uuid
 
 Close All Containers
     FOR     ${INDEX}    IN RANGE    15
-        ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+        ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.data == 3) | .containerID' | head -1
         EXIT FOR LOOP IF    "${container}" == "${EMPTY}"
                             ${message} =    Execute And Ignore Error    ozone admin container close "${container}"
                             Run Keyword If    '${message}' != '${EMPTY}'      Should Contain   ${message}   is in closing state
         ${output} =         Execute          ozone admin container info "${container}"
                             Should contain   ${output}   CLOS
     END
-    Wait until keyword succeeds    3min    10sec    All container is closed
+    Wait until keyword succeeds    4min    10sec    All container is closed
 
 All container is closed
     ${output} =         Execute           ozone admin container list --state OPEN
@@ -114,7 +147,7 @@ Get Datanode Ozone Used Bytes Info
     [return]          ${result}
 
 ** Test Cases ***
-Verify Container Balancer for RATIS containers
+Verify Container Balancer for RATIS/EC containers
     Prepare For Tests
 
     Datanode In Maintenance Mode
@@ -122,7 +155,7 @@ Verify Container Balancer for RATIS containers
     ${uuid} =                   Get Uuid
     Datanode Usageinfo          ${uuid}
 
-    Create Multiple Keys          3
+    Create Multiple Keys          ${KEYS}
 
     Close All Containers
 
@@ -133,10 +166,20 @@ Verify Container Balancer for RATIS containers
 
     Run Container Balancer
 
+    Run Balancer Status
+
+    Run Balancer Verbose Status
+
+    Run Balancer Verbose History Status
+
+    Wait Finish Of Balancing
+
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
-    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * 3.5
-    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * 3
+    #We need to ensure that after balancing, the amount of data recorded on each datanode falls within the following ranges:
+    #{SIZE}*3 < used < {SIZE}*3.5 for RATIS containers, and {SIZE}*1.5 < used < {SIZE}*2.5 for EC containers.
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * ${UPPER_LIMIT}
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * ${LOWER_LIMIT}
 
 
 

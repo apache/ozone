@@ -122,7 +122,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     if (ozoneAcls != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
     }
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.ADD_ACL, auditMap, exception,
             getOmRequest().getUserInfo()));
   }

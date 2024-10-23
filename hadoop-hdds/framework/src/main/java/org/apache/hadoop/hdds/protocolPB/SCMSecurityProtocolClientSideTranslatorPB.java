@@ -330,7 +330,6 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @param role          - node type: OM/SCM/DN.
    * @param startSerialId - start cert serial id.
    * @param count         - max number of certificates returned in a batch.
-   * @return
    * @throws IOException
    */
   @Override

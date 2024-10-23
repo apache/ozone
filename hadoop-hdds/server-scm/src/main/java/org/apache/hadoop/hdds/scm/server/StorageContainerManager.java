@@ -146,6 +146,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
@@ -170,6 +171,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
@@ -236,6 +238,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private static SCMMetrics metrics;
   private static SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
+  private final NettyMetrics nettyMetrics;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -456,6 +459,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   private void initializeEventHandlers() {
@@ -605,7 +609,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf        HDDS configuration
    * @param configurator SCM configurator
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(
       OzoneConfiguration conf, SCMConfigurator configurator)
@@ -618,7 +623,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf        HDDS configuration
    * @return SCM instance
-   * @throws IOException, AuthenticationException
+   * @throws IOException on Failure,
+   * @throws AuthenticationException
    */
   public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -1100,7 +1106,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       InetSocketAddress addr,
       Class<?> protocol,
       BlockingService instance,
-      int handlerCount)
+      int handlerCount,
+      int readThreads)
       throws IOException {
 
     RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
@@ -1109,6 +1116,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setBindAddress(addr.getHostString())
         .setPort(addr.getPort())
         .setNumHandlers(handlerCount)
+        .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
         .build());
@@ -1608,8 +1616,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
       List<String> pemEncodedCerts =
-          scmCertificateClient.listCA();
-
+          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
         X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
@@ -1710,6 +1717,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       metrics.unRegister();
     }
 
+    nettyMetrics.unregister();
     if (perfMetrics != null) {
       perfMetrics.unRegister();
     }
@@ -2126,10 +2134,54 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisRoles() {
+  public List<List<String>> getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
-    return server != null ?
-        HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
+
+    // If Ratis is disabled
+    if (server == null) {
+      return getRatisRolesException("Ratis is disabled");
+    }
+
+    // To attempt to find the SCM Leader,
+    // and if the Leader is not found
+    // return Leader is not found message.
+    RaftServer.Division division = server.getDivision();
+    RaftPeerId leaderId = division.getInfo().getLeaderId();
+    if (leaderId == null) {
+      return getRatisRolesException("No leader found");
+    }
+
+    // If the SCMRatisServer is stopped, return a service stopped message.
+    if (server.isStopped()) {
+      return getRatisRolesException("Server is shutting down");
+    }
+
+    // Attempt to retrieve role information.
+    try {
+      List<String> ratisRoles = server.getRatisRoles();
+      List<List<String>> result = new ArrayList<>();
+      for (String role : ratisRoles) {
+        String[] roleArr = role.split(":");
+        List<String> scmInfo = new ArrayList<>();
+        // Host Name
+        scmInfo.add(roleArr[0]);
+        // Node ID
+        scmInfo.add(roleArr[3]);
+        // Ratis Port
+        scmInfo.add(roleArr[1]);
+        // Role
+        scmInfo.add(roleArr[2]);
+        result.add(scmInfo);
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("Failed to getRatisRoles.", e);
+      return getRatisRolesException("Exception Occurred, " + e.getMessage());
+    }
+  }
+
+  private static List<List<String>> getRatisRolesException(String exceptionString) {
+    return Collections.singletonList(Collections.singletonList(exceptionString));
   }
 
   /**

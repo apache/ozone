@@ -5,8 +5,9 @@
     "healthyDatanodes": 24,
     "storageReport": {
       "capacity": 202114732032,
-      "used": 16384,
-      "remaining": 182447632384
+      "used": 4667099648,
+      "remaining": 182447632384,
+      "committed": 12000222315
     },
     "containers": 3230,
     "missingContainers": 1002,
@@ -94,7 +95,7 @@
       },
       {
         "hostname": "localhost1.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130011",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
@@ -162,7 +163,7 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130013",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
         "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -1479,7 +1480,7 @@
     "path": "/dummyVolume/dummyBucket",
     "size": 200000,
     "sizeWithReplica": -1,
-    "subPathCount": 5,
+    "subPathCount": 8,
     "subPaths": [
       {
         "path": "/dummyVolume/dummyBucket/dir1",
@@ -1857,6 +1858,15 @@
     ],
     "sizeDirectKey": 0
   },
+  "replica": {
+    "status": "OK",
+    "path": "/s3v/fso-bucket/dir1/key1-fso",
+    "size": 17289,
+    "sizeWithReplica": 17289,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": -1
+  },
   "taskStatus": [
     {
       "taskName": "ContainerKeyMapperTask",
@@ -1913,7 +1923,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 1,
         "reason": null,
-        "keys": 1,
+        "keys": 4,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -1987,7 +1997,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2061,7 +2071,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2098,7 +2108,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 5,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2135,7 +2145,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2172,7 +2182,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 6,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a2",
         "replicas": [
           {
@@ -2209,7 +2219,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a3",
         "replicas": [
           {
@@ -6737,6 +6747,201 @@
       }
     ],
     "status": "OK"
+  },
+  "decommissioninfo": {
+    "DatanodesDecommissionInfo":[
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "ipAddressAsByteString": {
+                "string": "172.18.0.13",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "hostNameAsByteString": {
+                "string": "ozone-ha-datanode-6.ozone-ha_default",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1,
+            "networkNameAsByteString": {
+                "string": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkLocationAsByteString": {
+                "string": "/default-rack",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            }
+        },
+        "metrics": null,
+        "containers": {}
+      },
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1
+        },
+        "metrics": null,
+        "containers": {}
+      }
+    ]
+  },
+  "DatanodesDecommissionInfo": {
+    "DatanodesDecommissionInfo": [
+      {
+        "datanodeDetails": {
+          "level": 3,
+          "parent": null,
+          "cost": 0,
+          "uuid": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "uuidString": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "ipAddress": "172.18.0.10",
+          "hostName": "ozone-ha-datanode-2.ozone-ha_default",
+          "ports": [
+            {
+              "name": "HTTP",
+              "value": 9882
+            },
+            {
+              "name": "CLIENT_RPC",
+              "value": 19864
+            },
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "DECOMMISSIONING",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "decommissioned": true,
+          "maintenance": false,
+          "ipAddressAsByteString": {
+            "string": "172.18.0.10",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "hostNameAsByteString": {
+            "string": "ozone-ha-datanode-2.ozone-ha_default",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkName": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "numOfLeaves": 1,
+          "networkNameAsByteString": {
+            "string": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkLocationAsByteString": {
+            "string": "/default-rack",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          }
+        },
+        "metrics": {
+          "decommissionStartTime": "23/05/2024 07:28:35 UTC",
+          "numOfUnclosedPipelines": 2,
+          "numOfUnderReplicatedContainers": 0.0,
+          "numOfUnclosedContainers": 0.0
+        },
+        "containers": {
+          "UnderReplicated": [],
+          "UnClosed": [
+            "#6",
+            "#10",
+            "#17"
+          ]
+        }
+      }
+    ]
   },
   "datanodesRemove": {
     "selectedRowKeys": [

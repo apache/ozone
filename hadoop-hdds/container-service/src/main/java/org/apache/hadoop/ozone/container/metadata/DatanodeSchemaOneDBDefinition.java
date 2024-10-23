@@ -51,27 +51,21 @@ public class DatanodeSchemaOneDBDefinition
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
           StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
-          String.class,
           SchemaOneKeyCodec.get(),
-          BlockData.class,
           BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
         METADATA =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
-            String.class,
             SchemaOneKeyCodec.get(),
-            Long.class,
             LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
         DELETED_BLOCKS =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
-            String.class,
             SchemaOneKeyCodec.get(),
-            ChunkInfoList.class,
             SchemaOneChunkInfoListCodec.get());
 
   private static final Map<String, List<DBColumnFamilyDefinition<?, ?>>>
@@ -99,6 +93,12 @@ public class DatanodeSchemaOneDBDefinition
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily() {
+    return null;
   }
 
   @Override

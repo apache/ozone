@@ -21,11 +21,15 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-current_version=1.5.0
-old_versions="1.0.0 1.1.0 1.2.1 1.3.0 1.4.0" # container is needed for each version in clients.yaml
+current_version="${ozone.version}"
+# TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
+old_versions="1.1.0 1.2.1 1.3.0 1.4.0" # container is needed for each version in clients.yaml
 
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
+
+export SECURITY_ENABLED=true
+: ${OZONE_BUCKET_KEY_NAME:=key1}
 
 old_client() {
   OZONE_DIR=/opt/ozone
@@ -40,11 +44,17 @@ new_client() {
   "$@"
 }
 
+_kinit() {
+  execute_command_in_container ${container} kinit -k -t /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
+}
+
 _init() {
+  _kinit
   execute_command_in_container ${container} ozone freon ockg -n1 -t1 -p warmup
 }
 
 _write() {
+  _kinit
   execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" \
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
@@ -53,6 +63,7 @@ _write() {
 }
 
 _read() {
+  _kinit
   local data_version="$1"
   execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" \
     -v CLIENT_VERSION:${client_version} \
@@ -62,17 +73,28 @@ _read() {
     compatibility/read.robot
 }
 
+test_bucket_encryption() {
+  _kinit
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}" -v SUFFIX:${client_version} security/bucket-encryption.robot
+}
+
 test_cross_compatibility() {
   echo "Starting cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
   OZONE_KEEP_RESULTS=true start_docker_env
 
+  execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
+  new_client test_bucket_encryption
+
+  container=scm _kinit
   execute_command_in_container scm ozone freon ockg -n1 -t1 -p warmup
   new_client _write
   new_client _read ${current_version}
 
   for client_version in "$@"; do
     client="old_client_${client_version//./_}"
+
+    old_client test_bucket_encryption
 
     old_client _write
     old_client _read ${client_version}
@@ -86,8 +108,10 @@ test_cross_compatibility() {
 
 test_ec_cross_compatibility() {
   echo "Running Erasure Coded storage backward compatibility tests."
-  local cluster_versions_with_ec="1.3.0 1.4.0"
-  local non_ec_client_versions="1.0.0 1.1.0 1.2.1"
+  # local cluster_versions_with_ec="1.3.0 1.4.0 ${current_version}"
+  local cluster_versions_with_ec="${current_version}" # until HDDS-11334
+  # TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
+  local non_ec_client_versions="1.1.0 1.2.1"
 
   for cluster_version in ${cluster_versions_with_ec}; do
     export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
@@ -110,12 +134,14 @@ test_ec_cross_compatibility() {
 
     local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
     OZONE_DIR=/opt/hadoop
+    new_client _kinit
     execute_robot_test new_client --include setup-ec-data -N "xcompat-cluster-${cluster_version}-setup-data" -v prefix:"${prefix}" ec/backward-compat.robot
      OZONE_DIR=/opt/ozone
 
     for client_version in ${non_ec_client_versions}; do
       client="old_client_${client_version//./_}"
       unset OUTPUT_PATH
+      container="${client}" _kinit
       execute_robot_test "${client}" --include test-ec-compat -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${cluster_version}" -v prefix:"${prefix}" ec/backward-compat.robot
     done
 

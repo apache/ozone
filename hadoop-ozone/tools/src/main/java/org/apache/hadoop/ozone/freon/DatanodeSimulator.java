@@ -469,7 +469,6 @@ public class DatanodeSimulator implements Callable<Void> {
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
-    details.setBuildDate(HDDS_VERSION_INFO.getDate());
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
     return details;
   }

@@ -125,11 +125,11 @@ public final class HddsServerUtil {
       HddsServerUtil.class);
 
   /**
-   * Add protobuf-based protocol to the {@link RPC.Server}.
+   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
    * @param conf configuration
    * @param protocol Protocol interface
    * @param service service that implements the protocol
-   * @param server RPC server to which the protocol & implementation is added to
+   * @param server RPC server to which the protocol and implementation is added to
    */
   public static void addPBProtocol(Configuration conf, Class<?> protocol,
       BlockingService service, RPC.Server server) throws IOException {
@@ -742,9 +742,7 @@ public final class HddsServerUtil {
         "  version = " + versionInfo.getVersion(),
         "  classpath = " + System.getProperty("java.class.path"),
         "  build = " + versionInfo.getUrl() + "/"
-            + versionInfo.getRevision()
-            + " ; compiled by '" + versionInfo.getUser()
-            + "' on " + versionInfo.getDate(),
+            + versionInfo.getRevision(),
         "  java = " + System.getProperty("java.version"),
         "  conf = " + conf);
   }

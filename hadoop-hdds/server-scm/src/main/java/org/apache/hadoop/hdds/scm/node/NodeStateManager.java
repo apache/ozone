@@ -29,6 +29,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -478,6 +479,38 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Returns all nodes that are in the decommissioning state.
+   * @return list of decommissioning nodes
+   */
+  public List<DatanodeInfo> getDecommissioningNodes() {
+    return getNodes(NodeOperationalState.DECOMMISSIONING, null);
+  }
+
+  /**
+   * Returns the count of decommissioning nodes.
+   * @return decommissioning node count
+   */
+  public int getDecommissioningNodeCount() {
+    return getDecommissioningNodes().size();
+  }
+
+  /**
+   * Returns all nodes that are in the entering maintenance state.
+   * @return list of entering maintenance nodes
+   */
+  public List<DatanodeInfo> getEnteringMaintenanceNodes() {
+    return getNodes(NodeOperationalState.ENTERING_MAINTENANCE, null);
+  }
+
+  /**
+   * Returns the count of entering maintenance nodes.
+   * @return entering maintenance node count
+   */
+  public int getEnteringMaintenanceNodeCount() {
+    return getEnteringMaintenanceNodes().size();
+  }
+
+  /**
    * Returns all the nodes with the specified status.
    *
    * @param status NodeStatus
@@ -499,6 +532,25 @@ public class NodeStateManager implements Runnable, Closeable {
   public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
     return nodeStateMap.getDatanodeInfos(opState, health);
+  }
+
+  /**
+   * Returns all nodes that contain failed volumes.
+   * @return list of nodes containing failed volumes
+   */
+  public List<DatanodeInfo> getVolumeFailuresNodes() {
+    List<DatanodeInfo> allNodes = nodeStateMap.getAllDatanodeInfos();
+    List<DatanodeInfo> failedVolumeNodes = allNodes.stream().
+        filter(dn -> dn.getFailedVolumeCount() > 0).collect(Collectors.toList());
+    return failedVolumeNodes;
+  }
+
+  /**
+   * Returns the count of nodes containing the failed volume.
+   * @return failed volume node count
+   */
+  public int getVolumeFailuresNodeCount() {
+    return getVolumeFailuresNodes().size();
   }
 
   /**
@@ -739,7 +791,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls this method, and the
-   * node health processing thread that calls {@link this#checkNodesHealth}.
+   * node health processing thread that calls {@link #checkNodesHealth}.
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
@@ -765,7 +817,7 @@ public class NodeStateManager implements Runnable, Closeable {
   /**
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls
-   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * {@link #forceNodesToHealthyReadOnly}, and the node health processing
    * thread that calls this method.
    */
   @VisibleForTesting

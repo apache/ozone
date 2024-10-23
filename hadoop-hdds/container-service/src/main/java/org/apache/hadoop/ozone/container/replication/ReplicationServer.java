@@ -115,15 +115,13 @@ public class ReplicationServer {
 
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
-            caClient.getServerKeyStoresFactory().getKeyManagers()[0]);
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(caClient.getKeyManager());
 
         sslContextBuilder = GrpcSslContexts.configure(
             sslContextBuilder, secConf.getGrpcSslProvider());
 
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager(
-            caClient.getServerKeyStoresFactory().getTrustManagers()[0]);
+        sslContextBuilder.trustManager(caClient.getTrustManager());
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {

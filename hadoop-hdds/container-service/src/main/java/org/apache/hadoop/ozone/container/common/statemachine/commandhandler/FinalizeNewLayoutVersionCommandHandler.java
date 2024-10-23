@@ -20,6 +20,8 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
@@ -42,12 +44,15 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(FinalizeNewLayoutVersionCommandHandler.class);
 
   private AtomicLong invocationCount = new AtomicLong(0);
-  private long totalTime;
+  private final MutableRate opsLatencyMs;
 
   /**
    * Constructs a FinalizeNewLayoutVersionCommandHandler.
    */
   public FinalizeNewLayoutVersionCommandHandler() {
+    MetricsRegistry registry = new MetricsRegistry(
+        FinalizeNewLayoutVersionCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.finalizeNewLayoutVersionCommand + "Ms");
   }
 
   /**
@@ -82,7 +87,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
       LOG.error("Exception during finalization.", e);
     } finally {
       long endTime = Time.monotonicNow();
-      totalTime += endTime - startTime;
+      this.opsLatencyMs.add(endTime - startTime);
     }
   }
 
@@ -113,15 +118,12 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
    */
   @Override
   public long getAverageRunTime() {
-    if (invocationCount.get() > 0) {
-      return totalTime / invocationCount.get();
-    }
-    return 0;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override

@@ -154,8 +154,6 @@ public final class OzoneClientCache {
         }
       } catch (CertificateException ce) {
         throw new IOException(ce);
-      } catch (IOException e) {
-        throw e;
       } finally {
         if (certClient != null) {
           certClient.close();

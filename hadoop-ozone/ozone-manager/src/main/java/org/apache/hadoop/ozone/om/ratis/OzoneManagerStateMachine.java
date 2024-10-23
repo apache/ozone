@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
@@ -87,7 +89,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new SimpleStateMachineStorage();
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
-  private RaftGroupId raftGroupId;
   private volatile OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
@@ -99,6 +100,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
+
+  private final NettyMetrics nettyMetrics;
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
@@ -120,6 +123,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.nettyMetrics = NettyMetrics.create();
   }
 
   /**
@@ -130,8 +134,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       RaftStorage raftStorage) throws IOException {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
-      this.raftGroupId = id;
       storage.init(raftStorage);
+      LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
   }
 
@@ -139,8 +143,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public synchronized void reinitialize() throws IOException {
     loadSnapshotInfoFromDB();
     if (getLifeCycleState() == LifeCycle.State.PAUSED) {
-      unpause(getLastAppliedTermIndex().getIndex(),
-          getLastAppliedTermIndex().getTerm());
+      final TermIndex lastApplied = getLastAppliedTermIndex();
+      unpause(lastApplied.getIndex(), lastApplied.getTerm());
+      LOG.info("{}: reinitialize {} with {}", getId(), getGroupId(), lastApplied);
     }
   }
 
@@ -156,6 +161,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                                   RaftPeerId newLeaderId) {
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
+    LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
   }
 
   /** Notified by Ratis for non-StateMachine term-index update. */
@@ -259,7 +265,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         messageContent);
 
     Preconditions.checkArgument(raftClientRequest.getRaftGroupId().equals(
-        raftGroupId));
+        getGroupId()));
     try {
       handler.validateRequest(omRequest);
     } catch (IOException ioe) {
@@ -289,6 +295,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{}: preAppendTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
+    }
+
     if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
       // Must authenticate prepare requests here, since we must determine
       // whether or not to apply the prepare gate before proceeding with the
@@ -299,8 +309,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (ozoneManager.getAclsEnabled()
           && !ozoneManager.isAdmin(userGroupInformation)) {
         String message = "Access denied for user " + userGroupInformation
-            + ". "
-            + "Superuser privilege is required to prepare ozone managers.";
+            + ". Superuser privilege is required to prepare upgrade/downgrade.";
         OMException cause =
             new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
         // Leader should not step down because of this failure.
@@ -337,6 +346,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
+      LOG.debug("{}: applyTransaction {}", getId(), termIndex);
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -423,12 +433,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    LOG.info("OzoneManagerStateMachine is un-pausing");
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+        LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
+            "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+                getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }
   }
@@ -478,15 +490,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     final TermIndex applied = getLastAppliedTermIndex();
     final TermIndex notified = getLastNotifiedTermIndex();
     final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
-    LOG.info(" applied = {}", applied);
-    LOG.info(" skipped = {}", lastSkippedIndex);
-    LOG.info("notified = {}", notified);
-    LOG.info("snapshot = {}", snapshot);
 
+    long startTime = Time.monotonicNow();
     final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
     ozoneManager.setTransactionInfo(transactionInfo);
     ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
+    LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
+        "notified = {}, current snapshot index = {}, took {} ms",
+            getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
     return snapshot.getIndex();
   }
 
@@ -620,6 +632,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    if (this.nettyMetrics != null) {
+      this.nettyMetrics.unregister();
+    }
   }
 
   /**

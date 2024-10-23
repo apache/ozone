@@ -30,7 +30,7 @@ import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.scm.net.NetUtils;
-import org.apache.hadoop.util.StringWithByteString;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -74,7 +74,8 @@ public class DatanodeDetails extends NodeImpl implements
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
-      DatanodeDetails::getExtendedProtoBufMessage);
+      DatanodeDetails::getExtendedProtoBufMessage,
+      DatanodeDetails.class);
 
   public static Codec<DatanodeDetails> getCodec() {
     return CODEC;
@@ -93,7 +94,6 @@ public class DatanodeDetails extends NodeImpl implements
   private String version;
   private long setupTime;
   private String revision;
-  private String buildDate;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
   private int initialVersion;
@@ -111,7 +111,6 @@ public class DatanodeDetails extends NodeImpl implements
     version = b.version;
     setupTime = b.setupTime;
     revision = b.revision;
-    buildDate = b.buildDate;
     persistedOpState = b.persistedOpState;
     persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
     initialVersion = b.initialVersion;
@@ -140,7 +139,6 @@ public class DatanodeDetails extends NodeImpl implements
     this.version = datanodeDetails.version;
     this.setupTime = datanodeDetails.setupTime;
     this.revision = datanodeDetails.revision;
-    this.buildDate = datanodeDetails.buildDate;
     this.persistedOpState = datanodeDetails.getPersistedOpState();
     this.persistedOpStateExpiryEpochSec =
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
@@ -389,6 +387,12 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setPersistedOpStateExpiry(
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
+    if (datanodeDetailsProto.hasCurrentVersion()) {
+      builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+    } else {
+      // fallback to version 1 if not present
+      builder.setCurrentVersion(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
+    }
     return builder;
   }
 
@@ -425,9 +429,6 @@ public class DatanodeDetails extends NodeImpl implements
     }
     if (extendedDetailsProto.hasRevision()) {
       builder.setRevision(extendedDetailsProto.getRevision());
-    }
-    if (extendedDetailsProto.hasBuildDate()) {
-      builder.setBuildDate(extendedDetailsProto.getBuildDate());
     }
     return builder.build();
   }
@@ -496,6 +497,8 @@ public class DatanodeDetails extends NodeImpl implements
       }
     }
 
+    builder.setCurrentVersion(currentVersion);
+
     return builder;
   }
 
@@ -518,14 +521,12 @@ public class DatanodeDetails extends NodeImpl implements
     if (!Strings.isNullOrEmpty(getRevision())) {
       extendedBuilder.setRevision(getRevision());
     }
-    if (!Strings.isNullOrEmpty(getBuildDate())) {
-      extendedBuilder.setBuildDate(getBuildDate());
-    }
 
     return extendedBuilder.build();
   }
 
   /**
+   * Note: Datanode initial version is not passed to the client due to no use case. See HDDS-9884
    * @return the version this datanode was initially created with
    */
   public int getInitialVersion() {
@@ -612,7 +613,6 @@ public class DatanodeDetails extends NodeImpl implements
     private String version;
     private long setupTime;
     private String revision;
-    private String buildDate;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
@@ -644,7 +644,6 @@ public class DatanodeDetails extends NodeImpl implements
       this.version = details.getVersion();
       this.setupTime = details.getSetupTime();
       this.revision = details.getRevision();
-      this.buildDate = details.getBuildDate();
       this.persistedOpState = details.getPersistedOpState();
       this.persistedOpStateExpiryEpochSec =
           details.getPersistedOpStateExpiryEpochSec();
@@ -788,18 +787,6 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public Builder setRevision(String rev) {
       this.revision = rev;
-      return this;
-    }
-
-    /**
-     * Sets the DataNode build date.
-     *
-     * @param date the build date of DataNode.
-     *
-     * @return DatanodeDetails.Builder
-     */
-    public Builder setBuildDate(String date) {
-      this.buildDate = date;
       return this;
     }
 
@@ -1042,24 +1029,6 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setRevision(String rev) {
     this.revision = rev;
-  }
-
-  /**
-   * Returns the DataNode build date.
-   *
-   * @return DataNode build date
-   */
-  public String getBuildDate() {
-    return buildDate;
-  }
-
-  /**
-   * Set DataNode build date.
-   *
-   * @param date DataNode build date
-   */
-  public void setBuildDate(String date) {
-    this.buildDate = date;
   }
 
   @Override

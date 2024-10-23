@@ -24,8 +24,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -121,10 +123,11 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -134,10 +137,11 @@ public interface ScmClient extends Closeable {
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
    * @param replicationConfig container replication Config.
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count,
+  ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -384,16 +388,26 @@ public interface ScmClient extends Closeable {
    */
   boolean getContainerBalancerStatus() throws IOException;
 
+  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
+
   /**
    * returns the list of ratis peer roles. Currently only include peer address.
    */
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Get the current SCM mode.
+   *
+   * @return `true` indicates that it is in RATIS mode,
+   * while `false` indicates that it is in STANDALONE mode.
+   * @throws IOException  an I/O exception of some sort has occurred.
+   */
+  boolean isScmRatisEnable() throws IOException;
+
+  /**
    * Force generates new secret keys (rotate).
    *
    * @param force boolean flag that forcefully rotates the key on demand
-   * @return
    * @throws IOException
    */
   boolean rotateSecretKeys(boolean force) throws IOException;
@@ -411,7 +425,7 @@ public interface ScmClient extends Closeable {
    * considered to be failed if it has been sent more than MAX_RETRY limit
    * and its count is reset to -1.
    *
-   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param count Maximum num of returned transactions, if {@literal < 0}. return all.
    * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException

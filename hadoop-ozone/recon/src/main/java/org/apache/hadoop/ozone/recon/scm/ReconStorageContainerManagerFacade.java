@@ -155,6 +155,7 @@ public class ReconStorageContainerManagerFacade
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
+  private final ContainerHealthTask containerHealthTask;
 
   private DBStore dbStore;
   private ReconNodeManager nodeManager;
@@ -217,8 +218,7 @@ public class ReconStorageContainerManagerFacade
 
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    this.dbStore = DBStoreBuilder
-        .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+    this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
@@ -272,7 +272,7 @@ public class ReconStorageContainerManagerFacade
         scmServiceProvider,
         reconTaskStatusDao,
         reconTaskConfig);
-    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
+    containerHealthTask = new ContainerHealthTask(
         containerManager, scmServiceProvider, reconTaskStatusDao,
         containerHealthSchemaManager, containerPlacementPolicy, reconTaskConfig,
         reconContainerMetadataManager, conf);
@@ -626,8 +626,7 @@ public class ReconStorageContainerManagerFacade
 
   private void initializeNewRdbStore(File dbFile) throws IOException {
     try {
-      DBStore newStore = createDBAndAddSCMTablesAndCodecs(
-          dbFile, new ReconSCMDBDefinition());
+      final DBStore newStore = createDBAndAddSCMTablesAndCodecs(dbFile, ReconSCMDBDefinition.get());
       Table<UUID, DatanodeDetails> nodeTable =
           ReconSCMDBDefinition.NODES.getTable(dbStore);
       Table<UUID, DatanodeDetails> newNodeTable =
@@ -741,6 +740,12 @@ public class ReconStorageContainerManagerFacade
   public ContainerSizeCountTask getContainerSizeCountTask() {
     return containerSizeCountTask;
   }
+
+  @VisibleForTesting
+  public ContainerHealthTask getContainerHealthTask() {
+    return containerHealthTask;
+  }
+
   @VisibleForTesting
   public ContainerCountBySizeDao getContainerCountBySizeDao() {
     return containerCountBySizeDao;

@@ -187,7 +187,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(),
+              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
               trxnLogIndex);
 
       // Add cache entries for the prefix directories.
@@ -228,7 +228,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ALLOCATE_KEY, auditMap, exception,
             getOmRequest().getUserInfo()));
 
@@ -246,7 +246,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   @Override

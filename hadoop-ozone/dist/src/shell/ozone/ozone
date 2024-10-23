@@ -61,6 +61,7 @@ function ozone_usage
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "checknative" client "checks if native libraries are loaded"
+  ozone_add_subcommand "ratis" client "Ozone ratis tool"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
@@ -125,7 +126,7 @@ function ozonecmd_case
     ;;
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
-      OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     getconf)
@@ -144,7 +145,7 @@ function ozonecmd_case
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
-      OZONE_SH_OPTS="${OZONE_SH_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_SH_OPTS="${OZONE_SH_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -163,12 +164,12 @@ function ozonecmd_case
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
-      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} ${RATIS_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -184,12 +185,12 @@ function ozonecmd_case
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
-      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-recon"
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
-      OZONE_FS_OPTS="${OZONE_FS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_FS_OPTS="${OZONE_FS_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)
@@ -214,22 +215,26 @@ function ozonecmd_case
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.cli.OzoneAdmin
-      OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
-      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     repair)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.repair.OzoneRepair
-      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     checknative)
         OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.checknative.CheckNative
         OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    ratis)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
@@ -250,6 +255,7 @@ function ozone_suppress_shell_log
       && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
     OZONE_LOGLEVEL=OFF
     OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+    OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
   fi
 }
 
