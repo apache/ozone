@@ -62,7 +62,7 @@ Datanode Recommission is Finished
                             Should Not Contain   ${result}   ENTERING_MAINTENANCE
 
 Run Container Balancer
-    ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
+    ${result} =             Execute                         ozone admin containerbalancer start -t 0.1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
 
 Wait Finish Of Balancing
