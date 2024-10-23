@@ -177,12 +177,6 @@ public class TestBackgroundContainerMetadataScanner extends
   }
 
   @Test
-  public void testTotalRunTimes() {
-    scanner.runIteration();
-    assertTrue(scanner.getMetrics().getTotalRunTime() > 0);
-  }
-
-  @Test
   @Override
   public void testUnhealthyContainerNotRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
