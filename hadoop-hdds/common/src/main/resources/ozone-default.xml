@@ -4552,4 +4552,16 @@
       maximum number of buckets across all volumes.
     </description>
   </property>
+
+  <property>
+    <name>ozone.volume.io.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
+      It helps in tracking the read and write performance of DataNodes in real-time,
+      allowing for better identification and analysis of performance issues.
+    </description>
+  </property>
+
 </configuration>

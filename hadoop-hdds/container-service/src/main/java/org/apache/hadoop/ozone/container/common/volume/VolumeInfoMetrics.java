@@ -37,6 +37,7 @@ public class VolumeInfoMetrics {
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
   private MutableRate dbCompactLatency;
+  private long containers;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -153,4 +154,11 @@ public class VolumeInfoMetrics {
     dbCompactLatency.add(time);
   }
 
+  /**
+   * Return the Container Count of the Volume.
+   */
+  @Metric("Returns the Container Count of the Volume")
+  public long getContainers() {
+    return volume.getContainers();
+  }
 }

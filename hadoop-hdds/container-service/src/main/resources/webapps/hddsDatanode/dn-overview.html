@@ -22,8 +22,28 @@
     </tbody>
 </table>
 
+<h2>HeartBeat Information</h2>
+<table class="table" class="col-md-6">
+    <thead>
+    <tr>
+        <th>Address</th>
+        <th>Last Successful HeartBeat</th>
+        <th>Missed Count</th>
+        <th>State</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="scm in $ctrl.dnmetrics2[0].SCMServers">
+        <td>{{scm.addressString}}</td>
+        <td>{{scm.lastSuccessfulHeartbeat}}</td>
+        <td>{{scm.missedCount}}</td>
+        <td>{{scm.state}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Volume Information</h2>
-<table class="table table-bordered table-striped" class="col-md-6">
+<table class="table" class="col-md-6">
     <thead>
     <tr>
         <th>Directory</th>
@@ -33,6 +53,7 @@
         <th>Available Space</th>
         <th>Reserved</th>
         <th>Total Capacity</th>
+        <th>Containers</th>
         <th>State</th>
     </tr>
     </thead>
@@ -45,6 +66,7 @@
         <td>{{volumeInfo.Available}}</td>
         <td>{{volumeInfo.Reserved}}</td>
         <td>{{volumeInfo.TotalCapacity}}</td>
+        <td>{{volumeInfo.Containers}}</td>
         <td>{{volumeInfo["tag.VolumeState"]}}</td>
     </tr>
     </tbody>
