@@ -59,7 +59,7 @@ public class ReconSchemaVersionTableManager {
           .fetchOptional()
           .map(record -> record.get(
               DSL.field(name("version_number"), Integer.class)))
-          .orElse(0); // Return 0 if no version is found
+          .orElse(-1); // Return -1 if no version is found
     } catch (Exception e) {
       LOG.error("Failed to fetch the current schema version.", e);
       return 0; // Return 0 if there is an exception

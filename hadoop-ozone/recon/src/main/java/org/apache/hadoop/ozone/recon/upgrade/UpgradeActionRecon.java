@@ -33,7 +33,7 @@ import java.lang.annotation.Target;
  * class with a specific layout feature and upgrade phase. The
  * framework will dynamically discover these annotated upgrade
  * actions and execute them based on the feature's version and
- * the defined action type (e.g., {@link ReconUpgradeAction.UpgradeActionType#AUTO_FINALIZE}).
+ * the defined action type (e.g., {@link ReconUpgradeAction.UpgradeActionType#FINALIZE}).
  *
  * <p>The annotation is retained at runtime, allowing the reflection-based
  * mechanism to scan for annotated classes, register the associated actions,

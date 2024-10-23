@@ -81,12 +81,12 @@ public class ReconLayoutVersionManager {
     for (ReconLayoutFeature feature : featuresToFinalize) {
       try {
         // Fetch only the AUTO_FINALIZE action for the feature
-        Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.AUTO_FINALIZE);
+        Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
         if (action.isPresent()) {
           // Execute the upgrade action & update the schema version in the DB
           action.get().execute();
           updateSchemaVersion(feature.getVersion());
-          LOG.info("Feature {} finalized successfully.", feature.getVersion());
+          LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
         }
       } catch (Exception e) {
         LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
@@ -105,18 +105,7 @@ public class ReconLayoutVersionManager {
     LOG.info("Current MLV: {}. SLV: {}. Checking features for registration...", currentMLV, currentSLV);
 
     List<ReconLayoutFeature> registeredFeatures = allFeatures.stream()
-        .filter(feature -> {
-          boolean shouldRegister = feature.getVersion() > currentMLV;
-          if (shouldRegister) {
-            LOG.info("Feature {} (version {}) is registered for finalization.",
-                feature.name(), feature.getVersion());
-          } else {
-            LOG.info(
-                "Feature {} (version {}) is NOT registered for finalization.",
-                feature.name(), feature.getVersion());
-          }
-          return shouldRegister;
-        })
+        .filter(feature -> feature.getVersion() > currentMLV)
         .sorted((a, b) -> Integer.compare(a.getVersion(), b.getVersion())) // Sort by version in ascending order
         .collect(Collectors.toList());
 
