@@ -264,7 +264,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .map(OzoneFileStatusLight::fromOzoneFileStatus)
         .collect(Collectors.toList());
   }
-  
+
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
@@ -501,7 +501,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             ozoneManager.getOmRpcServerAddr().getHostName());
   }
 
-  
+
   /**
    * CheckAcls for the ozone object.
    *

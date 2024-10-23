@@ -565,6 +565,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneFileStatusLight> listStatusLight(String volumeName, String bucketName, String keyName,
+                                                    boolean recursive, String startKey, long numEntries)
+      throws IOException {
+    return null;
+  }
+
+  @Override
   public List<OzoneFileStatusLight> listStatusLight(String volumeName,
       String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {

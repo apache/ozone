@@ -995,6 +995,20 @@ public interface OzoneManagerProtocol
    * @param startKey   Key from which listing needs to start. If startKey exists
    *                   its status is included in the final list.
    * @param numEntries Number of entries to list from the start key
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(OmKeyArgs keyArgs, boolean recursive, String startKey,
+                                             long numEntries) throws IOException;
+
+  /**
+   * Lightweight listStatus API.
+   *
+   * @param keyArgs    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
    * @param allowPartialPrefixes if partial prefixes should be allowed,
    *                             this is needed in context of ListKeys
    * @return list of file status

@@ -688,7 +688,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startKey, numEntries, uri,
-              workingDir, getUsername())
+                  workingDir, getUsername(), true)
               .stream()
               .map(this::convertFileStatus)
               .collect(Collectors.toList());
@@ -947,13 +947,13 @@ public class BasicOzoneFileSystem extends FileSystem {
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
-    return super.listLocatedStatus(f);
+    return new OzoneFileStatusIterator<>(f, false);
   }
 
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
       throws IOException {
-    return new OzoneFileStatusIterator<>(f);
+    return new OzoneFileStatusIterator<>(f, true);
   }
 
   @Override
@@ -999,6 +999,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     private Path p;
     private T curStat = null;
     private String startPath = "";
+    private boolean lite;
 
     /**
      * Constructor to initialize OzoneFileStatusIterator.
@@ -1007,10 +1008,11 @@ public class BasicOzoneFileSystem extends FileSystem {
      * @param p path to file/directory.
      * @throws IOException
      */
-    private OzoneFileStatusIterator(Path p) throws IOException {
+    private OzoneFileStatusIterator(Path p, boolean lite) throws IOException {
       this.p = p;
+      this.lite = lite;
       // fetch the first batch of entries in the directory
-      thisListing = listFileStatus(p, startPath);
+      thisListing = listFileStatus(p, startPath, lite);
       if (thisListing != null && !thisListing.isEmpty()) {
         startPath = pathToKey(
             thisListing.get(thisListing.size() - 1).getPath());
@@ -1050,7 +1052,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         if (startPath != null && (thisListing.size() == listingPageSize ||
             thisListing.size() == listingPageSize - 1)) {
           // current listing is exhausted & fetch a new listing
-          thisListing = listFileStatus(p, startPath);
+          thisListing = listFileStatus(p, startPath, lite);
           if (thisListing != null && !thisListing.isEmpty()) {
             startPath = pathToKey(
                 thisListing.get(thisListing.size() - 1).getPath());
@@ -1088,7 +1090,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * @return list of file status.
    * @throws IOException
    */
-  private List<FileStatus> listFileStatus(Path f, String startPath)
+  private List<FileStatus> listFileStatus(Path f, String startPath, boolean lite)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
@@ -1096,7 +1098,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     List<FileStatus> statusList;
     statusList =
         adapter.listStatus(pathToKey(f), false, startPath,
-                listingPageSize, uri, workingDir, getUsername())
+                listingPageSize, uri, workingDir, getUsername(), lite)
             .stream()
             .map(this::convertFileStatus)
             .collect(Collectors.toList());

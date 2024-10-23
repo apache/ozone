@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -87,6 +88,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -784,7 +786,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private List<FileStatusAdapter> listStatusRoot(
       boolean recursive, String startPath, long numEntries,
-      URI uri, Path workingDir, String username) throws IOException {
+      URI uri, Path workingDir, String username, boolean lite) throws IOException {
 
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list volumes
@@ -797,7 +799,7 @@ public class BasicRootedOzoneClientAdapterImpl
       if (recursive) {
         String pathStrNextVolume = volume.getName();
         res.addAll(listStatus(pathStrNextVolume, recursive, startPath,
-            numEntries - res.size(), uri, workingDir, username));
+            numEntries - res.size(), uri, workingDir, username, lite));
       }
     }
     return res;
@@ -806,9 +808,10 @@ public class BasicRootedOzoneClientAdapterImpl
   /**
    * Helper for OFS listStatus on a volume.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private List<FileStatusAdapter> listStatusVolume(String volumeStr,
       boolean recursive, String startPath, long numEntries,
-      URI uri, Path workingDir, String username) throws IOException {
+      URI uri, Path workingDir, String username, boolean lite) throws IOException {
 
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list buckets in the volume
@@ -822,7 +825,7 @@ public class BasicRootedOzoneClientAdapterImpl
       if (recursive) {
         String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         res.addAll(listStatus(pathStrNext, recursive, startPath,
-            numEntries - res.size(), uri, workingDir, username));
+            numEntries - res.size(), uri, workingDir, username, lite));
       }
     }
     return res;
@@ -874,13 +877,15 @@ public class BasicRootedOzoneClientAdapterImpl
    *                   Used in making the return path qualified.
    * @param username User name.
    *                 Used in making the return path qualified.
+   * @param lite true if lightweight response needs to be returned otherwise false.
    * @return A list of FileStatusAdapter.
    * @throws IOException Bucket exception or FileNotFoundException.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   @Override
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException {
+      Path workingDir, String username, boolean lite) throws IOException {
 
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     // Remove authority from startPath if it exists
@@ -899,44 +904,53 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot()) {
       return listStatusRoot(
-          recursive, startPath, numEntries, uri, workingDir, username);
+          recursive, startPath, numEntries, uri, workingDir, username, lite);
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
       String startBucketPath = ofsStartPath.getNonKeyPath();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucketPath, numEntries, uri, workingDir, username);
+          recursive, startBucketPath, numEntries, uri, workingDir, username, lite);
     }
 
     if (ofsPath.isSnapshotPath()) {
       return listStatusBucketSnapshot(ofsPath.getVolumeName(),
           ofsPath.getBucketName(), uri);
     }
-
+    List<FileStatusAdapter> result = new ArrayList<>();
     String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      List<OzoneFileStatus> statuses;
+      List<OzoneFileStatus> statuses = Collections.emptyList();
+      List<OzoneFileStatusLight> lightStatuses = Collections.emptyList();
       if (bucket.isSourcePathExist()) {
-        statuses = bucket
-            .listStatus(keyName, recursive, startKey, numEntries);
+        if (lite) {
+          lightStatuses = bucket.listStatusLight(keyName, recursive, startKey, numEntries);
+        } else {
+          statuses = bucket.listStatus(keyName, recursive, startKey, numEntries);
+        }
+
       } else {
         LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
             "and returning empty list of files inside it", bucket.getName());
-        statuses = Collections.emptyList();
       }
       
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
 
-      List<FileStatusAdapter> result = new ArrayList<>();
-      for (OzoneFileStatus status : statuses) {
-        result.add(toFileStatusAdapter(status, username, uri, workingDir,
-            ofsPathPrefix));
+      if (lite) {
+        for (OzoneFileStatusLight status : lightStatuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix));
+        }
+      } else {
+        for (OzoneFileStatus status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix));
+        }
       }
+
       return result;
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1035,6 +1049,31 @@ public class BasicRootedOzoneClientAdapterImpl
         null,
         getBlockLocations(status),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
+    );
+  }
+
+  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatusLight status,
+      String owner, URI defaultUri, Path workingDir, String ofsPathPrefix) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
+    return new FileStatusAdapter(
+        keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
+        new Path(ofsPathPrefix + OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
+        status.isDirectory(),
+        replication,
+        status.getBlockSize(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
+        owner,
+        null,
+        getBlockLocations(null),
+        false,
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
