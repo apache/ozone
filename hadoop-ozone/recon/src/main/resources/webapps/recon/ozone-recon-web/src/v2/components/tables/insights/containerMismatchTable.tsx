@@ -22,7 +22,8 @@ import {
   Dropdown,
   Menu,
   Popover,
-  Table
+  Table,
+  Tooltip
 } from 'antd';
 import {
   ColumnsType,
@@ -31,7 +32,7 @@ import {
 import {
   MenuProps as FilterMenuProps
 } from 'antd/es/menu';
-import { FilterFilled } from '@ant-design/icons';
+import { FilterFilled, InfoCircleOutlined } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
 import Search from '@/v2/components/search/search';
@@ -135,8 +136,15 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
               <Menu.Item key='SCM'> SCM </Menu.Item>
             </Menu>
           }>
-          <label> Exists At&nbsp;&nbsp;&nbsp;&nbsp;<FilterFilled /> </label>
+          <label style={{ marginRight: '5%' }}> Exists At&nbsp;&nbsp;&nbsp;<FilterFilled /> </label>
         </Dropdown>
+        <Tooltip placement='top' title={
+          <span>
+            <strong>SCM</strong>: Container exists at SCM but missing at OM.<br />
+            <strong>OM</strong>: Container exist at OM but missing at SCM.
+          </span>}>
+          <InfoCircleOutlined />
+        </Tooltip>
       </>,
       dataIndex: 'existsAt'
     }
@@ -183,9 +191,9 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
           disabled={(data?.length ?? 0) < 1}
           searchInput={searchTerm}
           onSearchChange={
-            (e: React.ChangeEvent<HTMLInputElement>) =>  setSearchTerm(e.target.value)
+            (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
           }
-          onChange={() => {}}/>
+          onChange={() => { }} />
       </div>
       <Table
         expandable={{
@@ -199,7 +207,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
         pagination={paginationConfig}
         rowKey='containerId'
         locale={{ filterTitle: '' }}
-        scroll={{ x: 'max-content' }}  />
+        scroll={{ x: 'max-content' }} />
     </>
   )
 }
