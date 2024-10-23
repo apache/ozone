@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
@@ -177,7 +178,31 @@ public class TestOnDemandContainerDataScanner extends
     // the number of scanned containers
     assertEquals(1, metrics.getNumUnHealthyContainers());
     assertEquals(2, metrics.getNumContainersScanned());
-    assertTrue(metrics.getTotalRunTime() > 0);
+
+    Container container1 = mockKeyValueContainer();
+    when(container1.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(container1.scanData(any(DataTransferThrottler.class),
+        any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
+          @Override
+          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Thread.sleep(200);
+            return getUnhealthyScanResult();
+          }
+        });
+    OnDemandContainerDataScanner.scanContainer(container1).get().get();
+    assertTrue(metrics.getTotalRunTime() > 200);
+    Container container2 = mockKeyValueContainer();
+    when(container2.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(container2.scanData(any(DataTransferThrottler.class),
+        any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
+          @Override
+          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Thread.sleep(200);
+            return getUnhealthyScanResult();
+          }
+        });
+    OnDemandContainerDataScanner.scanContainer(container2).get().get();
+    assertTrue(metrics.getTotalRunTime() > 400);
   }
 
   @Test
