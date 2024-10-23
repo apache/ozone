@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -72,6 +73,9 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -79,7 +83,10 @@ import static org.jooq.impl.DSL.using;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -622,23 +629,23 @@ public class ReconUtils {
    *
    * The method handles the following cases:
    *
-   * 1. {@code prevKey} provided, {@code startPrefix} empty:
-   *    - Seeks to {@code prevKey}, skips it, and returns subsequent records up to the limit.
+   * 1. prevKey provided, startPrefix empty:
+   *    - Seeks to prevKey, skips it, and returns subsequent records up to the limit.
    *
-   * 2. {@code prevKey} empty, {@code startPrefix} empty:
+   * 2. prevKey empty, startPrefix empty:
    *    - Iterates from the beginning of the table, retrieving all records up to the limit.
    *
-   * 3. {@code startPrefix} provided, {@code prevKey} empty:
-   *    - Seeks to the first key matching {@code startPrefix} and returns all matching keys up to the limit.
+   * 3. startPrefix provided, prevKey empty:
+   *    - Seeks to the first key matching startPrefix and returns all matching keys up to the limit.
    *
-   * 4. {@code startPrefix} provided, {@code prevKey} provided:
-   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix},
+   * 4. startPrefix provided, prevKey provided:
+   *    - Seeks to prevKey, skips it, and returns subsequent keys that match startPrefix,
    *      up to the limit.
    *
    * This method also handles the following {@code limit} scenarios:
    * - If {@code limit == 0} or {@code limit < -1}, no records are returned.
    * - If {@code limit == -1}, all records are returned.
-   * - For positive {@code limit}, it retrieves records up to the specified {@code limit}.
+   * - For positive limit, it retrieves records up to the specified limit.
    *
    * @param table       The table to retrieve keys from.
    * @param startPrefix The search prefix to match keys against.
@@ -750,6 +757,99 @@ public class ReconUtils {
             reconNamespaceSummaryManager);
       }
     }
+  }
+
+
+  /**
+   * Converts a key prefix into an object path for FSO buckets, using IDs.
+   *
+   * This method transforms a user-provided path (e.g., "volume/bucket/dir1") into
+   * a database-friendly format ("/volumeID/bucketID/ParentId/") by replacing names
+   * with their corresponding IDs. It simplifies database queries for FSO bucket operations.
+   * <pre>
+   * {@code
+   * Examples:
+   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/parentDirID/key"
+   * - Input: "volume/bucket/dir1" -> Output: "/volumeID/bucketID/dir1ID/"
+   * - Input: "volume/bucket/dir1/key1" -> Output: "/volumeID/bucketID/dir1ID/key1"
+   * - Input: "volume/bucket/dir1/dir2" -> Output: "/volumeID/bucketID/dir2ID/"
+   * }
+   * </pre>
+   * @param prevKeyPrefix The path to be converted.
+   * @return The object path as "/volumeID/bucketID/ParentId/" or an empty string if an error occurs.
+   * @throws IOException If database access fails.
+   * @throws IllegalArgumentException If the provided path is invalid or cannot be converted.
+   */
+  public static String convertToObjectPath(String prevKeyPrefix,
+                                           ReconOMMetadataManager omMetadataManager,
+                                           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                           OzoneStorageContainerManager reconSCM)
+      throws IOException {
+    try {
+      String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+      Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+      // Root-Level: Return the original path
+      if (names.length == 0 || names[0].isEmpty()) {
+        return prevKeyPrefix;
+      }
+
+      // Volume-Level: Fetch the volumeID
+      String volumeName = names[0];
+      validateNames(volumeName);
+      String volumeKey = omMetadataManager.getVolumeKey(volumeName);
+      long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey).getObjectID();
+      if (names.length == 1) {
+        return constructObjectPathWithPrefix(volumeId);
+      }
+
+      // Bucket-Level: Fetch the bucketID
+      String bucketName = names[1];
+      validateNames(bucketName);
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+      long bucketId = bucketInfo.getObjectID();
+      if (names.length == 2 || bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        return constructObjectPathWithPrefix(volumeId, bucketId);
+      }
+
+      // Directory or Key-Level: Check both key and directory
+      BucketHandler handler =
+          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
+
+      if (names.length >= 3) {
+        String lastEntiry = names[names.length - 1];
+
+        // Check if the directory exists
+        OmDirectoryInfo dirInfo = handler.getDirInfo(names);
+        if (dirInfo != null && dirInfo.getName().equals(lastEntiry)) {
+          return constructObjectPathWithPrefix(volumeId, bucketId, dirInfo.getObjectID()) + OM_KEY_PREFIX;
+        }
+
+        // Check if the key exists
+        long dirID = handler.getDirObjectId(names, names.length);
+        String keyKey = constructObjectPathWithPrefix(volumeId, bucketId, dirID) +
+            OM_KEY_PREFIX + lastEntiry;
+        OmKeyInfo keyInfo = openFileTable.getSkipCache(keyKey);
+        if (keyInfo != null && keyInfo.getFileName().equals(lastEntiry)) {
+          return constructObjectPathWithPrefix(volumeId, bucketId,
+              keyInfo.getParentObjectID()) + OM_KEY_PREFIX + lastEntiry;
+        }
+
+        return prevKeyPrefix;
+      }
+    } catch (IllegalArgumentException e) {
+      log.error(
+          "IllegalArgumentException encountered while converting key prefix to object path: {}",
+          prevKeyPrefix, e);
+      throw e;
+    } catch (RuntimeException e) {
+      log.error(
+          "RuntimeException encountered while converting key prefix to object path: {}",
+          prevKeyPrefix, e);
+      return prevKeyPrefix;
+    }
+    return prevKeyPrefix;
   }
 
   /**
