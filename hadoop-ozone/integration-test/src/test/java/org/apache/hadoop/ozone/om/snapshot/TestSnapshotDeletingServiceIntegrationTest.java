@@ -486,7 +486,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     GenericTestUtils.waitFor(() -> om.getKeyManager().getDirDeletingService().getThreadCount() == 0, 1000,
         100000);
     DirectoryDeletingService directoryDeletingService = Mockito.spy(new DirectoryDeletingService(10000,
-        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf()));
+        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf(), 1));
     directoryDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> directoryDeletingService.getThreadCount() == 0, 1000,
         100000);

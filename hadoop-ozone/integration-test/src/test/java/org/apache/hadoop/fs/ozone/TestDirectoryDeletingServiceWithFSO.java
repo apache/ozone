@@ -529,7 +529,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
         ozoneManager,
-        cluster.getConf()));
+        cluster.getConf(), 1));
     service.shutdown();
     final int initialSnapshotCount =
         (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
