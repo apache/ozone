@@ -98,11 +98,11 @@ public class BackgroundContainerDataScanner extends
     if (!result.isHealthy()) {
       LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
           containerId, result.getException());
-      metrics.incNumUnHealthyContainers();
+      incNumUnHealthyEachIteration();
       controller.markContainerUnhealthy(containerId, result);
     }
 
-    metrics.incNumContainersScanned();
+    incNumContainersScannedEachIteration();
     Instant now = Instant.now();
     logScanCompleted(containerData, now);
     controller.updateDataScanTimestamp(containerId, now);
