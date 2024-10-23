@@ -30,6 +30,9 @@ jobs:
           repository: apache/ozone-site
           ref: 'HDDS-9225-website-v2'
           path: ozone-site
+      - name: Get short commit SHA
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
       - name: Commit and push changes to apache/ozone-site
         env:
           GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
