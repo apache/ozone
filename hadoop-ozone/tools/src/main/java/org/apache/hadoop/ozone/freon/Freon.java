@@ -42,6 +42,7 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
     description = "Load generator and tester tool for ozone",
     subcommands = {
         RandomKeyGenerator.class,
+        RandomKeyReader.class,
         OzoneClientKeyGenerator.class,
         OzoneClientKeyValidator.class,
         OzoneClientKeyRemover.class,
