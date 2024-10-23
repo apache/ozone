@@ -171,7 +171,6 @@ public class NodeEndpoint {
           .withVersion(nodeManager.getVersion(datanode))
           .withSetupTime(nodeManager.getSetupTime(datanode))
           .withRevision(nodeManager.getRevision(datanode))
-          .withBuildDate(nodeManager.getBuildDate(datanode))
           .withLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
           .withNetworkLocation(datanode.getNetworkLocation())

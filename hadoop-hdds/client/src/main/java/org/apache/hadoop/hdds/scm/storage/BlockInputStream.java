@@ -274,16 +274,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
           blockID);
     }
 
-    DatanodeBlockID.Builder blkIDBuilder =
-        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-
-    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    if (replicaIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicaIndex);
-    }
-
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
         xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
     return response.getBlockData();

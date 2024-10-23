@@ -1,6 +1,6 @@
 ---
 title: "Transparent Data Encryption"
-date: "2019-April-03"
+date: "2019-04-03"
 summary: TDE allows data on the disks to be encrypted-at-rest and automatically decrypted during access. 
 weight: 2
 menu:

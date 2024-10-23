@@ -62,6 +62,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
@@ -1212,7 +1213,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_three", repeatedOmKeyInfo3);
 
-    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2, "");
+    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2, "", "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1244,7 +1245,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         .put("/sampleVol/bucketOne/key_three", repeatedOmKeyInfo3);
 
     Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2,
-        "/sampleVol/bucketOne/key_one");
+        "/sampleVol/bucketOne/key_one", "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1278,7 +1279,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
             .get("/sampleVol/bucketOne/key_one");
     assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
-    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
+    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(-1, "", "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
     assertNotNull(keyInsightInfoResp);
@@ -1286,6 +1287,128 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList()
             .get(0).getKeyName());
   }
+
+  @Test
+  public void testGetDeletedKeysWithPrevKeyProvidedAndStartPrefixEmpty()
+      throws Exception {
+    // Prepare mock data in the deletedTable.
+    for (int i = 1; i <= 10; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketOne/deleted_key_" + i,
+              new RepeatedOmKeyInfo(omKeyInfo));
+    }
+
+    // Case 1: prevKey provided, startPrefix empty
+    Response deletedKeyInfoResponse = omdbInsightEndpoint.getDeletedKeyInfo(5,
+        "/sampleVol/bucketOne/deleted_key_3", "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfoResponse.getEntity();
+
+    // Validate that the response skips the prevKey and returns subsequent records.
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(5, keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+    assertEquals("deleted_key_4",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+    assertEquals("deleted_key_8",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(4).getOmKeyInfoList().get(0).getKeyName());
+  }
+
+  @Test
+  public void testGetDeletedKeysWithPrevKeyEmptyAndStartPrefixEmpty()
+      throws Exception {
+    // Prepare mock data in the deletedTable.
+    for (int i = 1; i < 10; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+    }
+
+    // Case 2: prevKey empty, startPrefix empty
+    Response deletedKeyInfoResponse =
+        omdbInsightEndpoint.getDeletedKeyInfo(5, "", "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfoResponse.getEntity();
+
+    // Validate that the response retrieves from the beginning.
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(5, keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+    assertEquals("deleted_key_1",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+    assertEquals("deleted_key_5",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(4).getOmKeyInfoList().get(0).getKeyName());
+  }
+
+  @Test
+  public void testGetDeletedKeysWithStartPrefixProvidedAndPrevKeyEmpty()
+      throws Exception {
+    // Prepare mock data in the deletedTable.
+    for (int i = 1; i < 5; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+    }
+    for (int i = 5; i < 10; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketTwo", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+    }
+
+    // Case 3: startPrefix provided, prevKey empty
+    Response deletedKeyInfoResponse =
+        omdbInsightEndpoint.getDeletedKeyInfo(5, "",
+            "/sampleVol/bucketOne/");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfoResponse.getEntity();
+
+    // Validate that the response retrieves starting from the prefix.
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(4, keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+    assertEquals("deleted_key_1",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+    assertEquals("deleted_key_4",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(3).getOmKeyInfoList().get(0).getKeyName());
+  }
+
+  @Test
+  public void testGetDeletedKeysWithBothPrevKeyAndStartPrefixProvided()
+      throws IOException {
+    // Prepare mock data in the deletedTable.
+    for (int i = 1; i < 10; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+    }
+    for (int i = 10; i < 15; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "bucketTwo", "deleted_key_" + i, true);
+      reconOMMetadataManager.getDeletedTable()
+          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+    }
+
+    // Case 4: startPrefix and prevKey provided
+    Response deletedKeyInfoResponse =
+        omdbInsightEndpoint.getDeletedKeyInfo(5,
+            "/sampleVol/bucketOne/deleted_key_5",
+            "/sampleVol/bucketOne/");
+
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfoResponse.getEntity();
+
+    // Validate that the response retrieves starting from the prefix and skips the prevKey.
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(4, keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+    assertEquals("deleted_key_6",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
+    assertEquals("deleted_key_9",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(3).getOmKeyInfoList().get(0).getKeyName());
+  }
+
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName, boolean isFile) {

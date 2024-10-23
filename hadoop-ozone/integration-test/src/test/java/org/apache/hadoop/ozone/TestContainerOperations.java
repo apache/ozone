@@ -77,6 +77,7 @@ public class TestContainerOperations {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
+    ozoneConf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, "1");
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     storageClient = new ContainerOperationClient(ozoneConf);
     cluster.waitForClusterToBeReady();
@@ -142,6 +143,24 @@ public class TestContainerOperations {
     assertEquals(container.getContainerInfo().getContainerID(), storageClient
         .getContainer(container.getContainerInfo().getContainerID())
         .getContainerID());
+  }
+
+  /**
+   * Test to try to list number of containers over the max number Ozone allows.
+   * @throws Exception
+   */
+  @Test
+  public void testListContainerExceedMaxAllowedCountOperations() throws Exception {
+    // create 2 containers in cluster where the limit of max count for
+    // listing container is set to 1
+    for (int i = 0; i < 2; i++) {
+      storageClient.createContainer(HddsProtos
+          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
+          .ONE, OzoneConsts.OZONE);
+    }
+
+    assertEquals(1, storageClient.listContainer(0, 2)
+        .getContainerInfoList().size());
   }
 
   /**

@@ -48,7 +48,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
-      OmBucketInfo::getProtobuf);
+      OmBucketInfo::getProtobuf,
+      OmBucketInfo.class);
 
   public static Codec<OmBucketInfo> getCodec() {
     return CODEC;

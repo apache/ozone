@@ -75,8 +75,7 @@ public class TestContainerStateManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())

@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * Metrics related to Block Deleting Service running in SCM.
@@ -75,6 +76,15 @@ public final class ScmBlockDeletingServiceMetrics {
 
   @Metric(about = "The number of created txs which are added into DB.")
   private MutableCounterLong numBlockDeletionTransactionCreated;
+
+  @Metric(about = "The number of skipped transactions")
+  private MutableCounterLong numSkippedTransactions;
+
+  @Metric(about = "The number of processed transactions")
+  private MutableCounterLong numProcessedTransactions;
+
+  @Metric(about = "The number of dataNodes of delete transactions.")
+  private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
   private ScmBlockDeletingServiceMetrics() {
   }
@@ -130,6 +140,18 @@ public final class ScmBlockDeletingServiceMetrics {
     this.numBlockDeletionTransactionCreated.incr(count);
   }
 
+  public void incrSkippedTransaction() {
+    this.numSkippedTransactions.incr();
+  }
+
+  public void incrProcessedTransaction() {
+    this.numProcessedTransactions.incr();
+  }
+
+  public void setNumBlockDeletionTransactionDataNodes(long dataNodes) {
+    this.numBlockDeletionTransactionDataNodes.set(dataNodes);
+  }
+
   public long getNumBlockDeletionCommandSent() {
     return numBlockDeletionCommandSent.value();
   }
@@ -160,6 +182,18 @@ public final class ScmBlockDeletingServiceMetrics {
 
   public long getNumBlockDeletionTransactionCreated() {
     return numBlockDeletionTransactionCreated.value();
+  }
+
+  public long getNumSkippedTransactions() {
+    return numSkippedTransactions.value();
+  }
+
+  public long getNumProcessedTransactions() {
+    return numProcessedTransactions.value();
+  }
+
+  public long getNumBlockDeletionTransactionDataNodes() {
+    return numBlockDeletionTransactionDataNodes.value();
   }
 
   @Override

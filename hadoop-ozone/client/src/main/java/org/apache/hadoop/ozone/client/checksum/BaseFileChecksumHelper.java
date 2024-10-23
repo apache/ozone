@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.client.checksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -38,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -150,6 +153,90 @@ public abstract class BaseFileChecksumHelper {
     checksumType = type;
   }
 
+  protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength);
+
+  protected abstract String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException;
+
+  protected abstract List<ContainerProtos.ChunkInfo> getChunkInfos(
+      OmKeyLocationInfo keyLocationInfo) throws IOException;
+
+  protected ByteBuffer getBlockChecksumFromChunkChecksums(AbstractBlockChecksumComputer blockChecksumComputer)
+      throws IOException {
+    blockChecksumComputer.compute(getCombineMode());
+    return blockChecksumComputer.getOutByteBuffer();
+  }
+
+  /**
+   * Compute block checksums block by block and append the raw bytes of the
+   * block checksums into getBlockChecksumBuf().
+   *
+   * @throws IOException
+   */
+  protected void checksumBlocks() throws IOException {
+    long currentLength = 0;
+    for (int blockIdx = 0;
+         blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
+         blockIdx++) {
+      OmKeyLocationInfo keyLocationInfo =
+          getKeyLocationInfoList().get(blockIdx);
+      if (currentLength > getLength()) {
+        return;
+      }
+
+      if (!checksumBlock(keyLocationInfo)) {
+        throw new PathIOException(getSrc(),
+            "Fail to get block checksum for " + keyLocationInfo
+                + ", checksum combine mode: " + getCombineMode());
+      }
+
+      currentLength += keyLocationInfo.getLength();
+    }
+  }
+
+  /**
+   * Return true when sounds good to continue or retry, false when severe
+   * condition or totally failed.
+   */
+  protected boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
+      throws IOException {
+    // for each block, send request
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        getChunkInfos(keyLocationInfo);
+    if (chunkInfos.isEmpty()) {
+      return false;
+    }
+
+    long blockNumBytes = keyLocationInfo.getLength();
+
+    if (getRemaining() < blockNumBytes) {
+      blockNumBytes = getRemaining();
+    }
+    setRemaining(getRemaining() - blockNumBytes);
+
+    ContainerProtos.ChecksumData checksumData =
+        chunkInfos.get(0).getChecksumData();
+    setChecksumType(checksumData.getType());
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    setBytesPerCRC(bytesPerChecksum);
+
+    AbstractBlockChecksumComputer blockChecksumComputer = getBlockChecksumComputer(chunkInfos,
+        keyLocationInfo.getLength());
+    ByteBuffer blockChecksumByteBuffer =
+        getBlockChecksumFromChunkChecksums(blockChecksumComputer);
+    String blockChecksumForDebug =
+        populateBlockChecksumBuf(blockChecksumByteBuffer);
+
+    LOG.debug("Got reply from {} {} for block {}: blockChecksum={}, " +
+            "blockChecksumType={}",
+        keyInfo.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC
+            ? "EC pipeline" : "pipeline",
+        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
+        blockChecksumForDebug, checksumData.getType());
+
+    return true;
+  }
+
   /**
    * Request the blocks created in the most recent version from Ozone Manager.
    *
@@ -218,14 +305,6 @@ public abstract class BaseFileChecksumHelper {
       fileChecksum = makeFinalResult();
     }
   }
-
-  /**
-   * Compute block checksums block by block and append the raw bytes of the
-   * block checksums into getBlockChecksumBuf().
-   *
-   * @throws IOException
-   */
-  protected abstract void checksumBlocks() throws IOException;
 
   /**
    * Make final file checksum result given the per-block or per-block-group

@@ -42,7 +42,8 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(PersistedPrefixInfo.getDefaultInstance()),
       OmPrefixInfo::getFromProtobuf,
-      OmPrefixInfo::getProtobuf);
+      OmPrefixInfo::getProtobuf,
+      OmPrefixInfo.class);
 
   public static Codec<OmPrefixInfo> getCodec() {
     return CODEC;

@@ -48,13 +48,6 @@ public interface ServiceRuntimeInfo {
   String getSoftwareVersion();
 
   /**
-   * Get the compilation information which contains date, user and branch.
-   *
-   * @return the compilation information, as a JSON string.
-   */
-  String getCompileInfo();
-
-  /**
    * Gets the NN start time in milliseconds.
    *
    * @return the NN start time in msec

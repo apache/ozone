@@ -49,6 +49,11 @@ public final class SchemaOneKeyCodec implements Codec<String> {
   }
 
   @Override
+  public Class<String> getTypeClass() {
+    return String.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(String stringObject) throws IOException {
     try {
       // If the caller's string has no prefix, it should be stored as a long

@@ -42,7 +42,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
-      OmMultipartKeyInfo::getProto);
+      OmMultipartKeyInfo::getProto,
+      OmMultipartKeyInfo.class);
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;

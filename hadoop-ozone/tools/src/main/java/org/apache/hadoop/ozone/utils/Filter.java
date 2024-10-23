@@ -82,10 +82,12 @@ public class Filter {
   public FilterOperator getFilterOperator(String op) {
     if (op.equalsIgnoreCase("equals")) {
       return FilterOperator.EQUALS;
-    } else if (op.equalsIgnoreCase("max")) {
-      return FilterOperator.MAX;
-    } else if (op.equalsIgnoreCase("min")) {
-      return FilterOperator.MIN;
+    } else if (op.equalsIgnoreCase("GREATER")) {
+      return FilterOperator.GREATER;
+    } else if (op.equalsIgnoreCase("LESSER")) {
+      return FilterOperator.LESSER;
+    } else if (op.equalsIgnoreCase("REGEX")) {
+      return FilterOperator.REGEX;
     } else {
       return null;
     }
@@ -101,7 +103,8 @@ public class Filter {
    */
   public enum FilterOperator {
     EQUALS,
-    MAX,
-    MIN;
+    LESSER,
+    GREATER,
+    REGEX;
   }
 }

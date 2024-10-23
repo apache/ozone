@@ -46,6 +46,11 @@ public final class OldX509CertificateCodecForTesting
   }
 
   @Override
+  public Class<X509Certificate> getTypeClass() {
+    return X509Certificate.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
       return CertificateCodec.getPEMEncodedString(object)

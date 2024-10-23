@@ -45,11 +45,10 @@ public class TestOMDBDefinition {
     OzoneConfiguration configuration = new OzoneConfiguration();
     File metaDir = folder.toFile();
     DBStore store = OmMetadataManagerImpl.loadDB(configuration, metaDir);
-    OMDBDefinition dbDef = new OMDBDefinition();
 
     // Get list of tables from DB Definitions
     final Collection<DBColumnFamilyDefinition<?, ?>> columnFamilyDefinitions
-        = dbDef.getColumnFamilies();
+        = OMDBDefinition.get().getColumnFamilies();
     final int countOmDefTables = columnFamilyDefinitions.size();
     ArrayList<String> missingDBDefTables = new ArrayList<>();
 

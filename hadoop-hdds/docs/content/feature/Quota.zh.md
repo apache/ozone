@@ -1,6 +1,6 @@
 ---
 title: "Ozone 中的配额"
-date: "2020-October-22"
+date: "2020-10-22"
 weight: 4
 summary: Ozone中的配额
 icon: user

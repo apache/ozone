@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -52,6 +53,7 @@ public final class OmTestManagers {
   private final BucketManager bucketManager;
   private final PrefixManager prefixManager;
   private final ScmBlockLocationProtocol scmBlockClient;
+  private final OzoneClient rpcClient;
 
   public OzoneManager getOzoneManager() {
     return om;
@@ -76,6 +78,9 @@ public final class OmTestManagers {
   }
   public ScmBlockLocationProtocol getScmBlockClient() {
     return scmBlockClient;
+  }
+  public OzoneClient getRpcClient() {
+    return rpcClient;
   }
 
   public OmTestManagers(OzoneConfiguration conf)
@@ -121,7 +126,8 @@ public final class OmTestManagers {
     waitFor(() -> om.getOmRatisServer().checkLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
         10, 10_000);
 
-    writeClient = OzoneClientFactory.getRpcClient(conf)
+    rpcClient = OzoneClientFactory.getRpcClient(conf);
+    writeClient = rpcClient
         .getObjectStore().getClientProxy().getOzoneManagerClient();
     metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "metadataManager");

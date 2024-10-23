@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Simple interface to provide information to create a DBStore..
@@ -53,6 +57,16 @@ public interface DBDefinition {
   default File getDBLocation(ConfigurationSource conf) {
     return ServerUtils.getDirectoryFromConfig(conf,
             getLocationConfigKey(), getName());
+  }
+
+  static List<String> getColumnFamilyNames(Iterable<DBColumnFamilyDefinition<?, ?>> columnFamilies) {
+    return Collections.unmodifiableList(StreamSupport.stream(columnFamilies.spliterator(), false)
+        .map(DBColumnFamilyDefinition::getName)
+        .collect(Collectors.toList()));
+  }
+
+  default List<String> getColumnFamilyNames() {
+    return getColumnFamilyNames(getColumnFamilies());
   }
 
   /**
@@ -109,9 +123,17 @@ public interface DBDefinition {
    */
   abstract class WithMap implements WithMapInterface {
     private final Map<String, DBColumnFamilyDefinition<?, ?>> map;
+    private final Supplier<List<String>> columnFamilyNames;
 
     protected WithMap(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
       this.map = map;
+      this.columnFamilyNames = MemoizedSupplier.valueOf(
+          () -> DBDefinition.getColumnFamilyNames(getColumnFamilies()));
+    }
+
+    @Override
+    public final List<String> getColumnFamilyNames() {
+      return columnFamilyNames.get();
     }
 
     @Override

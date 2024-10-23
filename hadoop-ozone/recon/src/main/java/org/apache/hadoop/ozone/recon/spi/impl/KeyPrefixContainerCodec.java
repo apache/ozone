@@ -24,10 +24,9 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static org.apache.commons.compress.utils.CharsetNames.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Codec to serialize/deserialize {@link KeyPrefixContainer}.
@@ -49,8 +48,12 @@ public final class KeyPrefixContainerCodec
   private static final String KEY_DELIMITER = "_";
 
   @Override
-  public byte[] toPersistedFormat(KeyPrefixContainer keyPrefixContainer)
-      throws IOException {
+  public Class<KeyPrefixContainer> getTypeClass() {
+    return KeyPrefixContainer.class;
+  }
+
+  @Override
+  public byte[] toPersistedFormat(KeyPrefixContainer keyPrefixContainer) {
     Preconditions.checkNotNull(keyPrefixContainer,
             "Null object can't be converted to byte array.");
     byte[] keyPrefixBytes = keyPrefixContainer.getKeyPrefix().getBytes(UTF_8);
@@ -75,9 +78,7 @@ public final class KeyPrefixContainerCodec
   }
 
   @Override
-  public KeyPrefixContainer fromPersistedFormat(byte[] rawData)
-      throws IOException {
-
+  public KeyPrefixContainer fromPersistedFormat(byte[] rawData) {
     // When reading from byte[], we can always expect to have the key, version
     // and version parts in the byte array.
     byte[] keyBytes = ArrayUtils.subarray(rawData,
