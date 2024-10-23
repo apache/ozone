@@ -37,6 +37,7 @@ jobs:
           cd ozone-site
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
+          git checkout -b config-doc-update-from-"$GITHUB_SHA"
           echo "test content" > testfile.txt
           git add testfile.txt
           git commit -m "[Auto] Update configurations.md page from ozone $GITHUB_SHA"
