@@ -460,7 +460,7 @@ public class TestContainerCommandsEC {
       int replicaIndex = 4;
       XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
           createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
-              replicaIndex));
+              2));
       try {
         // To create the actual situation, container would have been in closed
         // state at SCM.
