@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -38,16 +40,16 @@ public class ReconLayoutVersionManager {
   private static final Logger LOG = LoggerFactory.getLogger(ReconLayoutVersionManager.class);
 
   private final ReconSchemaVersionTableManager schemaVersionTableManager;
+  private final ReconContext reconContext;
 
   // Metadata Layout Version (MLV) of the Recon Metadata on disk
   private int currentMLV;
-  // Software Layout Version (SLV) of the Recon service
-  private final int currentSLV;
 
-  public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager) {
+  public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
+                                   ReconContext reconContext) {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
-    this.currentSLV = determineSLV();
+    this.reconContext = reconContext;
     ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
   }
 
@@ -96,7 +98,10 @@ public class ReconLayoutVersionManager {
           LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
         }
       } catch (Exception e) {
+        // Log the error to both logs and ReconContext
         LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
+        reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
         break;
       }
     }
@@ -109,7 +114,7 @@ public class ReconLayoutVersionManager {
     List<ReconLayoutFeature> allFeatures =
         Arrays.asList(ReconLayoutFeature.values());
 
-    LOG.info("Current MLV: {}. SLV: {}. Checking features for registration...", currentMLV, currentSLV);
+    LOG.info("Current MLV: {}. SLV: {}. Checking features for registration...", currentMLV, determineSLV());
 
     List<ReconLayoutFeature> registeredFeatures = allFeatures.stream()
         .filter(feature -> feature.getVersion() > currentMLV)
@@ -136,7 +141,7 @@ public class ReconLayoutVersionManager {
   }
 
   public int getCurrentSLV() {
-    return currentSLV;
+    return determineSLV();
   }
 
 }
