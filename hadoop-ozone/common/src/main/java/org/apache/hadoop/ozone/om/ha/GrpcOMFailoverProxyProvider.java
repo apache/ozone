@@ -18,15 +18,9 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import io.grpc.Status;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -63,14 +57,12 @@ public class GrpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
-  private final long protocolVer;
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
     super(configuration, ugi, omServiceId, protocol);
-    this.protocolVer = RPC.getProtocolVersion(protocol);
   }
 
   @Override

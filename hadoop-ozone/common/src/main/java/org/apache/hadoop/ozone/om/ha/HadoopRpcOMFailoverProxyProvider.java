@@ -29,15 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -59,7 +53,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
-  private final long omVersion;
   private final Text delegationTokenService;
   private Map<String, OMProxyInfo> omProxyInfos;
   private List<String> retryExceptions = new ArrayList<>();
@@ -75,7 +68,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
                                  String omServiceId,
                                  Class<T> protocol) throws IOException {
     super(configuration, ugi, omServiceId, protocol);
-    this.omVersion = RPC.getProtocolVersion(protocol);
     this.delegationTokenService = computeDelegationTokenService();
   }
 
