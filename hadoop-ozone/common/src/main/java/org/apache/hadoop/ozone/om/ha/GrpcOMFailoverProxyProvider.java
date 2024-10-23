@@ -63,15 +63,13 @@ public class GrpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
-  private final UserGroupInformation ugi;
   private final long protocolVer;
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
-    super(configuration, omServiceId, protocol);
-    this.ugi = ugi;
+    super(configuration, ugi, omServiceId, protocol);
     this.protocolVer = RPC.getProtocolVersion(protocol);
   }
 
@@ -126,35 +124,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   private T createOMProxy() throws IOException {
     InetSocketAddress addr = new InetSocketAddress(0);
-    return createOmProxy(addr);
-  }
-
-  /**
-   * Get the protocol proxy for provided address.
-   * @param address An instance of {@link InetSocketAddress} which contains the address to connect
-   * @return the proxy connection to the address and the set of methods supported by the server at the address
-   * @throws IOException if any error occurs while trying to get the proxy
-   */
-  private T createOmProxy(InetSocketAddress address) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
-
-    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
-    RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
-
-    // Ensure we do not attempt retry on the same OM in case of exceptions
-    RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
-
-    return (T) RPC.getProtocolProxy(
-        getInterface(),
-        protocolVer,
-        address,
-        ugi,
-        hadoopConf,
-        NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int) OmUtils.getOMClientRpcTimeOut(getConf()),
-        connectionRetryPolicy
-    ).getProxy();
+    return createOMProxy(addr);
   }
 
   /**

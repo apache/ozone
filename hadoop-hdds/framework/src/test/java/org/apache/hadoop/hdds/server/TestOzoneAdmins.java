@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * This class is to test the utilities present in the OzoneAdmins class.
  */
-class TestOzoneAdminUtils {
+class TestOzoneAdmins {
   // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
   @Test
   void testS3AdminExtraction() throws IOException {
