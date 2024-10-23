@@ -216,16 +216,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                       omBucketInfo.getDefaultReplicationConfig() :
                       null, ozoneManager);
 
-          OmMultipartKeyInfo multipartKeyInfoFromArgs =
-              new OmMultipartKeyInfo.Builder()
-                  .setUploadID(keyArgs.getMultipartUploadID())
-                  .setCreationTime(keyArgs.getModificationTime())
-                  .setReplicationConfig(replicationConfig)
-                  .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-                  .setUpdateID(trxnLogIndex)
-                  .setParentID(pathInfoFSO.getLastKnownParentId())
-                  .build();
-
           OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
               .setVolumeName(volumeName)
               .setBucketName(bucketName)

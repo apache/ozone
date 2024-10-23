@@ -339,6 +339,7 @@ public final class OmUtils {
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
     case QuotaRepair:
+    case PersistDb:
     case UnknownCommand:
       return false;
     case EchoRPC:

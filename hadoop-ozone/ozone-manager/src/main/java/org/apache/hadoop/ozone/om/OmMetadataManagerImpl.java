@@ -329,6 +329,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private SnapshotChainManager snapshotChainManager;
   private final OMPerformanceMetrics perfMetrics;
   private final S3Batcher s3Batcher = new S3SecretBatcher();
+  private boolean isLeaderExecutorEnabled = false;
 
   /**
    * OmMetadataManagerImpl constructor.
@@ -359,6 +360,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
+    isLeaderExecutorEnabled = conf.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
     start(conf);
   }
 
@@ -370,6 +373,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = 0;
     perfMetrics = null;
+    isLeaderExecutorEnabled = conf.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
   }
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
@@ -401,6 +406,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
+    isLeaderExecutorEnabled = conf.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+        OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
@@ -414,6 +421,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     try {
       lock = new OmReadOnlyLock();
       omEpoch = 0;
+      isLeaderExecutorEnabled = conf.getBoolean(OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE,
+          OMConfigKeys.OZONE_OM_LEADER_EXECUTOR_ENABLE_DEFAULT);
       String snapshotDir = OMStorage.getOmDbDir(conf) +
           OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
       File metaDir = new File(snapshotDir);
@@ -683,9 +692,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected void initializeOmTables(CacheType cacheType,
                                     boolean addCacheMetrics)
       throws IOException {
+    CacheType defaultCacheType = CacheType.PARTIAL_CACHE;
+    if (isLeaderExecutorEnabled) {
+      // TODO HDDS-11415 to change PARTIAL_CACHE --- NO_CACHE, referring PARTIAL_CACHE for testcase success
+      defaultCacheType = CacheType.PARTIAL_CACHE;
+    }
     userTable =
         this.store.getTable(USER_TABLE, String.class,
-            PersistedUserVolumeInfo.class);
+            PersistedUserVolumeInfo.class, defaultCacheType);
     checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
 
     volumeTable =
@@ -699,92 +713,92 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     checkTableStatus(bucketTable, BUCKET_TABLE, addCacheMetrics);
 
-    keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class);
+    keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class, defaultCacheType);
     checkTableStatus(keyTable, KEY_TABLE, addCacheMetrics);
 
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
-        RepeatedOmKeyInfo.class);
+        RepeatedOmKeyInfo.class, defaultCacheType);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
-            OmKeyInfo.class);
+            OmKeyInfo.class, defaultCacheType);
     checkTableStatus(openKeyTable, OPEN_KEY_TABLE, addCacheMetrics);
 
     multipartInfoTable = this.store.getTable(MULTIPARTINFO_TABLE,
-        String.class, OmMultipartKeyInfo.class);
+        String.class, OmMultipartKeyInfo.class, defaultCacheType);
     checkTableStatus(multipartInfoTable, MULTIPARTINFO_TABLE, addCacheMetrics);
 
     dTokenTable = this.store.getTable(DELEGATION_TOKEN_TABLE,
-        OzoneTokenIdentifier.class, Long.class);
+        OzoneTokenIdentifier.class, Long.class, defaultCacheType);
     checkTableStatus(dTokenTable, DELEGATION_TOKEN_TABLE, addCacheMetrics);
 
     s3SecretTable = this.store.getTable(S3_SECRET_TABLE, String.class,
-        S3SecretValue.class);
+        S3SecretValue.class, defaultCacheType);
     checkTableStatus(s3SecretTable, S3_SECRET_TABLE, addCacheMetrics);
 
     prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
-        OmPrefixInfo.class);
+        OmPrefixInfo.class, defaultCacheType);
     checkTableStatus(prefixTable, PREFIX_TABLE, addCacheMetrics);
 
     dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
-            OmDirectoryInfo.class);
+            OmDirectoryInfo.class, defaultCacheType);
     checkTableStatus(dirTable, DIRECTORY_TABLE, addCacheMetrics);
 
     fileTable = this.store.getTable(FILE_TABLE, String.class,
-            OmKeyInfo.class);
+            OmKeyInfo.class, defaultCacheType);
     checkTableStatus(fileTable, FILE_TABLE, addCacheMetrics);
 
     openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
-            OmKeyInfo.class);
+            OmKeyInfo.class, defaultCacheType);
     checkTableStatus(openFileTable, OPEN_FILE_TABLE, addCacheMetrics);
 
     deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
-        OmKeyInfo.class);
+        OmKeyInfo.class, defaultCacheType);
     checkTableStatus(deletedDirTable, DELETED_DIR_TABLE, addCacheMetrics);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
-        String.class, TransactionInfo.class);
+        String.class, TransactionInfo.class, defaultCacheType);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE,
         addCacheMetrics);
 
-    metaTable = this.store.getTable(META_TABLE, String.class, String.class);
+    metaTable = this.store.getTable(META_TABLE, String.class, String.class, defaultCacheType);
     checkTableStatus(metaTable, META_TABLE, addCacheMetrics);
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
-        String.class, OmDBAccessIdInfo.class);
+        String.class, OmDBAccessIdInfo.class, defaultCacheType);
     checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE,
         addCacheMetrics);
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
-        String.class, OmDBUserPrincipalInfo.class);
+        String.class, OmDBUserPrincipalInfo.class, defaultCacheType);
     checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE,
         addCacheMetrics);
 
     // tenant name -> tenant (tenant states)
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
-        String.class, OmDBTenantState.class);
+        String.class, OmDBTenantState.class, defaultCacheType);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
     // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
     //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
-        String.class, SnapshotInfo.class);
+        String.class, SnapshotInfo.class, defaultCacheType);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
     // volumeName/bucketName/objectID -> renamedKey or renamedDir
     snapshotRenamedTable = this.store.getTable(SNAPSHOT_RENAMED_TABLE,
-        String.class, String.class);
+        String.class, String.class, defaultCacheType);
     checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
-        String.class, CompactionLogEntry.class);
+        String.class, CompactionLogEntry.class, defaultCacheType);
     checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
         addCacheMetrics);
   }
