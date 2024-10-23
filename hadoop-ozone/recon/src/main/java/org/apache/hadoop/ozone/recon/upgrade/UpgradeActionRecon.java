@@ -44,7 +44,7 @@ import java.lang.annotation.Target;
  * <pre>
  * {@code
  *
- * @UpgradeActionRecon(feature = FEATURE_NAME, type = AUTO_FINALIZE)
+ * @UpgradeActionRecon(feature = FEATURE_NAME, type = FINALIZE)
  *  public class FeatureNameUpgradeAction implements ReconUpgradeAction {
  *     @Override
  *     public void execute() throws Exception {

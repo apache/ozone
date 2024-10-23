@@ -80,7 +80,14 @@ public class ReconLayoutVersionManager {
 
     for (ReconLayoutFeature feature : featuresToFinalize) {
       try {
-        // Fetch only the AUTO_FINALIZE action for the feature
+        // If the feature is INITIAL_VERSION, skip executing any action and just update the schema version
+        if (feature == ReconLayoutFeature.INITIAL_VERSION) {
+          updateSchemaVersion(0);
+          LOG.info("INITIAL_VERSION feature processed by setting schema version to 0.");
+          continue;
+        }
+
+        // Fetch only the FINALIZE action for the feature
         Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
         if (action.isPresent()) {
           // Execute the upgrade action & update the schema version in the DB

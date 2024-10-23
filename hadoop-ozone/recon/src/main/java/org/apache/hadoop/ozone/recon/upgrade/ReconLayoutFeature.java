@@ -54,7 +54,7 @@ public enum ReconLayoutFeature {
   /**
    * Retrieves the upgrade action for the specified {@link ReconUpgradeAction.UpgradeActionType}.
    *
-   * @param type The type of the upgrade action (e.g., AUTO_FINALIZE).
+   * @param type The type of the upgrade action (e.g., FINALIZE).
    * @return An {@link Optional} containing the upgrade action if present.
    */
   public Optional<ReconUpgradeAction> getAction(ReconUpgradeAction.UpgradeActionType type) {
