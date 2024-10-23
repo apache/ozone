@@ -41,7 +41,8 @@ import picocli.CommandLine.Spec;
         TransferScmLeaderSubCommand.class,
         DeletedBlocksTxnCommands.class,
         DecommissionScmSubcommand.class,
-        RotateKeySubCommand.class
+        RotateKeySubCommand.class,
+        VolumeFailureSubCommand.class,
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ScmAdmin extends GenericCli implements SubcommandWithParent {

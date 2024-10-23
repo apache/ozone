@@ -139,6 +139,7 @@ public abstract class StorageVolume
   private AtomicInteger currentIOFailureCount;
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
+  private long failureDate = 0;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
@@ -382,6 +383,7 @@ public abstract class StorageVolume
     private boolean failedVolume = false;
     private String datanodeUuid;
     private String clusterID;
+    private long failureDate;
 
     public Builder(String volumeRootStr, String storageDirStr) {
       this.volumeRootStr = volumeRootStr;
@@ -428,6 +430,11 @@ public abstract class StorageVolume
       return this.getThis();
     }
 
+    public T failureDate(long volFailureDate) {
+      this.failureDate = volFailureDate;
+      return this.getThis();
+    }
+
     public abstract StorageVolume build() throws IOException;
 
     public String getVolumeRootStr() {
@@ -440,6 +447,10 @@ public abstract class StorageVolume
 
     public StorageType getStorageType() {
       return this.storageType;
+    }
+
+    public long getFailureDate() {
+      return failureDate;
     }
   }
 
@@ -510,6 +521,10 @@ public abstract class StorageVolume
             .orElse(StorageType.DEFAULT);
   }
 
+  public long getFailureDate() {
+    return failureDate;
+  }
+
   public String getStorageID() {
     return storageID;
   }
@@ -538,6 +553,14 @@ public abstract class StorageVolume
     this.state = state;
   }
 
+  public void setFailureDate(long failureDate) {
+    this.failureDate = failureDate;
+  }
+
+  public void resetFailureDate() {
+    this.failureDate = 0;
+  }
+
   public boolean isFailed() {
     return (state == VolumeState.FAILED);
   }
@@ -548,6 +571,11 @@ public abstract class StorageVolume
 
   public void failVolume() {
     setState(VolumeState.FAILED);
+    // Ensure it is set only once,
+    // which is the time when the failure was first detected.
+    if (failureDate == 0L) {
+      setFailureDate(Time.now());
+    }
     volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
   }
 
