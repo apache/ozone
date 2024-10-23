@@ -150,6 +150,7 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
 
   React.useEffect(() => {
     fetchDeletePendingKeys();
+    expandedDeletePendingKeys = [];
 
     return (() => {
       cancelSignal.current && cancelSignal.current.abort();
