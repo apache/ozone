@@ -684,6 +684,11 @@ public class OzoneContainer {
     }
   }
 
+  @VisibleForTesting
+  public void setHddsDatanodeService(HddsDatanodeService hddsDatanodeService) {
+    this.hddsDatanodeService = hddsDatanodeService;
+  }
+
   private void collectReplicationSupervisorMetrics(StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb) {
     List<HddsProtos.KeyValue> containerReplicationMetrics = new ArrayList<>();
 

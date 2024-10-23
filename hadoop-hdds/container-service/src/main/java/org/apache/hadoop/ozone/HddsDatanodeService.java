@@ -138,6 +138,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     this(false, args);
   }
 
+  @VisibleForTesting
+  public void setDatanodeStateMachine(DatanodeStateMachine datanodeStateMachine) {
+    this.datanodeStateMachine = datanodeStateMachine;
+  }
+
   /**
    * Create a Datanode instance based on the supplied command-line arguments.
    *
