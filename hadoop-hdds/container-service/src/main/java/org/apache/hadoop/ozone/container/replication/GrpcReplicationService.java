@@ -58,37 +58,24 @@ public class GrpcReplicationService extends
   private final ContainerReplicationSource source;
   private final ContainerImporter importer;
 
-  private final boolean zeroCopyEnabled;
-
   private final ZeroCopyMessageMarshaller<SendContainerRequest>
       sendContainerZeroCopyMessageMarshaller;
 
   private final ZeroCopyMessageMarshaller<CopyContainerRequestProto>
       copyContainerZeroCopyMessageMarshaller;
 
-  public GrpcReplicationService(ContainerReplicationSource source,
-      ContainerImporter importer, boolean zeroCopyEnabled) {
+  public GrpcReplicationService(ContainerReplicationSource source, ContainerImporter importer) {
     this.source = source;
     this.importer = importer;
-    this.zeroCopyEnabled = zeroCopyEnabled;
 
-    if (zeroCopyEnabled) {
-      sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-          SendContainerRequest.getDefaultInstance());
-      copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-          CopyContainerRequestProto.getDefaultInstance());
-    } else {
-      sendContainerZeroCopyMessageMarshaller = null;
-      copyContainerZeroCopyMessageMarshaller = null;
-    }
+    sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+            SendContainerRequest.getDefaultInstance());
+    copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+            CopyContainerRequestProto.getDefaultInstance());
   }
 
   public ServerServiceDefinition bindServiceWithZeroCopy() {
     ServerServiceDefinition orig = super.bindService();
-    if (!zeroCopyEnabled) {
-      LOG.info("Zerocopy is not enabled.");
-      return orig;
-    }
 
     Set<String> methodNames = new HashSet<>();
     ServerServiceDefinition.Builder builder =
@@ -154,10 +141,7 @@ public class GrpcReplicationService extends
     } finally {
       // output may have already been closed, ignore such errors
       IOUtils.cleanupWithLogger(LOG, outputStream);
-
-      if (copyContainerZeroCopyMessageMarshaller != null) {
-        copyContainerZeroCopyMessageMarshaller.release(request);
-      }
+      copyContainerZeroCopyMessageMarshaller.release(request);
     }
   }
 

@@ -14,6 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.commons.lang3.NotImplementedException;
@@ -74,7 +75,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Tests key output stream.
  */
-class TestECKeyOutputStreamWithZeroCopy {
+public class TestECKeyOutputStream {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
