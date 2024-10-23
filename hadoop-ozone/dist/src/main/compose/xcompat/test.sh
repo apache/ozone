@@ -79,7 +79,7 @@ test_bucket_encryption() {
 }
 
 test_cross_compatibility() {
-  echo "Starting cluster with COMPOSE_FILE=${COMPOSE_FILE}"
+  echo "Starting cluster with COMPOSE_FILE=${COMPOSE_FILE} CLUSTER_VERSION=${CLUSTER_VERSION}"
 
   OZONE_KEEP_RESULTS=true start_docker_env
 
