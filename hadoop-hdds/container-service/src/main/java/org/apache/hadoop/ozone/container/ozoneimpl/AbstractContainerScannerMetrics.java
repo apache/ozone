@@ -43,8 +43,8 @@ public abstract class AbstractContainerScannerMetrics {
   private MutableGaugeInt numUnHealthyContainers;
   @Metric("number of iterations of scanner completed since the restart")
   private MutableCounterInt numScanIterations;
-  @Metric("total time that the container scanned has been running, in milliseconds.")
-  private MutableCounterLong totalRunTimes;
+  @Metric("total time that the container scanner has been running, in milliseconds.")
+  private MutableCounterLong totalRunTime;
 
   public AbstractContainerScannerMetrics(String name, MetricsSystem ms) {
     this.name = name;
@@ -91,12 +91,12 @@ public abstract class AbstractContainerScannerMetrics {
     numScanIterations.incr();
   }
 
-  public long getTotalRunTimes() {
-    return totalRunTimes.value();
+  public long getTotalRunTime() {
+    return totalRunTime.value();
   }
 
-  public void incTotalRunTimes(long runTime) {
-    totalRunTimes.incr(runTime);
+  public void incTotalRunTime(long runTime) {
+    totalRunTime.incr(runTime);
   }
 
   public void unregister() {

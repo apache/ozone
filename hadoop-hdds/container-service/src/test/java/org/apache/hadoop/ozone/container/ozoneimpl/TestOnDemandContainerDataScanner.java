@@ -212,16 +212,16 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   @Test
-  public void testTotalRunTimes() throws Exception {
+  public void testTotalRunTime() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
     when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
     when(unhealthy.scanData(
-            any(DataTransferThrottler.class), any(Canceler.class)))
-            .thenReturn(getUnhealthyScanResult());
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyScanResult());
     scanContainer(unhealthy);
     verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
-    assertTrue(metrics.getTotalRunTimes() > 0);
+    assertTrue(metrics.getTotalRunTime() > 0);
   }
 
   /**

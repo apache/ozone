@@ -27,8 +27,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.mockito.stubbing.Answer;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -94,12 +96,22 @@ public class TestBackgroundContainerMetadataScanner extends
 
   @Test
   @Override
-  public void testScannerMetrics() {
+  public void testScannerMetrics() throws InterruptedException {
     scanner.runIteration();
-
     ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(4, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+
+    Container<?> unhealthy = mockKeyValueContainer();
+    when(unhealthy.scanMetaData()).thenReturn(getUnhealthyScanResult());
+    when(unhealthy.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(ScanResult.healthy());
+    setContainers(unhealthy);
+    scanner.runIteration();
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
@@ -125,12 +137,49 @@ public class TestBackgroundContainerMetadataScanner extends
     verifyContainerMarkedUnhealthy(corruptData, never());
     verifyContainerMarkedUnhealthy(openCorruptMetadata, atLeastOnce());
     verifyContainerMarkedUnhealthy(openContainer, never());
+
+    ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
+    Container<?> unhealthy1 = mockKeyValueContainer();
+    when(unhealthy1.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(ScanResult.healthy());
+    when(unhealthy1.scanMetaData()).thenAnswer(new Answer<ScanResult>() {
+      @Override
+      public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+        Thread.sleep(200);
+        return getUnhealthyScanResult();
+      }
+    });
+    setContainers(unhealthy1);
+    scanner.runIteration();
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertTrue(metrics.getTotalRunTime() > 200);
+
+    Container<?> unhealthy2 = mockKeyValueContainer();
+    when(unhealthy1.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(ScanResult.healthy());
+    when(unhealthy2.scanMetaData()).thenAnswer(new Answer<ScanResult>() {
+      @Override
+      public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+        Thread.sleep(300);
+        return getUnhealthyScanResult();
+      }
+    });
+    setContainers(unhealthy2);
+    scanner.runIteration();
+    assertEquals(3, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertTrue(metrics.getTotalRunTime() > 500);
   }
 
   @Test
   public void testTotalRunTimes() {
     scanner.runIteration();
-    assertTrue(scanner.getMetrics().getTotalRunTimes() > 0);
+    assertTrue(scanner.getMetrics().getTotalRunTime() > 0);
   }
 
   @Test

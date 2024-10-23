@@ -86,7 +86,7 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
     } else {
       AbstractContainerScannerMetrics metrics = getMetrics();
       metrics.incNumScanIterations();
-      metrics.incTotalRunTimes(TimeUnit.NANOSECONDS.toMillis(totalDuration));
+      metrics.incTotalRunTime(TimeUnit.NANOSECONDS.toMillis(totalDuration));
       metrics.resetNumContainersScanned();
       metrics.resetNumUnhealthyContainers();
       metrics.incNumContainersScanned(numContainersScannedEachIteration);

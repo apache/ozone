@@ -128,7 +128,7 @@ public final class OnDemandContainerDataScanner {
       return;
     }
 
-    long startTime = System.nanoTime();
+    long startTime = Instant.now().toEpochMilli();
     long containerId = container.getContainerData().getContainerID();
     try {
       ContainerData containerData = container.getContainerData();
@@ -162,8 +162,7 @@ public final class OnDemandContainerDataScanner {
       // ExecutorService.
       LOG.info("On demand container scan interrupted.");
     } finally {
-      long totalDuration = System.nanoTime() - startTime;
-      getMetrics().incTotalRunTimes(TimeUnit.NANOSECONDS.toMillis(totalDuration));
+      getMetrics().incTotalRunTime(Instant.now().toEpochMilli() - startTime);
     }
   }
 
