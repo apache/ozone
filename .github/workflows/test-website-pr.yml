@@ -30,9 +30,6 @@ jobs:
           repository: apache/ozone-site
           ref: 'HDDS-9225-website-v2'
           path: ozone-site
-      - name: Create change
-        run: |
-          echo "test content" > testfile.txt
       - name: Commit and push changes to apache/ozone-site
         env:
           GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
@@ -40,6 +37,7 @@ jobs:
           cd ozone-site
           git config --global user.name 'Github Actions'
           git config --global user.email 'noreply@github.com'
+          echo "test content" > testfile.txt
           git add testfile.txt
           git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
           git push origin config-doc-update-from-${{ env.SHORT_SHA }}
