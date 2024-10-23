@@ -30,9 +30,6 @@ jobs:
           repository: apache/ozone-site
           ref: 'HDDS-9225-website-v2'
           path: ozone-site
-      - name: Get short commit SHA
-        id: get_short_sha
-        run: echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
       - name: Commit and push changes to apache/ozone-site
         env:
           GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
@@ -42,8 +39,8 @@ jobs:
           git config --global user.email 'noreply@github.com'
           echo "test content" > testfile.txt
           git add testfile.txt
-          git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
-          git push origin config-doc-update-from-${{ env.SHORT_SHA }}
+          git commit -m "[Auto] Update configurations.md page from ozone $GITHUB_SHA"
+          git push origin config-doc-update-from-"$GITHUB_SHA"
       - name: Create Pull Request in apache/ozone-site
         env:
           GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
