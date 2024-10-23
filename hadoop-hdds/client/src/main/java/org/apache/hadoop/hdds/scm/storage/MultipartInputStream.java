@@ -179,7 +179,6 @@ public class MultipartInputStream extends ExtendedInputStream {
   }
 
   public synchronized void initialize() throws IOException {
-
     // Pre-check that the stream has not been intialized already
     if (initialized) {
       return;
@@ -193,7 +192,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     long streamLength = 0L;
     for (PartInputStream partInputStream : partStreams) {
-      //this.partOffsets[i++] = streamLength;
       streamLength += partInputStream.getLength();
     }
     this.length = streamLength;
