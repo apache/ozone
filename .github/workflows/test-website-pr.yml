@@ -1,0 +1,63 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: Test Ozone Site PR
+on:
+  workflow_dispatch:
+
+jobs:
+  update-ozone-site:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ozone-site repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
+          repository: apache/ozone-site
+          ref: 'HDDS-9225-website-v2'
+          path: ozone-site
+      - name: Create change
+        run: |
+          echo "test content" > testfile.txt
+      - name: Commit and push changes to apache/ozone-site
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+        run: |
+          cd ozone-site
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'noreply@github.com'
+          git add testfile.txt
+          git commit -m "[Auto] Update configurations.md page from ozone ${{ env.SHORT_SHA }}"
+          git push origin config-doc-update-from-${{ env.SHORT_SHA }}
+      - name: Create Pull Request in apache/ozone-site
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          BRANCH_NAME: ${{ github.ref_name }}
+
+        run: |
+          cd ozone-site
+          echo "## What changes were proposed in this pull request?" > pr_body1.txt
+          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-${{ env.SHORT_SHA }}](https://github.com/apache/ozone/tree/config-doc-update-from-${{ env.SHORT_SHA }}) branch after this PR is merged or closed." >> pr_body1.txt
+          echo "" >> pr_body1.txt
+          echo "## What is the link to the Apache JIRA?" >> pr_body1.txt
+          echo "" >> pr_body1.txt
+          echo "## How was this patch tested?" >> pr_body1.txt
+          echo "Reviewers should manually verify the correctness of this change." >> pr_body1.txt
+
+          gh pr create --base HDDS-9225-website-v2 --head config-doc-update-from-${{ env.SHORT_SHA }} \
+          --title ". Update Configurations.md page with changes from" \
+          --body-file pr_body1.txt
