@@ -172,6 +172,7 @@ public class TestHSync {
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
   private static final int SERVICE_INTERVAL = 100;
   private static final int EXPIRE_THRESHOLD_MS = 140;
+  private static final int WAL_HEADER_LEN = 83;
 
   private static OpenKeyCleanupService openKeyCleanupService;
 
@@ -431,7 +432,7 @@ public class TestHSync {
     final byte[] data = new byte[1024];
     final byte[] buffer = new byte[1024];
     ThreadLocalRandom.current().nextBytes(data);
-    final int WAL_HEADER_LEN = 83;
+
     try (FileSystem fs = FileSystem.get(CONF)) {
       // Create key1
       try (FSDataOutputStream os = fs.create(key1, true)) {
@@ -442,8 +443,8 @@ public class TestHSync {
         os.hsync(); // the second hsync will not update the length at OM
         try (FSDataInputStream in = fs.open(key1)) {
           // the actual key length is 1025, but the length in OM is 1
-          in.seek(WAL_HEADER_LEN+1);
-          final int n = in.read(buffer, 1, buffer.length-1);
+          in.seek(WAL_HEADER_LEN + 1);
+          final int n = in.read(buffer, 1, buffer.length - 1);
           // expect to read 1023 bytes
           assertEquals(buffer.length - 1, n);
           for (int i = 1; i < buffer.length; i++) {
