@@ -83,6 +83,13 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   /**
+   * Dummy constructor to support Jackson utilities for converting between json string and ECReplicationConfig object.
+   */
+  public ECReplicationConfig() {
+    this(0, 0, EcCodec.RS, 0);
+  }
+
+  /**
    * Create an ECReplicationConfig object from a string representing the
    * various parameters. Acceptable patterns are like:
    *     rs-3-2-1024k
