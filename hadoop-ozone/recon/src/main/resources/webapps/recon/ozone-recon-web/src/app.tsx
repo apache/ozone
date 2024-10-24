@@ -22,6 +22,7 @@ import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
 import NavBarV2 from '@/v2/components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
+import BreadcrumbsV2 from '@/v2/components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { routes } from '@/routes';
 import { routesV2 } from '@/v2/routes-v2';
@@ -70,7 +71,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
           <Layout className={layoutClass}>
             <Header>
               <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
-                <Breadcrumbs />
+                {(enableNewUI) ? <BreadcrumbsV2 /> : <Breadcrumbs />}
                 <AntDSwitch
                   disabled={true}
                   checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
