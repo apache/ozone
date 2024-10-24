@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +47,8 @@ public class ReconLayoutVersionManager {
   private int currentMLV;
 
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
-                                   ReconContext reconContext) {
+                                   ReconContext reconContext)
+      throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.reconContext = reconContext;
@@ -57,7 +59,7 @@ public class ReconLayoutVersionManager {
    * Determines the current Metadata Layout Version (MLV) from the version table.
    * @return The current Metadata Layout Version (MLV).
    */
-  private int determineMLV() {
+  private int determineMLV() throws SQLException {
     return schemaVersionTableManager.getCurrentSchemaVersion();
   }
 
@@ -82,13 +84,6 @@ public class ReconLayoutVersionManager {
 
     for (ReconLayoutFeature feature : featuresToFinalize) {
       try {
-        // If the feature is INITIAL_VERSION, skip executing any action and just update the schema version
-        if (feature == ReconLayoutFeature.INITIAL_VERSION) {
-          updateSchemaVersion(0);
-          LOG.info("INITIAL_VERSION feature processed by setting schema version to 0.");
-          continue;
-        }
-
         // Fetch only the FINALIZE action for the feature
         Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
         if (action.isPresent()) {
@@ -102,7 +97,8 @@ public class ReconLayoutVersionManager {
         LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
         reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
         reconContext.updateHealthStatus(new AtomicBoolean(false));
-        break;
+        // Stop further upgrades as an error occurred
+        throw new RuntimeException("Recon failed to finalize layout feature. Startup halted.");
       }
     }
   }
@@ -125,14 +121,12 @@ public class ReconLayoutVersionManager {
   }
 
   /**
-   * Updates the Software Layout Version (SLV) in the database after finalizing a feature.
-   * @param newVersion The new Software Layout Version (SLV) to set.
+   * Updates the Metadata Layout Version (MLV) in the database after finalizing a feature.
+   * @param newVersion The new Metadata Layout Version (MLV) to set.
    */
-  private void updateSchemaVersion(int newVersion) {
-    // Logic to update the MLV in the database
-    this.currentMLV = newVersion;
-    // Code to update the schema version in the database goes here.
+  private void updateSchemaVersion(int newVersion) throws SQLException {
     schemaVersionTableManager.updateSchemaVersion(newVersion);
+    this.currentMLV = newVersion;
     LOG.info("MLV updated to: " + newVersion);
   }
 

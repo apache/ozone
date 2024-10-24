@@ -52,7 +52,7 @@ public class ReconSchemaVersionTableManager {
    * If the table is empty, or if it does not exist, it will return 0.
    * @return The current schema version.
    */
-  public int getCurrentSchemaVersion() {
+  public int getCurrentSchemaVersion() throws SQLException {
     try {
       return dslContext.select(DSL.field(name("version_number")))
           .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
@@ -62,7 +62,7 @@ public class ReconSchemaVersionTableManager {
           .orElse(-1); // Return -1 if no version is found
     } catch (Exception e) {
       LOG.error("Failed to fetch the current schema version.", e);
-      return 0; // Return 0 if there is an exception
+      throw new SQLException("Unable to read schema version from the table.", e);
     }
   }
 
@@ -71,7 +71,7 @@ public class ReconSchemaVersionTableManager {
    *
    * @param newVersion The new version to set.
    */
-  public void updateSchemaVersion(int newVersion) {
+  public void updateSchemaVersion(int newVersion) throws SQLException {
     try {
       boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
           .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));
@@ -94,6 +94,7 @@ public class ReconSchemaVersionTableManager {
       }
     } catch (Exception e) {
       LOG.error("Failed to update schema version to '{}'.", newVersion, e);
+      throw new SQLException("Unable to update schema version in the table.", e);
     }
   }
 

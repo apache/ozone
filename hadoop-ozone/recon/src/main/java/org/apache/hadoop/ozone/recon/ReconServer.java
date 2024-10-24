@@ -106,9 +106,6 @@ public class ReconServer extends GenericCli {
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
-    ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
-        (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
-    ReconContext reconContext = reconStorageContainerManagerFacade.getReconContext();
 
     injector = Guice.createInjector(new ReconControllerModule(),
         new ReconRestServletModule(configuration),
@@ -140,6 +137,8 @@ public class ReconServer extends GenericCli {
           injector.getInstance(ReconContainerMetadataManager.class);
       this.reconNamespaceSummaryManager =
           injector.getInstance(ReconNamespaceSummaryManager.class);
+
+      ReconContext reconContext = injector.getInstance(ReconContext.class);
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
@@ -177,6 +176,9 @@ public class ReconServer extends GenericCli {
       isStarted = true;
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
+      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
+          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+      ReconContext reconContext = reconStorageContainerManagerFacade.getReconContext();
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
       LOG.error("Error during initializing Recon server.", e);

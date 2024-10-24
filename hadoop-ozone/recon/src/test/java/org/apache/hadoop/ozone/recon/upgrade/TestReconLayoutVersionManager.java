@@ -26,6 +26,8 @@ import org.mockito.MockedStatic;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +55,7 @@ public class TestReconLayoutVersionManager {
   private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws SQLException {
     schemaVersionTableManager = mock(ReconSchemaVersionTableManager.class);
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(0);
 
@@ -104,7 +106,7 @@ public class TestReconLayoutVersionManager {
    * the schemaVersionTable is triggered for each feature version.
    */
   @Test
-  public void testFinalizeLayoutFeaturesWithMockedValues() {
+  public void testFinalizeLayoutFeaturesWithMockedValues() throws SQLException {
     layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that schema versions are updated for our custom features
@@ -133,7 +135,7 @@ public class TestReconLayoutVersionManager {
    * version updates are attempted when there are no features to finalize.
    */
   @Test
-  public void testNoLayoutFeatures() {
+  public void testNoLayoutFeatures() throws SQLException {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
     layoutVersionManager.finalizeLayoutFeatures();
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
@@ -213,7 +215,7 @@ public class TestReconLayoutVersionManager {
    * schema version matches the maximum layout version, no upgrade actions are executed.
    */
   @Test
-  public void testNoUpgradeActionsNeeded() {
+  public void testNoUpgradeActionsNeeded() throws SQLException {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
     layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
     layoutVersionManager.finalizeLayoutFeatures();
