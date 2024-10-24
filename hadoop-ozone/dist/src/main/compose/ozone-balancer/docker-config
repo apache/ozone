@@ -45,7 +45,6 @@ OZONE-SITE.XML_hdds.datanode.du.refresh.period=20s
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.container.db.dir=/data/metadata
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
-OZONE-SITE.XML_hdds.container.balancer.balancing.iteration.interval=3m
 OZONE-SITE.XML_ozone.scm.pipeline.creation.auto.factor.one=false
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
