@@ -650,7 +650,7 @@ public final class HddsUtils {
    * Utility string formatter method to display SCM roles.
    *
    * @param nodes
-   * @return
+   * @return String
    */
   public static String format(List<String> nodes) {
     StringBuilder sb = new StringBuilder();
@@ -680,7 +680,8 @@ public final class HddsUtils {
 
   /**
    * Unwrap exception to check if it is some kind of access control problem
-   * ({@link AccessControlException} or {@link SecretManager.InvalidToken})
+   * ({@link org.apache.hadoop.security.AccessControlException} or
+   * {@link org.apache.hadoop.security.token.SecretManager.InvalidToken})
    * or a RpcException.
    */
   public static Throwable getUnwrappedException(Exception ex) {
@@ -876,5 +877,18 @@ public final class HddsUtils {
     return logger.isDebugEnabled()
         ? Thread.currentThread().getStackTrace()
         : null;
+  }
+
+  /**
+   * Logs a warning to report that the class is not closed properly.
+   */
+  public static void reportLeak(Class<?> clazz, String stackTrace, Logger log) {
+    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
+    if (stackTrace != null && log.isDebugEnabled()) {
+      String debugMessage = String.format("%nStackTrace for unclosed instance: %s",
+          stackTrace);
+      warning = warning.concat(debugMessage);
+    }
+    log.warn(warning);
   }
 }

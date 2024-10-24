@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getPreviousSnapshot;
 
 /**
  * Snapshot BG Service for deleted directory deep clean and exclusive size
@@ -143,11 +144,11 @@ public class SnapshotDirectoryCleaningService
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         while (iterator.hasNext()) {
-          SnapshotInfo currSnapInfo = iterator.next().getValue();
+          SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
 
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
-          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
+          if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepCleanedDeletedDir()) {
             continue;
           }
@@ -173,7 +174,7 @@ public class SnapshotDirectoryCleaningService
                   "unexpected state.");
             }
 
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(currSnapInfo, snapChainManager);
+            SnapshotInfo previousSnapshot = getPreviousSnapshot(getOzoneManager(), snapChainManager, currSnapInfo);
             SnapshotInfo previousToPrevSnapshot = null;
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -190,7 +191,7 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
               prevRenamedTable = omPreviousSnapshot
                   .getMetadataManager().getSnapshotRenamedTable();
-              previousToPrevSnapshot = getPreviousActiveSnapshot(previousSnapshot, snapChainManager);
+              previousToPrevSnapshot = getPreviousSnapshot(getOzoneManager(), snapChainManager, previousSnapshot);
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;

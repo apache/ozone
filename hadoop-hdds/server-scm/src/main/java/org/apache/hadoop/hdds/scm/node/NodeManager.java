@@ -97,8 +97,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param type The type of the SCMCommand.
    * @param scmCommand A BiConsumer that takes a DatanodeDetails and a
    *                   SCMCommand object and performs the necessary actions.
-   * @return whatever the regular register command returns with default
-   * layout version passed in.
    */
   default void registerSendCommandNotify(SCMCommandProto.Type type,
       BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {

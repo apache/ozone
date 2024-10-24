@@ -150,9 +150,9 @@ enum Type {
   RenameSnapshot = 131;
   ListOpenFiles = 132;
   QuotaRepair = 133;
-  GetServerDefaults = 134;
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
 }
 
 enum SafeMode {
@@ -292,9 +292,9 @@ message OMRequest {
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
   optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
   optional QuotaRepairRequest               QuotaRepairRequest             = 131;
-  optional ServerDefaultsRequest            ServerDefaultsRequest          = 132;
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
 }
 
 message OMResponse {
@@ -422,7 +422,6 @@ message OMResponse {
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
   optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
-  optional ServerDefaultsResponse            ServerDefaultsResponse        = 135;
   optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
   optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 }
@@ -1379,6 +1378,8 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+    // previous snapshotID can also be null & this field would be absent in older requests.
+    optional NullableUUID expectedPreviousSnapshotID = 4;
 }
 
 message PurgeKeysResponse {
@@ -1401,6 +1402,12 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 3;
+}
+
+message NullableUUID {
+  optional hadoop.hdds.UUID uuid = 1;
 }
 
 message PurgeDirectoriesResponse {
@@ -1630,6 +1637,7 @@ message ServiceInfo {
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
     optional int32 OMVersion = 5 [default = 0];
+    optional FsServerDefaultsProto serverDefaults = 6;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1981,6 +1989,13 @@ message SnapshotMoveDeletedKeysRequest {
   repeated string deletedDirsToMove = 5;
 }
 
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+}
+
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
@@ -2222,15 +2237,8 @@ message BucketQuotaCount {
 message QuotaRepairResponse {
 }
 
-message ServerDefaultsRequest {
-}
-
 message FsServerDefaultsProto {
   optional string keyProviderUri = 1;
-}
-
-message ServerDefaultsResponse {
-  required FsServerDefaultsProto serverDefaults = 1;
 }
 
 message GetQuotaRepairStatusRequest {
