@@ -57,7 +57,6 @@ public class GrpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
-
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
                                      String omServiceId,

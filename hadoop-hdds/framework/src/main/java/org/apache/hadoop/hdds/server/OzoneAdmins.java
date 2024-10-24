@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -194,19 +195,25 @@ public class OzoneAdmins {
 
   /**
    * Get the list of S3 administrators from Ozone config.
-   *
+   * <p/>
+   * <strong>Notes</strong>:
+   * <ul>
+   *   <li>If <code>ozone.s3.administrators</code> value is empty string or unset,
+   *       defaults to <code>ozone.administrators</code> value.</li>
+   *   <li>If current user is not part of the administrators group,
+   *       {@link UserGroupInformation#getCurrentUser()} will be added to the resulting list</li>
+   * </ul>
    * @param conf An instance of {@link OzoneConfiguration} being used
    * @return A {@link Collection} of the S3 administrator users
    *
-   * If ozone.s3.administrators value is empty string or unset,
-   * defaults to ozone.administrators value.
    */
-  public static Collection<String> getS3AdminsFromConfig(OzoneConfiguration conf) throws IOException {
-    Collection<String> ozoneAdmins = conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS);
+  public static Set<String> getS3AdminsFromConfig(OzoneConfiguration conf) throws IOException {
+    Set<String> ozoneAdmins = new HashSet<>(conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS));
 
-    if (ozoneAdmins == null || ozoneAdmins.isEmpty()) {
-      ozoneAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    if (ozoneAdmins.isEmpty()) {
+      ozoneAdmins = new HashSet<>(conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS));
     }
+
     String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
     if (!ozoneAdmins.contains(omSPN)) {
       ozoneAdmins.add(omSPN);
@@ -216,19 +223,19 @@ public class OzoneAdmins {
   }
 
   /**
-   * Get the list of the groups that are a part S3 administrators from Ozone config.
+   * Get the list of the groups that are a part of S3 administrators from Ozone config.
+   * <p/>
+   * <strong>Note</strong>: If <code>ozone.s3.administrators.groups</code> value is empty or unset,
+   * defaults to the <code>ozone.administrators.groups</code> value
    *
    * @param conf An instance of {@link OzoneConfiguration} being used
    * @return A {@link Collection} of the S3 administrator groups
-   *
-   * If ozone.s3.administrators.groups value is empty or unset,
-   * defaults to the ozone.administrators.groups value
    */
-  public static Collection<String> getS3AdminsGroupsFromConfig(OzoneConfiguration conf) {
-    Collection<String> s3AdminsGroup = conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS);
+  public static Set<String> getS3AdminsGroupsFromConfig(OzoneConfiguration conf) {
+    Set<String> s3AdminsGroup = new HashSet<>(conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS_GROUPS));
 
     if (s3AdminsGroup.isEmpty() && conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS).isEmpty()) {
-      s3AdminsGroup = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
+      s3AdminsGroup = new HashSet<>(conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS));
     }
 
     return s3AdminsGroup;
@@ -240,13 +247,13 @@ public class OzoneAdmins {
    * @return an instance of {@link OzoneAdmins} containing the S3 admin users and groups
    */
   public static OzoneAdmins getS3Admins(OzoneConfiguration conf) {
-    Collection<String> s3Admins;
+    Set<String> s3Admins;
     try {
       s3Admins = getS3AdminsFromConfig(conf);
     } catch (IOException ie) {
-      s3Admins = null;
+      s3Admins = Collections.emptySet();
     }
-    Collection<String> s3AdminGroups = getS3AdminsGroupsFromConfig(conf);
+    Set<String> s3AdminGroups = getS3AdminsGroupsFromConfig(conf);
 
     return new OzoneAdmins(s3Admins, s3AdminGroups);
   }
