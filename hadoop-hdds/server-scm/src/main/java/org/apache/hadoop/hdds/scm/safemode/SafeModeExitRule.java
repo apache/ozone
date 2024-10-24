@@ -40,6 +40,7 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
   private final String ruleName;
   protected static final int SAMPLE_CONTAINER_DISPLAY_LIMIT = 5;
   protected static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
+  protected static final int SAMPLE_DN_DISPLAY_LIMIT = 5;
 
   public SafeModeExitRule(SCMSafeModeManager safeModeManager,
       String ruleName, EventQueue eventQueue) {

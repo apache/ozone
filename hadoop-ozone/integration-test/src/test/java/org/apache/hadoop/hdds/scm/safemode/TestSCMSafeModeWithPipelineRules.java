@@ -143,6 +143,17 @@ public class TestSCMSafeModeWithPipelineRules {
             .validate(), 1000, 60000);
 
     // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
+    // We need to re-trigger DN registration because the DataNodeSafeModeRule is quite strict.
+    for (Pipeline pipeline : pipelineList) {
+      List<DatanodeDetails> nodes = pipeline.getNodes();
+      for (DatanodeDetails node : nodes) {
+        try {
+          cluster.restartHddsDatanode(node, false);
+        } catch (Exception ex) {
+          fail("Datanode restart failed");
+        }
+      }
+    }
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000,
         60000);

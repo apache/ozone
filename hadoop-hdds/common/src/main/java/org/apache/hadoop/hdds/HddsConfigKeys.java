@@ -116,6 +116,10 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
+  public static final String HDDS_SCM_SAFEMODE_REPORTED_DATANODE_PCT =
+      "hdds.scm.safemode.reported.datanode.pct";
+  public static final double HDDS_SCM_SAFEMODE_REPORTED_DATANODE_PCT_DEFAULT = 0.10;
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
