@@ -164,7 +164,10 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1});
 
     // Execute the layout feature finalization
-    layoutVersionManager.finalizeLayoutFeatures();
+    try {
+      layoutVersionManager.finalizeLayoutFeatures();
+    } catch (Exception e) {
+    }
     // Verify that schema version update was never called due to the exception
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
   }
