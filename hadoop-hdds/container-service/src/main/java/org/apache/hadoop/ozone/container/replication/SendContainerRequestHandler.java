@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,10 +104,7 @@ class SendContainerRequestHandler
       onError(t);
     } finally {
       if (marshaller != null) {
-        InputStream popStream = marshaller.popStream(req);
-        if (popStream != null) {
-          IOUtils.cleanupWithLogger(LOG, popStream);
-        }
+        marshaller.release(req);
       }
     }
   }
