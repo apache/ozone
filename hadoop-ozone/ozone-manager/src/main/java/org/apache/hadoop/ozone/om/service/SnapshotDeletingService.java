@@ -37,9 +37,10 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.MultiLocks;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -54,8 +55,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -91,7 +94,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final int keyLimitPerTask;
   private final int snapshotDeletionPerTask;
   private final int ratisByteLimit;
-  private final long serviceTimeout;
+  private MultiLocks<UUID> snapshotIdLocks;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
                                  OzoneManager ozoneManager)
@@ -118,32 +121,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-    this.serviceTimeout = serviceTimeout;
-  }
-
-  // Wait for a notification from KeyDeletingService if the key deletion is running. This is to ensure, merging of
-  // entries do not start while the AOS is still processing the deleted keys.
-  @VisibleForTesting
-  public void waitForKeyDeletingService() throws InterruptedException {
-    KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
-    synchronized (keyDeletingService) {
-      while (keyDeletingService.isRunningOnAOS()) {
-        keyDeletingService.wait(serviceTimeout);
-      }
-    }
-  }
-
-  // Wait for a notification from DirectoryDeletingService if the directory deletion is running. This is to ensure,
-  // merging of entries do not start while the AOS is still processing the deleted keys.
-  @VisibleForTesting
-  public void waitForDirDeletingService() throws InterruptedException {
-    DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
-        .getDirDeletingService();
-    synchronized (directoryDeletingService) {
-      while (directoryDeletingService.isRunningOnAOS()) {
-        directoryDeletingService.wait(serviceTimeout);
-      }
-    }
+    IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+    this.snapshotIdLocks = new MultiLocks<>(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, true);
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -175,20 +154,28 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
             continue;
           }
+          SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
+              chainManager, snapInfo);
 
-          // nextSnapshot = null means entries would be moved to AOS.
-          if (nextSnapshot == null) {
-            waitForKeyDeletingService();
-            waitForDirDeletingService();
+          // Wait for the next iteration if the next snapshot or next to next snapshot is still not deep cleaned
+          // since purge transaction will add entries and it could be processed by mistake.
+          if (isSnapshotNotDeepCleaned(nextSnapshot) || isSnapshotNotDeepCleaned(nextToNextSnapshot)) {
+            continue;
           }
-          try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
-              snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
+          // Acquire write lock on current snapshot and next snapshot in chain.
+          if (!snapshotIdLocks.acquireLock(Arrays.asList(snapInfo.getSnapshotId(),
+              Optional.ofNullable(nextSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null)))
+              .isLockAcquired()) {
+            continue;
+          }
+          try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(snapInfo.getVolumeName(),
+              snapInfo.getBucketName(), snapInfo.getName())) {
             KeyManager snapshotKeyManager = snapshot.get().getKeyManager();
             int moveCount = 0;
             // Get all entries from deletedKeyTable.
             List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries =
                 snapshotKeyManager.getDeletedKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(),
-                    null, remaining);
+                    null, (kv) -> true, remaining);
             moveCount += deletedKeyEntries.size();
             // Get all entries from deletedDirTable.
             List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = snapshotKeyManager.getDeletedDirEntries(
@@ -196,7 +183,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
@@ -227,6 +214,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             } else {
               snapshotsToBePurged.add(snapInfo.getTableKey());
             }
+          } finally {
+            snapshotIdLocks.releaseLock();
           }
           successRunCount.incrementAndGet();
           snapshotLimit--;
@@ -314,61 +303,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo) throws IOException {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
     return snapshotStatus != SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED ||
-        !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo);
+        !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)
+        || isSnapshotNotDeepCleaned(snapInfo);
   }
 
-  // TODO: Move this util class.
-  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
-                                                OmKeyInfo deletedKeyInfo) {
-
-    if (prevKeyInfo == null && deletedKeyInfo == null) {
-      LOG.debug("Both prevKeyInfo and deletedKeyInfo are null.");
-      return true;
-    }
-    if (prevKeyInfo == null || deletedKeyInfo == null) {
-      LOG.debug("prevKeyInfo: '{}' or deletedKeyInfo: '{}' is null.",
-          prevKeyInfo, deletedKeyInfo);
-      return false;
-    }
-    // For hsync, Though the blockLocationInfo of a key may not be same
-    // at the time of snapshot and key deletion as blocks can be appended.
-    // If the objectId is same then the key is same.
-    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
-      return true;
-    }
-
-    if (prevKeyInfo.getKeyLocationVersions().size() !=
-        deletedKeyInfo.getKeyLocationVersions().size()) {
-      return false;
-    }
-
-    OmKeyLocationInfoGroup deletedOmKeyLocation =
-        deletedKeyInfo.getLatestVersionLocations();
-    OmKeyLocationInfoGroup prevOmKeyLocation =
-        prevKeyInfo.getLatestVersionLocations();
-
-    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
-      return false;
-    }
-
-    List<OmKeyLocationInfo> deletedLocationList =
-        deletedOmKeyLocation.getLocationList();
-    List<OmKeyLocationInfo> prevLocationList =
-        prevOmKeyLocation.getLocationList();
-
-    if (deletedLocationList.size() != prevLocationList.size()) {
-      return false;
-    }
-
-    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
-      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
-      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
-      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
-        return false;
-      }
-    }
-
-    return true;
+  @VisibleForTesting
+  boolean isSnapshotNotDeepCleaned(SnapshotInfo snapInfo) {
+    // if snapshot is null it means snapshot doesn't exist, so it means deep cleaned.
+    return snapInfo != null && !(snapInfo.getDeepCleanedDeletedDir() && snapInfo.getDeepClean());
   }
 
   @Override

@@ -21,11 +21,11 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -70,8 +70,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
-
     final SnapshotInfo fromSnapshotInfo;
     try {
       fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
@@ -93,11 +91,12 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
     List<String> keysToBePurgedList = new ArrayList<>();
 
+    List<String> renamedKeysToBePurged = new ArrayList<>(purgeKeysRequest.getRenamedKeysList());
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
     }
 
-    if (keysToBePurgedList.isEmpty()) {
+    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
           new OMException("None of the keys can be purged be purged since a new snapshot was created for all the " +
               "buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR)));
@@ -116,7 +115,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     return new OMKeyPurgeResponse(omResponse.build(),
-        keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
+        keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList);
   }
 
 }

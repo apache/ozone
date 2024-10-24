@@ -273,7 +273,7 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
-  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116 [deprecated = true];
 
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
@@ -295,6 +295,7 @@ message OMRequest {
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
   optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 136;
 }
 
 message OMResponse {
@@ -1378,8 +1379,9 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
-    // previous snapshotID can also be null & this field would be absent in older requests.
-    optional NullableUUID expectedPreviousSnapshotID = 4;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 4;
+  repeated string renamedKeys = 5;
 }
 
 message PurgeKeysResponse {
@@ -2012,6 +2014,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotDirSize = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility

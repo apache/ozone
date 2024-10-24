@@ -282,18 +282,11 @@ public class SCMBlockProtocolServer implements
       e = ioe;
       perfMetrics.updateDeleteKeyFailureStats(startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
-      switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
-          IO_EXCEPTION) {
-      case SAFE_MODE_EXCEPTION:
+      if ((ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
+          IO_EXCEPTION) == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
         resultCode =
             ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.safeMode;
-        break;
-      case FAILED_TO_FIND_BLOCK:
-        resultCode =
-            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
-                errorNotFound;
-        break;
-      default:
+      } else {
         resultCode =
             ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
                 unknownFailure;

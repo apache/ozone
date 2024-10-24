@@ -29,11 +29,12 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -119,30 +120,52 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
+  /**
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
+   *
+   * @param count max number of keys to return.
+   * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
+   * and a hashmap for key-value pair to be updated in the deletedTable.
+   * @throws IOException
+   */
+  PendingKeysDeletion getPendingDeletionKeys(
+      String volume, String bucket, String startKey,
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
 
   /**
-   * Returns a list rename entries from the snapshotRenamedTable.
+   * Returns a list renamed entries from the snapshotRenamedTable.
    *
-   * @param size max number of keys to return.
+   * @param count max number of keys to return.
+   * @param filter filter to apply on the entries.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
    */
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException;
-
+      String volume, String bucket, String startKey,
+      CheckedExceptionOperation<Table.KeyValue<String, String>, Boolean, IOException> filter, int size)
+      throws IOException;
 
   /**
-   * Returns a list deleted entries from the deletedTable.
+   * Returns a list rename entries from the snapshotRenamedTable.
    *
-   * @param size max number of keys to return.
+   * @param count max number of keys to return.
+   * @param filter filter to apply on the entries.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
    */
   List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException;
+      String volume, String bucket, String startKey,
+      CheckedExceptionOperation<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -241,6 +264,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
 
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getPendingDeletionDirs(
+      String volume, String bucket) throws IOException;
   /**
    * Returns an iterator for pending deleted directories.
    * @throws IOException
@@ -269,8 +294,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries) throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubDirs(
+      long volumeId, long bucketId, OmKeyInfo parentInfo,
+      CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      long numEntries) throws IOException;
+
+
 
   /**
    * Returns all sub files under the given parent directory.
@@ -280,9 +309,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries)
-          throws IOException;
+  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId, long bucketId, OmKeyInfo parentInfo,
+                                             CheckedExceptionOperation<Table.KeyValue<String, OmKeyInfo>, Boolean,
+                                                                                          IOException> filter,
+                                             long numEntries) throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.
@@ -314,9 +344,4 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   SnapshotDeletingService getSnapshotDeletingService();
 
-  /**
-   * Returns the instance of Snapshot Directory service.
-   * @return Background service.
-   */
-  SnapshotDirectoryCleaningService getSnapshotDirectoryService();
 }
