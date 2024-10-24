@@ -29,9 +29,10 @@ import java.util.Arrays;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
-
 
 /**
  * Tests the behavior of OzoneFsShell.
@@ -45,7 +46,7 @@ public class TestOzoneFsShell {
     final String rmCmd = "-" + rmCmdName;
     final String arg = "arg1";
     OzoneFsShell shell = new OzoneFsShell();
-    String[] argv = {arg, arg};
+    String[] argv = {rmCmd, arg, arg };
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     PrintStream bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
     PrintStream oldErr = System.err;
@@ -64,6 +65,51 @@ public class TestOzoneFsShell {
       assertEquals(rmCmdName, instance.getCommandName());
       shell.close();
       System.setErr(oldErr);
+    }
+  }
+
+  @Test
+  public void testOzoneFsShellRegisterSetRepCmd() throws IOException {
+    final String setrepCmdName = "setrep";
+    final String setrepCmd = "-" + setrepCmdName;
+    final String rfarg = String.valueOf(3);
+    final String arg = "arg1";
+    OzoneFsShell shell = new OzoneFsShell();
+    String[] argv = {setrepCmd, rfarg, arg };
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    PrintStream bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+    PrintStream oldErr = System.err;
+    System.setErr(bytesPrintStream);
+    try {
+      ToolRunner.run(shell, argv);
+    } catch (Exception e) {
+    } finally {
+      // test command bindings for "rm" command handled by OzoneDelete class
+      CommandFactory factory = shell.getCommandFactory();
+      assertEquals(1,
+          Arrays.stream(factory.getNames()).filter(c -> c.equals(setrepCmd))
+              .count());
+      Command instance = factory.getInstance(setrepCmd);
+      assertNotNull(instance);
+      assertEquals(OzoneFsSetRep.class, instance.getClass());
+      assertEquals(setrepCmdName, instance.getCommandName());
+      shell.close();
+      assertTrue(bytes.toString(UTF_8.name())
+          .contains("Asynchronous set rep is not supported"));
+    }
+    bytes.reset();
+    // try with -w
+    String[] argv2 = {setrepCmd, "-w", rfarg, arg };
+    shell = new OzoneFsShell();
+    try {
+      ToolRunner.run(shell, argv2);
+    } catch (Exception e) {
+    } finally {
+      shell.close();
+      System.setErr(oldErr);
+      assertFalse(bytes.toString(UTF_8.name())
+          .contains("Asynchronous set rep is not supported"));
+      bytes.reset();
     }
   }
 }

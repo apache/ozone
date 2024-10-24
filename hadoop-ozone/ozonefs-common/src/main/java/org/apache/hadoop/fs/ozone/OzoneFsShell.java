@@ -61,6 +61,7 @@ public class OzoneFsShell extends FsShell {
       factory.registerCommands(FsCommand.class);
       // ozone delete rm command registration supersedes fs delete
       factory.registerCommands(OzoneFsDelete.class);
+      factory.registerCommands(OzoneFsSetRep.class);
     }
   }
 
