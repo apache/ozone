@@ -69,13 +69,13 @@ public class TestAbortMultipartUpload {
 
 
     // Abort multipart upload
-    response = rest.delete(bucket, key, uploadID);
+    response = rest.delete(bucket, key, uploadID, null);
 
     assertEquals(204, response.getStatus());
 
     // test with unknown upload Id.
     try {
-      rest.delete(bucket, key, "random");
+      rest.delete(bucket, key, "random", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),

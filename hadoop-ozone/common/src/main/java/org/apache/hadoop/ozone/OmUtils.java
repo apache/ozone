@@ -278,6 +278,7 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
+    case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
       return true;
@@ -339,6 +340,8 @@ public final class OmUtils {
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
     case QuotaRepair:
+    case PutObjectTagging:
+    case DeleteObjectTagging:
     case UnknownCommand:
       return false;
     case EchoRPC:
