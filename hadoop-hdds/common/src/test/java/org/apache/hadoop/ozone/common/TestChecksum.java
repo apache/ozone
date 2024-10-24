@@ -39,7 +39,7 @@ public class TestChecksum {
     if (type == null) {
       type = CHECKSUM_TYPE_DEFAULT;
     }
-    return new Checksum(type, BYTES_PER_CHECKSUM);
+    return new Checksum(type, BYTES_PER_CHECKSUM, true);
   }
 
   /**
