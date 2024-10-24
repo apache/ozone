@@ -46,7 +46,7 @@ public final class DurationUtil {
     } else if (seconds >= 0) {
       return format("%ds", seconds);
     } else {
-      throw new IllegalStateException("Incorrect duration exception" + duration);
+      throw new IllegalStateException("Provided duration is incorrect: " + duration);
     }
   }
 }

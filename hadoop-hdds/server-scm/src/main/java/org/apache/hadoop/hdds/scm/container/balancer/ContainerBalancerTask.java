@@ -123,6 +123,7 @@ public class ContainerBalancerTask implements Runnable {
   private boolean delayStart;
   private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
+
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
    *
@@ -313,28 +314,10 @@ public class ContainerBalancerTask implements Runnable {
 
   private void saveIterationStatistic(Integer iterationNumber, IterationResult currentIterationResult) {
     long iterationDuration = now().toEpochSecond() - currentIterationStarted.toEpochSecond();
-    Map<UUID, Long> sizeEnteringDataToNodes = findTargetStrategy.getSizeEnteringNodes()
-        .entrySet()
-        .stream()
-        .filter(Objects::nonNull)
-        .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-        .collect(
-            Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
-                Map.Entry::getValue
-            )
-        );
-    Map<UUID, Long> sizeLeavingDataFromNodes = findSourceStrategy.getSizeLeavingNodes()
-        .entrySet()
-        .stream()
-        .filter(Objects::nonNull)
-        .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-        .collect(
-            Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
-                Map.Entry::getValue
-            )
-        );
+    Map<UUID, Long> sizeEnteringDataToNodes =
+        convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
+    Map<UUID, Long> sizeLeavingDataFromNodes =
+        convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         iterationNumber,
         currentIterationResult.name(),
@@ -351,22 +334,8 @@ public class ContainerBalancerTask implements Runnable {
     iterationsStatistic.add(iterationStatistic);
   }
 
-  public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    int lastIterationNumber = iterationsStatistic.isEmpty()
-        ? 0
-        : iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
-    long iterationDuration = getCurrentIterationDuration();
-    Map<UUID, Long> sizeEnteringDataToNodes = findTargetStrategy.getSizeEnteringNodes()
-        .entrySet()
-        .stream()
-        .filter(Objects::nonNull)
-        .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-        .collect(Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
-                Map.Entry::getValue
-            )
-        );
-    Map<UUID, Long> sizeLeavingDataFromNodes = findSourceStrategy.getSizeLeavingNodes()
+  private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
+    return nodeTrafficMap
         .entrySet()
         .stream()
         .filter(Objects::nonNull)
@@ -377,6 +346,21 @@ public class ContainerBalancerTask implements Runnable {
                 Map.Entry::getValue
             )
         );
+  }
+
+  /**
+   * Get current iteration statistics.
+   * @return current iteration statistic
+   */
+  public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
+    int lastIterationNumber = iterationsStatistic.isEmpty()
+        ? 0
+        : iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
+    long iterationDuration = getCurrentIterationDuration();
+    Map<UUID, Long> sizeEnteringDataToNodes =
+        convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
+    Map<UUID, Long> sizeLeavingDataFromNodes =
+        convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
         lastIterationNumber,
         null,
