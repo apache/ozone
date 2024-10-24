@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Represents the response from RatisServer.
@@ -72,13 +73,11 @@ public final class SCMRatisResponse {
     }
 
     final Class<?> type = result.getClass();
-    final ByteString value = CodecFactory.getCodec(type).serialize(result);
-
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
-        .setType(type.getName()).setValue(value).build();
-    return Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            response.toByteArray()));
+        .setType(type.getName())
+        .setValue(CodecFactory.getCodec(type).serialize(result))
+        .build();
+    return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
 
   public static SCMRatisResponse decode(RaftClientReply reply)
@@ -87,14 +86,13 @@ public final class SCMRatisResponse {
       return new SCMRatisResponse(reply.getException());
     }
 
-    final byte[] response = reply.getMessage().getContent().toByteArray();
+    final ByteString response = reply.getMessage().getContent();
 
-    if (response.length == 0) {
+    if (response.isEmpty()) {
       return new SCMRatisResponse();
     }
 
-    final SCMRatisResponseProto responseProto = SCMRatisResponseProto
-        .parseFrom(response);
+    final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.toByteArray());
 
     try {
       final Class<?> type = ReflectionUtil.getClass(responseProto.getType());

@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
@@ -367,6 +368,28 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
+  public void transitionDeletingToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        if (oldState != DELETING) {
+          throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
+              " back to CLOSED. The container must be in the DELETING state.");
+        }
+        ExecutionUtil.create(() -> {
+          containers.updateState(id, oldState, CLOSED);
+          transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
+        }).onException(() -> {
+          transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+          containers.updateState(id, CLOSED, oldState);
+        }).execute();
+      }
+    }
+  }
 
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {

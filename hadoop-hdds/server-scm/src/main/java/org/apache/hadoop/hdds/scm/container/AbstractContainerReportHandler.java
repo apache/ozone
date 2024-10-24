@@ -349,8 +349,18 @@ public class AbstractContainerReportHandler {
       break;
     case DELETING:
       /*
-       * The container is under deleting. do nothing.
+      HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to CLOSED
+      state.
        */
+      boolean replicaStateAllowed = replica.getState() == State.CLOSED;
+      boolean replicaNotEmpty = replica.hasIsEmpty() && !replica.getIsEmpty();
+      if (replicaStateAllowed && replicaNotEmpty) {
+        logger.info("Moving DELETING container {} to CLOSED state, datanode {} reported replica with state={}, " +
+            "isEmpty={} and keyCount={}.", containerId, datanode.getHostName(), replica.getState(), false,
+            replica.getKeyCount());
+        containerManager.transitionDeletingToClosedState(containerId);
+      }
+
       break;
     case DELETED:
       /*

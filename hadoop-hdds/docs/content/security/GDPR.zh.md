@@ -1,6 +1,6 @@
 ---
 title: "Ozone 中的 GDPR"
-date: "2019-September-17"
+date: "2019-09-17"
 weight: 3
 summary: Ozone 中的 GDPR
 menu:

@@ -149,7 +149,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     } else {
       stream = commitInfoProtos.stream().map(proto -> commitInfoMap
           .computeIfPresent(RatisHelper.toDatanodeId(proto.getServer()),
-              (address, index) -> proto.getCommitIndex()));
+              (address, index) -> proto.getCommitIndex()))
+          .filter(Objects::nonNull);
     }
     return stream.mapToLong(Long::longValue).min().orElse(0);
   }

@@ -76,7 +76,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.1.0</ratis.version>
+    <ratis.version>3.1.1</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
