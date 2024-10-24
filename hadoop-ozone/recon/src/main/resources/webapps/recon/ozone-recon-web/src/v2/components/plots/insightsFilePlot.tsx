@@ -132,7 +132,8 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
 
     setFilePlotData({
       fileCountValues: fileCountValues,
-      fileCountMap: fileCountMap
+      // set the sorted value by size for the map
+      fileCountMap: new Map([...fileCountMap.entries()].sort((a, b) => a[0] - b[0]))
     });
   }
 
@@ -154,7 +155,7 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
   const filePlotOptions: EChartsOption = {
     xAxis: {
       type: 'category',
-      data: fileCountValues ?? []
+      data: [...fileCountValues] ?? []
     },
     yAxis: {
       type: 'value'
