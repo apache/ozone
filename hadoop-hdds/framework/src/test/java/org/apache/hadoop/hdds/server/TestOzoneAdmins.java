@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -35,20 +36,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TestOzoneAdmins {
   // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
-
-  /**
-   * Value provider method for ParameterizedTest.
-   * @return A 2D array of {@link String} containing the pair of <code>
-   *   Administrator configuration key, Administrator Group configuration key
-   * </code> to set in the config
-   */
-  static String[][] getAdminsAndGroupsSet() {
-    return new String[][]{
-        {OzoneConfigKeys.OZONE_ADMINISTRATORS, OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS},
-        {OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS}
-    };
-  }
-
   @ParameterizedTest
   @ValueSource(strings = {OzoneConfigKeys.OZONE_S3_ADMINISTRATORS,
                           OzoneConfigKeys.OZONE_ADMINISTRATORS})
@@ -72,12 +59,15 @@ class TestOzoneAdmins {
   }
 
   @ParameterizedTest
-  @MethodSource(value = "getAdminsAndGroupsSet")
-  void testIsAdmin(String[] adminsAndGroupsSet) {
+  @CsvSource({
+      OzoneConfigKeys.OZONE_ADMINISTRATORS + ", " +  OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
+      OzoneConfigKeys.OZONE_S3_ADMINISTRATORS + ", " + OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS
+  })
+  void testIsAdmin(String adminKey, String adminGroupKey) {
     // When there is no S3 admin, but Ozone admins present
     OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set(adminsAndGroupsSet[0], "alice");
-    configuration.set(adminsAndGroupsSet[1], "test_group");
+    configuration.set(adminKey, "alice");
+    configuration.set(adminGroupKey, "test_group");
 
     OzoneAdmins admins = OzoneAdmins.getS3Admins(configuration);
     UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
