@@ -21,17 +21,25 @@ package org.apache.hadoop.ozone.om.ha;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
+import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
@@ -85,13 +93,17 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
+  private final UserGroupInformation ugi;
+
   public OMFailoverProxyProviderBase(ConfigurationSource configuration,
+                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
     this.conf = configuration;
     this.protocolClass = protocol;
     this.performFailoverDone = true;
     this.omServiceId = omServiceId;
+    this.ugi = ugi;
 
     waitBetweenRetries = conf.getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
@@ -111,6 +123,35 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   protected abstract void loadOMClientConfigs(ConfigurationSource config,
                                               String omSvcId)
       throws IOException;
+
+  /**
+   * Get the protocol proxy for provided address.
+   * @param omAddress An instance of {@link InetSocketAddress} which contains the address to connect
+   * @return the proxy connection to the address and the set of methods supported by the server at the address
+   * @throws IOException if any error occurs while trying to get the proxy
+   */
+  protected T createOMProxy(InetSocketAddress omAddress) throws IOException {
+    Configuration hadoopConf =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+
+    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
+    RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
+
+    // Ensure we do not attempt retry on the same OM in case of exceptions
+    RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
+
+    return (T) RPC.getProtocolProxy(
+        getInterface(),
+        RPC.getProtocolVersion(protocolClass),
+        omAddress,
+        ugi,
+        hadoopConf,
+        NetUtils.getDefaultSocketFactory(hadoopConf),
+        (int) OmUtils.getOMClientRpcTimeOut(getConf()),
+        connectionRetryPolicy
+    ).getProxy();
+  }
+
 
   protected synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
