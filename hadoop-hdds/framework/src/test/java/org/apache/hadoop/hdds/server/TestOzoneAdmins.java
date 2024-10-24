@@ -37,15 +37,15 @@ class TestOzoneAdmins {
   // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
 
   /**
-   * Value provider method for ParameterizedTest
+   * Value provider method for ParameterizedTest.
    * @return A 2D array of {@link String} containing the pair of <code>
    *   Administrator configuration key, Administrator Group configuration key
    * </code> to set in the config
    */
   static String[][] getAdminsAndGroupsSet() {
     return new String[][]{
-        { OzoneConfigKeys.OZONE_ADMINISTRATORS, OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS },
-        { OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS }
+        {OzoneConfigKeys.OZONE_ADMINISTRATORS, OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS},
+        {OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS}
     };
   }
 
@@ -106,8 +106,8 @@ class TestOzoneAdmins {
     UserGroupInformation ugiGroupOnly = UserGroupInformation.createUserForTesting(
         "bob", new String[] {"test_group"});
 
-      assertThat(admins.isAdmin(ugi)).isEqualTo(isAdminSet);
-      assertThat(admins.isAdmin(ugiGroupOnly)).isEqualTo(isAdminSet);
+    assertThat(admins.isAdmin(ugi)).isEqualTo(isAdminSet);
+    assertThat(admins.isAdmin(ugiGroupOnly)).isEqualTo(isAdminSet);
   }
 
   @ParameterizedTest
@@ -125,8 +125,7 @@ class TestOzoneAdmins {
 
       assertThat(OzoneAdmins.isS3Admin(ugi, configuration)).isEqualTo(true);
       assertThat(OzoneAdmins.isS3Admin(ugiGroupOnly, configuration)).isEqualTo(true);
-    }
-    else {
+    } else {
       assertThat(OzoneAdmins.isS3Admin(null, configuration)).isEqualTo(false);
     }
 
