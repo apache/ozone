@@ -43,6 +43,8 @@ FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+    ${result} =     Execute    ozone sh key list /vol1/fso-bucket-${SUFFIX}
+                    Should Contain    ${result}    dir/subdir/file
     Execute    ozone fs -get ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file ${TEMP_DIR}/
     Execute    diff -q ${TESTFILE} ${TEMP_DIR}/file
     [teardown]    Execute    rm -f ${TEMP_DIR}/file

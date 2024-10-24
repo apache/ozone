@@ -25,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.InvalidProtocolBufferException;
 import jakarta.annotation.Nonnull;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -34,6 +35,7 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -2316,16 +2318,28 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
     OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
-    if (omVersion.compareTo(OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS) >= 0) {
-      return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
-          numEntries, allowPartialPrefixes);
-    } else {
-      return ozoneManagerClient.listStatus(keyArgs, recursive, startKey,
-              numEntries, allowPartialPrefixes)
-          .stream()
-          .map(OzoneFileStatusLight::fromOzoneFileStatus)
-          .collect(Collectors.toList());
+    if (omVersion.compareTo(OzoneManagerVersion.MAYBE_LIGHTWEIGHT_LIST_STATUS) >= 0) {
+      try {
+        return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
+            numEntries, allowPartialPrefixes);
+      } catch (Exception e) {
+        Throwable cause = HddsUtils.getUnwrappedException(e);
+        if (cause instanceof InvalidProtocolBufferException) {
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Failed listStatusLight, reverting to listStatus", e);
+          } else if (LOG.isDebugEnabled()) {
+            LOG.debug("Failed listStatusLight, reverting to listStatus");
+          }
+        } else {
+          throw e;
+        }
+      }
     }
+
+    return ozoneManagerClient.listStatus(keyArgs, recursive, startKey, numEntries, allowPartialPrefixes)
+        .stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
   }
 
   /**
