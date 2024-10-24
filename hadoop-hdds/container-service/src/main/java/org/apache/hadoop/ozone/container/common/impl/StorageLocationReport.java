@@ -49,10 +49,18 @@ public final class StorageLocationReport implements
   private final StorageType storageType;
   private final String storageLocation;
 
+  // If the disk is not faulty, this value will be 0.
+  // If the disk is faulty, we will try to obtain the time of the disk failure
+  // as accurately as possible.
+  // - If the disk fault is detected at startup, the time will be the DN startup time.
+  // - If the disk fault is detected by the health check,
+  // the time will be the earliest health check time.
+  private final long failureDate;
+
   @SuppressWarnings("checkstyle:parameternumber")
   private StorageLocationReport(String id, boolean failed, long capacity,
       long scmUsed, long remaining, long committed, long freeSpaceToSpare,
-      StorageType storageType, String storageLocation) {
+      StorageType storageType, String storageLocation, long failureDate) {
     this.id = id;
     this.failed = failed;
     this.capacity = capacity;
@@ -62,6 +70,7 @@ public final class StorageLocationReport implements
     this.freeSpaceToSpare = freeSpaceToSpare;
     this.storageType = storageType;
     this.storageLocation = storageLocation;
+    this.failureDate = failureDate;
   }
 
   @Override
@@ -111,6 +120,10 @@ public final class StorageLocationReport implements
 
   public StorageType getStorageType() {
     return storageType;
+  }
+
+  public long getFailureDate() {
+    return failureDate;
   }
 
   private StorageTypeProto getStorageTypeProto() throws IOException {
@@ -188,6 +201,7 @@ public final class StorageLocationReport implements
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
+        .setFailureDate(getFailureDate())
         .setFreeSpaceToSpare(conf != null ?
             new VolumeUsage.MinFreeSpaceCalculator(conf).get(getCapacity()) : 0)
         .build();
@@ -209,6 +223,7 @@ public final class StorageLocationReport implements
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
+        .setFailureDate(getFailureDate())
         .build();
   }
 
@@ -240,6 +255,11 @@ public final class StorageLocationReport implements
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
+
+    if (report.hasFailureDate()) {
+      builder.setFailureDate(report.getFailureDate());
+    }
+
     return builder.build();
   }
 
@@ -270,6 +290,11 @@ public final class StorageLocationReport implements
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
+
+    if (report.hasFailureDate()) {
+      builder.setFailureDate(report.getFailureDate());
+    }
+
     return builder.build();
   }
 
@@ -295,6 +320,7 @@ public final class StorageLocationReport implements
     private long freeSpaceToSpare;
     private StorageType storageType;
     private String storageLocation;
+    private long failureDate;
 
     /**
      * Sets the storageId.
@@ -396,15 +422,25 @@ public final class StorageLocationReport implements
     }
 
     /**
+     * Sets the lastVolumeFailureDate.
+     *
+     * @param failureDate The last failure time of the disk.
+     * @return StorageLocationReport.Builder
+     */
+    public Builder setFailureDate(long failureDate) {
+      this.failureDate = failureDate;
+      return this;
+    }
+
+    /**
      * Builds and returns StorageLocationReport instance.
      *
      * @return StorageLocationReport
      */
     public StorageLocationReport build() {
       return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, committed, freeSpaceToSpare, storageType, storageLocation);
+          remaining, committed, freeSpaceToSpare, storageType, storageLocation, failureDate);
     }
-
   }
 
 }

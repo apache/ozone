@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeFailureInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -54,7 +55,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private volatile long lastHeartbeatTime;
   private long lastStatsUpdatedTime;
   private int failedVolumeCount;
-
+  private List<VolumeFailureInfoProto> volumeFailureInfos;
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
@@ -80,6 +81,7 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
+    this.volumeFailureInfos = Collections.emptyList();
   }
 
   /**
@@ -156,14 +158,40 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param reports list of storage report
    */
   public void updateStorageReports(List<StorageReportProto> reports) {
+
     final int failedCount = (int) reports.stream()
         .filter(e -> e.hasFailed() && e.getFailed())
         .count();
+
+    // We choose to update the status of failed disks during the heartbeat,
+    // so we can directly retrieve it when querying.
+    List<VolumeFailureInfoProto> volumeFailureInfoLists = Collections.emptyList();
+    for (StorageReportProto report : reports) {
+      if (report.hasFailed() && report.getFailed()) {
+        String storageLocation = report.getStorageLocation();
+        long capacity = report.getCapacity();
+        String node = getHostName();
+        String ipAddress = getIpAddress();
+        long failureDate = -1;
+        if (report.hasFailureDate()) {
+          failureDate = report.getFailureDate();
+        }
+        VolumeFailureInfoProto volumeFailure =
+            VolumeFailureInfoProto.newBuilder().
+            setNode(node + "(" + ipAddress + ")").
+            setVolumeName(storageLocation).
+            setCapacityLost(capacity).
+            setFailureDate(failureDate).
+            build();
+        volumeFailureInfoLists.add(volumeFailure);
+      }
+    }
 
     try {
       lock.writeLock().lock();
       lastStatsUpdatedTime = Time.monotonicNow();
       failedVolumeCount = failedCount;
+      this.volumeFailureInfos = volumeFailureInfoLists;
       storageReports = reports;
     } finally {
       lock.writeLock().unlock();
@@ -366,5 +394,19 @@ public class DatanodeInfo extends DatanodeDetails {
   @Override
   public boolean equals(Object obj) {
     return super.equals(obj);
+  }
+
+  /**
+   * Retrieve the list of failed disks.
+   *
+   * @return list of failed disks.
+   */
+  public List<VolumeFailureInfoProto> getVolumeFailureInfos() {
+    try {
+      lock.readLock().lock();
+      return volumeFailureInfos;
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 }

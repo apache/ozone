@@ -282,6 +282,13 @@ message RemoveScmResponseProto {
     optional string scmId = 2;
 }
 
+message VolumeFailureInfoProto {
+    required string node = 1;
+    required string volumeName = 2;
+    required int64 failureDate = 3;
+    required int64 capacityLost = 4;
+}
+
 enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;

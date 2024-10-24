@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeFailureInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.datanode.VolumeFailureInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -603,4 +605,15 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getMetrics(query);
   }
 
+  @Override
+  public List<VolumeFailureInfo> getVolumeFailureInfos() throws IOException {
+    List<VolumeFailureInfo> volumeFailureInfoList = new ArrayList<>();
+    List<VolumeFailureInfoProto> volumeFailureInfos =
+        storageContainerLocationClient.getVolumeFailureInfos();
+    for (VolumeFailureInfoProto volumeFailureInfoProto : volumeFailureInfos) {
+      VolumeFailureInfo volumeFailureInfo = VolumeFailureInfo.fromProtobuf(volumeFailureInfoProto);
+      volumeFailureInfoList.add(volumeFailureInfo);
+    }
+    return volumeFailureInfoList;
+  }
 }

@@ -113,6 +113,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeFailureInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeFailureInfosResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -731,6 +733,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case GetVolumeFailureInfos:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetVolumeFailureInfosResponse(getVolumeFailureInfos(
+                request.getGetVolumeFailureInfosRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -882,6 +891,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.deleteContainer(request.getContainerID());
     return SCMDeleteContainerResponseProto.newBuilder().build();
 
+  }
+
+  public GetVolumeFailureInfosResponseProto getVolumeFailureInfos(
+      GetVolumeFailureInfosRequestProto request) throws IOException {
+    GetVolumeFailureInfosResponseProto.Builder builder =
+        GetVolumeFailureInfosResponseProto.newBuilder();
+    List<HddsProtos.VolumeFailureInfoProto> volumeFailureInfos = impl.getVolumeFailureInfos();
+    for (HddsProtos.VolumeFailureInfoProto volumeFailureInfo : volumeFailureInfos) {
+      builder.addVolumeFailureInfos(volumeFailureInfo);
+    }
+    return builder.build();
   }
 
   public NodeQueryResponseProto queryNode(
