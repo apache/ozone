@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.server;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -35,11 +36,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TestOzoneAdmins {
   // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
+  private static OzoneConfiguration configuration;
+
+  @BeforeEach
+  void setUp() {
+    configuration = new OzoneConfiguration();
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {OzoneConfigKeys.OZONE_S3_ADMINISTRATORS,
                           OzoneConfigKeys.OZONE_ADMINISTRATORS})
   void testS3AdminExtraction(String configKey) throws IOException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(configKey, "alice,bob");
 
     assertThat(OzoneAdmins.getS3AdminsFromConfig(configuration))
@@ -50,7 +57,6 @@ class TestOzoneAdmins {
   @ValueSource(strings = {OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
                           OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS})
   void testS3AdminGroupExtraction(String configKey) {
-    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(configKey, "test1, test2");
 
     assertThat(OzoneAdmins.getS3AdminsGroupsFromConfig(configuration))
@@ -64,7 +70,6 @@ class TestOzoneAdmins {
   })
   void testIsAdmin(String adminKey, String adminGroupKey) {
     // When there is no S3 admin, but Ozone admins present
-    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(adminKey, "alice");
     configuration.set(adminGroupKey, "test_group");
 
@@ -83,7 +88,6 @@ class TestOzoneAdmins {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testIsAdminWithUgi(boolean isAdminSet) {
-    OzoneConfiguration configuration = new OzoneConfiguration();
     if (isAdminSet) {
       configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice");
       configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS, "test_group");
@@ -102,7 +106,6 @@ class TestOzoneAdmins {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testIsS3AdminWithUgiAndConfiguration(boolean isAdminSet) {
-    OzoneConfiguration configuration = new OzoneConfiguration();
     if (isAdminSet) {
       configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice");
       configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS, "test_group");

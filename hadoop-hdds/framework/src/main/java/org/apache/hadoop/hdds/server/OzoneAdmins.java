@@ -39,7 +39,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRAT
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
 
-
 /**
  * This class contains ozone admin user information, username and group,
  * and is able to check whether the provided {@link UserGroupInformation}
@@ -205,7 +204,6 @@ public class OzoneAdmins {
    * </ul>
    * @param conf An instance of {@link OzoneConfiguration} being used
    * @return A {@link Collection} of the S3 administrator users
-   *
    */
   public static Set<String> getS3AdminsFromConfig(OzoneConfiguration conf) throws IOException {
     Set<String> ozoneAdmins = new HashSet<>(conf.getTrimmedStringCollection(OZONE_S3_ADMINISTRATORS));
@@ -215,9 +213,7 @@ public class OzoneAdmins {
     }
 
     String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!ozoneAdmins.contains(omSPN)) {
-      ozoneAdmins.add(omSPN);
-    }
+    ozoneAdmins.add(omSPN);
 
     return ozoneAdmins;
   }
