@@ -15,21 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { Option } from '@/v2/components/select/singleSelect';
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
-}
-
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Buckets': 'Buckets',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Containers': 'Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage',
-  '/Heatmap': 'Heatmap',
-  '/Om': 'Om'
-};
+export const LIMIT_OPTIONS: Option[] = [
+  {
+    label: '1000',
+    value: '1000'
+  },
+  {
+    label: '5000',
+    value: '5000'
+  },
+  {
+    label: '10000',
+    value: '10000'
+  },
+  {
+    label: '20000',
+    value: '20000'
+  }
+];
