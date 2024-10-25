@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -627,7 +629,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     String keyFrom = createKey(ozoneBucket);
 
-    long callId = 10;
+    int callId = 10;
     ClientId clientId = ClientId.randomId();
     MiniOzoneHAClusterImpl cluster = getCluster();
     OzoneManager omLeader = cluster.getOMLeader();
@@ -649,9 +651,12 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
             .setRenameKeyRequest(renameKeyRequest)
             .setClientId(clientId.toString())
             .build();
+    // set up the current call so that OM Ratis Server doesn't complain.
+    Server.getCurCall().set(new Server.Call(callId, 0, null, null,
+        RPC.RpcKind.RPC_BUILTIN, clientId.toByteString().toByteArray()));
     // Submit rename request to OM
     OzoneManagerProtocolProtos.OMResponse omResponse =
-        OzoneManagerRatisUtils.submitRequest(omLeader, omRequest, clientId, callId);
+        omLeader.getOmServerProtocol().processRequest(omRequest);
     assertTrue(omResponse.getSuccess());
 
     // Make one of the follower OM the leader, and shutdown the current leader.
@@ -668,7 +673,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     assertTrue(ozoneBucket.getKey(keyTo).isFile());
 
     // Submit rename request to OM again. The request is cached so it will succeed.
-    omResponse = OzoneManagerRatisUtils.submitRequest(newLeader, omRequest, clientId, callId);
+    omResponse = newLeader.getOmServerProtocol().processRequest(omRequest);
     assertTrue(omResponse.getSuccess());
   }
 
