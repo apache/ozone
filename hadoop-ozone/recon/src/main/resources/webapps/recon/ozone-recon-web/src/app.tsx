@@ -32,6 +32,7 @@ import classNames from 'classnames';
 import Loader from '@/v2/components/loader/loader';
 
 import './app.less';
+import NotFound from '@/v2/pages/notFound/notFound';
 
 const {
   Header, Content, Footer
@@ -39,7 +40,7 @@ const {
 
 interface IAppState {
   collapsed: boolean;
-  enableNewUI: boolean;
+  enableOldUI: boolean;
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
@@ -47,7 +48,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
     super(props);
     this.state = {
       collapsed: false,
-      enableNewUI: false
+      enableOldUI: false
     };
   }
 
@@ -56,7 +57,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
   };
 
   render() {
-    const { collapsed, enableNewUI } = this.state;
+    const { collapsed, enableOldUI } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
 
@@ -64,40 +65,43 @@ class App extends React.Component<Record<string, object>, IAppState> {
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
           {
-            (enableNewUI)
-            ? <NavBarV2 collapsed={collapsed} onCollapse={this.onCollapse} />
-            : <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
+            (enableOldUI)
+              ? <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
+              : <NavBarV2 collapsed={collapsed} onCollapse={this.onCollapse} />
           }
           <Layout className={layoutClass}>
             <Header>
               <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
-                {(enableNewUI) ? <BreadcrumbsV2 /> : <Breadcrumbs />}
+                {(enableOldUI) ? <Breadcrumbs /> : <BreadcrumbsV2 />}
                 <AntDSwitch
-                  disabled={true}
-                  checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                  unCheckedChildren={<div style={{ paddingRight: '2px' }}>UI v2</div>}
+                  checkedChildren={<div style={{ paddingLeft: '2px' }}>UI v1</div>}
                   onChange={(checked: boolean) => {
                     this.setState({
-                      enableNewUI: checked
+                      enableOldUI: checked
                     });
                   }} />
               </div>
             </Header>
-            <Content style={(enableNewUI) ? {} : { margin: '0 16px 0', overflow: 'initial' }}>
-              <Switch>
-                <Route exact path='/'>
-                  <Redirect to='/Overview' />
-                </Route>
-                {(enableNewUI)
-                  ? <Suspense fallback={<Loader/>}>
-                    {routesV2.map(
+            <Content style={(enableOldUI) ? { margin: '0 16px 0', overflow: 'initial' } : {}}>
+              <Suspense fallback={<Loader />}>
+                <Switch>
+                  <Route exact path='/'>
+                    <Redirect to='/Overview' />
+                  </Route>
+                  {(enableOldUI)
+                    ? routes.map(
                       (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                    )}
-                  </Suspense>
-                  : routes.map(
-                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                  )
-                }
-              </Switch>
+                    )
+                    : routesV2.map(
+                      (route, index) => {
+                        return <MakeRouteWithSubRoutes key={index} {...route} />
+                      }
+                    )
+                  }
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
             </Content>
             <Footer style={{ textAlign: 'center' }} />
           </Layout>
