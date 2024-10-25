@@ -44,6 +44,7 @@ import org.slf4j.event.Level;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -255,6 +256,22 @@ public class TestContainerBalancer {
         () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
     assertThat(logCapturer.getOutput()).contains(expectedLog);
     stopBalancer();
+  }
+
+  @Test
+  public void testGetBalancerStatusInfo() throws Exception {
+    startBalancer(balancerConfiguration);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
+
+    // Assert the configuration fields that were explicitly set
+    ContainerBalancerStatusInfo status = containerBalancer.getBalancerStatusInfo();
+    assertEquals(balancerConfiguration.getThreshold(),
+        Double.parseDouble(status.getConfiguration().getUtilizationThreshold()));
+    assertEquals(balancerConfiguration.getIterations(), status.getConfiguration().getIterations());
+    assertEquals(balancerConfiguration.getTriggerDuEnable(), status.getConfiguration().getTriggerDuBeforeMoveEnable());
+
+    stopBalancer();
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)
