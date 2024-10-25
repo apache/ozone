@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.protobuf.ServiceException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -38,12 +39,15 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +56,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.LoggerFactory;
 
 import java.net.ConnectException;
 import java.util.HashMap;
@@ -71,6 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -80,7 +86,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Flaky("HDDS-11352")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
-
+  private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
+      TestOzoneManagerHAWithStoppedNodes.class);
   /**
    * After restarting OMs we need to wait
    * for a leader to be elected and ready.
@@ -592,6 +599,76 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     validateVolumesList(expectedVolumes,
         objectStore.listVolumesByUser(userName, prefix, ""));
+  }
+
+  @Test
+  void testRetryCacheWithDownedOM() throws Exception {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+    getObjectStore().createVolume(volumeName, createVolumeArgs);
+
+    OzoneVolume retVolumeinfo = getObjectStore().getVolume(volumeName);
+
+    String bucketName = UUID.randomUUID().toString();
+
+    retVolumeinfo.createBucket(bucketName);
+
+    String keyFrom = UUID.randomUUID().toString();
+    String keyTo = UUID.randomUUID().toString();
+
+    long runCount = 10;
+    ClientId clientId = ClientId.randomId();
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    OzoneManager omLeader = cluster.getOMLeader();
+
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+        OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyFrom)
+            .build();
+    OzoneManagerProtocolProtos.RenameKeyRequest renameKeyRequest
+        = OzoneManagerProtocolProtos.RenameKeyRequest.newBuilder()
+        .setKeyArgs(keyArgs)
+        .setToKeyName(keyTo)
+        .build();
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+            .setRenameKeyRequest(renameKeyRequest)
+            .setClientId(clientId.toString())
+            .build();
+    // Submit Purge paths request to OM
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerRatisUtils.submitRequest(omLeader, omRequest, clientId, runCount);
+    assertTrue(omResponse.getSuccess());
+    Thread.sleep(10000);
+
+    cluster.shutdownOzoneManager(omLeader);
+    OzoneManager newOmLeader = null;
+    while (true) {
+      Thread.sleep(10000);
+      for (OzoneManager ozoneManager : cluster.getOzoneManagersList()) {
+        if (ozoneManager.isLeaderReady()) {
+          if (!omLeader.getOMNodeId().equals(ozoneManager.getOMNodeId())) {
+            newOmLeader = ozoneManager;
+            break;
+          }
+        }
+      }
+      if (newOmLeader != null) {
+        break;
+      }
+    }
+    
+    omResponse = OzoneManagerRatisUtils.submitRequest(newOmLeader, omRequest, clientId, runCount);
+    assertTrue(omResponse.getSuccess());
   }
 
   private void validateVolumesList(Set<String> expectedVolumes,
