@@ -442,7 +442,7 @@ public class TestHSync {
         os.write(data, 0, data.length);
         os.hsync(); // the second hsync will not update the length at OM
         try (FSDataInputStream in = fs.open(key1)) {
-          // the actual key length is 1025, but the length in OM is 1
+          // the actual key length is WAL_HEADER_LEN + 1024, but the length in OM is WAL_HEADER_LEN (83)
           in.seek(WAL_HEADER_LEN + 1);
           final int n = in.read(buffer, 1, buffer.length - 1);
           // expect to read 1023 bytes
