@@ -131,11 +131,14 @@ public class RangerClientMultiTenantAccessController implements
     LOG.info("authType = {}, login user = {}", authType, usernameOrPrincipal);
 
     UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
-    client = new RangerClient(rangerHttpsAddress,
-        authType, usernameOrPrincipal, passwordOrKeytab,
-        rangerServiceName, OzoneConsts.OZONE);
-    // set back the expected login user
-    UserGroupInformation.setLoginUser(loginUser);
+    try {
+      client = new RangerClient(rangerHttpsAddress,
+          authType, usernameOrPrincipal, passwordOrKeytab,
+          rangerServiceName, OzoneConsts.OZONE);
+    } finally {
+      // set back the expected login user
+      UserGroupInformation.setLoginUser(loginUser);
+    }
 
     // Whether or not the Ranger credentials are valid is unknown right after
     // RangerClient initialization here. Because RangerClient does not perform
