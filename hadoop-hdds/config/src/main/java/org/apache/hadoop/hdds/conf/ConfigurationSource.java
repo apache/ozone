@@ -108,7 +108,7 @@ public interface ConfigurationSource {
   /**
    * Gets the configuration entries where the key contains the prefix. This
    * method will strip the prefix from the key in the return Map.
-   * Example: somePrefix.key->value will be key->value in the returned map.
+   * Example: {@code somePrefix.key->value} will be {@code key->value} in the returned map.
    * @param keyPrefix Prefix to search.
    * @return Map containing keys that match and their values.
    */

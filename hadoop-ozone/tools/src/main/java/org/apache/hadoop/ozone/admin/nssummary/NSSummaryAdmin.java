@@ -108,7 +108,6 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
    * Returns false if bucket is part of path but not a OBS bucket.
    * @param path
    * @return true if bucket is OBS bucket or not part of provided path.
-   * @throws IOException
    */
   public boolean isNotValidBucketOrOBSBucket(String path) {
     OFSPath ofsPath = new OFSPath(path,

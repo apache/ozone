@@ -147,9 +147,6 @@ public class BasicOzoneFileSystem extends FileSystem {
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
         StorageUnit.BYTES);
-    hsyncEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OZONE_FS_HSYNC_ENABLED_DEFAULT);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -197,6 +194,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       ConfigurationSource source = getConfSource();
+      this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
+      LOG.debug("hsyncEnabled = {}", hsyncEnabled);
       this.adapter =
           createAdapter(source, bucketStr,
               volumeStr, omHost, omPort);

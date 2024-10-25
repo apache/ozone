@@ -187,6 +187,8 @@ abstract class AbstractOzoneFileSystemTest {
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (!bucketLayout.equals(FILE_SYSTEM_OPTIMIZED)) {
@@ -407,7 +409,7 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   private void checkInvalidPath(Path path) {
-    InvalidPathException pathException = assertThrows(
+    InvalidPathException pathException = GenericTestUtils.assertThrows(
         InvalidPathException.class, () -> fs.create(path, false)
     );
     assertThat(pathException.getMessage()).contains("Invalid path Name");
@@ -1829,12 +1831,14 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, linkBucket1Name, linksVolume);
 
-    try {
-      FileSystem.get(URI.create(rootPath), cluster.getConf());
-      fail("Should throw Exception due to loop in Link Buckets");
+    try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
+        cluster.getConf())) {
+      fail("Should throw Exception due to loop in Link Buckets" +
+          " while initialising fs with URI " + fileSystem.getUri());
     } catch (OMException oe) {
       // Expected exception
-      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS, oe.getResult());
+      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
     } finally {
       volume.deleteBucket(linkBucket1Name);
       volume.deleteBucket(linkBucket2Name);
@@ -1852,13 +1856,17 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath2 = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, danglingLinkBucketName, linksVolume);
 
+    FileSystem fileSystem = null;
     try {
-      FileSystem.get(URI.create(rootPath2), cluster.getConf());
+      fileSystem = FileSystem.get(URI.create(rootPath2), cluster.getConf());
     } catch (OMException oe) {
       // Expected exception
       fail("Should not throw Exception and show orphan buckets");
     } finally {
       volume.deleteBucket(danglingLinkBucketName);
+      if (fileSystem != null) {
+        fileSystem.close();
+      }
     }
   }
 
@@ -2228,7 +2236,8 @@ abstract class AbstractOzoneFileSystemTest {
       OzoneConfiguration config = new OzoneConfiguration(fs.getConf());
       config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
-      IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> FileSystem.get(config));
+      IllegalArgumentException e = GenericTestUtils.assertThrows(IllegalArgumentException.class,
+              () -> FileSystem.get(config));
       assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
     }
   }

@@ -33,7 +33,7 @@ import java.util.List;
  * information can be converted to this class, and this class can be used to
  * create hadoop 2.x FileStatus.
  * <p>
- * FileStatus (Hadoop 3.x) --> FileStatusAdapter --> FileStatus (Hadoop 2.x)
+ * FileStatus (Hadoop 3.x) --&gt; FileStatusAdapter --&gt; FileStatus (Hadoop 2.x)
  */
 public final class FileStatusAdapter {
 

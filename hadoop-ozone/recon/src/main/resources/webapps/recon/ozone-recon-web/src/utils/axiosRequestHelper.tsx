@@ -37,7 +37,7 @@ export const AxiosGetHelper = (
 export const AxiosPutHelper = (
   url: string,
   data: any = {},
-  controller: AbortController,
+  controller: AbortController | undefined,
   message: string = '',  //optional
 ): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
   controller && controller.abort(message);

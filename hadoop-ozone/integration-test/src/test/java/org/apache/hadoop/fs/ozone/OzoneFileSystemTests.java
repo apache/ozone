@@ -77,15 +77,17 @@ final class OzoneFileSystemTests {
     URI uri = FileSystem.getDefaultUri(config);
     config.setBoolean(
         String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
-    FileSystem subject = FileSystem.get(uri, config);
-    Path dir = new Path(Objects.requireNonNull(rootPath), "listStatusIterator");
-    try {
-      Set<String> paths = new TreeSet<>();
-      for (int dirCount : dirCounts) {
-        listStatusIterator(subject, dir, paths, dirCount);
+    try (FileSystem subject = FileSystem.get(uri, config)) {
+      Path dir = new Path(Objects.requireNonNull(rootPath),
+          "listStatusIterator");
+      try {
+        Set<String> paths = new TreeSet<>();
+        for (int dirCount : dirCounts) {
+          listStatusIterator(subject, dir, paths, dirCount);
+        }
+      } finally {
+        subject.delete(dir, true);
       }
-    } finally {
-      subject.delete(dir, true);
     }
   }
 

@@ -34,7 +34,7 @@ import java.util.UUID;
 public final class PipelineID {
   private static final Codec<PipelineID> CODEC = new DelegatedCodec<>(
       UuidCodec.get(), PipelineID::valueOf, c -> c.id,
-      DelegatedCodec.CopyType.SHALLOW);
+      PipelineID.class, DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<PipelineID> getCodec() {
     return CODEC;

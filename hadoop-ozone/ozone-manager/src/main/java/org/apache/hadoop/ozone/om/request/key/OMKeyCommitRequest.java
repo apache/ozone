@@ -31,7 +31,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -111,9 +110,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     boolean isHsync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
-    boolean enableHsync = ozoneManager.getConfiguration().getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    boolean enableHsync = OzoneFSUtils.canEnableHsync(ozoneManager.getConfiguration(), false);
 
     // If hsynced is called for a file, then this file is hsynced, otherwise it's not hsynced.
     // Currently, file lease recovery by design only supports recover hsynced file
@@ -461,7 +458,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
    * @param omMetrics        om metrics
    * @param exception        exception trace
    * @param omKeyInfo        omKeyInfo
-   * @param result           result
    * @param result           stores the result of the execution
    */
   @SuppressWarnings("parameternumber")
@@ -558,7 +554,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   public static OMRequest disallowHsync(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.HSYNC)) {
+        .isAllowed(OMLayoutFeature.HBASE_SUPPORT)) {
       CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
       boolean isHSync = commitKeyRequest.hasHsync() &&
           commitKeyRequest.getHsync();
