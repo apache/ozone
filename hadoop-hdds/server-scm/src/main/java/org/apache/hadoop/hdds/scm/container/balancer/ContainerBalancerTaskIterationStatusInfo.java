@@ -30,42 +30,18 @@ import java.util.stream.Collectors;
  * Information about balancer task iteration.
  */
 public class ContainerBalancerTaskIterationStatusInfo {
-  private final Integer iterationNumber;
-  private final String iterationResult;
-  private final long iterationDuration;
-  private final long sizeScheduledForMove;
-  private final long dataSizeMoved;
-  private final long containerMovesScheduled;
-  private final long containerMovesCompleted;
-  private final long containerMovesFailed;
-  private final long containerMovesTimeout;
-  private final Map<UUID, Long> sizeEnteringNodes;
-  private final Map<UUID, Long> sizeLeavingNodes;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  private final IterationInfo iterationInfo;
+  private final ContainerMoveInfo containerMoveInfo;
+  private final DataMoveInfo dataMoveInfo;
+
   public ContainerBalancerTaskIterationStatusInfo(
-      Integer iterationNumber,
-      String iterationResult,
-      long iterationDuration,
-      long sizeScheduledForMove,
-      long dataSizeMoved,
-      long containerMovesScheduled,
-      long containerMovesCompleted,
-      long containerMovesFailed,
-      long containerMovesTimeout,
-      Map<UUID, Long> sizeEnteringNodes,
-      Map<UUID, Long> sizeLeavingNodes) {
-    this.iterationNumber = iterationNumber;
-    this.iterationResult = iterationResult;
-    this.iterationDuration = iterationDuration;
-    this.sizeScheduledForMove = sizeScheduledForMove;
-    this.dataSizeMoved = dataSizeMoved;
-    this.containerMovesScheduled = containerMovesScheduled;
-    this.containerMovesCompleted = containerMovesCompleted;
-    this.containerMovesFailed = containerMovesFailed;
-    this.containerMovesTimeout = containerMovesTimeout;
-    this.sizeEnteringNodes = sizeEnteringNodes;
-    this.sizeLeavingNodes = sizeLeavingNodes;
+      IterationInfo iterationInfo,
+      ContainerMoveInfo containerMoveInfo,
+      DataMoveInfo dataMoveInfo) {
+    this.iterationInfo = iterationInfo;
+    this.containerMoveInfo = containerMoveInfo;
+    this.dataMoveInfo = dataMoveInfo;
   }
 
   /**
@@ -73,7 +49,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return iteration number
    */
   public Integer getIterationNumber() {
-    return iterationNumber;
+    return iterationInfo.getIterationNumber();
   }
 
   /**
@@ -81,7 +57,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return iteration result
    */
   public String getIterationResult() {
-    return iterationResult;
+    return iterationInfo.getIterationResult();
   }
 
   /**
@@ -89,7 +65,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return size in bytes
    */
   public long getSizeScheduledForMove() {
-    return sizeScheduledForMove;
+    return dataMoveInfo.getSizeScheduledForMove();
   }
 
   /**
@@ -97,7 +73,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return size in bytes
    */
   public long getDataSizeMoved() {
-    return dataSizeMoved;
+    return dataMoveInfo.getDataSizeMoved();
   }
 
   /**
@@ -105,7 +81,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return number of containers scheduled to move
    */
   public long getContainerMovesScheduled() {
-    return containerMovesScheduled;
+    return containerMoveInfo.getContainerMovesScheduled();
   }
 
   /**
@@ -113,7 +89,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return number of successfully moved containers
    */
   public long getContainerMovesCompleted() {
-    return containerMovesCompleted;
+    return containerMoveInfo.getContainerMovesCompleted();
   }
 
   /**
@@ -121,7 +97,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return number of unsuccessfully moved containers
    */
   public long getContainerMovesFailed() {
-    return containerMovesFailed;
+    return containerMoveInfo.getContainerMovesFailed();
   }
 
   /**
@@ -129,7 +105,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return number of moved with timeout containers
    */
   public long getContainerMovesTimeout() {
-    return containerMovesTimeout;
+    return containerMoveInfo.getContainerMovesTimeout();
   }
 
   /**
@@ -137,7 +113,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return nodeId to size entering from node map
    */
   public Map<UUID, Long> getSizeEnteringNodes() {
-    return sizeEnteringNodes;
+    return dataMoveInfo.getSizeEnteringNodes();
   }
 
   /**
@@ -145,7 +121,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return nodeId to size leaving from node map
    */
   public Map<UUID, Long> getSizeLeavingNodes() {
-    return sizeLeavingNodes;
+    return dataMoveInfo.getSizeLeavingNodes();
   }
 
   /**
@@ -153,7 +129,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return iteration duration
    */
   public long getIterationDuration() {
-    return iterationDuration;
+    return iterationInfo.getIterationDuration();
   }
 
   /**

@@ -318,18 +318,22 @@ public class ContainerBalancerTask implements Runnable {
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
     Map<UUID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
-    ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+    IterationInfo iterationInfo = new IterationInfo(
         iterationNumber,
         currentIterationResult.name(),
-        iterationDuration,
+        iterationDuration
+    );
+    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
+    DataMoveInfo dataMoveInfo = new DataMoveInfo(
         getSizeScheduledForMoveInLatestIteration(),
         metrics.getDataSizeMovedInLatestIteration(),
-        metrics.getNumContainerMovesScheduledInLatestIteration(),
-        metrics.getNumContainerMovesCompletedInLatestIteration(),
-        metrics.getNumContainerMovesFailedInLatestIteration(),
-        metrics.getNumContainerMovesTimeoutInLatestIteration(),
         sizeEnteringDataToNodes,
         sizeLeavingDataFromNodes
+    );
+    ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+        iterationInfo,
+        containerMoveInfo,
+        dataMoveInfo
     );
     iterationsStatistic.add(iterationStatistic);
   }
@@ -361,18 +365,23 @@ public class ContainerBalancerTask implements Runnable {
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
     Map<UUID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
-    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-        lastIterationNumber,
-        null,
-        iterationDuration,
+
+    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
+    DataMoveInfo dataMoveInfo = new DataMoveInfo(
         getSizeScheduledForMoveInLatestIteration(),
         sizeActuallyMovedInLatestIteration,
-        metrics.getNumContainerMovesScheduledInLatestIteration(),
-        metrics.getNumContainerMovesCompletedInLatestIteration(),
-        metrics.getNumContainerMovesFailedInLatestIteration(),
-        metrics.getNumContainerMovesTimeoutInLatestIteration(),
         sizeEnteringDataToNodes,
         sizeLeavingDataFromNodes
+    );
+    IterationInfo iterationInfo = new IterationInfo(
+        lastIterationNumber,
+        null,
+        iterationDuration
+    );
+    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+        iterationInfo,
+        containerMoveInfo,
+        dataMoveInfo
     );
     List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
     resultList.add(currentIterationStatistic);
