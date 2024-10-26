@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TestOzoneAdmins {
   // The following set of tests are to validate the S3 based utilities present in OzoneAdmins
-  private static OzoneConfiguration configuration;
+  private OzoneConfiguration configuration;
 
   @BeforeEach
   void setUp() {
