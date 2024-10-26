@@ -29,15 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -59,9 +53,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   public static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
-  private final long omVersion;
   private final Text delegationTokenService;
-  private final UserGroupInformation ugi;
   private Map<String, OMProxyInfo> omProxyInfos;
   private List<String> retryExceptions = new ArrayList<>();
 
@@ -75,9 +67,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
                                  UserGroupInformation ugi,
                                  String omServiceId,
                                  Class<T> protocol) throws IOException {
-    super(configuration, omServiceId, protocol);
-    this.ugi = ugi;
-    this.omVersion = RPC.getProtocolVersion(protocol);
+    super(configuration, ugi, omServiceId, protocol);
     this.delegationTokenService = computeDelegationTokenService();
   }
 
@@ -128,24 +118,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     setOmProxies(omProxies);
     setOmNodeIDList(omNodeIDList);
     setOmNodeAddressMap(omNodeAddressMap);
-  }
-
-  private T createOMProxy(InetSocketAddress omAddress) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
-    RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
-
-    // FailoverOnNetworkException ensures that the IPC layer does not attempt
-    // retries on the same OM in case of connection exception. This retry
-    // policy essentially results in TRY_ONCE_THEN_FAIL.
-    RetryPolicy connectionRetryPolicy = RetryPolicies
-        .failoverOnNetworkException(0);
-
-    return (T) RPC.getProtocolProxy(getInterface(), omVersion,
-        omAddress, ugi, hadoopConf, NetUtils.getDefaultSocketFactory(
-            hadoopConf), (int) OmUtils.getOMClientRpcTimeOut(getConf()),
-        connectionRetryPolicy).getProxy();
-
   }
 
   /**
