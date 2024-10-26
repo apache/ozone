@@ -695,11 +695,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Get read only admin list
     readOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
 
-    Collection<String> s3AdminUsernames =
-            OzoneConfigUtil.getS3AdminsFromConfig(configuration);
-    Collection<String> s3AdminGroups =
-            OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration);
-    s3OzoneAdmins = new OzoneAdmins(s3AdminUsernames, s3AdminGroups);
+    s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -4345,7 +4341,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean isS3Admin(UserGroupInformation callerUgi) {
-    return callerUgi != null && s3OzoneAdmins.isAdmin(callerUgi);
+    return OzoneAdmins.isS3Admin(callerUgi, s3OzoneAdmins);
   }
 
   @VisibleForTesting
