@@ -120,7 +120,7 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void blankLine() {
-    output("\n");
+    System.out.print("\n");
   }
 
   private void output(String s) {
@@ -130,8 +130,8 @@ public class ReportSubcommand extends ScmSubcommand {
   private void outputHeading(String s) {
     output(s);
     for (int i = 0; i < s.length(); i++) {
-      output("=");
+      System.out.print("=");
     }
-    output("\n");
+    System.out.print("\n");
   }
 }
