@@ -47,8 +47,17 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
   private String dbPath;
 
   @CommandLine.Option(names = {"--dry-run"},
-      description = "Path to OM RocksDB")
+        description = "Mode to run the tool in. Read-mode will just log information about unreachable files or " +
+        "directories; otherwise the tool will move those files and directories to the deleted tables." )
   private boolean dryRun;
+
+  @CommandLine.Option(names = {"--volume"},
+      description = "Filter by volume name")
+  private String volume;
+
+  @CommandLine.Option(names = {"--bucket"},
+      description = "Filter by bucket name")
+  private String bucket;
 
   @CommandLine.Option(names = {"--verbose"},
       description = "More verbose output. ")
@@ -59,7 +68,7 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     try {
       FSORepairTool
-          repairTool = new FSORepairTool(dbPath, dryRun);
+          repairTool = new FSORepairTool(dbPath, dryRun, volume, bucket);
       repairTool.run();
     } catch (Exception ex) {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());

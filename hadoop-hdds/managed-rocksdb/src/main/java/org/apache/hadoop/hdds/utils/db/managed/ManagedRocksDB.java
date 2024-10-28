@@ -102,5 +102,4 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
-
 }

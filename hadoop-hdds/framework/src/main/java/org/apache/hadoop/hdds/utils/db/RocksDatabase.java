@@ -694,7 +694,6 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-
   /**
    * Get the value mapped to the given key.
    *

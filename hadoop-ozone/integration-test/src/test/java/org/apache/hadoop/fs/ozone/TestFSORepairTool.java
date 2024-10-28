@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
  * FSORepairTool test cases.
@@ -97,7 +99,7 @@ public class TestFSORepairTool {
 
     // Init ofs.
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, cluster.getOzoneManager().getOMNodeId());
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
     client = OzoneClientFactory.getRpcClient("omservice", conf);
@@ -124,12 +126,31 @@ public class TestFSORepairTool {
   }
 
   @Test
+  public void testFSORepairToolWithVolumeAndBucketFilter() throws Exception {
+    // Build a tree with unreachable points in multiple volumes and buckets
+    FSORepairTool.Report reportVol1Buck1 = buildDisconnectedTree("vol1", "bucket1", 10);
+    FSORepairTool.Report reportVol2Buck2 = buildDisconnectedTree("vol2", "bucket2", 10);
+
+    // Case 1: Run repair tool for a specific volume and bucket.
+    FSORepairTool repairToolFiltered = new FSORepairTool(
+        getOmDB(), getOmDBLocation(), false, "vol1", "bucket1");
+    FSORepairTool.Report filteredReport = repairToolFiltered.run();
+
+    // Ensure that only the unreachable points from vol1/bucket1 are in the report.
+    Assertions.assertEquals(reportVol1Buck1, filteredReport, "Filtered report should match the unreachable points in vol1/bucket1.");
+    Assertions.assertNotEquals(reportVol2Buck2, filteredReport, "Filtered report should not include vol2/bucket2.");
+
+    // Ensure unreachable objects in vol1/bucket1 are properly marked for delete.
+    assertDisconnectedObjectsMarkedForDelete(1);
+  }
+
+  @Test
   public void testConnectedTreeOneBucket() throws Exception {
     org.apache.hadoop.ozone.repair.om.FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
 
     // Test the connected tree in debug mode.
     FSORepairTool fsoTool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true);
+        getOmDBLocation(), true, null, null);
     FSORepairTool.Report debugReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
@@ -139,7 +160,7 @@ public class TestFSORepairTool {
     // Running again in repair mode should give same results since the tree
     // is connected.
     fsoTool = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     org.apache.hadoop.ozone.repair.om.FSORepairTool.Report repairReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
@@ -155,7 +176,7 @@ public class TestFSORepairTool {
 
     FSORepairTool
         repair = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     FSORepairTool.Report debugReport = repair.run();
     Assertions.assertEquals(expectedReport, debugReport);
   }
@@ -169,7 +190,7 @@ public class TestFSORepairTool {
 
     org.apache.hadoop.ozone.repair.om.FSORepairTool
         repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
     Assertions.assertEquals(generatedReport, expectedAggregateReport);
@@ -204,7 +225,7 @@ public class TestFSORepairTool {
 
     org.apache.hadoop.ozone.repair.om.FSORepairTool
         repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
     Assertions.assertEquals(1, generatedReport.getUnreachableDirs());
@@ -218,7 +239,7 @@ public class TestFSORepairTool {
     // Run when there are no file trees.
     org.apache.hadoop.ozone.repair.om.FSORepairTool
         repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
     Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
     assertDeleteTablesEmpty();
@@ -229,7 +250,7 @@ public class TestFSORepairTool {
 
     // Run on an empty volume and bucket.
     repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false);
+        getOmDBLocation(), false, null, null);
     generatedReport = repair.run();
     Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
     assertDeleteTablesEmpty();
@@ -269,7 +290,7 @@ public class TestFSORepairTool {
       // will be skipped and FSO tree is connected.
       org.apache.hadoop.ozone.repair.om.FSORepairTool
           repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-          getOmDBLocation(), false);
+          getOmDBLocation(), false, null, null);
       org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
       Assertions.assertEquals(connectReport, generatedReport);

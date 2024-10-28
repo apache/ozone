@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.repair.om;
 
-
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -89,7 +88,6 @@ public class FSORepairTool {
       LoggerFactory.getLogger(org.apache.hadoop.ozone.repair.om.FSORepairTool.class);
 
   private final String omDBPath;
-
   private final DBStore store;
   private final Table<String, OmVolumeArgs> volumeTable;
   private final Table<String, OmBucketInfo> bucketTable;
@@ -97,6 +95,8 @@ public class FSORepairTool {
   private final Table<String, OmKeyInfo> fileTable;
   private final Table<String, OmKeyInfo> deletedDirectoryTable;
   private final Table<String, RepeatedOmKeyInfo> deletedTable;
+  private final String volumeFilter;
+  private final String bucketFilter;
   // The temporary DB is used to track which items have been seen.
   // Since usage of this DB is simple, use it directly from
   // RocksDB.
@@ -115,8 +115,8 @@ public class FSORepairTool {
   private long unreachableDirs;
   private boolean dryRun;
 
-  public FSORepairTool(String dbPath, boolean dryRun) throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, dryRun);
+  public FSORepairTool(String dbPath, boolean dryRun, String volume, String bucket) throws IOException {
+    this(getStoreFromPath(dbPath), dbPath, dryRun, volume, bucket);
   }
 
   /**
@@ -124,7 +124,7 @@ public class FSORepairTool {
    * class for testing.
    */
   @VisibleForTesting
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun) throws IOException {
+  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, String volume, String bucket) throws IOException {
     dryRun = isDryRun;
     // Counters to track as we walk the tree.
     reachableBytes = 0;
@@ -136,6 +136,8 @@ public class FSORepairTool {
 
     this.store = dbStore;
     this.omDBPath = dbPath;
+    this.volumeFilter = volume;
+    this.bucketFilter = bucket;
     volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
         String.class,
         OmVolumeArgs.class);
@@ -170,7 +172,23 @@ public class FSORepairTool {
   }
 
   public org.apache.hadoop.ozone.repair.om.FSORepairTool.Report run() throws IOException {
-    // Iterate all volumes.
+    System.out.println("Disclaimer: This tool currently does not support snapshots.");
+
+    if (bucketFilter != null && volumeFilter == null) {
+      System.out.println("--bucket flag cannot be used without specifying --volume.");
+      return null;
+    }
+    if (volumeFilter != null) {
+      System.out.println("Looking up volume: " + volumeFilter);
+      OmVolumeArgs volumeArgs = volumeTable.get(volumeFilter);
+      if (volumeArgs == null) {
+        //Volume does not exist
+        System.out.println("Volume '" + volumeFilter + "' does not exist.");
+        return null;
+      }
+    }
+
+    // Iterate all volumes or a specific volume if specified
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
              volumeIterator = volumeTable.iterator()) {
       openReachableDB();
@@ -180,35 +198,62 @@ public class FSORepairTool {
             volumeIterator.next();
         String volumeKey = volumeEntry.getKey();
 
+        if (volumeFilter!=null && !volumeFilter.equals(volumeKey)) {
+          continue;
+        }
+
+        if (bucketFilter != null) {
+          OmBucketInfo bucketInfo = bucketTable.get(volumeKey + "/" + bucketFilter);
+          if (bucketInfo == null) {
+            //Bucket does not exist in the volume
+            System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
+            return null;
+          }
+
+          if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+            //LOG.debug("Skipping non-FSO bucket {}", bucketKey);
+            System.out.println("Skipping non-FSO bucket " + bucketFilter);
+            continue;
+          }
+
+          dropReachableTableIfExists();
+          createReachableTable();
+          markReachableObjectsInBucket(volumeEntry.getValue(), bucketInfo);
+          handleUnreachableObjects(volumeEntry.getValue(), bucketInfo);
+          dropReachableTableIfExists();
+        } else {
+
         // Iterate all buckets in the volume.
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-                 bucketIterator = bucketTable.iterator()) {
-          bucketIterator.seek(volumeKey);
-          while (bucketIterator.hasNext()) {
-            Table.KeyValue<String, OmBucketInfo> bucketEntry =
-                bucketIterator.next();
-            String bucketKey = bucketEntry.getKey();
-            OmBucketInfo bucketInfo = bucketEntry.getValue();
+          try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+                   bucketIterator = bucketTable.iterator()) {
+            bucketIterator.seek(volumeKey);
+            while (bucketIterator.hasNext()) {
+              Table.KeyValue<String, OmBucketInfo> bucketEntry =
+                  bucketIterator.next();
+              String bucketKey = bucketEntry.getKey();
+              OmBucketInfo bucketInfo = bucketEntry.getValue();
 
-            if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-              LOG.debug("Skipping non-FSO bucket {}", bucketKey);
-              continue;
+              if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+                //LOG.debug("Skipping non-FSO bucket {}", bucketKey);
+                System.out.println("Skipping non-FSO bucket " + bucketKey);
+                continue;
+              }
+
+              // Stop this loop once we have seen all buckets in the current
+              // volume.
+              if (!bucketKey.startsWith(volumeKey)) {
+                break;
+              }
+
+              // Start with a fresh list of reachable files for this bucket.
+              // Also clears partial state if the tool failed on a previous run.
+              dropReachableTableIfExists();
+              createReachableTable();
+              // Process one bucket's FSO tree at a time.
+              markReachableObjectsInBucket(volumeEntry.getValue(), bucketInfo);
+              handleUnreachableObjects(volumeEntry.getValue(), bucketInfo);
+              dropReachableTableIfExists();
             }
-
-            // Stop this loop once we have seen all buckets in the current
-            // volume.
-            if (!bucketKey.startsWith(volumeKey)) {
-              break;
-            }
-
-            // Start with a fresh list of reachable files for this bucket.
-            // Also clears partial state if the tool failed on a previous run.
-            dropReachableTableIfExists();
-            createReachableTable();
-            // Process one bucket's FSO tree at a time.
-            markReachableObjectsInBucket(volumeEntry.getValue(), bucketInfo);
-            handleUnreachableObjects(volumeEntry.getValue(), bucketInfo);
-            dropReachableTableIfExists();
           }
         }
       }
@@ -229,13 +274,15 @@ public class FSORepairTool {
         .setUnreachableBytes(unreachableBytes)
         .build();
 
-    LOG.info("\n{}", report);
+    //LOG.info("\n{}", report);
+    System.out.println("\n" + report);
     return report;
   }
 
   private void markReachableObjectsInBucket(OmVolumeArgs volume,
                                             OmBucketInfo bucket) throws IOException {
-    LOG.info("Processing bucket {}", bucket.getBucketName());
+    //LOG.info("Processing bucket {}", bucket.getBucketName());
+    System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucket.getBucketName());
     // Only put directories in the stack.
     // Directory keys should have the form /volumeID/bucketID/parentID/name.
     Stack<String> dirKeyStack = new Stack<>();
@@ -254,8 +301,10 @@ public class FSORepairTool {
       String currentDirKey = dirKeyStack.pop();
       OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
       if (currentDir == null) {
-        LOG.error("Directory key {} to be processed was not found in the " +
-            "directory table", currentDirKey);
+        //LOG.error("Directory key {} to be processed was not found in the " +
+        //    "directory table", currentDirKey);
+        System.out.println("Directory key" + currentDirKey + "to be processed was not found in the " +
+              "directory table.");
         continue;
       }
 
@@ -288,11 +337,13 @@ public class FSORepairTool {
         }
 
         if (!isReachable(dirKey)) {
-          LOG.debug("Found unreachable directory: {}", dirKey);
+          //LOG.debug("Found unreachable directory: {}", dirKey);
+          System.out.println("Found unreachable directory: " + dirKey);
           unreachableDirs++;
 
           if (dryRun) {
-            LOG.debug("Marking unreachable directory {} for deletion.", dirKey);
+            //LOG.debug("Marking unreachable directory {} for deletion.", dirKey);
+            System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
             OmDirectoryInfo dirInfo = dirEntry.getValue();
             markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(),
                 dirKey, dirInfo);
@@ -315,13 +366,14 @@ public class FSORepairTool {
 
         OmKeyInfo fileInfo = fileEntry.getValue();
         if (!isReachable(fileKey)) {
-          LOG.debug("Found unreachable file: {}", fileKey);
+          //LOG.debug("Found unreachable file: {}", fileKey);
+          System.out.println("Found unreachable file: " + fileKey);
           unreachableBytes += fileInfo.getDataSize();
           unreachableFiles++;
 
           if (dryRun) {
-            LOG.debug("Marking unreachable file {} for deletion.",
-                fileKey);
+            //LOG.debug("Marking unreachable file {} for deletion.", fileKey);
+            System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
             markFileForDeletion(fileKey, fileInfo);
           }
         } else {
@@ -349,9 +401,8 @@ public class FSORepairTool {
       // is gone. The name of the key does not matter so just use IDs.
       deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
 
-      LOG.debug("Added entry {} to open key table: {}",
-          fileKey, updatedRepeatedOmKeyInfo);
-
+      //LOG.debug("Added entry {} to open key table: {}", fileKey, updatedRepeatedOmKeyInfo);
+      System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
       store.commitBatchOperation(batch);
     }
   }
@@ -466,8 +517,8 @@ public class FSORepairTool {
   private void openReachableDB() throws IOException {
     File reachableDBFile = new File(new File(omDBPath).getParentFile(),
         "reachable.db");
-    LOG.info("Creating database of reachable directories at {}",
-        reachableDBFile);
+    //LOG.info("Creating database of reachable directories at {}", reachableDBFile);
+    System.out.println("Creating database of reachable directories at " + reachableDBFile);
     // Delete the DB from the last run if it exists.
     if (reachableDBFile.exists()) {
       FileUtils.deleteDirectory(reachableDBFile);
@@ -520,6 +571,12 @@ public class FSORepairTool {
   private void createReachableTable() throws IOException {
     reachableCFHandle = reachableDB.createColumnFamily(
         new ColumnFamilyDescriptor(REACHABLE_TABLE_BYTES));
+  }
+
+  private void estimateReplicatedSize() {
+    int replicationFactor = 3;
+    long totalReplicatedSize = (reachableBytes + unreachableBytes) * replicationFactor;
+    System.out.println("Estimated replicated size: " + totalReplicatedSize + " bytes");
   }
 
   /**
@@ -610,7 +667,8 @@ public class FSORepairTool {
       FSORepairTool.Report report = (FSORepairTool.Report) other;
 
       // Useful for testing.
-      LOG.debug("Comparing reports\nExpect:\n{}\nActual:\n{}", this, report);
+      //LOG.debug("Comparing reports\nExpect:\n{}\nActual:\n{}", this, report);
+      System.out.println("Comparing reports\nExpect:\n" + this + "\nActual:\n" + report);
 
       return reachableBytes == report.reachableBytes &&
           reachableFiles == report.reachableFiles &&
