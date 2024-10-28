@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -127,20 +126,18 @@ public class TestFSORepairTool {
 
   @Test
   public void testFSORepairToolWithVolumeAndBucketFilter() throws Exception {
-    // Build a tree with unreachable points in multiple volumes and buckets
     FSORepairTool.Report reportVol1Buck1 = buildDisconnectedTree("vol1", "bucket1", 10);
     FSORepairTool.Report reportVol2Buck2 = buildDisconnectedTree("vol2", "bucket2", 10);
 
-    // Case 1: Run repair tool for a specific volume and bucket.
     FSORepairTool repairToolFiltered = new FSORepairTool(
         getOmDB(), getOmDBLocation(), false, "vol1", "bucket1");
     FSORepairTool.Report filteredReport = repairToolFiltered.run();
 
-    // Ensure that only the unreachable points from vol1/bucket1 are in the report.
-    Assertions.assertEquals(reportVol1Buck1, filteredReport, "Filtered report should match the unreachable points in vol1/bucket1.");
-    Assertions.assertNotEquals(reportVol2Buck2, filteredReport, "Filtered report should not include vol2/bucket2.");
+    Assertions.assertEquals(reportVol1Buck1, filteredReport,
+        "Filtered report should match the unreachable points in vol1/bucket1.");
+    Assertions.assertNotEquals(reportVol2Buck2, filteredReport,
+        "Filtered report should not include vol2/bucket2.");
 
-    // Ensure unreachable objects in vol1/bucket1 are properly marked for delete.
     assertDisconnectedObjectsMarkedForDelete(1);
   }
 

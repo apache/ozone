@@ -124,7 +124,8 @@ public class FSORepairTool {
    * class for testing.
    */
   @VisibleForTesting
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, String volume, String bucket) throws IOException {
+  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, String volume, String bucket)
+      throws IOException {
     dryRun = isDryRun;
     // Counters to track as we walk the tree.
     reachableBytes = 0;
@@ -198,7 +199,7 @@ public class FSORepairTool {
             volumeIterator.next();
         String volumeKey = volumeEntry.getKey();
 
-        if (volumeFilter!=null && !volumeFilter.equals(volumeKey)) {
+        if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
           continue;
         }
 
