@@ -23,12 +23,13 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for the on-demand container scanner.
@@ -179,30 +182,19 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(1, metrics.getNumUnHealthyContainers());
     assertEquals(2, metrics.getNumContainersScanned());
 
-    Container container1 = mockKeyValueContainer();
-    when(container1.scanMetaData()).thenReturn(ScanResult.healthy());
-    when(container1.scanData(any(DataTransferThrottler.class),
-        any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
-          @Override
-          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
-            Thread.sleep(200);
-            return getUnhealthyScanResult();
-          }
-        });
+    Container<ContainerData> container1 = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container1,
+        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        new AtomicLong(1), vol, 200);
     OnDemandContainerDataScanner.scanContainer(container1).get().get();
     assertTrue(metrics.getTotalRunTime() > 200);
-    Container container2 = mockKeyValueContainer();
-    when(container2.scanMetaData()).thenReturn(ScanResult.healthy());
-    when(container2.scanData(any(DataTransferThrottler.class),
-        any(Canceler.class))).thenAnswer(new Answer<ScanResult>() {
-          @Override
-          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
-            Thread.sleep(200);
-            return getUnhealthyScanResult();
-          }
-        });
+
+    Container<ContainerData> container2 = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container2,
+        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        new AtomicLong(2), vol, 300);
     OnDemandContainerDataScanner.scanContainer(container2).get().get();
-    assertTrue(metrics.getTotalRunTime() > 400);
+    assertTrue(metrics.getTotalRunTime() > 500);
   }
 
   @Test
