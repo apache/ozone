@@ -278,36 +278,45 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     map.get(volumeBucketPair).add(objectKey);
   }
 
-  protected void submitPurgePaths(List<PurgePathRequest> requests,
+  protected void submitPurgePaths(List<List<PurgePathRequest>> purgeDirRequests,
                                   String snapTableKey,
                                   UUID expectedPreviousSnapshotId) {
-    OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
-        OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
+    boolean omRequestSent = false;
 
-    if (snapTableKey != null) {
-      purgeDirRequest.setSnapshotTableKey(snapTableKey);
+    for (List<PurgePathRequest> requests: purgeDirRequests) {
+      if (requests.isEmpty()) {
+        continue;
+      }
+      omRequestSent = true;
+      OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
+          OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
+
+      if (snapTableKey != null) {
+        purgeDirRequest.setSnapshotTableKey(snapTableKey);
+      }
+      OzoneManagerProtocolProtos.NullableUUID.Builder
+          expectedPreviousSnapshotNullableUUID = OzoneManagerProtocolProtos.NullableUUID.newBuilder();
+      if (expectedPreviousSnapshotId != null) {
+        expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+      }
+      purgeDirRequest.setExpectedPreviousSnapshotID(
+          expectedPreviousSnapshotNullableUUID.build());
+
+      purgeDirRequest.addAllDeletedPath(requests);
+
+      OzoneManagerProtocolProtos.OMRequest omRequest =
+          OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+              .setPurgeDirectoriesRequest(purgeDirRequest).setClientId(clientId.toString()).build();
+      // Submit Purge paths request to OM
+      try {
+        OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId,
+            runCount.getAndIncrement());
+      } catch (ServiceException e) {
+        LOG.error("PurgePaths request failed. Will retry at next run.");
+      }
     }
-    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
-        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
-    if (expectedPreviousSnapshotId != null) {
-      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
-    }
-    purgeDirRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
-
-    purgeDirRequest.addAllDeletedPath(requests);
-
-    OzoneManagerProtocolProtos.OMRequest omRequest =
-        OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
-            .setPurgeDirectoriesRequest(purgeDirRequest)
-            .setClientId(clientId.toString())
-            .build();
-
-    // Submit Purge paths request to OM
-    try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
-    } catch (ServiceException e) {
-      LOG.error("PurgePaths request failed. Will retry at next run.");
+    if (omRequestSent) {
+      ozoneManager.getMetrics().incNumSuccessfulIterationsDirDeletingService();
     }
   }
 
@@ -397,7 +406,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   public long optimizeDirDeletesAndSubmitRequest(long remainNum,
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<PurgePathRequest> purgePathRequestList,
+      List<PurgePathRequest> currentPurgePathRequestList,
+      List<List<PurgePathRequest>> purgePathRequestBatches,
       String snapTableKey, long startTime,
       int remainingBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId) {
@@ -418,10 +428,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
             request.getSerializedSize())) {
           // ignore further add request
-          break;
+          purgePathRequestBatches.add(currentPurgePathRequestList);
+          currentPurgePathRequestList = new ArrayList<>();
+          consumedSize = 0;
         }
         consumedSize += request.getSerializedSize();
-        purgePathRequestList.add(request);
+        currentPurgePathRequestList.add(request);
         // reduce remain count for self, sub-files, and sub-directories
         remainNum = remainNum - 1;
         remainNum = remainNum - request.getDeletedSubFilesCount();
@@ -441,9 +453,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
-    }
+    purgePathRequestBatches.add(currentPurgePathRequestList);
+    submitPurgePaths(purgePathRequestBatches, snapTableKey, expectedPreviousSnapshotId);
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);

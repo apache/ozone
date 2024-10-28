@@ -236,6 +236,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
 
+  // TODO: Add more deletion metrics, HDDS-11511.
+  // Deletion Metrics
+  private @Metric MutableCounterLong numSuccessfulIterationsDirDeletingService;
+
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {
@@ -1456,6 +1460,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incEcBucketCreateFailsTotal() {
     ecBucketCreateFailsTotal.incr();
+  }
+
+  public void incNumSuccessfulIterationsDirDeletingService() {
+    numSuccessfulIterationsDirDeletingService.incr();
+  }
+
+  public long getNumSuccessfulIterationsDirDeletingService() {
+    return numSuccessfulIterationsDirDeletingService.value();
   }
 
   public void incNumRecoverLease() {
