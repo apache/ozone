@@ -62,7 +62,9 @@ import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUN
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -532,12 +534,16 @@ public class BlockOutputStream extends OutputStream {
     }
 
     LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
+    final long start = Time.monotonicNowNanos();
     return sendWatchForCommit(commitIndex)
         .thenAccept(this::checkReply)
         .exceptionally(e -> {
           throw new FlushRuntimeException(setIoException(e));
         })
-        .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
+        .whenComplete((r, e) -> {
+          LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+          clientMetrics.getHsyncWatchForCommitNs().add(Time.monotonicNowNanos() - start);
+        });
   }
 
   private void checkReply(XceiverClientReply reply) {
@@ -693,12 +699,15 @@ public class BlockOutputStream extends OutputStream {
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     LOG.debug("Start handleFlushInternal close={}", close);
-    CompletableFuture<Void> toWaitFor = handleFlushInternalSynchronized(close);
+    CompletableFuture<Void> toWaitFor = captureLatencyNs(clientMetrics.getHsyncSynchronizedWorkNs(),
+        () -> handleFlushInternalSynchronized(close));
 
     if (toWaitFor != null) {
       LOG.debug("Waiting for flush");
       try {
+        long startWaiting = Time.monotonicNowNanos();
         toWaitFor.get();
+        clientMetrics.getHsyncWaitForFlushNs().add(Time.monotonicNowNanos() - startWaiting);
       } catch (ExecutionException ex) {
         if (ex.getCause() instanceof FlushRuntimeException) {
           throw ((FlushRuntimeException) ex.getCause()).cause;
@@ -727,6 +736,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private synchronized CompletableFuture<Void> handleFlushInternalSynchronized(boolean close) throws IOException {
+    long start = Time.monotonicNowNanos();
     CompletableFuture<PutBlockResult> putBlockResultFuture = null;
     // flush the last chunk data residing on the currentBuffer
     if (totalWriteChunkLength < writtenDataLength) {
@@ -768,6 +778,7 @@ public class BlockOutputStream extends OutputStream {
     if (putBlockResultFuture != null) {
       recordWatchForCommitAsync(putBlockResultFuture);
     }
+    clientMetrics.getHsyncSendWriteChunkNs().add(Time.monotonicNowNanos() - start);
     return lastFlushFuture;
   }
 
