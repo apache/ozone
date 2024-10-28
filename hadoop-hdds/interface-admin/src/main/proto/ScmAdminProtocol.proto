@@ -617,15 +617,15 @@ message ContainerBalancerStatusInfoRequestProto {
 
 message ContainerBalancerStatusInfoResponseProto {
   optional bool isRunning = 1;
-  optional ContainerBalancerStatusInfo containerBalancerStatusInfo = 2;
+  optional ContainerBalancerStatusInfoProto containerBalancerStatusInfo = 2;
 }
-message ContainerBalancerStatusInfo {
+message ContainerBalancerStatusInfoProto {
   optional uint64 startedAt = 1;
   optional ContainerBalancerConfigurationProto configuration = 2;
-  repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
+  repeated ContainerBalancerTaskIterationStatusInfoProto iterationsStatusInfo = 3;
 }
 
-message ContainerBalancerTaskIterationStatusInfo {
+message ContainerBalancerTaskIterationStatusInfoProto {
   optional int32 iterationNumber = 1;
   optional string iterationResult = 2;
   optional int64 sizeScheduledForMove = 3;
@@ -634,12 +634,12 @@ message ContainerBalancerTaskIterationStatusInfo {
   optional int64 containerMovesCompleted = 6;
   optional int64 containerMovesFailed = 7;
   optional int64 containerMovesTimeout = 8;
-  repeated NodeTransferInfo sizeEnteringNodes = 9;
-  repeated NodeTransferInfo sizeLeavingNodes = 10;
+  repeated NodeTransferInfoProto sizeEnteringNodes = 9;
+  repeated NodeTransferInfoProto sizeLeavingNodes = 10;
   optional int64 iterationDuration = 11;
 }
 
-message NodeTransferInfo {
+message NodeTransferInfoProto {
   optional string uuid = 1;
   optional int64 dataVolume = 2;
 }

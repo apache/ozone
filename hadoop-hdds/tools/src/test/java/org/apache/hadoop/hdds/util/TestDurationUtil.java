@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-class DurationUtilTest {
+class TestDurationUtil {
 
   private static Stream<Arguments> paramsForPositiveCases() {
     return Stream.of(

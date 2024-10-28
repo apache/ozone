@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
@@ -63,8 +63,8 @@ class TestContainerBalancerSubCommand {
 
   private static ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfoResponseProto(
       ContainerBalancerConfiguration config) {
-    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration1StatusInfo =
-        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration1StatusInfo =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
             .setIterationNumber(1)
             .setIterationResult("ITERATION_COMPLETED")
             .setIterationDuration(400L)
@@ -75,32 +75,32 @@ class TestContainerBalancerSubCommand {
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
                     .setDataVolume(28 * GB)
                     .build()
             )
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
                     .setDataVolume(26 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
                     .setDataVolume(25 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
                     .setDataVolume(29 * GB)
                     .build()
             )
             .build();
-    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration2StatusInfo =
-        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration2StatusInfo =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
             .setIterationNumber(2)
             .setIterationResult("ITERATION_COMPLETED")
             .setIterationDuration(300L)
@@ -111,32 +111,32 @@ class TestContainerBalancerSubCommand {
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
                     .setDataVolume(20 * GB)
                     .build()
             )
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
                     .setDataVolume(10 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
                     .setDataVolume(15 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
                     .setDataVolume(15 * GB)
                     .build()
             )
             .build();
-    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration3StatusInfo =
-        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration3StatusInfo =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
             .setIterationNumber(3)
             .setIterationResult("")
             .setIterationDuration(4000L)
@@ -147,25 +147,25 @@ class TestContainerBalancerSubCommand {
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
                     .setDataVolume(20 * GB)
                     .build()
             )
             .addSizeEnteringNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
                     .setDataVolume(28 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
                     .setDataVolume(30 * GB)
                     .build()
             )
             .addSizeLeavingNodes(
-                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
                     .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
                     .setDataVolume(18 * GB)
                     .build()
@@ -174,7 +174,7 @@ class TestContainerBalancerSubCommand {
     ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
         ContainerBalancerStatusInfoResponseProto.newBuilder()
             .setIsRunning(true)
-            .setContainerBalancerStatusInfo(ContainerBalancerStatusInfo.newBuilder()
+            .setContainerBalancerStatusInfo(ContainerBalancerStatusInfoProto.newBuilder()
                 .setStartedAt(OffsetDateTime.now().toEpochSecond())
                 .setConfiguration(config.toProtobufBuilder().setShouldRun(true))
                 .addAllIterationsStatusInfo(

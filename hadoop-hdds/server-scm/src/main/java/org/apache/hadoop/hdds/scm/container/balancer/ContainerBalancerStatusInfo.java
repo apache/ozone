@@ -58,8 +58,8 @@ public class ContainerBalancerStatusInfo {
    * Converts an instance into a protobuf-compatible object.
    * @return proto representation
    */
-  public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo toProto() {
-    return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo
+  public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto
         .newBuilder()
         .setStartedAt(getStartedAt().toEpochSecond())
         .setConfiguration(getConfiguration())

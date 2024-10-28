@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 /**
- * Information about the process of moving data.
+ * Information about the iteration.
  */
 public class IterationInfo {
 

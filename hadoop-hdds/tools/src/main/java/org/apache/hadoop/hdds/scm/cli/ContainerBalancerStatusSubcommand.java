@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -62,7 +62,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
-    ContainerBalancerStatusInfo balancerStatusInfo = response.getContainerBalancerStatusInfo();
+    ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();
     if (isRunning) {
       Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
       LocalDateTime dateTime =
@@ -74,7 +74,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
         Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
         System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-        List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
+        List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
 
         System.out.println("Current iteration info:");
@@ -143,7 +143,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
   }
 
-  private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
+  private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfoProto iterationStatusInfo) {
     int iterationNumber = iterationStatusInfo.getIterationNumber();
     String iterationResult = iterationStatusInfo.getIterationResult();
     long iterationDuration = iterationStatusInfo.getIterationDuration();

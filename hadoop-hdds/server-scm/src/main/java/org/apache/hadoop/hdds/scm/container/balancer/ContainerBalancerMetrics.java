@@ -244,7 +244,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Increases the number of containers that transfer completed with a timeout.
+   * Increases the number of timeout container moves in the latest iteration.
    */
   public void incrementNumContainerMovesTimeoutInLatestIteration(
       long valueToAdd) {
@@ -252,7 +252,7 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Resets the number of containers that transfer completed with the timeout.
+   * Reset the number of timeout container moves in the latest iteration.
    */
   public void resetNumContainerMovesTimeoutInLatestIteration() {
     numContainerMovesTimeoutInLatestIteration.incr(-getNumContainerMovesTimeoutInLatestIteration());

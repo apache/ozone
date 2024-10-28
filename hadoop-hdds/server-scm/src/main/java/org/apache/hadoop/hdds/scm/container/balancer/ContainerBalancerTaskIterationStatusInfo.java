@@ -136,8 +136,8 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Converts an instance into the protobuf compatible object.
    * @return proto representation
    */
-  public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo toProto() {
-    return StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+  public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
         .setIterationNumber(getIterationNumber())
         .setIterationResult(Optional.ofNullable(getIterationResult()).orElse(""))
         .setIterationDuration(getIterationDuration())
@@ -161,12 +161,12 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @param nodes node id to node traffic size
    * @return node transfer info proto representation
    */
-  private List<StorageContainerLocationProtocolProtos.NodeTransferInfo> mapToProtoNodeTransferInfo(
+  private List<StorageContainerLocationProtocolProtos.NodeTransferInfoProto> mapToProtoNodeTransferInfo(
       Map<UUID, Long> nodes
   ) {
     return nodes.entrySet()
         .stream()
-        .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+        .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
             .setUuid(entry.getKey().toString())
             .setDataVolume(entry.getValue())
             .build()
