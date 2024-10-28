@@ -183,7 +183,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     return response;
   }
 
-  private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
+  private OMResponse internalProcessRequest(OMRequest request) throws
+      ServiceException {
+    OMClientRequest omClientRequest = null;
     boolean s3Auth = false;
 
     try {
@@ -212,16 +214,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (!s3Auth) {
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
-
-      // check retry cache
-      final OMResponse cached = omRatisServer.checkRetryCache();
-      if (cached != null) {
-        return cached;
-      }
-
-      // process new request
-      OMClientRequest omClientRequest = null;
-      final OMRequest requestToSubmit;
+      OMRequest requestToSubmit;
       try {
         omClientRequest = createClientRequest(request, ozoneManager);
         // TODO: Note: Due to HDDS-6055, createClientRequest() could now
@@ -261,7 +254,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         return createErrorResponse(request, ex);
       }
 
-      final OMResponse response = omRatisServer.submitRequest(request);
+      OMResponse response = submitRequestToRatis(requestToSubmit);
       if (!response.getSuccess()) {
         omClientRequest.handleRequestFailure(ozoneManager);
       }
@@ -280,6 +273,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   @VisibleForTesting
   public OMRequest getLastRequestToSubmit() {
     return lastRequestToSubmit;
+  }
+
+  /**
+   * Submits request to OM's Ratis server.
+   */
+  private OMResponse submitRequestToRatis(OMRequest request)
+      throws ServiceException {
+    return omRatisServer.submitRequest(request);
   }
 
   private OMResponse submitReadRequestToOM(OMRequest request)
