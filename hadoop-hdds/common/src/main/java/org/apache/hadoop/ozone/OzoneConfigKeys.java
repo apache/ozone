@@ -705,6 +705,9 @@ public final class OzoneConfigKeys {
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
+  public static final String OZONE_OM_LIST_KEYS_MAX_SIZE = "ozone.om.list.keys.max.size";
+  public static final int OZONE_OM_LIST_KEYS_MAX_SIZE_DEFAULT = 500;
+
 
   /**
    * There is no need to instantiate this class.

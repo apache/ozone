@@ -55,6 +55,8 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LIST_KEYS_MAX_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LIST_KEYS_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -329,6 +331,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         perfMetrics.getListKeysResolveBucketLatencyNs(),
         () -> ozoneManager.resolveBucketLink(
             Pair.of(volumeName, bucketName)));
+
+    maxKeys = Math.min(maxKeys, ozoneManager.getConfiguration()
+        .getInt(OZONE_OM_LIST_KEYS_MAX_SIZE, OZONE_OM_LIST_KEYS_MAX_SIZE_DEFAULT));
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();

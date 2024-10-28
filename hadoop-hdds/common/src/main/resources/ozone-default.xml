@@ -4182,6 +4182,16 @@
   </property>
 
   <property>
+    <name>ozone.om.list.keys.max.size</name>
+    <value>500</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Limits the maximum number of keys to be returned as part of the listKeys call. The actual size of the result
+      would be minimum of the two settings: ozone.client.list.cache and ozone.om.list.keys.max.size.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.recon.nssummary.flush.db.max.threshold</name>
     <value>150000</value>
     <tag>OZONE, RECON, PERFORMANCE</tag>
