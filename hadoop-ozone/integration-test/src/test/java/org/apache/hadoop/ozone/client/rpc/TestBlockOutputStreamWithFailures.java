@@ -51,7 +51,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
@@ -70,12 +72,12 @@ class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
 
-  @BeforeEach
+  @BeforeAll
   void init() throws Exception {
     cluster = createCluster();
   }
 
-  @AfterEach
+  @AfterAll
   void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -266,6 +268,7 @@ class TestBlockOutputStreamWithFailures {
       assertEquals(0, keyOutputStream.getStreamEntries().size());
       // Written the same data twice
       byte[] bytes = ArrayUtils.addAll(data1, data1);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
     }
   }
@@ -365,6 +368,8 @@ class TestBlockOutputStreamWithFailures {
       // make sure the bufferPool is empty
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(0, keyOutputStream.getLocationInfoList().size());
+      cluster.restartHddsDatanode(pipeline.getNodes().get(0), false);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(1), true);
       validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
     }
   }
