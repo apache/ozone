@@ -50,6 +50,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -140,7 +143,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    List<Table.KeyValue<String, OmKeyInfo>> dirList = new ArrayList<>();
+    BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue =
+        new ArrayBlockingQueue<>(10000);
     // Iterate the deleted dir table and push the dir omKeyInfo in an Array list.
     // Using a map to maintain unique elements in the list.
     int count = 0;
@@ -152,7 +156,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       while (count < MAX_COUNT && deleteTableIterator.hasNext()) {
         deletedDirInfo = deleteTableIterator.next();
         if (uniqueIDs.add(deletedDirInfo.getValue().getObjectID())) {
-          dirList.add(deletedDirInfo);
+          dirQueue.add(deletedDirInfo);
           count++;
         }
       }
@@ -161,17 +165,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           "Error while running delete directories and files " + "background task. Will retry at next run.",
           e);
     }
-    // Partitioning the array list containing dir omKeyInfo based on number of available threads.
-    // So, that each thread can have its own array list to process.
-    int partition = Math.max(dirList.size() / DIR_DELETING_CORE_POOL_SIZE, 1);
-    int numThreads = dirList.size() < DIR_DELETING_CORE_POOL_SIZE ? 1 : DIR_DELETING_CORE_POOL_SIZE;
+    int numThreads = dirQueue.size() < DIR_DELETING_CORE_POOL_SIZE ? 1 :
+        DIR_DELETING_CORE_POOL_SIZE;
     for (int i = 0; i < numThreads; i++) {
-      int endIndex = (i == numThreads - 1) ? dirList.size() : (i * partition) + partition;
-      queue.add(new DirectoryDeletingService.DirDeletingTask(this,
-          dirList.subList((i * partition), endIndex)));
+      queue.add(new DirectoryDeletingService.DirDeletingTask(this, dirQueue));
     }
     cleanUniqueIdSet(uniqueIDs);
-    dirList.clear();
     return queue;
   }
 
@@ -191,16 +190,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   private final class DirDeletingTask implements BackgroundTask {
     private final DirectoryDeletingService directoryDeletingService;
-    List<Table.KeyValue<String, OmKeyInfo>> dirList = new ArrayList<>();
+    BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue =
+        new ArrayBlockingQueue<>(10000);
 
     private DirDeletingTask(DirectoryDeletingService service) {
       this.directoryDeletingService = service;
     }
 
     private DirDeletingTask(DirectoryDeletingService service,
-        List<Table.KeyValue<String, OmKeyInfo>> dirList) {
+        BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue) {
       this.directoryDeletingService = service;
-      this.dirList = dirList;
+      this.dirQueue = dirQueue;
     }
 
     @Override
@@ -234,48 +234,47 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                   .getLatestGlobalSnapshotId();
 
           long startTime = Time.monotonicNow();
-          for (KeyValue<String, OmKeyInfo> dirInfo : dirList) {
-            while (remainNum > 0) {
-              pendingDeletedDirInfo = dirInfo;
-              System.out.println("Aryan, to be purged: " + pendingDeletedDirInfo.getValue().getKeyName());
-              LOG.info("Aryan, to be purged: " + pendingDeletedDirInfo.getValue().getKeyName());
-              // Do not reclaim if the directory is still being referenced by
-              // the previous snapshot.
-              if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
-                continue;
-              }
-
-              PurgePathRequest request = prepareDeleteDirRequest(remainNum,
-                  pendingDeletedDirInfo.getValue(), pendingDeletedDirInfo.getKey(), allSubDirList,
-                  getOzoneManager().getKeyManager());
-              if (isBufferLimitCrossed(ratisByteLimit, consumedSize, request.getSerializedSize())) {
-                if (purgePathRequestList.size() != 0) {
-                  // if message buffer reaches max limit, avoid sending further
-                  remainNum = 0;
-                  break;
-                }
-                // if directory itself is having a lot of keys / files,
-                // reduce capacity to minimum level
-                remainNum = MIN_ERR_LIMIT_PER_TASK;
-                request = prepareDeleteDirRequest(remainNum,
-                    pendingDeletedDirInfo.getValue(), pendingDeletedDirInfo.getKey(), allSubDirList,
-                    getOzoneManager().getKeyManager());
-              }
-              consumedSize += request.getSerializedSize();
-              purgePathRequestList.add(request);
-              // reduce remain count for self, sub-files, and sub-directories
-              remainNum = remainNum - 1;
-              remainNum = remainNum - request.getDeletedSubFilesCount();
-              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-              // Count up the purgeDeletedDir, subDirs and subFiles
-              if (request.getDeletedDir() != null && !request.getDeletedDir().isEmpty()) {
-                dirNum++;
-              }
-              subDirNum += request.getMarkDeletedSubDirsCount();
-              subFileNum += request.getDeletedSubFilesCount();
+          while (remainNum > 0 && dirQueue.size() > 0) {
+            pendingDeletedDirInfo = dirQueue.poll();
+            // Do not reclaim if the directory is still being referenced by
+            // the previous snapshot.
+            if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
+              continue;
             }
+
+            PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+                pendingDeletedDirInfo.getValue(),
+                pendingDeletedDirInfo.getKey(), allSubDirList,
+                getOzoneManager().getKeyManager());
+            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                request.getSerializedSize())) {
+              if (purgePathRequestList.size() != 0) {
+                // if message buffer reaches max limit, avoid sending further
+                remainNum = 0;
+                break;
+              }
+              // if directory itself is having a lot of keys / files,
+              // reduce capacity to minimum level
+              remainNum = MIN_ERR_LIMIT_PER_TASK;
+              request = prepareDeleteDirRequest(remainNum,
+                  pendingDeletedDirInfo.getValue(),
+                  pendingDeletedDirInfo.getKey(), allSubDirList,
+                  getOzoneManager().getKeyManager());
+            }
+            consumedSize += request.getSerializedSize();
+            purgePathRequestList.add(request);
+            // reduce remain count for self, sub-files, and sub-directories
+            remainNum = remainNum - 1;
+            remainNum = remainNum - request.getDeletedSubFilesCount();
+            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+            // Count up the purgeDeletedDir, subDirs and subFiles
+            if (request.getDeletedDir() != null && !request.getDeletedDir()
+                .isEmpty()) {
+              dirNum++;
+            }
+            subDirNum += request.getMarkDeletedSubDirsCount();
+            subFileNum += request.getDeletedSubFilesCount();
           }
-          dirList.clear();
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestList, null, startTime,
