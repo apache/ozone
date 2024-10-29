@@ -109,7 +109,8 @@ public class ReconServer extends GenericCli {
 
     injector = Guice.createInjector(new ReconControllerModule(),
         new ReconRestServletModule(configuration),
-        new ReconSchemaGenerationModule());
+        new ReconSchemaGenerationModule(),
+        new ReconUpgradeActionsModule());
 
     //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
     ReconGuiceServletContextListener.setInjector(injector);
@@ -163,7 +164,7 @@ public class ReconServer extends GenericCli {
           injector.getInstance(ReconSchemaVersionTableManager.class);
 
       ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext);
+          new ReconLayoutVersionManager(versionTableManager, reconContext, injector);
       // Run the upgrade framework to finalize layout features if needed
       layoutVersionManager.finalizeLayoutFeatures();
 

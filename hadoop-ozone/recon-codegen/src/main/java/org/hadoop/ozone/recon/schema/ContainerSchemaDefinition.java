@@ -70,18 +70,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-
     if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      // Drop the existing constraint if it exists
-      String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
-      dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
-          .dropConstraint(constraintName)
-          .execute();
-
-      // Add the updated constraint with all enum states
-      addUpdatedConstraint();
-    } else {
-      // Create the table if it does not exist
       createUnhealthyContainersTable();
     }
   }
@@ -125,5 +114,9 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public DSLContext getDSLContext() {
     return dslContext;
+  }
+
+  public DataSource getDataSource() {
+    return dataSource;
   }
 }

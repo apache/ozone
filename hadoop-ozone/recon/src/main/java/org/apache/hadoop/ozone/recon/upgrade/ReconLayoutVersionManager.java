@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.slf4j.Logger;
@@ -47,12 +48,12 @@ public class ReconLayoutVersionManager {
   private int currentMLV;
 
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
-                                   ReconContext reconContext)
+                                   ReconContext reconContext, Injector injector)
       throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.reconContext = reconContext;
-    ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
+    ReconLayoutFeature.registerUpgradeActions(injector);  // Register actions via annotation
   }
 
   /**

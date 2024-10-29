@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.mockito.InOrder;
@@ -78,7 +79,8 @@ public class TestReconLayoutVersionManager {
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
+        mock(Injector.class));
   }
 
   @AfterEach
@@ -220,7 +222,8 @@ public class TestReconLayoutVersionManager {
   @Test
   public void testNoUpgradeActionsNeeded() throws SQLException {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
+        mock(Injector.class));
     layoutVersionManager.finalizeLayoutFeatures();
 
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
