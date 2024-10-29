@@ -70,8 +70,6 @@ public class TestFSORepairTool {
   private static MiniOzoneHAClusterImpl cluster;
   private static FileSystem fs;
   private static OzoneClient client;
-  private static OzoneShell shell;
-
 
   @BeforeAll
   public static void init() throws Exception {
@@ -120,19 +118,14 @@ public class TestFSORepairTool {
 
   @AfterEach
   public void cleanNamespace() throws Exception {
-    shell = new OzoneShell();
+    OzoneShell shell = new OzoneShell();
     String[] args1 = new String[]{"volume", "delete", "-r", "/vol1", "-y"};
     String[] args2 = new String[]{"volume", "delete", "-r", "/vol2", "-y"};
-
     shell.execute(args1);
-    System.out.println("Deleted vol11");
     shell.execute(args2);
-    System.out.println("Deleted vol12");
 
     runDeletes();
-    System.out.println("Deleted");
     assertFileAndDirTablesEmpty();
-    System.out.println("Deleted");
   }
 
   @AfterAll
