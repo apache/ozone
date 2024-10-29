@@ -225,6 +225,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
 
+  @Config(key="ec.reconstruction.validation",
+      defaultValue = "false",
+      description = "Flag to enable validation for EC reconstruction tasks" +
+          " to reconstruct target containers correctly. Reconstruction tasks" +
+          " will fail if validation fails when enabled.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecReconstructionValidation = false;
+
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -507,6 +515,14 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeWritePoolLimit() {
     return ecReconstructStripeWritePoolLimit;
+  }
+
+  public void setEcReconstructionValidation(boolean validationEnabled) {
+    this.ecReconstructionValidation = validationEnabled;
+  }
+
+  public boolean getEcReconstructionValidation() {
+    return ecReconstructionValidation;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {
