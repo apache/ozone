@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -126,8 +127,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         //  OMRequest model.
         delCount = deleteAllKeys(blockDeletionResults, manager);
       }
-      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
+      int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
+          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime, limit);
     }
     return delCount;
   }
@@ -450,13 +453,21 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);
       movedDirsCount.addAndGet(subDirNum - subdirDelNum);
       movedFilesCount.addAndGet(subFileNum);
+      long timeTakenInIteration = Time.monotonicNow() - startTime;
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
               "deleted: {}, Number of sub-files moved:" +
               " {} to DeletedTable, Number of sub-dirs moved {} to " +
-              "DeletedDirectoryTable, current iteration limit: {}, iteration elapsed: {}ms," +
+              "DeletedDirectoryTable, limit per iteration: {}, iteration elapsed: {}ms, " +
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
-          Time.monotonicNow() - startTime, getRunCount());
+          timeTakenInIteration, getRunCount());
+      if (remainNum <= 0) {
+        LOG.warn("Limit for no. of directory+files that can be deleted in one iteration is reached. " +
+                "Current limit: {} = {}",
+            OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, ozoneManager.getConfiguration()
+                .getInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK,
+                    OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT));
+      }
     }
     return remainNum;
   }

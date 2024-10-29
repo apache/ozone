@@ -222,6 +222,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 getOzoneManager().getKeyManager(),
                 pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
             deletedKeyCount.addAndGet(delCount);
+            if (delCount >= getKeyLimitPerTask()) {
+              LOG.warn("Limit for no. of keys that can be deleted in one iteration is reached. Current limit: {} = {}",
+                  OZONE_KEY_DELETING_LIMIT_PER_TASK, getKeyLimitPerTask());
+            }
           }
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +

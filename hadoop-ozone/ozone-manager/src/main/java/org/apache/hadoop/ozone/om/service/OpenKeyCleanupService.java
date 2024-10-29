@@ -54,6 +54,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 /**
  * This is the background service to delete hanging open keys.
  * Scan the metadata of om periodically to get
@@ -219,7 +221,7 @@ public class OpenKeyCleanupService extends BackgroundService {
           if (LOG.isDebugEnabled()) {
             StringBuilder sb = new StringBuilder();
             for (OpenKeyBucket.Builder openKey : openKeyBuckets) {
-              sb.append(openKey.getVolumeName() + "." +  openKey.getBucketName() + ": ")
+              sb.append(openKey.getVolumeName() + OZONE_URI_DELIMITER +  openKey.getBucketName() + ": ")
                   .append(openKey.getKeysList().stream().map(OzoneManagerProtocolProtos.OpenKey::getName)
                       .collect(Collectors.toList()))
                   .append("\n");
@@ -241,7 +243,8 @@ public class OpenKeyCleanupService extends BackgroundService {
             if (LOG.isDebugEnabled()) {
               StringBuilder sb = new StringBuilder();
               for (CommitKeyRequest.Builder openKey : hsyncKeys) {
-                sb.append(openKey.getKeyArgs().getVolumeName() + "." +  openKey.getKeyArgs().getBucketName() + ": ")
+                sb.append(openKey.getKeyArgs().getVolumeName() + OZONE_URI_DELIMITER +
+                        openKey.getKeyArgs().getBucketName() + ": ")
                     .append(openKey.getKeyArgs().getKeyName())
                     .append(", ");
               }
@@ -254,6 +257,10 @@ public class OpenKeyCleanupService extends BackgroundService {
       LOG.info("Number of expired open keys submitted for deletion: {},"
               + " for commit: {}, cleanupLimit: {}, elapsed time: {}ms",
           numOpenKeys, numHsyncKeys, cleanupLimitPerTask, Time.monotonicNow() - startTime);
+      if ((numOpenKeys + numHsyncKeys) >= cleanupLimitPerTask) {
+        LOG.warn("Limit for no. of openKeys that can be cleaned Up in one iteration is reached. Current limit: {} = {}",
+            OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK, cleanupLimitPerTask);
+      }
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;

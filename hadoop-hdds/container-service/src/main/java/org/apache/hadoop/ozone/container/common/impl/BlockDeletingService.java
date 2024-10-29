@@ -151,12 +151,19 @@ public class BlockDeletingService extends BackgroundService {
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
+        LOG.info("Queued- Container: {}, deleted blocks: {}",
+            containerBlockInfo.getContainerData().getContainerID(), containerBlockInfo.getNumBlocksToDelete());
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.info("Queued {} blocks from {} containers for deletion, blocksLimit was {}, elapsed time {}ms.",
-            totalBlocks, containers.size(), blocksLimitPerInterval, Time.monotonicNow() - startTime);
+        LOG.info("In this iteration, Queued {} blocks from {} containers for deletion, blocksLimit was {}," +
+                " elapsed time {}ms.", totalBlocks, containers.size(), blocksLimitPerInterval,
+            Time.monotonicNow() - startTime);
+        if (totalBlocks >= blocksLimitPerInterval) {
+          LOG.warn("Limit for no. of blocks that can be deleted in one iteration is reached. Current limit: {} = {}",
+              "hdds.datanode.block.deleting.limit.per.interval", blocksLimitPerInterval);
+        }
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
