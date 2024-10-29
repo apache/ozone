@@ -179,11 +179,10 @@ public class FSORepairTool {
       System.out.println("--bucket flag cannot be used without specifying --volume.");
       return null;
     }
+
     if (volumeFilter != null) {
-      System.out.println("Looking up volume: " + volumeFilter);
       OmVolumeArgs volumeArgs = volumeTable.get(volumeFilter);
       if (volumeArgs == null) {
-        //Volume does not exist
         System.out.println("Volume '" + volumeFilter + "' does not exist.");
         return null;
       }
@@ -202,6 +201,8 @@ public class FSORepairTool {
         if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
           continue;
         }
+
+        System.out.println("Processing volume: " + volumeKey);
 
         if (bucketFilter != null) {
           OmBucketInfo bucketInfo = bucketTable.get(volumeKey + "/" + bucketFilter);

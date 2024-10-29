@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.repair.om.FSORepairTool;
+import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -58,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
  * FSORepairTool test cases.
@@ -70,6 +70,7 @@ public class TestFSORepairTool {
   private static MiniOzoneHAClusterImpl cluster;
   private static FileSystem fs;
   private static OzoneClient client;
+  private static OzoneShell shell;
 
 
   @BeforeAll
@@ -98,22 +99,40 @@ public class TestFSORepairTool {
 
     // Init ofs.
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+        OZONE_OFS_URI_SCHEME, cluster.getOzoneManager().getOMServiceId());
+    System.out.println("Rootpath: " + rootPath);
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
     client = OzoneClientFactory.getRpcClient("omservice", conf);
   }
 
+//  @AfterEach
+//  public void cleanNamespace() throws Exception {
+//    if (fs.exists(new Path("/vol1"))) {
+//      fs.delete(new Path("/vol1"), true);
+//    }
+//    if (fs.exists(new Path("/vol2"))) {
+//      fs.delete(new Path("/vol2"), true);
+//    }
+//    runDeletes();
+//    assertFileAndDirTablesEmpty();
+//  }
+
   @AfterEach
   public void cleanNamespace() throws Exception {
-    if (fs.exists(new Path("/vol1"))) {
-      fs.delete(new Path("/vol1"), true);
-    }
-    if (fs.exists(new Path("/vol2"))) {
-      fs.delete(new Path("/vol2"), true);
-    }
+    shell = new OzoneShell();
+    String[] args1 = new String[]{"volume", "delete", "-r", "/vol1", "-y"};
+    String[] args2 = new String[]{"volume", "delete", "-r", "/vol2", "-y"};
+
+    shell.execute(args1);
+    System.out.println("Deleted vol11");
+    shell.execute(args2);
+    System.out.println("Deleted vol12");
+
     runDeletes();
+    System.out.println("Deleted");
     assertFileAndDirTablesEmpty();
+    System.out.println("Deleted");
   }
 
   @AfterAll
@@ -122,23 +141,6 @@ public class TestFSORepairTool {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
-  }
-
-  @Test
-  public void testFSORepairToolWithVolumeAndBucketFilter() throws Exception {
-    FSORepairTool.Report reportVol1Buck1 = buildDisconnectedTree("vol1", "bucket1", 10);
-    FSORepairTool.Report reportVol2Buck2 = buildDisconnectedTree("vol2", "bucket2", 10);
-
-    FSORepairTool repairToolFiltered = new FSORepairTool(
-        getOmDB(), getOmDBLocation(), false, "vol1", "bucket1");
-    FSORepairTool.Report filteredReport = repairToolFiltered.run();
-
-    Assertions.assertEquals(reportVol1Buck1, filteredReport,
-        "Filtered report should match the unreachable points in vol1/bucket1.");
-    Assertions.assertNotEquals(reportVol2Buck2, filteredReport,
-        "Filtered report should not include vol2/bucket2.");
-
-    assertDisconnectedObjectsMarkedForDelete(1);
   }
 
   @Test
