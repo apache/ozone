@@ -71,16 +71,19 @@ class App extends React.Component<Record<string, object>, IAppState> {
           }
           <Layout className={layoutClass}>
             <Header>
-              <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {(enableOldUI) ? <Breadcrumbs /> : <BreadcrumbsV2 />}
-                <AntDSwitch
-                  unCheckedChildren={<div style={{ paddingRight: '2px' }}>UI v2</div>}
-                  checkedChildren={<div style={{ paddingLeft: '2px' }}>UI v1</div>}
-                  onChange={(checked: boolean) => {
-                    this.setState({
-                      enableOldUI: checked
-                    });
-                  }} />
+                <span>
+                  <span style={{ marginRight: '8px', color: '#515151'}}>Switch to</span>
+                  <AntDSwitch
+                    unCheckedChildren={<div style={{ paddingRight: '2px' }}>Old UI</div>}
+                    checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                    onChange={(checked: boolean) => {
+                      this.setState({
+                        enableOldUI: checked
+                      });
+                    }} />
+                </span>
               </div>
             </Header>
             <Content style={(enableOldUI) ? { margin: '0 16px 0', overflow: 'initial' } : {}}>
