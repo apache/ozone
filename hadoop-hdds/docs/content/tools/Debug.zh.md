@@ -35,15 +35,15 @@ Developer tools for Ozone Debug operations
       --verbose   More verbose output. Show the stack trace of the errors.
 ```
 子命令:
-  chunkinfo                  返回有关现有键的块位置信息
+  chunkinfo                  返回指定文件/对象的块位置信息。
   print-log-dag, pld         在 OM 中创建当前压缩日志 DAG 的镜像。
-  find-missing-padding, fmp  列出所有缺少填充的键，可以选择限制为卷/存储桶/键 URI。
-  recover                    恢复指定文件的租约。如果 ofs:// 不是默认值，请确保指定文件系统方案。
-  prefix                     解析前缀内容
-  ldb                        解析 rocksdb 文件内容
-  read-replicas              读取与给定键关联的所有块的每个副本。
-  container                  仅在数据节点上执行容器副本特定操作
-  ratislogparser             以可理解的文本打印 Ratis Log 的外壳
+  find-missing-padding, fmp  列出所有缺少填充的文件/对象，可以选择指定卷/存储桶/键 URI。
+  recover                    恢复指定文件的租约。如果默认值不是 ofs:// ，请确保指定文件系统schema。
+  prefix                     解析前缀内容。
+  ldb                        解析 rocksdb 文件内容。
+  read-replicas              读取给定路径文件/对象所有块的每个副本。
+  container                  容器副本特定操作，仅在数据节点上执行。
+  ratislogparser             解析Ratis Log 成用户可理解的文字形式。
 
 有关更详细的用法，请参阅每个子命令的“--help”输出。
 
@@ -66,7 +66,7 @@ Commands:
 
 ### list_column_families command
 
-`list_column_families` 命令列出了提供的数据库中的所有列族。
+`list_column_families` 命令列出指定数据库中的所有列族。
 
 ```bash
 $ ozone debug ldb --db=/path/to/scm.db ls
@@ -140,7 +140,7 @@ Parse specified metadataTable
 ```
 默认情况下，内容打印在控制台上，但可以使用 `--out` 选项将其重定向到文件。 <br>
 `--length` 可用于限制打印的记录数。 <br>
-`--count` 不打印记录，它显示大概的记录数。这是不准确的。 <br>
+`--count` 不打印记录，它显示大概的，并不是完全精确的记录数。 <br>
 `ozone debug ldb scan` 命令提供了许多过滤选项以使调试更容易，详细说明如下：<br>
 
 <div class="alert alert-success" role="alert">
@@ -149,7 +149,7 @@ Parse specified metadataTable
 
 #### --startkey and --endkey
 顾名思义，这些选项指定迭代需要发生的键。  <br>
-`--startkey` 指定从哪个键开始迭代，它是包含的。 `--endkey` 指定停止迭代的键，它是独占的。
+`--startkey` 指定从哪个键开始迭代，包含该键。 `--endkey` 指定停止迭代的键，不包含该键。
 
 ```bash
 $ ozone debug ldb --db=/path/to/om.db scan --cf=volumeTable --startkey=vol3 --endkey=vol5
