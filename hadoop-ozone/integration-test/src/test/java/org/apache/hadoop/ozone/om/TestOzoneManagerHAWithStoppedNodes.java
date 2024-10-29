@@ -77,7 +77,6 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
  * @see TestOzoneManagerHAWithAllRunning
  */
-@Flaky("HDDS-11352")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
