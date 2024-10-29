@@ -407,7 +407,7 @@ public class OMRangerBGSyncService extends BackgroundService {
           raftClientRequest);
     } catch (ServiceException e) {
       LOG.error("SetRangerServiceVersion request failed. "
-          + "Will retry at next run.");
+          + "Will retry at next run.", e);
       throw e;
     }
   }

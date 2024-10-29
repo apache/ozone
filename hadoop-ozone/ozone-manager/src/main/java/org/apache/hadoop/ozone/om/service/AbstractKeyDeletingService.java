@@ -252,7 +252,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       ozoneManager.getOmRatisServer().submitRequest(omRequest,
           raftClientRequest);
     } catch (ServiceException e) {
-      LOG.error("PurgeKey request failed. Will retry at next run.");
+      LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
     }
 
@@ -321,7 +321,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             .submitRequest(null, omRequest);
       }
     } catch (ServiceException e) {
-      LOG.error("PurgePaths request failed. Will retry at next run.");
+      LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
   }
 
