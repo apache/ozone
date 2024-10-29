@@ -62,6 +62,10 @@ public final class ContainerClientMetrics {
   private MutableRate hsyncWaitForFlushNs;
   @Metric
   private MutableRate hsyncWatchForCommitNs;
+  @Metric
+  private MutableCounterLong writeChunksDuringWrite;
+  @Metric
+  private MutableCounterLong flushesDuringWrite;
 
 
   private MutableQuantiles[] listBlockLatency;
@@ -276,5 +280,13 @@ public final class ContainerClientMetrics {
 
   public MutableRate getHsyncWatchForCommitNs() {
     return hsyncWatchForCommitNs;
+  }
+
+  public MutableCounterLong getWriteChunksDuringWrite() {
+    return writeChunksDuringWrite;
+  }
+
+  public MutableCounterLong getFlushesDuringWrite() {
+    return flushesDuringWrite;
   }
 }

@@ -362,6 +362,7 @@ public class BlockOutputStream extends OutputStream {
   private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       LOG.debug("WriteChunk from write(), buffer = {}", currentBuffer);
+      clientMetrics.getWriteChunksDuringWrite().incr();
       writeChunk(currentBuffer);
       updateWriteChunkLength();
     }
@@ -406,6 +407,7 @@ public class BlockOutputStream extends OutputStream {
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
         recordWatchForCommitAsync(putBlockFuture);
+        clientMetrics.getFlushesDuringWrite().incr();
       }
 
       if (bufferPool.isAtCapacity()) {
