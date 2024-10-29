@@ -132,8 +132,10 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/_keytabs
 
 for file in $(find "${ROOT}" -path '*/target/classes/*.classpath' | sort); do
+  # We need to add the artifact manually as it's not part the generated classpath desciptor
   module=$(basename "${file%.classpath}")
   sed -i -e "s;$;:\$HDDS_LIB_JARS_DIR/${module}-${HDDS_VERSION}.jar;" "$file"
+
   cp -n -p -v "$file" share/ozone/classpath/
 done
 
