@@ -33,10 +33,16 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DomainSocketFactory implements Closeable {
+/**
+ *  A factory to help create DomainSocket.
+ */
+public final class DomainSocketFactory implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(
       DomainSocketFactory.class);
 
+  /**
+   *  Domain socket path state.
+   */
   public enum PathState {
     NOT_CONFIGURED(false),
     DISABLED(false),
@@ -52,13 +58,16 @@ public class DomainSocketFactory implements Closeable {
     private final boolean usableForShortCircuit;
   }
 
+  /**
+   *  Domain socket path.
+   */
   public static class PathInfo {
-    private final static PathInfo NOT_CONFIGURED = new PathInfo("", PathState.NOT_CONFIGURED);
-    private final static PathInfo DISABLED = new PathInfo("", PathState.DISABLED);
-    private final static PathInfo VALID = new PathInfo("", PathState.VALID);
+    private static final PathInfo NOT_CONFIGURED = new PathInfo("", PathState.NOT_CONFIGURED);
+    private static final PathInfo DISABLED = new PathInfo("", PathState.DISABLED);
+    private static final PathInfo VALID = new PathInfo("", PathState.VALID);
 
-    final private String path;
-    final private PathState state;
+    private final String path;
+    private final PathState state;
 
     PathInfo(String path, PathState state) {
       this.path = path;
@@ -79,16 +88,13 @@ public class DomainSocketFactory implements Closeable {
     }
   }
 
-  /**
-   * Information about domain socket paths.
-   */
-  public static String FEATURE = "short-circuit local reads";
-  public static String FEATURE_FLAG = "SC";
-  public static boolean nativeCodeLoaded = false;
-  public static String nativeLibraryLoadFailureReason;
+  public static final String FEATURE = "short-circuit reads";
+  public static final String FEATURE_FLAG = "SC";
+  private static boolean nativeCodeLoaded = false;
+  private static String nativeLibraryLoadFailureReason;
   private long pathExpireMills;
-  private ConcurrentHashMap<String, PathInfo> pathMap;
-  public Timer timer;
+  private final ConcurrentHashMap<String, PathInfo> pathMap;
+  private Timer timer;
   private boolean isEnabled = false;
   private String domainSocketPath;
 
@@ -103,7 +109,7 @@ public class DomainSocketFactory implements Closeable {
         LOG.info("Loaded the native-hadoop library");
         nativeCodeLoaded = true;
       } catch (Throwable t) {
-        // Ignore failure to load
+        // Ignore failure to continue
         LOG.info("Failed to load native-hadoop with error: " + t);
         LOG.info("java.library.path=" + System.getProperty("java.library.path"));
         nativeLibraryLoadFailureReason = "libhadoop cannot be loaded.";
@@ -126,16 +132,16 @@ public class DomainSocketFactory implements Closeable {
   }
 
   private DomainSocketFactory(ConfigurationSource conf) {
-    PathInfo pathInfo;
-    domainSocketPath = conf.get(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH_DEFAULT);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     boolean shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
+    PathInfo pathInfo;
     long startTime = System.nanoTime();
     if (!shortCircuitEnabled) {
       LOG.info(FEATURE + " is disabled.");
       pathInfo = PathInfo.NOT_CONFIGURED;
     } else {
+      domainSocketPath = conf.get(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
+          OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH_DEFAULT);
       if (domainSocketPath.isEmpty()) {
         throw new IllegalArgumentException(FEATURE + " is enabled but "
             + OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH + " is not set.");
@@ -210,7 +216,7 @@ public class DomainSocketFactory implements Closeable {
       sock.setAttribute(DomainSocket.RECEIVE_TIMEOUT, readTimeoutMs);
       sock.setAttribute(DomainSocket.SEND_TIMEOUT, writeTimeoutMs);
       success = true;
-      LOG.info("{} is created 'within' {} ns", sock, System.nanoTime() - startTime);
+      LOG.info("{} is created within {} ns", sock, System.nanoTime() - startTime);
     } catch (IOException e) {
       LOG.error("Failed to create DomainSocket", e);
       throw e;

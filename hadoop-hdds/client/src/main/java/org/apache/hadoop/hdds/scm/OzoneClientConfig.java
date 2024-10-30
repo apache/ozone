@@ -39,7 +39,6 @@ public class OzoneClientConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientConfig.class);
 
-  public static final String OZONE_READ_SHORT_CIRCUIT = "ozone.client.read.short-circuit";
   public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
   public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
   public static final String OZONE_DOMAIN_SOCKET_PATH_DEFAULT = "/var/lib/ozone/dn_socket";
@@ -69,13 +68,14 @@ public class OzoneClientConfig {
       tags = { ConfigTag.CLIENT })
   private long shortCircuitReadDisableInterval = 60 * 10;
 
-  public long getShortCircuitReadDisableInterval() {
-    return shortCircuitReadDisableInterval;
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
   }
 
-  public void setShortCircuitReadDisableInterval(long value) {
-    shortCircuitReadDisableInterval = value;
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
   }
+
 
   public int getShortCircuitBufferSize() {
     return shortCircuitBufferSize;
@@ -83,6 +83,14 @@ public class OzoneClientConfig {
 
   public void setShortCircuitBufferSize(int size) {
     this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
   }
 
   /**
@@ -603,13 +611,5 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
-  }
-
-  public boolean isShortCircuitEnabled() {
-    return shortCircuitEnabled;
-  }
-
-  public void setShortCircuit(boolean enabled) {
-    shortCircuitEnabled = enabled;
   }
 }
