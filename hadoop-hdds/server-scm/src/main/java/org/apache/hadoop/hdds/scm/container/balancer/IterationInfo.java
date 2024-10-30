@@ -25,7 +25,7 @@ public class IterationInfo {
 
   private final Integer iterationNumber;
   private final String iterationResult;
-  private final long iterationDuration;
+  private final Long iterationDuration;
 
   public IterationInfo(Integer iterationNumber, String iterationResult, long iterationDuration) {
     this.iterationNumber = iterationNumber;
@@ -41,7 +41,7 @@ public class IterationInfo {
     return iterationResult;
   }
 
-  public long getIterationDuration() {
+  public Long getIterationDuration() {
     return iterationDuration;
   }
 }

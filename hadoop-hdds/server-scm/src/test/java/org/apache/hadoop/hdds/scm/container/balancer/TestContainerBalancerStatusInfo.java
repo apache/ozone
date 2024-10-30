@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.commons.math3.util.ArithmeticUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -25,10 +26,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link ContainerBalancerStatusInfo}.
@@ -48,14 +49,186 @@ class TestContainerBalancerStatusInfo {
     ContainerBalancerTask task = mockedScm.startBalancerTask(config);
     List<ContainerBalancerTaskIterationStatusInfo> iterationStatistics = task.getCurrentIterationsStatistic();
     assertEquals(3, iterationStatistics.size());
-    iterationStatistics.forEach(is -> {
-      assertTrue(is.getContainerMovesCompleted() > 0);
-      assertEquals(0, is.getContainerMovesFailed());
-      assertEquals(0, is.getContainerMovesTimeout());
-      assertFalse(is.getSizeEnteringNodes().isEmpty());
-      assertFalse(is.getSizeLeavingNodes().isEmpty());
-    });
 
+    ContainerBalancerTaskIterationStatusInfo iterationHistory1 = iterationStatistics.get(0);
+    verifyCompletedIteration(iterationHistory1, 1, "ITERATION_COMPLETED");
+
+    ContainerBalancerTaskIterationStatusInfo iterationHistory2 = iterationStatistics.get(1);
+    verifyCompletedIteration(iterationHistory2, 2, "ITERATION_COMPLETED");
+
+    ContainerBalancerTaskIterationStatusInfo currentIteration = iterationStatistics.get(2);
+    verifyCompletedIteration1(currentIteration, 3, null);
+  }
+
+  @Test
+  void testReRequestIterationStatistics() throws InterruptedException {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(2);
+    config.setBalancingInterval(0);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTask(config);
+    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    Thread.sleep(1000L);
+    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
+    assertEquals(firstRequestIterationStatistics.get(1), secondRequestIterationStatistics.get(1));
+
+    assertEquals(firstRequestIterationStatistics.get(2).getIterationNumber(), secondRequestIterationStatistics.get(2).getIterationNumber());
+    assertNotEquals(firstRequestIterationStatistics.get(2).getIterationDuration(), secondRequestIterationStatistics.get(2).getIterationDuration());
+  }
+
+  @Test
+  void testGetCurrentStatisticsRequestInPeriodBetweenIterations() throws InterruptedException {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(2);
+    config.setBalancingInterval(10000);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
+    // Delay in finishing the first iteration
+    Thread.sleep(1000L);
+    List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
+    assertEquals(2, iterationsStatic.size());
+
+    ContainerBalancerTaskIterationStatusInfo firstIteration = iterationsStatic.get(0);
+    verifyCompletedIteration(firstIteration, 1, "ITERATION_COMPLETED");
+
+    assertEquals(2, iterationsStatic.get(1).getIterationNumber());
+    assertTrue(iterationsStatic.get(1).getIterationDuration() > 0);
+    assertNull(iterationsStatic.get(1).getIterationResult());
+    assertEquals(0, iterationsStatic.get(1).getContainerMovesScheduled());
+    assertEquals(0, iterationsStatic.get(1).getContainerMovesCompleted());
+    assertEquals(0, iterationsStatic.get(1).getContainerMovesFailed());
+    assertEquals(0, iterationsStatic.get(1).getContainerMovesTimeout());
+    assertEquals(0, iterationsStatic.get(1).getSizeScheduledForMove());
+    assertEquals(0, iterationsStatic.get(1).getDataSizeMoved());
+    assertEquals(0, iterationsStatic.get(1).getSizeEnteringNodes().size());
+    assertEquals(0, iterationsStatic.get(1).getSizeLeavingNodes().size());
+  }
+
+  @Test
+  void testCurrentStatisticsDoesntChangeWhenReRequestInPeriodBetweenIterations() throws InterruptedException {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(2);
+    config.setBalancingInterval(10000);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
+    // Delay in finishing the first iteration
+    Thread.sleep(1000L);
+    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    // Delay occurred for some time during the period between iterations.
+    Thread.sleep(1000L);
+    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    assertEquals(2, firstRequestIterationStatistics.size());
+    assertEquals(2, secondRequestIterationStatistics.size());
+    assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
+
+    assertEquals(firstRequestIterationStatistics.get(1).getIterationNumber(), secondRequestIterationStatistics.get(1).getIterationNumber());
+    assertNotEquals(firstRequestIterationStatistics.get(1).getIterationDuration(), secondRequestIterationStatistics.get(1).getIterationDuration());
+    assertEquals(firstRequestIterationStatistics.get(1).getIterationResult(), secondRequestIterationStatistics.get(1).getIterationResult());
+    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesScheduled(), secondRequestIterationStatistics.get(1).getContainerMovesScheduled());
+    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesCompleted(), secondRequestIterationStatistics.get(1).getContainerMovesCompleted());
+    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesFailed(), secondRequestIterationStatistics.get(1).getContainerMovesFailed());
+    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesTimeout(), secondRequestIterationStatistics.get(1).getContainerMovesTimeout());
+    assertEquals(firstRequestIterationStatistics.get(1).getSizeScheduledForMove(), secondRequestIterationStatistics.get(1).getSizeScheduledForMove());
+    assertEquals(firstRequestIterationStatistics.get(1).getDataSizeMoved(), secondRequestIterationStatistics.get(1).getDataSizeMoved());
+    assertEquals(firstRequestIterationStatistics.get(1).getSizeEnteringNodes().size(), secondRequestIterationStatistics.get(1).getSizeEnteringNodes().size());
+    assertEquals(firstRequestIterationStatistics.get(1).getSizeLeavingNodes().size(), secondRequestIterationStatistics.get(1).getSizeLeavingNodes().size());
+  }
+
+  @Test
+  void testGetCurrentStatisticsWithDelay() throws InterruptedException {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(2);
+    config.setBalancingInterval(0);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, true);
+    // Delay in finishing the first iteration
+    Thread.sleep(1000L);
+    List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
+    assertEquals(1, iterationsStatic.size());
+    ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(0);
+    assertEmptyIteration(currentIteration);
+  }
+
+  private static void assertEmptyIteration(ContainerBalancerTaskIterationStatusInfo iterationsStatic) {
+
+    assertEquals(-1, iterationsStatic.getIterationDuration());
+    assertNull(iterationsStatic.getIterationResult());
+    assertEquals(0, iterationsStatic.getContainerMovesScheduled());
+    assertEquals(0, iterationsStatic.getContainerMovesCompleted());
+    assertEquals(0, iterationsStatic.getContainerMovesFailed());
+    assertEquals(0, iterationsStatic.getContainerMovesTimeout());
+    assertEquals(0, iterationsStatic.getSizeScheduledForMove());
+    assertEquals(0, iterationsStatic.getDataSizeMoved());
+    assertEquals(0, iterationsStatic.getSizeEnteringNodes().size());
+    assertEquals(0, iterationsStatic.getSizeLeavingNodes().size());
+  }
+
+  private void verifyCompletedIteration(
+      ContainerBalancerTaskIterationStatusInfo iteration,
+      Integer expectedIterationNumber,
+      String iterationResult
+  ) {
+    assertEquals(expectedIterationNumber, iteration.getIterationNumber());
+    assertEquals("ITERATION_COMPLETED", iteration.getIterationResult());
+    assertNotNull(iteration.getIterationDuration());
+    assertTrue(iteration.getContainerMovesScheduled() > 0);
+    assertTrue(iteration.getContainerMovesCompleted() > 0);
+    assertEquals(0, iteration.getContainerMovesFailed());
+    assertEquals(0, iteration.getContainerMovesTimeout());
+    assertTrue(iteration.getSizeScheduledForMove() > 0);
+    assertTrue(iteration.getDataSizeMoved() > 0);
+    assertFalse(iteration.getSizeEnteringNodes().isEmpty());
+    assertFalse(iteration.getSizeLeavingNodes().isEmpty());
+    iteration.getSizeEnteringNodes().forEach((id, size) -> {
+      assertNotNull(id);
+      assertTrue(size > 0);
+    });
+    iteration.getSizeLeavingNodes().forEach((id, size) -> {
+      assertNotNull(id);
+      assertTrue(size > 0);
+    });
+    Long enteringDataSum = getTotalMovedData(iteration.getSizeEnteringNodes());
+    Long leavingDataSum = getTotalMovedData(iteration.getSizeLeavingNodes());
+    assertEquals(enteringDataSum, leavingDataSum);
+  }
+
+  private void verifyCompletedIteration1(
+      ContainerBalancerTaskIterationStatusInfo iteration,
+      Integer expectedIterationNumber,
+      String iterationResult
+  ) {
+    assertEquals(expectedIterationNumber, iteration.getIterationNumber());
+    assertEquals(iterationResult, iteration.getIterationResult());
+    assertNotNull(iteration.getIterationDuration());
+    assertEquals(0,iteration.getContainerMovesScheduled());
+    assertEquals(0,iteration.getContainerMovesCompleted());
+    assertEquals(0, iteration.getContainerMovesFailed());
+    assertEquals(0, iteration.getContainerMovesTimeout());
+    assertEquals(0, iteration.getSizeScheduledForMove());
+    assertEquals(0, iteration.getDataSizeMoved());
+    assertTrue(iteration.getSizeEnteringNodes().isEmpty());
+    assertTrue(iteration.getSizeLeavingNodes().isEmpty());
+  }
+
+  private static Long getTotalMovedData(Map<UUID, Long> iteration) {
+    return iteration.values().stream().reduce(0L, ArithmeticUtils::addAndCheck);
   }
 
   /**

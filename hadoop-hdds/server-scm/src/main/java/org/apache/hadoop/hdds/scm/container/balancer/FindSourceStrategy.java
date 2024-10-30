@@ -92,4 +92,9 @@ public interface FindSourceStrategy {
    * @return nodeId to size leaving from node map
    */
   Map<DatanodeDetails, Long> getSizeLeavingNodes();
+
+  /**
+   * Clear the map of node IDs and their corresponding data sizes that were moved from each node.
+   */
+  void clearSizeLeavingNodes();
 }

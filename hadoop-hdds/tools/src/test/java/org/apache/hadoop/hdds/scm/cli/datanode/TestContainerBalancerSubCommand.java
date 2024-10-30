@@ -106,8 +106,8 @@ class TestContainerBalancerSubCommand {
             .setIterationDuration(300L)
             .setSizeScheduledForMove(30 * GB)
             .setDataSizeMoved(30 * GB)
-            .setContainerMovesScheduled(11)
-            .setContainerMovesCompleted(11)
+            .setContainerMovesScheduled(8)
+            .setContainerMovesCompleted(8)
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
             .addSizeEnteringNodes(
@@ -139,11 +139,11 @@ class TestContainerBalancerSubCommand {
         StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
             .setIterationNumber(3)
             .setIterationResult("")
-            .setIterationDuration(4000L)
+            .setIterationDuration(370L)
             .setSizeScheduledForMove(48 * GB)
             .setDataSizeMoved(48 * GB)
-            .setContainerMovesScheduled(11)
-            .setContainerMovesCompleted(11)
+            .setContainerMovesScheduled(5)
+            .setContainerMovesCompleted(5)
             .setContainerMovesFailed(0)
             .setContainerMovesTimeout(0)
             .addSizeEnteringNodes(
@@ -171,8 +171,7 @@ class TestContainerBalancerSubCommand {
                     .build()
             )
             .build();
-    ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
-        ContainerBalancerStatusInfoResponseProto.newBuilder()
+    return ContainerBalancerStatusInfoResponseProto.newBuilder()
             .setIsRunning(true)
             .setContainerBalancerStatusInfo(ContainerBalancerStatusInfoProto.newBuilder()
                 .setStartedAt(OffsetDateTime.now().toEpochSecond())
@@ -183,7 +182,6 @@ class TestContainerBalancerSubCommand {
             )
 
             .build();
-    return statusInfoResponseProto;
   }
 
   private static ContainerBalancerConfiguration getContainerBalancerConfiguration() {
@@ -331,36 +329,16 @@ class TestContainerBalancerSubCommand {
         "Datanodes Excluded from Balancing                  None";
     assertTrue(output.contains(balancerConfigOutput));
 
-    String currentIterationOutput =
-        "Current iteration info:\n" +
-        "Key                                                Value\n" +
-        "Iteration number                                   3\n" +
-        "Iteration duration                                 1h 6m 40s\n" +
-        "Iteration result                                   IN_PROGRESS\n" +
-        "Size scheduled to move                             48 GB\n" +
-        "Moved data size                                    48 GB\n" +
-        "Scheduled to move containers                       11\n" +
-        "Already moved containers                           11\n" +
-        "Failed to move containers                          0\n" +
-        "Failed to move containers by timeout               0\n" +
-        "Entered data to nodes                              \n" +
-        "80f6bc27-e6f3-493e-b1f4-25f810ad960d <- 20 GB\n" +
-        "701ca98e-aa1a-4b36-b817-e28ed634bba6 <- 28 GB\n" +
-        "Exited data from nodes                             \n" +
-        "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
-        "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertTrue(output.contains(currentIterationOutput));
-
     assertTrue(output.contains("Iteration history list:"));
     String firstHistoryIterationOutput =
         "Key                                                Value\n" +
         "Iteration number                                   3\n" +
-        "Iteration duration                                 1h 6m 40s\n" +
-        "Iteration result                                   IN_PROGRESS\n" +
+        "Iteration duration                                 6m 10s\n" +
+        "Iteration result                                   -\n" +
         "Size scheduled to move                             48 GB\n" +
         "Moved data size                                    48 GB\n" +
-        "Scheduled to move containers                       11\n" +
-        "Already moved containers                           11\n" +
+        "Scheduled to move containers                       5\n" +
+        "Already moved containers                           5\n" +
         "Failed to move containers                          0\n" +
         "Failed to move containers by timeout               0\n" +
         "Entered data to nodes                              \n" +
@@ -378,8 +356,8 @@ class TestContainerBalancerSubCommand {
         "Iteration result                                   ITERATION_COMPLETED\n" +
         "Size scheduled to move                             30 GB\n" +
         "Moved data size                                    30 GB\n" +
-        "Scheduled to move containers                       11\n" +
-        "Already moved containers                           11\n" +
+        "Scheduled to move containers                       8\n" +
+        "Already moved containers                           8\n" +
         "Failed to move containers                          0\n" +
         "Failed to move containers by timeout               0\n" +
         "Entered data to nodes                              \n" +
@@ -445,12 +423,12 @@ class TestContainerBalancerSubCommand {
         "Current iteration info:\n" +
         "Key                                                Value\n" +
         "Iteration number                                   3\n" +
-        "Iteration duration                                 1h 6m 40s\n" +
-        "Iteration result                                   IN_PROGRESS\n" +
+        "Iteration duration                                 6m 10s\n" +
+        "Iteration result                                   -\n" +
         "Size scheduled to move                             48 GB\n" +
         "Moved data size                                    48 GB\n" +
-        "Scheduled to move containers                       11\n" +
-        "Already moved containers                           11\n" +
+        "Scheduled to move containers                       5\n" +
+        "Already moved containers                           5\n" +
         "Failed to move containers                          0\n" +
         "Failed to move containers by timeout               0\n" +
         "Entered data to nodes                              \n" +
@@ -465,7 +443,7 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  public void testContainerBalancerStatusInfoSubcommandRunningOnStoppedBalancer()
+  void testContainerBalancerStatusInfoSubcommandRunningOnStoppedBalancer()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 

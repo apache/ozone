@@ -128,7 +128,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Get the iteration duration.
    * @return iteration duration
    */
-  public long getIterationDuration() {
+  public Long getIterationDuration() {
     return iterationInfo.getIterationDuration();
   }
 

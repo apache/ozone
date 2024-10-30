@@ -137,9 +137,24 @@ public final class MockedSCM {
     return task;
   }
 
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(
+      @Nonnull ContainerBalancer containerBalancer,
+      @Nonnull ContainerBalancerConfiguration config,
+      Boolean withDelay) {
+    ContainerBalancerTask task = new ContainerBalancerTask(scm, 0, containerBalancer,
+        containerBalancer.getMetrics(), config, withDelay);
+    new Thread(task).start();
+    return task;
+  }
+
   public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
     init(config, new OzoneConfiguration());
     return startBalancerTask(new ContainerBalancer(scm), config);
+  }
+
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(@Nonnull ContainerBalancerConfiguration config, Boolean withDelay) {
+    init(config, new OzoneConfiguration());
+    return startBalancerTaskAsync(new ContainerBalancer(scm), config, withDelay);
   }
 
   public void enableLegacyReplicationManager() {
