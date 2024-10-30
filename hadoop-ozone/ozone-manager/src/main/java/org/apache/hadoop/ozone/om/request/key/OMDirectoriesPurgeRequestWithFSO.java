@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -75,6 +76,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
     OMMetrics omMetrics = ozoneManager.getMetrics();
+    DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     final SnapshotInfo fromSnapshotInfo;
@@ -98,6 +100,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
+      int numDirDeleted = 0, numSubFilesDeleted = 0;
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -111,6 +114,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
+          deletingServiceMetrics.incrNumDirPurged(1);
+          numDirDeleted++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -153,6 +158,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
 
           omMetrics.decNumKeys();
+          deletingServiceMetrics.incrNumSubKeysPurged(1);
+          numSubFilesDeleted++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -169,6 +176,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
       }
+      deletingServiceMetrics.setNumDirPurgedInLatestRequest(numDirDeleted);
+      deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(numSubFilesDeleted);
+
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
