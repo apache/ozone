@@ -76,9 +76,11 @@ class TestContainerBalancerStatusInfo {
     config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
 
     ContainerBalancerTask task = mockedScm.startBalancerTask(config);
-    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics =
+        task.getCurrentIterationsStatistic();
     Thread.sleep(1000L);
-    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics =
+        task.getCurrentIterationsStatistic();
     assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
     assertEquals(firstRequestIterationStatistics.get(1), secondRequestIterationStatistics.get(1));
 
@@ -133,10 +135,12 @@ class TestContainerBalancerStatusInfo {
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
     // Delay in finishing the first iteration
     Thread.sleep(1000L);
-    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    List<ContainerBalancerTaskIterationStatusInfo> firstRequestIterationStatistics =
+        task.getCurrentIterationsStatistic();
     // Delay occurred for some time during the period between iterations.
     Thread.sleep(1000L);
-    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics = task.getCurrentIterationsStatistic();
+    List<ContainerBalancerTaskIterationStatusInfo> secondRequestIterationStatistics =
+        task.getCurrentIterationsStatistic();
     assertEquals(2, firstRequestIterationStatistics.size());
     assertEquals(2, secondRequestIterationStatistics.size());
     assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
@@ -246,8 +250,8 @@ class TestContainerBalancerStatusInfo {
     assertEquals(expectedIterationNumber, iteration.getIterationNumber());
     assertNull(iteration.getIterationResult());
     assertNotNull(iteration.getIterationDuration());
-    assertEquals(0,iteration.getContainerMovesScheduled());
-    assertEquals(0,iteration.getContainerMovesCompleted());
+    assertEquals(0, iteration.getContainerMovesScheduled());
+    assertEquals(0, iteration.getContainerMovesCompleted());
     assertEquals(0, iteration.getContainerMovesFailed());
     assertEquals(0, iteration.getContainerMovesTimeout());
     assertEquals(0, iteration.getSizeScheduledForMove());
