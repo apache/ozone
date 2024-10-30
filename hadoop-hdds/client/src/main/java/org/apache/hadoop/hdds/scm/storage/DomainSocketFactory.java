@@ -192,7 +192,7 @@ public final class DomainSocketFactory implements Closeable {
     PathInfo status = pathMap.get(escapedPath);
     if (status == null) {
       PathInfo pathInfo = new PathInfo(escapedPath, PathState.VALID);
-      pathMap.put(escapedPath, pathInfo);
+      pathMap.putIfAbsent(escapedPath, pathInfo);
       return pathInfo;
     } else {
       return status;
