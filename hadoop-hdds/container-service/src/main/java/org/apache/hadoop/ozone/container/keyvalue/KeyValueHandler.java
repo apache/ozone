@@ -560,6 +560,8 @@ public class KeyValueHandler extends Handler {
         endOfBlock = true;
       }
 
+      // Note: checksum held inside blockData. But no extra checksum validation here with handlePutBlock.
+
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
@@ -888,6 +890,7 @@ public class KeyValueHandler extends Handler {
       if (isWrite) {
         data =
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
+        // TODO: Can improve checksum validation here. Make this one-shot after protocol change.
         validateChunkChecksumData(data, chunkInfo);
       }
       chunkManager

@@ -841,6 +841,8 @@ public class BlockOutputStream extends OutputStream {
     if (lastChunkBuffer != null) {
       DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
       lastChunkBuffer = null;
+      // Clear checksum cache
+      checksum.clearChecksumCache();
     }
   }
 
@@ -890,7 +892,10 @@ public class BlockOutputStream extends OutputStream {
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    ChecksumData checksumData = checksum.computeChecksum(chunk);
+    // chunk is incremental, don't cache its checksum
+    ChecksumData checksumData = checksum.computeChecksum(chunk, false);
+    // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
+    // current impl does not support caching both
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -1041,6 +1046,8 @@ public class BlockOutputStream extends OutputStream {
       appendLastChunkBuffer(chunk, 0, remainingBufferSize);
       updateBlockDataWithLastChunkBuffer();
       checksum.clearChecksumCache();  // New chunk, clear the checksum cache
+      // TODO: Can make the cache impl a bit more robust by associating ChecksumCache with ChunkBuffer/ByteBuffer rather
+      //  than the Checksum object.
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
@@ -1125,7 +1132,8 @@ public class BlockOutputStream extends OutputStream {
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
     ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer);
+        checksum.computeChecksum(lastChunkBuffer, true);
+    // Cache checksum here. This checksum is stored in blockData (and later transferred in PutBlock)
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()

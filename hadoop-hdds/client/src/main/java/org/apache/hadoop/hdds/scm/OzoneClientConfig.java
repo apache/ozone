@@ -178,6 +178,8 @@ public class OzoneClientConfig {
       tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private int bytesPerChecksum = 16 * 1024;
 
+  // TODO: Add block chunk checksum cache client option
+
   @Config(key = "verify.checksum",
       defaultValue = "true",
       description = "Ozone client to verify checksum of the checksum "

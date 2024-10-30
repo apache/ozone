@@ -133,13 +133,13 @@ public class Checksum {
    * Constructs a Checksum object.
    * @param type type of Checksum
    * @param bytesPerChecksum number of bytes of data per checksum
-   * @param useChecksumCache true to enable checksum cache
+   * @param allowChecksumCache true to enable checksum cache
    */
-  public Checksum(ChecksumType type, int bytesPerChecksum, boolean useChecksumCache) {
+  public Checksum(ChecksumType type, int bytesPerChecksum, boolean allowChecksumCache) {
     this.checksumType = type;
     this.bytesPerChecksum = bytesPerChecksum;
-    LOG.debug("useChecksumCache = {}", useChecksumCache);
-    if (useChecksumCache) {
+    LOG.debug("allowChecksumCache = {}", allowChecksumCache);
+    if (allowChecksumCache) {
       this.checksumCache = new ChecksumCache(bytesPerChecksum);
     } else {
       this.checksumCache = null;
@@ -167,12 +167,24 @@ public class Checksum {
   }
 
   /**
+   * The default implementation of computeChecksum(ByteBuffer) that does not use cache, even if cache is initialized.
+   * This is a stop-gap solution before the protocol change.
+   * @param data ByteBuffer
+   * @return ChecksumData
+   * @throws OzoneChecksumException
+   */
+  public ChecksumData computeChecksum(ByteBuffer data)
+      throws OzoneChecksumException {
+    return computeChecksum(data, false);
+  }
+
+  /**
    * Computes checksum for give data.
    * @param data input data.
    * @return ChecksumData computed for input data.
    * @throws OzoneChecksumException thrown when ChecksumType is not recognized
    */
-  public ChecksumData computeChecksum(ByteBuffer data)
+  public ChecksumData computeChecksum(ByteBuffer data, boolean useChecksumCache)
       throws OzoneChecksumException {
     // If type is set to NONE, we do not need to compute the checksums. We also
     // need to avoid unnecessary conversions.
@@ -182,7 +194,7 @@ public class Checksum {
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
-    return computeChecksum(ChunkBuffer.wrap(data));
+    return computeChecksum(ChunkBuffer.wrap(data), useChecksumCache);
   }
 
   public ChecksumData computeChecksum(List<ByteString> byteStrings)
@@ -192,7 +204,19 @@ public class Checksum {
     return computeChecksum(ChunkBuffer.wrap(buffers));
   }
 
+  /**
+   * The default implementation of computeChecksum(ChunkBuffer) that does not use cache, even if cache is initialized.
+   * This is a stop-gap solution before the protocol change.
+   * @param data ChunkBuffer
+   * @return ChecksumData
+   * @throws OzoneChecksumException
+   */
   public ChecksumData computeChecksum(ChunkBuffer data)
+      throws OzoneChecksumException {
+    return computeChecksum(data, false);
+  }
+
+  public ChecksumData computeChecksum(ChunkBuffer data, boolean useCache)
       throws OzoneChecksumException {
     if (checksumType == ChecksumType.NONE) {
       // Since type is set to NONE, we do not need to compute the checksums
@@ -207,7 +231,7 @@ public class Checksum {
     }
 
     final List<ByteString> checksumList;
-    if (checksumCache == null) {
+    if (checksumCache == null || !useCache) {
       // When checksumCache is not enabled:
       // Checksum is computed for each bytesPerChecksum number of bytes of data
       // starting at offset 0. The last checksum might be computed for the

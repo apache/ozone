@@ -42,6 +42,8 @@ public class TestChecksum {
     return new Checksum(type, BYTES_PER_CHECKSUM, true);
   }
 
+  // TODO: Parameterize all test cases: useChecksumCache = [true, false]
+
   /**
    * Tests {@link Checksum#verifyChecksum(byte[], ChecksumData)}.
    */
