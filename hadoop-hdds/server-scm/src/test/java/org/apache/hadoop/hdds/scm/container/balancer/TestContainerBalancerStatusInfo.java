@@ -56,13 +56,13 @@ class TestContainerBalancerStatusInfo {
     assertEquals(3, iterationStatistics.size());
 
     ContainerBalancerTaskIterationStatusInfo iterationHistory1 = iterationStatistics.get(0);
-    verifyCompletedIteration(iterationHistory1, 1, "ITERATION_COMPLETED");
+    verifyCompletedIteration(iterationHistory1, 1);
 
     ContainerBalancerTaskIterationStatusInfo iterationHistory2 = iterationStatistics.get(1);
-    verifyCompletedIteration(iterationHistory2, 2, "ITERATION_COMPLETED");
+    verifyCompletedIteration(iterationHistory2, 2);
 
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationStatistics.get(2);
-    verifyCompletedIteration1(currentIteration, 3, null);
+    verifyEmptyIteration(currentIteration, 3);
   }
 
   @Test
@@ -82,8 +82,10 @@ class TestContainerBalancerStatusInfo {
     assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
     assertEquals(firstRequestIterationStatistics.get(1), secondRequestIterationStatistics.get(1));
 
-    assertEquals(firstRequestIterationStatistics.get(2).getIterationNumber(), secondRequestIterationStatistics.get(2).getIterationNumber());
-    assertNotEquals(firstRequestIterationStatistics.get(2).getIterationDuration(), secondRequestIterationStatistics.get(2).getIterationDuration());
+    assertEquals(firstRequestIterationStatistics.get(2).getIterationNumber(),
+        secondRequestIterationStatistics.get(2).getIterationNumber());
+    assertNotEquals(firstRequestIterationStatistics.get(2).getIterationDuration(),
+        secondRequestIterationStatistics.get(2).getIterationDuration());
   }
 
   @Test
@@ -103,7 +105,7 @@ class TestContainerBalancerStatusInfo {
     assertEquals(2, iterationsStatic.size());
 
     ContainerBalancerTaskIterationStatusInfo firstIteration = iterationsStatic.get(0);
-    verifyCompletedIteration(firstIteration, 1, "ITERATION_COMPLETED");
+    verifyCompletedIteration(firstIteration, 1);
 
     assertEquals(2, iterationsStatic.get(1).getIterationNumber());
     assertTrue(iterationsStatic.get(1).getIterationDuration() > 0);
@@ -139,17 +141,41 @@ class TestContainerBalancerStatusInfo {
     assertEquals(2, secondRequestIterationStatistics.size());
     assertEquals(firstRequestIterationStatistics.get(0), secondRequestIterationStatistics.get(0));
 
-    assertEquals(firstRequestIterationStatistics.get(1).getIterationNumber(), secondRequestIterationStatistics.get(1).getIterationNumber());
-    assertNotEquals(firstRequestIterationStatistics.get(1).getIterationDuration(), secondRequestIterationStatistics.get(1).getIterationDuration());
-    assertEquals(firstRequestIterationStatistics.get(1).getIterationResult(), secondRequestIterationStatistics.get(1).getIterationResult());
-    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesScheduled(), secondRequestIterationStatistics.get(1).getContainerMovesScheduled());
-    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesCompleted(), secondRequestIterationStatistics.get(1).getContainerMovesCompleted());
-    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesFailed(), secondRequestIterationStatistics.get(1).getContainerMovesFailed());
-    assertEquals(firstRequestIterationStatistics.get(1).getContainerMovesTimeout(), secondRequestIterationStatistics.get(1).getContainerMovesTimeout());
-    assertEquals(firstRequestIterationStatistics.get(1).getSizeScheduledForMove(), secondRequestIterationStatistics.get(1).getSizeScheduledForMove());
-    assertEquals(firstRequestIterationStatistics.get(1).getDataSizeMoved(), secondRequestIterationStatistics.get(1).getDataSizeMoved());
-    assertEquals(firstRequestIterationStatistics.get(1).getSizeEnteringNodes().size(), secondRequestIterationStatistics.get(1).getSizeEnteringNodes().size());
-    assertEquals(firstRequestIterationStatistics.get(1).getSizeLeavingNodes().size(), secondRequestIterationStatistics.get(1).getSizeLeavingNodes().size());
+    ContainerBalancerTaskIterationStatusInfo currentIterationFromFirstRequest =
+        firstRequestIterationStatistics.get(1);
+    ContainerBalancerTaskIterationStatusInfo currentIterationFromSecondRequest =
+        secondRequestIterationStatistics.get(1);
+    assertEquals(
+        currentIterationFromFirstRequest.getIterationNumber(),
+        currentIterationFromSecondRequest.getIterationNumber());
+    assertNotEquals(
+        currentIterationFromFirstRequest.getIterationDuration(),
+        currentIterationFromSecondRequest.getIterationDuration());
+    assertEquals(
+        currentIterationFromFirstRequest.getIterationResult(),
+        currentIterationFromSecondRequest.getIterationResult());
+    assertEquals(
+        currentIterationFromFirstRequest.getContainerMovesScheduled(),
+        currentIterationFromSecondRequest.getContainerMovesScheduled());
+    assertEquals(
+        currentIterationFromFirstRequest.getContainerMovesCompleted(),
+        currentIterationFromSecondRequest.getContainerMovesCompleted());
+    assertEquals(
+        currentIterationFromFirstRequest.getContainerMovesFailed(),
+        currentIterationFromSecondRequest.getContainerMovesFailed());
+    assertEquals(
+        currentIterationFromFirstRequest.getContainerMovesTimeout(),
+        currentIterationFromSecondRequest.getContainerMovesTimeout());
+    assertEquals(
+        currentIterationFromFirstRequest.getSizeScheduledForMove(),
+        currentIterationFromSecondRequest.getSizeScheduledForMove());
+    assertEquals(currentIterationFromFirstRequest.getDataSizeMoved(),
+        currentIterationFromSecondRequest.getDataSizeMoved());
+    assertEquals(currentIterationFromFirstRequest.getSizeEnteringNodes().size(),
+        currentIterationFromSecondRequest.getSizeEnteringNodes().size());
+    assertEquals(
+        currentIterationFromFirstRequest.getSizeLeavingNodes().size(),
+        currentIterationFromSecondRequest.getSizeLeavingNodes().size());
   }
 
   @Test
@@ -187,8 +213,7 @@ class TestContainerBalancerStatusInfo {
 
   private void verifyCompletedIteration(
       ContainerBalancerTaskIterationStatusInfo iteration,
-      Integer expectedIterationNumber,
-      String iterationResult
+      Integer expectedIterationNumber
   ) {
     assertEquals(expectedIterationNumber, iteration.getIterationNumber());
     assertEquals("ITERATION_COMPLETED", iteration.getIterationResult());
@@ -214,13 +239,12 @@ class TestContainerBalancerStatusInfo {
     assertEquals(enteringDataSum, leavingDataSum);
   }
 
-  private void verifyCompletedIteration1(
+  private void verifyEmptyIteration(
       ContainerBalancerTaskIterationStatusInfo iteration,
-      Integer expectedIterationNumber,
-      String iterationResult
+      Integer expectedIterationNumber
   ) {
     assertEquals(expectedIterationNumber, iteration.getIterationNumber());
-    assertEquals(iterationResult, iteration.getIterationResult());
+    assertNull(iteration.getIterationResult());
     assertNotNull(iteration.getIterationDuration());
     assertEquals(0,iteration.getContainerMovesScheduled());
     assertEquals(0,iteration.getContainerMovesCompleted());

@@ -152,7 +152,8 @@ public final class MockedSCM {
     return startBalancerTask(new ContainerBalancer(scm), config);
   }
 
-  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(@Nonnull ContainerBalancerConfiguration config, Boolean withDelay) {
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(@Nonnull ContainerBalancerConfiguration config,
+                                                               Boolean withDelay) {
     init(config, new OzoneConfiguration());
     return startBalancerTaskAsync(new ContainerBalancer(scm), config, withDelay);
   }
