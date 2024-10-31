@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 
 import jakarta.annotation.Nonnull;
@@ -685,21 +686,26 @@ public final class HddsUtils {
    * or a RpcException.
    */
   public static Throwable getUnwrappedException(Exception ex) {
+    Throwable t = ex;
     if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof RpcException ||
-            t instanceof AccessControlException ||
-            t instanceof SecretManager.InvalidToken) {
-          return t;
-        }
-        t = t.getCause();
-      }
+      t = ex.getCause();
     }
-    return null;
+    if (t instanceof RemoteException) {
+      t = ((RemoteException) t).unwrapRemoteException();
+    }
+    while (t != null) {
+      if (t instanceof RpcException ||
+          t instanceof AccessControlException ||
+          t instanceof SecretManager.InvalidToken) {
+        break;
+      }
+      Throwable cause = t.getCause();
+      if (cause == null || cause instanceof RemoteException) {
+        break;
+      }
+      t = cause;
+    }
+    return t;
   }
 
   /**
@@ -719,7 +725,7 @@ public final class HddsUtils {
         return true;
       }
     }
-    return false;
+    return exception instanceof InvalidProtocolBufferException;
   }
 
   /**
