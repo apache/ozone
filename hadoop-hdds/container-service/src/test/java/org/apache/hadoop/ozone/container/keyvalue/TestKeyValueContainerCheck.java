@@ -24,17 +24,37 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.CORRUPT_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.CORRUPT_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.MISSING_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.MISSING_CHUNKS_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.MISSING_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.TRUNCATED_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions.TRUNCATED_CONTAINER_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,10 +62,104 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
- * Basic sanity test for the KeyValueContainerCheck class.
+ * Test the KeyValueContainerCheck class's ability to detect container errors.
  */
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
+
+  private static Stream<ContainerCorruptions> getMetadataCorruptions() {
+    return Stream.of(
+        MISSING_CHUNKS_DIR,
+        MISSING_METADATA_DIR,
+        MISSING_CONTAINER_DIR,
+        MISSING_CONTAINER_FILE,
+        CORRUPT_CONTAINER_FILE,
+        TRUNCATED_CONTAINER_FILE
+    );
+  }
+
+  /**
+   * When the scanner encounters an issue with container metadata, it should fail the scan immediately.
+   * Metadata is required before reading the data.
+   */
+  @ParameterizedTest
+  @MethodSource("getMetadataCorruptions")
+  public void testExitEarlyOnMetadataError(ContainerCorruptions metadataCorruption) throws Exception {
+    ContainerTestVersionInfo versionInfo = new ContainerTestVersionInfo(OzoneConsts.SCHEMA_V3,
+        ContainerLayoutVersion.FILE_PER_BLOCK);
+    initTestData(versionInfo);
+    long containerID = 101;
+    int deletedBlocks = 0;
+    int normalBlocks = 3;
+    OzoneConfiguration conf = getConf();
+    ContainerScannerConfiguration c = conf.getObject(
+        ContainerScannerConfiguration.class);
+    DataTransferThrottler throttler = new DataTransferThrottler(c.getBandwidthPerVolume());
+
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks, true);
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
+
+    DataScanResult result = kvCheck.fullCheck(throttler, null);
+    assertTrue(result.isHealthy());
+
+    // Inject a metadata and a data error.
+    metadataCorruption.applyTo(container);
+    // All other metadata failures are independent of the block files, so we can add a data failure later in the scan.
+    if (metadataCorruption != MISSING_CHUNKS_DIR && metadataCorruption != MISSING_CONTAINER_DIR) {
+      CORRUPT_BLOCK.applyTo(container);
+    }
+
+    result = kvCheck.fullCheck(throttler, null);
+    assertFalse(result.isHealthy());
+    // Scan should have failed after the first metadata error and not made it to the data error.
+    assertEquals(1, result.getErrors().size());
+    assertEquals(metadataCorruption.getExpectedResult(), result.getErrors().get(0).getFailureType());
+  }
+
+  /**
+   * When the scanner encounters an issues with container data, it should continue scanning to collect all issues
+   * among all blocks.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testAllDataErrorsCollected(ContainerTestVersionInfo versionInfo) throws Exception {
+    // TODO only run with file per block layout
+    initTestData(versionInfo);
+
+    long containerID = 101;
+    int deletedBlocks = 0;
+    int normalBlocks = 6;
+    OzoneConfiguration conf = getConf();
+    ContainerScannerConfiguration c = conf.getObject(
+        ContainerScannerConfiguration.class);
+    DataTransferThrottler throttler = new DataTransferThrottler(c.getBandwidthPerVolume());
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks, true);
+    KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
+
+    DataScanResult result = kvCheck.fullCheck(throttler, null);
+    assertTrue(result.isHealthy());
+
+    // Put different types of block failures in the middle of the container.
+    CORRUPT_BLOCK.applyTo(container, 1);
+    MISSING_BLOCK.applyTo(container, 2);
+    TRUNCATED_BLOCK.applyTo(container, 4);
+    Set<FailureType> expectedErrors = new HashSet<>();
+    expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
+    expectedErrors.add(MISSING_BLOCK.getExpectedResult());
+    expectedErrors.add(TRUNCATED_BLOCK.getExpectedResult());
+
+    result = kvCheck.fullCheck(throttler, null);
+    result.getErrors().forEach(System.err::println);
+
+    assertFalse(result.isHealthy());
+    // Check that all data errors were detected.
+    assertEquals(3, result.getErrors().size());
+    Set<FailureType> actualErrors = result.getErrors().stream()
+        .map(ContainerScanError::getFailureType)
+        .collect(Collectors.toSet());
+    assertEquals(expectedErrors, actualErrors);
+  }
 
   /**
    * Sanity test, when there are no corruptions induced.
@@ -144,7 +258,7 @@ public class TestKeyValueContainerCheck
     assertTrue(result.isHealthy());
     assertFalse(result.isDeleted());
 
-    // When a container is not marked for deletion and it has peices missing, the scan should fail.
+    // When a container is not marked for deletion and it has pieces missing, the scan should fail.
     File metadataDir = new File(container.getContainerData().getChunksPath());
     FileUtils.deleteDirectory(metadataDir);
     assertFalse(metadataDir.exists());
