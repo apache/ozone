@@ -124,9 +124,13 @@ public final class DomainSocketFactory implements Closeable {
 
   private static volatile DomainSocketFactory instance = null;
 
-  public static synchronized DomainSocketFactory getInstance(ConfigurationSource conf) {
+  public static DomainSocketFactory getInstance(ConfigurationSource conf) {
     if (instance == null) {
-      instance = new DomainSocketFactory(conf);
+      synchronized (DomainSocketFactory.class) {
+        if (instance == null) {
+          instance = new DomainSocketFactory(conf);
+        }
+      }
     }
     return instance;
   }
