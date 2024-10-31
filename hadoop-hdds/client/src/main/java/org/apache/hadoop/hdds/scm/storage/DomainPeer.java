@@ -103,7 +103,7 @@ public class DomainPeer implements Closeable {
     // See #{java.org.apache.hadoop.net.unix.DomainSocket#validateSocketPathSecurity0}
     // for details.
     //
-    // So unless you are running as root or the ozone superuser, you cannot
+    // So unless you are running as root or the user launches the service, you cannot
     // launch a man-in-the-middle attach on UNIX domain socket traffic.
     //
     return true;
