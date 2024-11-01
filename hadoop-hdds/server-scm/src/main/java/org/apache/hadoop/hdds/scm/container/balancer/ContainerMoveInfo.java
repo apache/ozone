@@ -27,6 +27,14 @@ public class ContainerMoveInfo {
   private final long containerMovesFailed;
   private final long containerMovesTimeout;
 
+  public ContainerMoveInfo(long containerMovesScheduled, long containerMovesCompleted, long containerMovesFailed,
+                           long containerMovesTimeout) {
+    this.containerMovesScheduled = containerMovesScheduled;
+    this.containerMovesCompleted = containerMovesCompleted;
+    this.containerMovesFailed = containerMovesFailed;
+    this.containerMovesTimeout = containerMovesTimeout;
+  }
+
   public ContainerMoveInfo(ContainerBalancerMetrics metrics) {
     this.containerMovesScheduled = metrics.getNumContainerMovesScheduledInLatestIteration();
     this.containerMovesCompleted = metrics.getNumContainerMovesCompletedInLatestIteration();

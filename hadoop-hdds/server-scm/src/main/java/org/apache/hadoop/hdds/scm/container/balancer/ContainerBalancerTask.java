@@ -59,9 +59,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.time.OffsetDateTime.now;
+import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.StringUtils.byteDesc;
@@ -104,7 +106,6 @@ public class ContainerBalancerTask implements Runnable {
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private volatile Status taskStatus = Status.RUNNING;
-
   /*
   Since a container can be selected only once during an iteration, these maps
    use it as a primary key to track source to target pairings.
@@ -123,6 +124,7 @@ public class ContainerBalancerTask implements Runnable {
   private boolean delayStart;
   private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
+  private AtomicBoolean isCurrentIterationInProgress = new AtomicBoolean(false);
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -221,6 +223,9 @@ public class ContainerBalancerTask implements Runnable {
     int i = nextIterationIndex;
     for (; i < iterations && isBalancerRunning(); i++) {
       currentIterationStarted = now();
+
+      isCurrentIterationInProgress.compareAndSet(false, true);
+
       // reset some variables and metrics for this iteration
       resetState();
       if (config.getTriggerDuEnable()) {
@@ -270,7 +275,8 @@ public class ContainerBalancerTask implements Runnable {
       IterationResult iR = doIteration();
       saveIterationStatistic(i + 1, iR);
 
-      resetState();
+      isCurrentIterationInProgress.compareAndSet(true, false);
+
       findTargetStrategy.clearSizeEnteringNodes();
       findSourceStrategy.clearSizeLeavingNodes();
 
@@ -362,10 +368,48 @@ public class ContainerBalancerTask implements Runnable {
    * @return current iteration statistic
    */
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
+    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = createCurrentIterationStatistic();
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    resultList.add(currentIterationStatistic);
+    return resultList;
+  }
+
+  private ContainerBalancerTaskIterationStatusInfo createCurrentIterationStatistic() {
     int lastIterationNumber = iterationsStatistic.isEmpty()
         ? 0
         : iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
     long iterationDuration = getCurrentIterationDuration();
+
+    if (isCurrentIterationInProgress.get()) {
+      return getFilledCurrentIterationStatistic(lastIterationNumber, iterationDuration);
+    } else {
+      return getEmptyCurrentIterationStatistic(lastIterationNumber, iterationDuration);
+    }
+  }
+
+  private static ContainerBalancerTaskIterationStatusInfo getEmptyCurrentIterationStatistic(
+      int lastIterationNumber, long iterationDuration) {
+    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(0, 0, 0, 0);
+    DataMoveInfo dataMoveInfo = new DataMoveInfo(
+        0,
+        0,
+        emptyMap(),
+        emptyMap()
+    );
+    IterationInfo iterationInfo = new IterationInfo(
+        lastIterationNumber + 1,
+        null,
+        iterationDuration
+    );
+    return new ContainerBalancerTaskIterationStatusInfo(
+        iterationInfo,
+        containerMoveInfo,
+        dataMoveInfo
+    );
+  }
+
+  private ContainerBalancerTaskIterationStatusInfo getFilledCurrentIterationStatistic(int lastIterationNumber,
+                                                                                      long iterationDuration) {
     Map<UUID, Long> sizeEnteringDataToNodes =
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
     Map<UUID, Long> sizeLeavingDataFromNodes =
@@ -383,14 +427,11 @@ public class ContainerBalancerTask implements Runnable {
         null,
         iterationDuration
     );
-    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+    return new ContainerBalancerTaskIterationStatusInfo(
         iterationInfo,
         containerMoveInfo,
         dataMoveInfo
     );
-    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
-    resultList.add(currentIterationStatistic);
-    return resultList;
   }
 
   private long getCurrentIterationDuration() {
