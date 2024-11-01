@@ -264,8 +264,8 @@ class TestBlockOutputStreamWithFailures {
       assertEquals(0, keyOutputStream.getStreamEntries().size());
       // Written the same data twice
       byte[] bytes = ArrayUtils.addAll(data1, data1);
-      cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
     }
   }
 
@@ -364,9 +364,9 @@ class TestBlockOutputStreamWithFailures {
       // make sure the bufferPool is empty
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(0, keyOutputStream.getLocationInfoList().size());
+      validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
       cluster.restartHddsDatanode(pipeline.getNodes().get(0), false);
       cluster.restartHddsDatanode(pipeline.getNodes().get(1), true);
-      validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
     }
   }
 
