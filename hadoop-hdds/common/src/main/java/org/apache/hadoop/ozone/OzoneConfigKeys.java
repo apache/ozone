@@ -702,6 +702,11 @@ public final class OzoneConfigKeys {
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
+  public static final String OZONE_S3G_KEY_INFO_CACHE_IDLE_LIFETIME =
+      "ozone.s3g.key.info.cache.idle.lifetime";
+
+  public static final String OZONE_S3G_KEY_INFO_CACHE_IDLE_LIFETIME_DEFAULT = "10s";
+
 
   /**
    * There is no need to instantiate this class.
