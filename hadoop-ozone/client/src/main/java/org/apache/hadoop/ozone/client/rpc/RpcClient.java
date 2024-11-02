@@ -233,6 +233,7 @@ public class RpcClient implements ClientProtocol {
   private volatile OzoneFsServerDefaults serverDefaults;
   private volatile long serverDefaultsLastUpdate;
   private final long serverDefaultsValidityPeriod;
+  private boolean useListStatusLight;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -274,6 +275,7 @@ public class RpcClient implements ClientProtocol {
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
+    useListStatusLight = omVersion.compareTo(OzoneManagerVersion.MAYBE_LIGHTWEIGHT_LIST_STATUS) >= 0;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
@@ -2318,13 +2320,14 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
     OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
-    if (omVersion.compareTo(OzoneManagerVersion.MAYBE_LIGHTWEIGHT_LIST_STATUS) >= 0) {
+    if (useListStatusLight) {
       try {
         return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
             numEntries, allowPartialPrefixes);
       } catch (Exception e) {
         Throwable cause = HddsUtils.getUnwrappedException(e);
         if (cause instanceof InvalidProtocolBufferException) {
+          useListStatusLight = false;
           if (LOG.isTraceEnabled()) {
             LOG.trace("Failed listStatusLight, reverting to listStatus", e);
           } else if (LOG.isDebugEnabled()) {
