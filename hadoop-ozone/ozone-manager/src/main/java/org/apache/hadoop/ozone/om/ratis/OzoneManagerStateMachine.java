@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -216,7 +217,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     List<RaftProtos.RaftPeerProto> newPeers =
         newRaftConfiguration.getPeersList();
     LOG.info("Received Configuration change notification from Ratis. New Peer" +
-        " list:\n{}", newPeers);
+        " list:\n[{}]", newPeers.stream().map(peer ->
+            String.format("id: \"%s\"\naddress: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
+        .collect(Collectors.joining("\n,")));
 
     List<String> newPeerIds = new ArrayList<>();
     for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
