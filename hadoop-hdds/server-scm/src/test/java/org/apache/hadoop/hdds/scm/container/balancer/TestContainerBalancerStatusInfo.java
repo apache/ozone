@@ -62,7 +62,7 @@ class TestContainerBalancerStatusInfo {
     verifyCompletedIteration(iterationHistory2, 2);
 
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationStatistics.get(2);
-    verifyEmptyIteration(currentIteration, 3);
+    verifyEmptyIteration(currentIteration);
   }
 
   @Test
@@ -109,7 +109,7 @@ class TestContainerBalancerStatusInfo {
     ContainerBalancerTaskIterationStatusInfo firstIteration = iterationsStatic.get(0);
     verifyCompletedIteration(firstIteration, 1);
 
-    assertEquals(2, iterationsStatic.get(1).getIterationNumber());
+    assertEquals(0, iterationsStatic.get(1).getIterationNumber());
     assertTrue(iterationsStatic.get(1).getIterationDuration() > 0);
     assertNull(iterationsStatic.get(1).getIterationResult());
     assertEquals(0, iterationsStatic.get(1).getContainerMovesScheduled());
@@ -244,10 +244,9 @@ class TestContainerBalancerStatusInfo {
   }
 
   private void verifyEmptyIteration(
-      ContainerBalancerTaskIterationStatusInfo iteration,
-      Integer expectedIterationNumber
+      ContainerBalancerTaskIterationStatusInfo iteration
   ) {
-    assertEquals(expectedIterationNumber, iteration.getIterationNumber());
+    assertEquals(0, iteration.getIterationNumber());
     assertNull(iteration.getIterationResult());
     assertNotNull(iteration.getIterationDuration());
     assertEquals(0, iteration.getContainerMovesScheduled());

@@ -383,12 +383,12 @@ public class ContainerBalancerTask implements Runnable {
     if (isCurrentIterationInProgress.get()) {
       return getFilledCurrentIterationStatistic(lastIterationNumber, iterationDuration);
     } else {
-      return getEmptyCurrentIterationStatistic(lastIterationNumber, iterationDuration);
+      return getEmptyCurrentIterationStatistic(iterationDuration);
     }
   }
 
   private static ContainerBalancerTaskIterationStatusInfo getEmptyCurrentIterationStatistic(
-      int lastIterationNumber, long iterationDuration) {
+      long iterationDuration) {
     ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(0, 0, 0, 0);
     DataMoveInfo dataMoveInfo = new DataMoveInfo(
         0,
@@ -397,7 +397,7 @@ public class ContainerBalancerTask implements Runnable {
         emptyMap()
     );
     IterationInfo iterationInfo = new IterationInfo(
-        lastIterationNumber + 1,
+                      0,
         null,
         iterationDuration
     );

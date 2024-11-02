@@ -99,7 +99,7 @@ Run Balancer Status
 
 Run Balancer Verbose Status
     ${result} =      Execute                         ozone admin containerbalancer status -v
-                     Verify Balancer Iteration       ${result}             1
+                     Verify Balancer Iteration       ${result}             -
                      Should Contain                  ${result}             Iteration result -    collapse_spaces=True
 
 
