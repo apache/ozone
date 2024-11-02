@@ -166,6 +166,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         if (blockInfo != null && blockInfo.isUnderConstruction()) {
           // use the block length from DN if block is under construction.
           length = blockData.getSize();
+          LOG.debug("Updated block length to {} for block {}", length, blockID);
         }
         break;
         // If we get a StorageContainerException or an IOException due to
