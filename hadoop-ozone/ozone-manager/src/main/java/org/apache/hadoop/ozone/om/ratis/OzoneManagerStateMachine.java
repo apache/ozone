@@ -218,7 +218,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         newRaftConfiguration.getPeersList();
     LOG.info("Received Configuration change notification from Ratis. New Peer" +
         " list:\n[{}\n]", newPeers.stream().map(peer ->
-            String.format("id: \"%s\"\naddress: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
+            String.format("id: \"%s\"%n address: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
         .collect(Collectors.joining("\n, ")));
 
     List<String> newPeerIds = new ArrayList<>();
