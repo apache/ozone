@@ -262,6 +262,9 @@ public class KeyManagerImpl implements KeyManager {
       int dirDeletingServiceCorePoolSize =
           configuration.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
               OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
+      if (dirDeletingServiceCorePoolSize <= 0) {
+        dirDeletingServiceCorePoolSize = 1;
+      }
       dirDeletingService =
           new DirectoryDeletingService(dirDeleteInterval, TimeUnit.MILLISECONDS,
               serviceTimeout, ozoneManager, configuration,

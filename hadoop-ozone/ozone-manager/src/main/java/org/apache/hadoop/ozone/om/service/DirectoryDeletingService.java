@@ -74,10 +74,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
 
-  // Use only a single thread for DirDeletion. Multiple threads would read
-  // or write to same tables and can send deletion requests for same key
-  // multiple times.
-  private static int DIR_DELETING_CORE_POOL_SIZE;
+  // Using multi thread for DirDeletion. Multiple threads would read
+  // from parent directory info from deleted directory table concurrently
+  // and send deletion requests.
+  private final int dirDeletingCorePoolSize;
   private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
 
   // Number of items(dirs/files) to be batched in an iteration.
@@ -85,7 +85,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
-  Supplier supplier = null;
+  DeletedDirSupplier deletedDirSupplier = null;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -103,9 +103,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
-    DIR_DELETING_CORE_POOL_SIZE = dirDeletingServiceCorePoolSize;
+    this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
     try {
-      supplier = new Supplier();
+      deletedDirSupplier = new DeletedDirSupplier();
     } catch (IOException ex) {
       LOG.error("Couldn't initialize supplier.");
     }
@@ -142,8 +142,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    supplier.reInitItr();
-    for (int i = 0; i < DIR_DELETING_CORE_POOL_SIZE; i++) {
+    deletedDirSupplier.reInitItr();
+    for (int i = 0; i < dirDeletingCorePoolSize; i++) {
       queue.add(new DirectoryDeletingService.DirDeletingTask(this));
     }
     return queue;
@@ -152,20 +152,20 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public void shutdown() {
     super.shutdown();
-    supplier.closeItr();
+    deletedDirSupplier.closeItr();
   }
 
-  private final class Supplier {
+  private final class DeletedDirSupplier {
     TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
-    private Supplier() throws IOException {
+    private DeletedDirSupplier() throws IOException {
       this.deleteTableIterator =
           getOzoneManager().getMetadataManager().getDeletedDirTable()
               .iterator();
     }
 
-    private synchronized Table.KeyValue<String, OmKeyInfo> getItr() {
+    private synchronized Table.KeyValue<String, OmKeyInfo> get() {
       if (deleteTableIterator != null && !deleteTableIterator.hasNext()) {
         try {
           if (getOzoneManager().getMetadataManager().getDeletedDirTable()
@@ -178,7 +178,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.error("Not able to determine if deleted dir table is empty.");
         }
       }
-      return deleteTableIterator.next();
+      return deleteTableIterator != null ? deleteTableIterator.next() : null;
     }
 
     private void closeItr() {
@@ -240,7 +240,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           long startTime = Time.monotonicNow();
           while (remainNum > 0) {
-            pendingDeletedDirInfo = supplier.getItr();
+            pendingDeletedDirInfo = deletedDirSupplier.get();
+            if(pendingDeletedDirInfo == null) {
+              break;
+            }
             // Do not reclaim if the directory is still being referenced by
             // the previous snapshot.
             if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
