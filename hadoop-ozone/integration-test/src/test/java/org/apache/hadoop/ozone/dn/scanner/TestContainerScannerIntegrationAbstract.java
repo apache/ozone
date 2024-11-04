@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -62,15 +63,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -243,7 +244,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(chunksDir.exists());
-    }, ScanResult.FailureType.MISSING_CHUNKS_DIR),
+    }, FailureType.MISSING_CHUNKS_DIR),
 
     MISSING_METADATA_DIR(container -> {
       File metadataDir =
@@ -256,13 +257,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(metadataDir.exists());
-    }, ScanResult.FailureType.MISSING_METADATA_DIR),
+    }, FailureType.MISSING_METADATA_DIR),
 
     MISSING_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       assertTrue(containerFile.delete());
       assertFalse(containerFile.exists());
-    }, ScanResult.FailureType.MISSING_CONTAINER_FILE),
+    }, FailureType.MISSING_CONTAINER_FILE),
 
     MISSING_CONTAINER_DIR(container -> {
       File containerDir =
@@ -274,7 +275,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       assertFalse(containerDir.exists());
-    }, ScanResult.FailureType.MISSING_CONTAINER_DIR),
+    }, FailureType.MISSING_CONTAINER_DIR),
 
     MISSING_BLOCK(container -> {
       File chunksDir = new File(
@@ -288,17 +289,17 @@ public abstract class TestContainerScannerIntegrationAbstract {
           throw new UncheckedIOException(ex);
         }
       }
-    }, ScanResult.FailureType.MISSING_CHUNK_FILE),
+    }, FailureType.MISSING_CHUNK_FILE),
 
     CORRUPT_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       corruptFile(containerFile);
-    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
+    }, FailureType.CORRUPT_CONTAINER_FILE),
 
     TRUNCATED_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       truncateFile(containerFile);
-    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
+    }, FailureType.CORRUPT_CONTAINER_FILE),
 
     CORRUPT_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -308,7 +309,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
-    }, ScanResult.FailureType.CORRUPT_CHUNK),
+    }, FailureType.CORRUPT_CHUNK),
 
     TRUNCATED_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -318,13 +319,12 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       assertTrue(blockFile.isPresent());
       truncateFile(blockFile.get());
-    }, ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH);
+    }, FailureType.INCONSISTENT_CHUNK_LENGTH);
 
     private final Consumer<Container<?>> corruption;
-    private final ScanResult.FailureType expectedResult;
+    private final FailureType expectedResult;
 
-    ContainerCorruptions(Consumer<Container<?>> corruption,
-                         ScanResult.FailureType expectedResult) {
+    ContainerCorruptions(Consumer<Container<?>> corruption, FailureType expectedResult) {
       this.corruption = corruption;
       this.expectedResult = expectedResult;
 
@@ -335,11 +335,14 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
 
     /**
-     * Check that the correct corruption type was written to the container log.
+     * Check that the correct corruption type was written to the container log for the provided container.
      */
-    public void assertLogged(LogCapturer logCapturer) {
-      assertThat(logCapturer.getOutput())
-          .contains(expectedResult.toString());
+    public void assertLogged(long containerID, int numErrors, LogCapturer logCapturer) {
+      // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
+      // The log will have captured lines from all previous tests as well since we re-use the same cluster.
+      Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Scan result has " + numErrors +
+          " error.*" + expectedResult.toString());
+      assertThat(logCapturer.getOutput()).containsPattern(logLine);
     }
 
     /**
@@ -364,8 +367,9 @@ public abstract class TestContainerScannerIntegrationAbstract {
         Path path = file.toPath();
         final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
 
-        final byte[] corruptedBytes = new byte[length];
-        ThreadLocalRandom.current().nextBytes(corruptedBytes);
+        // Corrupt the last byte of the last chunk. This should map to a single error from the scanner.
+        final byte[] corruptedBytes = Arrays.copyOf(original, length);
+        corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
 
         Files.write(path, corruptedBytes,
             StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
