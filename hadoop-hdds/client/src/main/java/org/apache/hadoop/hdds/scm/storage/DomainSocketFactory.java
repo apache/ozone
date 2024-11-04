@@ -90,7 +90,7 @@ public final class DomainSocketFactory implements Closeable {
 
   public static final String FEATURE = "short-circuit reads";
   public static final String FEATURE_FLAG = "SC";
-  private static boolean nativeCodeLoaded = false;
+  private static boolean nativeLibraryLoaded = false;
   private static String nativeLibraryLoadFailureReason;
   private long pathExpireMills;
   private final ConcurrentHashMap<String, PathInfo> pathMap;
@@ -107,7 +107,7 @@ public final class DomainSocketFactory implements Closeable {
       try {
         System.loadLibrary("hadoop");
         LOG.info("Loaded the native-hadoop library");
-        nativeCodeLoaded = true;
+        nativeLibraryLoaded = true;
       } catch (Throwable t) {
         // Ignore failure to continue
         LOG.info("Failed to load native-hadoop with error: " + t);
@@ -115,7 +115,7 @@ public final class DomainSocketFactory implements Closeable {
         nativeLibraryLoadFailureReason = "libhadoop cannot be loaded.";
       }
 
-      if (!nativeCodeLoaded) {
+      if (!nativeLibraryLoaded) {
         LOG.warn("Unable to load native-hadoop library for your platform... " +
             "using builtin-java classes where applicable");
       }
@@ -149,7 +149,7 @@ public final class DomainSocketFactory implements Closeable {
       if (domainSocketPath.isEmpty()) {
         throw new IllegalArgumentException(FEATURE + " is enabled but "
             + OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH + " is not set.");
-      } else if (!nativeCodeLoaded) {
+      } else if (!nativeLibraryLoaded) {
         LOG.warn(FEATURE + " cannot be used because " + nativeLibraryLoadFailureReason);
         pathInfo = PathInfo.DISABLED;
       } else {
