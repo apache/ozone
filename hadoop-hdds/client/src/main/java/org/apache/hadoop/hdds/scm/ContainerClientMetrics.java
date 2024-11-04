@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
@@ -52,6 +53,21 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
   private MutableCounterLong totalWriteChunkBytes;
+
+  @Metric
+  private MutableRate hsyncSynchronizedWorkNs;
+  @Metric
+  private MutableRate hsyncSendWriteChunkNs;
+  @Metric
+  private MutableRate hsyncWaitForFlushNs;
+  @Metric
+  private MutableRate hsyncWatchForCommitNs;
+  @Metric
+  private MutableCounterLong writeChunksDuringWrite;
+  @Metric
+  private MutableCounterLong flushesDuringWrite;
+
+
   private MutableQuantiles[] listBlockLatency;
   private MutableQuantiles[] getBlockLatency;
   private MutableQuantiles[] getCommittedBlockLengthLatency;
@@ -248,5 +264,29 @@ public final class ContainerClientMetrics {
 
   Map<UUID, MutableCounterLong> getWriteChunksCallsByLeaders() {
     return writeChunksCallsByLeaders;
+  }
+
+  public MutableRate getHsyncSynchronizedWorkNs() {
+    return hsyncSynchronizedWorkNs;
+  }
+
+  public MutableRate getHsyncSendWriteChunkNs() {
+    return hsyncSendWriteChunkNs;
+  }
+
+  public MutableRate getHsyncWaitForFlushNs() {
+    return hsyncWaitForFlushNs;
+  }
+
+  public MutableRate getHsyncWatchForCommitNs() {
+    return hsyncWatchForCommitNs;
+  }
+
+  public MutableCounterLong getWriteChunksDuringWrite() {
+    return writeChunksDuringWrite;
+  }
+
+  public MutableCounterLong getFlushesDuringWrite() {
+    return flushesDuringWrite;
   }
 }
