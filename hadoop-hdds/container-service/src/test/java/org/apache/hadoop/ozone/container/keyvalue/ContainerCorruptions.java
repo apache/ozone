@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Represents a type of container corruption that can be injected into the
- * test.
+ * Represents a type of container corruption that can be injected into a container for testing.
+ * Currently this class only supports file per block layout.
  */
 public enum ContainerCorruptions {
   MISSING_CHUNKS_DIR((container, index) -> {
@@ -98,6 +98,7 @@ public enum ContainerCorruptions {
 
   TRUNCATED_BLOCK((container, index) -> {
     File blockFile = getBlockAtIndex(container, index);
+    System.err.println("truncating " + blockFile);
     truncateFile(blockFile);
   }, ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
