@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -56,7 +57,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
@@ -88,7 +88,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         keyPath, getBucketLayout());
 
     KeyArgs newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now())
+        keyArgs.toBuilder().setModificationTime(Instant.now().toEpochMilli())
             .setKeyName(keyPath).build();
 
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,

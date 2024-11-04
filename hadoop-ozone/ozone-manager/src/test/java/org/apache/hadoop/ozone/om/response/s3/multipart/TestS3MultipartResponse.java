@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,7 +53,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .PartKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -95,7 +95,7 @@ public class TestS3MultipartResponse {
       String multipartUploadID) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .build();
@@ -104,8 +104,8 @@ public class TestS3MultipartResponse {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
@@ -158,8 +158,8 @@ public class TestS3MultipartResponse {
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setDataSize(100L) // Just set dummy size for testing
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setObjectID(UUID.randomUUID().hashCode())
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
@@ -181,8 +181,8 @@ public class TestS3MultipartResponse {
             .setBucketName(bucketName)
             .setKeyName(fileName)
             .setDataSize(100L) // Just set dummy size for testing
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setObjectID(UUID.randomUUID().hashCode())
             .setParentID(parentID)
             .setType(HddsProtos.ReplicationType.RATIS)
@@ -196,7 +196,7 @@ public class TestS3MultipartResponse {
       long volumeId, long bucketId) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
-            .setCreationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setParentID(parentID)
@@ -209,8 +209,8 @@ public class TestS3MultipartResponse {
             .setBucketName(bucketName)
             .setKeyName(fileName)
             .setFileName(fileName)
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
@@ -252,7 +252,7 @@ public class TestS3MultipartResponse {
     if (multipartKeyInfo == null) {
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
               .setUploadID(multipartUploadID)
-              .setCreationTime(Time.now())
+              .setCreationTime(Instant.now().toEpochMilli())
               .setReplicationConfig(RatisReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
               .setParentID(parentID)
@@ -274,8 +274,8 @@ public class TestS3MultipartResponse {
             .setBucketName(bucketName)
             .setKeyName(fileName)
             .setFileName(fileName)
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(

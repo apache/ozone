@@ -58,12 +58,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -107,7 +107,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     BucketInfo.Builder newBucketInfo = bucketInfo.toBuilder();
 
     // Set creation time & modification time.
-    long initialTime = Time.now();
+    long initialTime = Instant.now().toEpochMilli();
     newBucketInfo.setCreationTime(initialTime)
         .setModificationTime(initialTime);
 

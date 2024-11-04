@@ -40,6 +40,7 @@ import java.security.SignatureException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -269,8 +270,8 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     id.setOwner(new Text("User1"));
     id.setRenewer(new Text("yarn"));
-    id.setIssueDate(Time.now());
-    id.setMaxDate(Time.now() + 5000);
+    id.setIssueDate(Instant.now().toEpochMilli());
+    id.setMaxDate(Instant.now().toEpochMilli() + 5000);
     id.setSequenceNumber(1);
     id.setOmCertSerialId("123");
     return id;

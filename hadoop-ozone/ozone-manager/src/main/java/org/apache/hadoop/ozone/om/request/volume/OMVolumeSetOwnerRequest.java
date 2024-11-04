@@ -40,12 +40,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolu
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -64,7 +64,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-    long modificationTime = Time.now();
+    long modificationTime = Instant.now().toEpochMilli();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);

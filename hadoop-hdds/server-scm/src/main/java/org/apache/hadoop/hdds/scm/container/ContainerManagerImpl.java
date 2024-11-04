@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,7 +50,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -253,7 +253,7 @@ public class ContainerManagerImpl implements ContainerManager {
         .setPipelineID(pipeline.getId().getProtobuf())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.now())
+        .setStateEnterTime(Instant.now().toEpochMilli())
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setDeleteTransactionId(0)

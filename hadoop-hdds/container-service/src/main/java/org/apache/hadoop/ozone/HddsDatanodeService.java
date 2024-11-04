@@ -21,6 +21,7 @@ import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -66,7 +67,6 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -225,7 +225,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setIpAddress(ip);
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
-      datanodeDetails.setSetupTime(Time.now());
+      datanodeDetails.setSetupTime(Instant.now().toEpochMilli());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       TracingUtil.initTracing(

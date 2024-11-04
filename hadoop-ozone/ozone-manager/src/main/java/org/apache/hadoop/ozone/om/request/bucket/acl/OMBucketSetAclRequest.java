@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +57,7 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    long modificationTime = Time.now();
+    long modificationTime = Instant.now().toEpochMilli();
     OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
         getOmRequest().getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);

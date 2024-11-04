@@ -27,10 +27,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,7 +60,7 @@ public class TestOMVolumeSetOwnerResponse extends TestOMVolumeResponse {
 
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(oldOwner).setAdminName(oldOwner)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
+        .setVolume(volumeName).setCreationTime(Instant.now().toEpochMilli()).build();
     OMVolumeCreateResponse omVolumeCreateResponse =
         new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 

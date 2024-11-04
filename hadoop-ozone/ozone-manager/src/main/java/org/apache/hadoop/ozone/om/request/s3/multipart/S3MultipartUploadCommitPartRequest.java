@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.slf4j.Logger;
@@ -62,6 +61,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -92,7 +92,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         keyPath, getBucketLayout());
 
     KeyArgs newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now())
+        keyArgs.toBuilder().setModificationTime(Instant.now().toEpochMilli())
             .setKeyName(keyPath).build();
 
     KeyArgs resolvedArgs = resolveBucketAndCheckOpenKeyAcls(newKeyArgs,

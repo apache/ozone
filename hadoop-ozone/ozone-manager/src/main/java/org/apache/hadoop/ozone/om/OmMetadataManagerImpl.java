@@ -22,6 +22,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -1808,10 +1809,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         keyValueTableIterator = getOpenKeyTable(bucketLayout).iterator()) {
 
       final long expiredCreationTimestamp =
-          expireThreshold.negated().plusMillis(Time.now()).toMillis();
+          expireThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
       final long expiredLeaseTimestamp =
-          leaseThreshold.negated().plusMillis(Time.now()).toMillis();
+          leaseThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
       int num = 0;
       while (num < count && keyValueTableIterator.hasNext()) {
@@ -1886,7 +1887,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
              mpuInfoTableIterator = getMultipartInfoTable().iterator()) {
 
       final long expiredCreationTimestamp =
-          expireThreshold.negated().plusMillis(Time.now()).toMillis();
+          expireThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
       ExpiredMultipartUploadInfo.Builder builder =
           ExpiredMultipartUploadInfo.newBuilder();

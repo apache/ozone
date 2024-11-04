@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,6 +53,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -702,15 +702,15 @@ public class TestOmMetadataManager {
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
     final long expiredOpenKeyCreationTime =
-        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+        expireThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the
     // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
-      final long creationTime = i < numExpiredOpenKeys ?
-          expiredOpenKeyCreationTime : Time.now();
+      final long creationTime;
+      creationTime = i < numExpiredOpenKeys ? expiredOpenKeyCreationTime : Instant.now().toEpochMilli();
       final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
               volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
           .setCreationTime(creationTime)
@@ -779,7 +779,7 @@ public class TestOmMetadataManager {
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
     final long expiredOpenKeyCreationTime =
-        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+        expireThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
     // Ensure that "expired" MPU-related open keys are not fetched.
     // MPU-related open keys, identified by isMultipartKey = false
@@ -866,15 +866,15 @@ public class TestOmMetadataManager {
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
     final long expiredMPUCreationTime =
-        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+        expireThreshold.negated().plusMillis(Instant.now().toEpochMilli()).toMillis();
 
     // Add expired MPUs to multipartInfoTable.
     // The method under test does not check for expired open keys in the
     // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredMPUs = new HashSet<>();
     for (int i = 0; i < numExpiredMPUs + numUnexpiredMPUs; i++) {
-      final long creationTime = i < numExpiredMPUs ?
-          expiredMPUCreationTime : Time.now();
+      final long creationTime;
+      creationTime = i < numExpiredMPUs ? expiredMPUCreationTime : Instant.now().toEpochMilli();
 
       String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils

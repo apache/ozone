@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -32,7 +33,6 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .PartKeyInfo;
-import org.apache.hadoop.util.Time;
 
 /**
  * Test multipart upload abort response.
@@ -123,7 +123,7 @@ public class TestS3MultipartUploadAbortResponse
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
+        .setCreationTime(Instant.now().toEpochMilli()).build();
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
         createS3InitiateMPUResponse(volumeName, bucketName, keyName,

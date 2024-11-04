@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
@@ -302,7 +302,7 @@ public abstract class StorageVolume
    */
   private void createVersionFile() throws IOException {
     this.storageID = StorageVolumeUtil.generateUuid();
-    this.cTime = Time.now();
+    this.cTime = Instant.now().toEpochMilli();
     this.layoutVersion = getLatestVersion().getVersion();
 
     if (this.clusterID == null || datanodeUuid == null) {

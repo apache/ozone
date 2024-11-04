@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.slf4j.Logger;
@@ -61,6 +60,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -95,7 +95,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(
                 OMMultipartUploadUtils.getMultipartUploadId())
-            .setModificationTime(Time.now())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setKeyName(keyPath);
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);

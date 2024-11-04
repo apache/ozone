@@ -30,11 +30,11 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -137,7 +137,7 @@ public final class StorageVolumeUtil {
     String cTimeStr = getProperty(props, OzoneConsts.CTIME, versionFile);
 
     long cTime = Long.parseLong(cTimeStr);
-    long currentTime = Time.now();
+    long currentTime = Instant.now().toEpochMilli();
     if (cTime > currentTime || cTime < 0) {
       throw new InconsistentStorageStateException("Invalid Creation time in " +
           "Version File : " + versionFile + " - " + cTime + ". Current system" +

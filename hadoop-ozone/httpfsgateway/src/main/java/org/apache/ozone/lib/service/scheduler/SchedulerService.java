@@ -26,11 +26,11 @@ import org.apache.ozone.lib.server.ServiceException;
 import org.apache.ozone.lib.service.Instrumentation;
 import org.apache.ozone.lib.service.Scheduler;
 import org.apache.ozone.lib.util.Check;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.MessageFormat;
+import java.time.Instant;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -66,11 +66,11 @@ public class SchedulerService extends BaseService implements Scheduler {
   @Override
   public void destroy() {
     try {
-      long limit = Time.now() + 30 * 1000;
+      long limit = Instant.now().toEpochMilli() + 30 * 1000;
       scheduler.shutdownNow();
       while (!scheduler.awaitTermination(1000, TimeUnit.MILLISECONDS)) {
         LOG.debug("Waiting for scheduler to shutdown");
-        if (Time.now() > limit) {
+        if (Instant.now().toEpochMilli() > limit) {
           LOG.warn("Gave up waiting for scheduler to shutdown");
           break;
         }

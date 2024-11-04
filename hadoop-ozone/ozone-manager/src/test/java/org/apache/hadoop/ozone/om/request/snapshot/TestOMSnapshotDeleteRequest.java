@@ -28,12 +28,12 @@ import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
@@ -128,7 +128,7 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
     // add key to cache
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(getVolumeName(), getBucketName(),
-        snapshotName, null, Time.now());
+        snapshotName, null, Instant.now().toEpochMilli());
     assertEquals(SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
     getOmMetadataManager().getSnapshotInfoTable().addCacheEntry(
         new CacheKey<>(key),

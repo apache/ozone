@@ -33,13 +33,13 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -137,7 +137,7 @@ public class TestScmApplyTransactionFailure {
             .setPipelineID(pipeline.getId().getProtobuf())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
-            .setStateEnterTime(Time.now())
+            .setStateEnterTime(Instant.now().toEpochMilli())
             .setOwner("test")
             .setContainerID(1)
             .setDeleteTransactionId(0)

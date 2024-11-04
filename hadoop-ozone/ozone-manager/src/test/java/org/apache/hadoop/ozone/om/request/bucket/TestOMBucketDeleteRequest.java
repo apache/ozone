@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -38,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.Test;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -129,7 +129,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
             RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
         .build();
     final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
-        createOmMultipartKeyInfo(uploadId, Time.now(),
+        createOmMultipartKeyInfo(uploadId, Instant.now().toEpochMilli(),
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, 0L);
     OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo,

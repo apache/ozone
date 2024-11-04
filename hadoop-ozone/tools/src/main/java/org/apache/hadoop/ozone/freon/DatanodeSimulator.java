@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -467,7 +466,7 @@ public class DatanodeSimulator implements Callable<Void> {
     details.setPort(DatanodeDetails.Port.Name.RATIS, 0);
     details.setPort(DatanodeDetails.Port.Name.REST, 0);
     details.setVersion(HDDS_VERSION_INFO.getVersion());
-    details.setSetupTime(Time.now());
+    details.setSetupTime(Instant.now().toEpochMilli());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
     return details;

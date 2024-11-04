@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -33,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.util.Time;
 
 /**
  * Ozone volume with in-memory state for testing.
@@ -127,7 +127,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
         .setBucketLayout(bucketArgs.getBucketLayout())
         .setStorageType(bucketArgs.getStorageType())
         .setVersioning(bucketArgs.getVersioning())
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .build());
   }
 

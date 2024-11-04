@@ -28,6 +28,7 @@ import java.security.Signature;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -370,7 +371,7 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     id.setOmCertSerialId(certificateClient.getCertificate()
         .getSerialNumber().toString());
-    id.setMaxDate(Time.now() + 60 * 60 * 24);
+    id.setMaxDate(Instant.now().toEpochMilli() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
     assertTrue(secretManager.verifySignature(id,
         certificateClient.signData(id.getBytes())));
@@ -384,7 +385,7 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     // set invalid om cert serial id
     id.setOmCertSerialId("1927393");
-    id.setMaxDate(Time.now() + 60 * 60 * 24);
+    id.setMaxDate(Instant.now().toEpochMilli() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
     assertFalse(secretManager.verifySignature(id, id.getBytes()));
   }

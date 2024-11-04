@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -71,7 +72,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -121,7 +121,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         createDirectoryRequest.getKeyArgs().getKeyName());
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
-        .toBuilder().setModificationTime(Time.now());
+        .toBuilder().setModificationTime(Instant.now().toEpochMilli());
 
     KeyArgs resolvedKeyArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, ACLType.CREATE);

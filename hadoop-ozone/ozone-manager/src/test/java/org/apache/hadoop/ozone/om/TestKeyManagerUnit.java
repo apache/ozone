@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -136,7 +135,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @BeforeEach
   void init() {
     reset(blockClient, containerClient);
-    startDate = Instant.ofEpochMilli(Time.now());
+    startDate = Instant.ofEpochMilli(Instant.now().toEpochMilli());
   }
 
   @AfterAll
@@ -398,7 +397,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     String uploadID = UUID.randomUUID().toString();
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .build();
@@ -605,8 +604,8 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setOmKeyLocationInfos(singletonList(
             new OmKeyLocationInfoGroup(0,
                 singletonList(keyLocationInfo))))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setDataSize(256000)
         .setReplicationConfig(
                     RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
@@ -668,7 +667,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
       OmKeyInfo keyInfo = new OmKeyInfo.Builder()
           .setVolumeName(volume)
           .setBucketName(bucket)
-          .setCreationTime(Time.now())
+          .setCreationTime(Instant.now().toEpochMilli())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setReplicationConfig(RatisReplicationConfig

@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -4565,7 +4566,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmVolumeArgs createS3VolumeContext(String s3Volume,
       long objectID) throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
-    long time = Time.now();
+    long time = Instant.now().toEpochMilli();
 
     // We need to set the updateID to DEFAULT_OM_UPDATE_ID, because when
     // acl op on S3v volume during updateID check it will fail if we have a

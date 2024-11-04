@@ -34,10 +34,10 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -52,7 +52,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    doPreExecuteCommitMPU(volumeName, bucketName, keyName, Time.now(),
+    doPreExecuteCommitMPU(volumeName, bucketName, keyName, Instant.now().toEpochMilli(),
         UUID.randomUUID().toString(), 1);
   }
 
@@ -76,7 +76,7 @@ public class TestS3MultipartUploadCommitPartRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = omClientResponse.getOMResponse()
         .getInitiateMultiPartUploadResponse().getMultipartUploadID();
 
@@ -132,7 +132,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
     createParentPath(volumeName, bucketName);
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = UUID.randomUUID().toString();
 
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
@@ -167,7 +167,7 @@ public class TestS3MultipartUploadCommitPartRequest
         omMetadataManager, getBucketLayout());
 
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = UUID.randomUUID().toString();
 
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
@@ -203,7 +203,7 @@ public class TestS3MultipartUploadCommitPartRequest
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = UUID.randomUUID().toString();
 
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,

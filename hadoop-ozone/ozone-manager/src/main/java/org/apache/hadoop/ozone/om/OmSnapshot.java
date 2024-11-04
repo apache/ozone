@@ -37,12 +37,12 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -287,8 +287,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
       .setKeyName(denormalizeKeyName(""))
       .setOmKeyLocationInfos(Collections.singletonList(
           new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-      .setCreationTime(Time.now())
-      .setModificationTime(Time.now())
+      .setCreationTime(Instant.now().toEpochMilli())
+      .setModificationTime(Instant.now().toEpochMilli())
       .setDataSize(0)
       .setReplicationConfig(RatisReplicationConfig
           .getInstance(HddsProtos.ReplicationFactor.ZERO))

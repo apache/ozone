@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
@@ -79,7 +79,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         ozoneManager.isStrictS3());
 
     // Set creation time & set modification time
-    long initialTime = Time.now();
+    long initialTime = Instant.now().toEpochMilli();
     VolumeInfo updatedVolumeInfo =
         volumeInfo.toBuilder()
             .setCreationTime(initialTime)

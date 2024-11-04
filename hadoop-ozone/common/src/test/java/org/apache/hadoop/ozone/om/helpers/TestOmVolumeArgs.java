@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.time.Instant;
 import java.util.Collections;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -41,7 +41,7 @@ public class TestOmVolumeArgs {
     String admin = "admin";
     String owner = UserGroupInformation.getCurrentUser().getUserName();
     OmVolumeArgs omVolumeArgs = new OmVolumeArgs.Builder().setVolume(volumeName)
-        .setAdminName(admin).setCreationTime(Time.now()).setOwnerName(owner)
+        .setAdminName(admin).setCreationTime(Instant.now().toEpochMilli()).setOwnerName(owner)
         .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(Long.MAX_VALUE)
         .addMetadata("key1", "value1").addMetadata("key2", "value2")
         .addOzoneAcls(

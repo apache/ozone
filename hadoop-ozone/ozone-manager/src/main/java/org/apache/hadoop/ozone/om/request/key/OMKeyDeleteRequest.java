@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -90,7 +91,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         keyPath, getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
+        keyArgs.toBuilder().setModificationTime(Instant.now().toEpochMilli()).setKeyName(keyPath);
 
     KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
     return getOmRequest().toBuilder()

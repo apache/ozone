@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +66,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -147,7 +147,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
               userInfo);
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now()).setType(type).setFactor(factor)
+        .setModificationTime(Instant.now().toEpochMilli()).setType(type).setFactor(factor)
         .setDataSize(requestedSize);
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()

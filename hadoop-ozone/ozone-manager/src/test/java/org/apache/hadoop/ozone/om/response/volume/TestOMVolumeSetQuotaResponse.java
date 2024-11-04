@@ -26,10 +26,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,7 +55,7 @@ public class TestOMVolumeSetQuotaResponse extends TestOMVolumeResponse {
 
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(userName).setAdminName(userName)
-        .setVolume(volumeName).setCreationTime(Time.now()).build();
+        .setVolume(volumeName).setCreationTime(Instant.now().toEpochMilli()).build();
     OMVolumeSetQuotaResponse omVolumeSetQuotaResponse =
         new OMVolumeSetQuotaResponse(omResponse, omVolumeArgs);
 

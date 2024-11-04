@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -543,7 +544,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
           .setTenQuantileKeyWriteTime(
               quantileTime[FreonOps.KEY_WRITE.ordinal()]);
       String jsonName =
-          new SimpleDateFormat("yyyyMMddHHmmss").format(Time.now()) + ".json";
+          new SimpleDateFormat("yyyyMMddHHmmss").format(Instant.now().toEpochMilli()) + ".json";
       String jsonPath = jsonDir + "/" + jsonName;
       try (FileOutputStream os = new FileOutputStream(jsonPath)) {
         ObjectMapper mapper = new ObjectMapper();

@@ -31,10 +31,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -143,8 +143,8 @@ public class TestOmKeyInfo {
         .setKeyName("key1")
         .setBucketName("bucket")
         .setVolumeName("vol1")
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setDataSize(100L)
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))

@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -94,7 +95,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
@@ -317,8 +317,8 @@ public class TestKeyManagerImpl {
         .setKeyName(keyArgs.getKeyName())
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setDataSize(0)
         .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
@@ -1723,8 +1723,8 @@ public class TestKeyManagerImpl {
         .setKeyName(keyArgs.getKeyName() + "/")
         .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
         .setOmKeyLocationInfos(null)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setDataSize(0)
         .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();

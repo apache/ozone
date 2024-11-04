@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,7 +90,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
@@ -239,11 +239,11 @@ public class TestRocksDBCheckpointDiffer {
 
     String compactionLog =
         // Snapshot 0
-        "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 " + now() + " \n"
+        "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 " + Instant.now().toEpochMilli() + " \n"
             // Additional "compaction" to trigger and test early exit condition
             + "C 1291 000001,000002:000062\n"
             // Snapshot 1
-            + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 " + now() + " \n"
+            + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 " + Instant.now().toEpochMilli() + " \n"
             // Regular compaction
             + "C 4023 000068,000062:000069\n"
             // Trivial move
@@ -254,53 +254,53 @@ public class TestRocksDBCheckpointDiffer {
             // Deletion?
             + "C 12755 000093,000090,000083:\n"
             // Snapshot 2
-            + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd " + now() + "\n"
+            + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd " + Instant.now().toEpochMilli() + "\n"
             + "C 16192 000098,000096,000085,000078,000071,000064,000060,000052"
             + ":000099\n"
             + "C 16762 000105,000095,000088:000107\n"
             // Snapshot 3
-            + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea " + now() + "\n";
+            + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea " + Instant.now().toEpochMilli() + "\n";
 
     List<CompactionLogEntry> compactionLogEntries = Arrays.asList(
         // Additional "compaction" to trigger and test early exit condition
         createCompactionEntry(1291,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000001", "000002"),
             Collections.singletonList("000062")),
         // Regular compaction
         createCompactionEntry(4023,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000068", "000062"),
             Collections.singletonList("000069")),
         // Trivial move
         createCompactionEntry(5547,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000071", "000064", "000060", "000052"),
             Arrays.asList("000071", "000064", "000060", "000062")),
         createCompactionEntry(5647,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000073", "000066"),
             Collections.singletonList("000074")),
         createCompactionEntry(7872,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000082", "000076", "000069"),
             Collections.singletonList("000083")),
         createCompactionEntry(9001,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000087", "000080", "000074"),
             Collections.singletonList("000088")),
         // Deletion
         createCompactionEntry(12755,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000093", "000090", "000083"),
             Collections.emptyList()),
         createCompactionEntry(16192,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000098", "000096", "000085", "000078", "000071",
                 "000064", "000060", "000052"),
             Collections.singletonList("000099")),
         createCompactionEntry(16762,
-            now(),
+            Instant.now().toEpochMilli(),
             Arrays.asList("000105", "000095", "000088"),
             Collections.singletonList("000107"))
     );
@@ -1415,7 +1415,7 @@ public class TestRocksDBCheckpointDiffer {
                 "One level compaction.",
             null,
             Collections.singletonList(createCompactionEntry(1,
-                now(),
+                Instant.now().toEpochMilli(),
                 asList("000015", "000013", "000011", "000009"),
                 asList("000018", "000016", "000017"))),
             initialFiles2,
@@ -1425,22 +1425,22 @@ public class TestRocksDBCheckpointDiffer {
                 "Multi-level compaction.",
             null,
             asList(createCompactionEntry(1,
-                    now(),
+                    Instant.now().toEpochMilli(),
                     asList("000015", "000013", "000011", "000009"),
                     asList("000018", "000016", "000017")),
                 createCompactionEntry(2,
-                    now(),
+                    Instant.now().toEpochMilli(),
                     asList("000018", "000016", "000017", "000026", "000024",
                         "000022", "000020"),
                     asList("000027", "000030", "000028", "000031", "000029")),
                 createCompactionEntry(3,
-                    now(),
+                    Instant.now().toEpochMilli(),
                     asList("000027", "000030", "000028", "000031", "000029",
                         "000039", "000037", "000035", "000033"),
                     asList("000040", "000044", "000042", "000043", "000046",
                         "000041", "000045")),
                 createCompactionEntry(4,
-                    now(),
+                    Instant.now().toEpochMilli(),
                     asList("000040", "000044", "000042", "000043", "000046",
                         "000041", "000045", "000054", "000052", "000050",
                         "000048"),
@@ -1611,7 +1611,7 @@ public class TestRocksDBCheckpointDiffer {
               "/volume/bucket3/key-0000099136",
               "keyTable")),
           null),
-      new CompactionLogEntry(397, now(),
+      new CompactionLogEntry(397, Instant.now().toEpochMilli(),
           Arrays.asList(new CompactionFileInfo("000106",
                   "/volume/bucket1/key-0000000730",
                   "/volume/bucket3/key-0000099136",

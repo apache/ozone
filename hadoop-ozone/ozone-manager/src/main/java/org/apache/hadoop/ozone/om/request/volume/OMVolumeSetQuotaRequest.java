@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +29,6 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +71,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-    long modificationTime = Time.now();
+    long modificationTime = Instant.now().toEpochMilli();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilde = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);

@@ -36,10 +36,10 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -74,7 +74,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             bucketName, keyName, multipartUploadID);
     String dbMultipartOpenKey = omMetadataManager.getMultipartKey(volumeId,
             bucketId, parentID, fileName, multipartUploadID);
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
 
     // add MPU entry to OpenFileTable
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
@@ -161,7 +161,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         bucketName, keyName, multipartUploadID);
     String dbMultipartOpenKey = omMetadataManager.getMultipartKey(volumeId,
         bucketId, parentID, fileName, multipartUploadID);
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
 
     // add MPU entry to OpenFileTable
     List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
@@ -365,7 +365,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     addPart(1, part1, omMultipartKeyInfo);
 
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
 

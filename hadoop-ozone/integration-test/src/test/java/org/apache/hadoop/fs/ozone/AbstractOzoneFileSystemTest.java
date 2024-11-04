@@ -67,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
@@ -1917,7 +1916,7 @@ abstract class AbstractOzoneFileSystemTest {
   public void testOzFsReadWrite() throws IOException {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
-    long currentTime = Time.now();
+    long currentTime = Instant.now().toEpochMilli();
     int stringLen = 20;
     OMMetadataManager metadataManager = cluster.getOzoneManager()
         .getMetadataManager();

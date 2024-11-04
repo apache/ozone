@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -246,7 +247,7 @@ public class OzoneDelegationTokenSecretManager
    */
   private void updateIdentifierDetails(OzoneTokenIdentifier identifier) {
     int sequenceNum;
-    long now = Time.now();
+    long now = Instant.now().toEpochMilli();
     sequenceNum = incrementDelegationTokenSeqNum();
     identifier.setIssueDate(now);
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
@@ -280,7 +281,7 @@ public class OzoneDelegationTokenSecretManager
           formatTokenId(id), currentTokens.size());
     }
 
-    long now = Time.now();
+    long now = Instant.now().toEpochMilli();
     if (id.getMaxDate() < now) {
       throw new OMException(renewer + " tried to renew an expired token "
           + formatTokenId(id) + " max expiration date: "
@@ -419,7 +420,7 @@ public class OzoneDelegationTokenSecretManager
       throw new InvalidToken("token " + formatTokenId(identifier)
           + " can't be found in cache");
     }
-    long now = Time.now();
+    long now = Instant.now().toEpochMilli();
     if (info.getRenewDate() < now) {
       throw new InvalidToken("token " + formatTokenId(identifier) + " is " +
           "expired, current time: " + Time.formatTime(now) +
@@ -592,7 +593,7 @@ public class OzoneDelegationTokenSecretManager
    * Remove expired delegation tokens from cache and persisted store.
    */
   private void removeExpiredToken() {
-    long now = Time.now();
+    long now = Instant.now().toEpochMilli();
     synchronized (noInterruptsLock) {
       Iterator<Map.Entry<OzoneTokenIdentifier,
           TokenInfo>> i = currentTokens.entrySet().iterator();
@@ -625,7 +626,7 @@ public class OzoneDelegationTokenSecretManager
               getTokenRemoverScanInterval() / (60 * 1000));
       try {
         while (isRunning()) {
-          long now = Time.now();
+          long now = Instant.now().toEpochMilli();
           if (lastTokenCacheCleanup + getTokenRemoverScanInterval()
               < now) {
             removeExpiredToken();

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -79,7 +80,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.util.Time;
 import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
@@ -229,7 +229,7 @@ public class TestOMKeyRequest {
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
     replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
-    clientID = Time.now();
+    clientID = Instant.now().toEpochMilli();
     dataSize = 1000L;
     random = new Random();
     version = 0L;

@@ -28,12 +28,12 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
@@ -144,7 +144,7 @@ public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse 
 
     // Add key to cache.
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(getVolumeName(), getBucketName(),
-        snapshotName1, UUID.randomUUID(), Time.now());
+        snapshotName1, UUID.randomUUID(), Instant.now().toEpochMilli());
     snapshotInfo.setReferencedSize(1000L);
     snapshotInfo.setReferencedReplicatedSize(3 * 1000L);
     assertEquals(SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());

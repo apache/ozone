@@ -20,7 +20,8 @@
 package org.apache.hadoop.ozone.om.response;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.util.Time;
+
+import java.time.Instant;
 
 /**
  * Helper class to test OMClientResponse classes.
@@ -33,7 +34,7 @@ public final class TestOMResponseUtils {
 
   public static  OmBucketInfo createBucket(String volume, String bucket) {
     return OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
-        .setCreationTime(Time.now()).setIsVersionEnabled(true).addMetadata(
+        .setCreationTime(Instant.now().toEpochMilli()).setIsVersionEnabled(true).addMetadata(
             "key1", "value1").build();
 
   }

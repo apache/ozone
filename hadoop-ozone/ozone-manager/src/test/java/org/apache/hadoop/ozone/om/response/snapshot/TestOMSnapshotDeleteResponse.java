@@ -34,13 +34,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.time.Instant;
 import java.util.UUID;
 import java.nio.file.Path;
 
@@ -88,7 +88,7 @@ public class TestOMSnapshotDeleteResponse {
         bucketName,
         snapshotName,
         snapshotId,
-        Time.now());
+        Instant.now().toEpochMilli());
 
     // confirm table is empty
     assertEquals(0,

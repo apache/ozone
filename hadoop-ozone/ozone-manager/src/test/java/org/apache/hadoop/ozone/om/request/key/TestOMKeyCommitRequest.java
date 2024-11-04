@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
-import org.apache.hadoop.util.Time;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
@@ -645,7 +645,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     testValidateAndUpdateCache();
 
     // Become a new client and set next version number
-    clientID = Time.now();
+    clientID = Instant.now().toEpochMilli();
     version += 1;
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(getKeyLocation(10).subList(4, 10), false));

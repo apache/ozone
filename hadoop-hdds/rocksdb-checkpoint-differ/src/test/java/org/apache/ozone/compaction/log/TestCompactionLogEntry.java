@@ -19,11 +19,11 @@
 package org.apache.ozone.compaction.log;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -55,14 +55,14 @@ public class TestCompactionLogEntry {
     return Stream.of(
         Arguments.of("With compaction reason.",
             1000,
-            Time.now(),
+            Instant.now().toEpochMilli(),
             inputFiles,
             outputFiles,
             "compactionReason"
         ),
         Arguments.of("Without compaction reason.",
             2000,
-            Time.now(),
+            Instant.now().toEpochMilli(),
             inputFiles,
             outputFiles,
             null

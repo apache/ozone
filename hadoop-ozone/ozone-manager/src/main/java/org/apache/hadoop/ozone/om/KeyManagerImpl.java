@@ -110,7 +110,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1462,8 +1461,8 @@ public class KeyManagerImpl implements KeyManager {
         .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setDataSize(0)
         .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)

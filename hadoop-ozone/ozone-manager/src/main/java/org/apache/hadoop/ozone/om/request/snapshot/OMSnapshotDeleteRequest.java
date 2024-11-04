@@ -43,12 +43,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -102,7 +102,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
                 .setVolumeName(volumeName)
                 .setBucketName(bucketName)
                 .setSnapshotName(snapshotName)
-                .setDeletionTime(Time.now()));
+                .setDeletionTime(Instant.now().toEpochMilli()));
 
     return omRequestBuilder.build();
   }
@@ -210,7 +210,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (snapshotInfo == null) {
       // Dummy SnapshotInfo for logging and audit logging when erred
       snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-          snapshotName, null, Time.now());
+          snapshotName, null, Instant.now().toEpochMilli());
     }
 
     // Perform audit logging outside the lock

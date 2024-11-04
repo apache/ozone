@@ -31,10 +31,10 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
@@ -134,7 +134,7 @@ public class DeleteKeyHandler extends KeyHandler {
         // Key already exists in trash, Append timestamp with keyName
         // And move into trash
         // Same behaviour as filesystem trash
-        toKeyName += Time.now();
+        toKeyName += Instant.now().toEpochMilli();
       }
 
       // Check whether trash directory already exist inside bucket

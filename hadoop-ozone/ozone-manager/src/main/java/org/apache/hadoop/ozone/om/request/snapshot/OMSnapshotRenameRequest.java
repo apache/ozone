@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAP
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
+
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -48,7 +50,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 
 /**
@@ -96,7 +97,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
                 .setBucketName(bucketName)
                 .setSnapshotNewName(snapshotNewName)
                 .setSnapshotOldName(renameSnapshotRequest.getSnapshotOldName())
-                .setRenameTime(Time.now()));
+                .setRenameTime(Instant.now().toEpochMilli()));
 
     return omRequestBuilder.build();
   }
@@ -219,7 +220,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     if (snapshotOldInfo == null) {
       // Dummy SnapshotInfo for logging and audit logging when erred
       snapshotOldInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-                                              snapshotOldName, null, Time.now());
+                                              snapshotOldName, null, Instant.now().toEpochMilli());
     }
 
     // Perform audit logging outside the lock

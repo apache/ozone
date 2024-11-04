@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -40,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -120,8 +120,8 @@ public class TestDirectoryDeletingService {
     String longName = sb.toString();
     OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
         .setName("dir" + longName)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setObjectID(1)
         .setParentObjectID(bucketInfo.getObjectID())
         .setUpdateID(0)
@@ -180,14 +180,16 @@ public class TestDirectoryDeletingService {
     int dirCreatesCount = OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT * 2 + 100;
     long parentId = 1;
     OmDirectoryInfo baseDir = new OmDirectoryInfo.Builder().setName("dir_base")
-        .setCreationTime(Time.now()).setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli()).setModificationTime(Instant.now().toEpochMilli())
         .setObjectID(parentId).setParentObjectID(bucketInfo.getObjectID())
         .setUpdateID(0).build();
     OMRequestTestUtils.addDirKeyToDirTable(true, baseDir, volumeName, bucketName,
         1L, om.getMetadataManager());
     for (int i = 0; i < dirCreatesCount; ++i) {
       OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder().setName("dir" + i)
-          .setCreationTime(Time.now()).setModificationTime(Time.now()).setParentObjectID(parentId)
+          .setCreationTime(Instant.now().toEpochMilli())
+          .setModificationTime(Instant.now().toEpochMilli())
+          .setParentObjectID(parentId)
           .setObjectID(i + 100).setUpdateID(i).build();
       OMRequestTestUtils.addDirKeyToDirTable(true, dir1, volumeName, bucketName,
           1L, om.getMetadataManager());
