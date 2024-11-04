@@ -85,7 +85,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
-  DeletedDirSupplier deletedDirSupplier = null;
+
+  private DeletedDirSupplier deletedDirSupplier = null;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -109,6 +110,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     } catch (IOException ex) {
       LOG.error("Couldn't initialize supplier.");
     }
+  }
+
+  public DeletedDirSupplier getDeletedDirSupplier() {
+    return deletedDirSupplier;
   }
 
   private boolean shouldRun() {
@@ -156,13 +161,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private final class DeletedDirSupplier {
-    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
     private DeletedDirSupplier() throws IOException {
       this.deleteTableIterator =
           getOzoneManager().getMetadataManager().getDeletedDirTable()
               .iterator();
+    }
+
+    private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> getDeleteTableIterator() {
+      return deleteTableIterator;
     }
 
     private synchronized Table.KeyValue<String, OmKeyInfo> get() {
@@ -241,7 +250,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           long startTime = Time.monotonicNow();
           while (remainNum > 0) {
             pendingDeletedDirInfo = deletedDirSupplier.get();
-            if(pendingDeletedDirInfo == null) {
+            if (pendingDeletedDirInfo == null) {
               break;
             }
             // Do not reclaim if the directory is still being referenced by
