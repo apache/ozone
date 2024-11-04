@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -33,14 +32,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Collection;
+import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
@@ -151,11 +150,11 @@ public class ContainerChecksumTreeManager {
   public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo peerChecksumInfo)
       throws IOException {
     Preconditions.assertNotNull(thisContainer, "Container data is null");
+    Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null");
     Optional<ContainerProtos.ContainerChecksumInfo.Builder> thisContainerChecksumInfoBuilder =
         read(thisContainer);
     if (!thisContainerChecksumInfoBuilder.isPresent()) {
-      // TODO: To create containerMerkleTree or fail the request.
-      return null;
+      throw new IOException("The container #" + thisContainer.getContainerID() + " doesn't have container checksum");
     }
 
     if (thisContainer.getContainerID() != peerChecksumInfo.getContainerID()) {
@@ -178,22 +177,42 @@ public class ContainerChecksumTreeManager {
       return new ContainerDiff();
     }
 
-    Map<Long, ContainerProtos.BlockMerkleTree> thisBlockMerkleTreeMap = thisMerkleTree.getBlockMerkleTreeList()
-        .stream().collect(Collectors.toMap(ContainerProtos.BlockMerkleTree::getBlockID,
-            blockMerkleTree -> blockMerkleTree));
-
+    List<ContainerProtos.BlockMerkleTree> thisBlockMerkleTreeList = thisMerkleTree.getBlockMerkleTreeList();
+    List<ContainerProtos.BlockMerkleTree> peerBlockMerkleTreeList = peerMerkleTree.getBlockMerkleTreeList();
     // Since we are reconciling our container with a peer, We only need to go through the peer's block list
-    for (ContainerProtos.BlockMerkleTree peerBlockMerkleTree: peerMerkleTree.getBlockMerkleTreeList()) {
-      // Check if our container has the peer block.
-      ContainerProtos.BlockMerkleTree thisBlockMerkleTree = thisBlockMerkleTreeMap.get(
-          peerBlockMerkleTree.getBlockID());
+    int peerIdx = 0, thisIdx = 0;
+    while (peerIdx < peerBlockMerkleTreeList.size() || thisIdx < thisBlockMerkleTreeList.size()) {
+      ContainerProtos.BlockMerkleTree thisBlockMerkleTree = thisIdx < thisBlockMerkleTreeList.size() ?
+          thisBlockMerkleTreeList.get(thisIdx) : null;
+      ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerIdx < peerBlockMerkleTreeList.size() ?
+          peerBlockMerkleTreeList.get(peerIdx) : null;
+
+      // We have checked all the peer blocks, So we can return the ContainerDiff report
+      if (peerBlockMerkleTree == null) {
+        return report;
+      }
+
+      // peerBlockMerkleTree is not null, but thisBlockMerkleTree is null. Means we have missing blocks.
       if (thisBlockMerkleTree == null) {
         report.addMissingBlock(peerBlockMerkleTree);
+        peerIdx++;
         continue;
       }
 
-      if (thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
-        compareBlockMerkleTree(report, thisBlockMerkleTree, peerBlockMerkleTree);
+      // BlockId matches for both thisBlockMerkleTree and peerBlockMerkleTree
+      if (thisBlockMerkleTree.getBlockID() == peerBlockMerkleTree.getBlockID()) {
+        if (thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
+          compareBlockMerkleTree(report, thisBlockMerkleTree, peerBlockMerkleTree);
+        }
+        peerIdx++;
+        thisIdx++;
+      } else {
+        if (peerBlockMerkleTree.getBlockID() > thisBlockMerkleTree.getBlockID()) {
+          thisIdx++;
+        } else {
+          report.addMissingBlock(peerBlockMerkleTree);
+          peerIdx++;
+        }
       }
     }
     return report;
@@ -201,26 +220,49 @@ public class ContainerChecksumTreeManager {
 
   private void compareBlockMerkleTree(ContainerDiff report, ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
                                       ContainerProtos.BlockMerkleTree peerBlockMerkleTree) {
-    Map<Long, ContainerProtos.ChunkMerkleTree> thisChunkMerkleTreeMap = thisBlockMerkleTree.getChunkMerkleTreeList()
-        .stream().collect(Collectors.toMap(ContainerProtos.ChunkMerkleTree::getOffset,
-            chunkMerkleTree -> chunkMerkleTree));
+
+    List<ContainerProtos.ChunkMerkleTree> thisChunkMerkleTreeList = thisBlockMerkleTree.getChunkMerkleTreeList();
     List<ContainerProtos.ChunkMerkleTree> peerChunkMerkleTreeList = peerBlockMerkleTree.getChunkMerkleTreeList();
 
     // Since we are reconciling our container with a peer, We only need to go through the peer's chunk list
-    for (ContainerProtos.ChunkMerkleTree peerChunkMerkleTree: peerChunkMerkleTreeList) {
-      ContainerProtos.ChunkMerkleTree thisChunkMerkleTree = thisChunkMerkleTreeMap.get(
-          peerChunkMerkleTree.getOffset());
+    int peerIdx = 0, thisIdx = 0;
+    while (peerIdx < peerChunkMerkleTreeList.size() || thisIdx < thisChunkMerkleTreeList.size()) {
+      ContainerProtos.ChunkMerkleTree thisChunkMerkleTree = thisIdx < thisChunkMerkleTreeList.size() ?
+          thisChunkMerkleTreeList.get(thisIdx) : null;
+      ContainerProtos.ChunkMerkleTree peerChunkMerkleTree = peerIdx < peerChunkMerkleTreeList.size() ?
+          peerChunkMerkleTreeList.get(peerIdx) : null;
+
+      // We have checked all the peer chunks, So we can return the ContainerDiff report
+      if (peerChunkMerkleTree == null) {
+        return;
+      }
+
+      // peerBlockMerkleTree is not null, but thisBlockMerkleTree is null. Means we have missing blocks.
       if (thisChunkMerkleTree == null) {
-        report.addMissingChunk(peerChunkMerkleTree);
+        report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+        peerIdx++;
         continue;
       }
 
-      if (thisChunkMerkleTree.getChunkChecksum() != peerChunkMerkleTree.getChunkChecksum()) {
-        ChunkArgs thisChunkArgs = new ChunkArgs(thisBlockMerkleTree.getBlockID(), thisChunkMerkleTree.getOffset(),
-            thisChunkMerkleTree.getLength(), thisChunkMerkleTree.getChunkChecksum());
-        ChunkArgs peerChunkArgs = new ChunkArgs(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree.getOffset(),
-            peerChunkMerkleTree.getLength(), peerChunkMerkleTree.getChunkChecksum());
-        report.addCorruptChunks(Pair.of(thisChunkArgs, peerChunkArgs));
+      if (thisChunkMerkleTree.getOffset() == peerChunkMerkleTree.getOffset()) {
+        // Possible state when this Checksum != peer Checksum:
+        // thisTree = Healthy, peerTree = Healthy -> We don't know what is healthy. Skip.
+        // thisTree = Unhealthy, peerTree = Healthy -> Add to corrupt chunk.
+        // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
+        // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
+        if (thisChunkMerkleTree.getChunkChecksum() != peerChunkMerkleTree.getChunkChecksum() &&
+            !thisChunkMerkleTree.getIsHealthy() && peerChunkMerkleTree.getIsHealthy()) {
+          report.addCorruptChunks(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+        }
+        peerIdx++;
+        thisIdx++;
+      } else {
+        if (peerChunkMerkleTree.getOffset() > thisChunkMerkleTree.getOffset()) {
+          thisIdx++;
+        } else {
+          report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+          peerIdx++;
+        }
       }
     }
   }
@@ -322,70 +364,44 @@ public class ContainerChecksumTreeManager {
    */
   public static class ContainerDiff {
     private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
-    private final List<ContainerProtos.ChunkMerkleTree> missingChunks;
-    private final List<Pair<ChunkArgs, ChunkArgs>> corruptChunks;
+    private final SortedMap<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
+    private final SortedMap<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
 
     public ContainerDiff() {
       this.missingBlocks = new ArrayList<>();
-      this.missingChunks = new ArrayList<>();
-      this.corruptChunks = new ArrayList<>();
+      this.missingChunks = new TreeMap<>();
+      this.corruptChunks = new TreeMap<>();
     }
 
-    public void addMissingBlock(ContainerProtos.BlockMerkleTree otherBlockMerkleTree) {
-      this.missingBlocks.add(otherBlockMerkleTree);
+    public void addMissingBlock(ContainerProtos.BlockMerkleTree missingBlockMerkleTree) {
+      this.missingBlocks.add(missingBlockMerkleTree);
     }
 
-    public void addMissingChunk(ContainerProtos.ChunkMerkleTree otherChunkMerkleTree) {
-      this.missingChunks.add(otherChunkMerkleTree);
+    public void addMissingChunk(long blockId, ContainerProtos.ChunkMerkleTree missingChunkMerkleTree) {
+      this.missingChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(missingChunkMerkleTree);
     }
 
-    public void addCorruptChunks(Pair<ChunkArgs, ChunkArgs> mismatchedChunk) {
-      this.corruptChunks.add(mismatchedChunk);
+    public void addCorruptChunks(long blockId, ContainerProtos.ChunkMerkleTree corruptChunk) {
+      this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
     }
 
     public List<ContainerProtos.BlockMerkleTree> getMissingBlocks() {
       return missingBlocks;
     }
 
-    public List<ContainerProtos.ChunkMerkleTree> getMissingChunks() {
+    public SortedMap<Long, List<ContainerProtos.ChunkMerkleTree>> getMissingChunks() {
       return missingChunks;
     }
 
-    public List<Pair<ChunkArgs, ChunkArgs>> getCorruptChunks() {
+    public SortedMap<Long, List<ContainerProtos.ChunkMerkleTree>> getCorruptChunks() {
       return corruptChunks;
     }
-  }
 
-  /**
-   * This class encapsulates chunk merkle tree with block ID which is required for reconciliation.
-   */
-  public static class ChunkArgs {
-    private final long blockId;
-    private final long chunkOffset;
-    private final long chunkLength;
-    private final long checksum;
-
-    public ChunkArgs(long blockId, long chunkOffset, long chunkLength, long checksum) {
-      this.blockId = blockId;
-      this.chunkOffset = chunkOffset;
-      this.chunkLength = chunkLength;
-      this.checksum = checksum;
-    }
-
-    public long getBlockId() {
-      return blockId;
-    }
-
-    public long getChunkOffset() {
-      return chunkOffset;
-    }
-
-    public long getChunkLength() {
-      return chunkLength;
-    }
-
-    public long getChecksum() {
-      return checksum;
+    public boolean isHealthy() {
+      if (missingBlocks.isEmpty() && missingChunks.isEmpty() && corruptChunks.isEmpty()) {
+        return true;
+      }
+      return false;
     }
   }
 }

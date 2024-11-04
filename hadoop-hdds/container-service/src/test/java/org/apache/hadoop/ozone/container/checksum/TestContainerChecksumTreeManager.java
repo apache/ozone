@@ -16,14 +16,17 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +38,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertContainerDiffMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTreeWithMismatches;
@@ -60,6 +65,19 @@ class TestContainerChecksumTreeManager {
   private ContainerChecksumTreeManager checksumManager;
   private ContainerMerkleTreeMetrics metrics;
   private ConfigurationSource config;
+
+  public static Stream<Arguments> getParameters() {
+    return Stream.of(
+        Arguments.of(1, 2, 3),
+        Arguments.of(2, 3, 1),
+        Arguments.of(3, 1, 2),
+        Arguments.of(2, 2, 3),
+        Arguments.of(3, 2, 2),
+        Arguments.of(3, 3, 3),
+        Arguments.of(2, 1, 4),
+        Arguments.of(2, 3, 4),
+        Arguments.of(1, 2, 4));
+  }
 
   @BeforeEach
   public void init() {
@@ -313,14 +331,17 @@ class TestContainerChecksumTreeManager {
             .setContainerMerkleTree(peerMerkleTree.toProto()).build();
     ContainerChecksumTreeManager.ContainerDiff diff =
         containerChecksumTreeManager.diff(container, peerChecksumInfo);
-    Assertions.assertTrue(diff.getCorruptChunks().isEmpty());
-    Assertions.assertTrue(diff.getMissingBlocks().isEmpty());
-    Assertions.assertTrue(diff.getMissingChunks().isEmpty());
+    assertTrue(diff.isHealthy());
   }
 
-  @Test
-  public void testContainerDiffWithMissingBlocksAndChunks() throws IOException {
-    ContainerMerkleTree ourMerkleTree = buildTestTreeWithMismatches(config, true, true, false);
+  @ParameterizedTest
+  @MethodSource("getParameters")
+  public void testContainerDiffWithMismatches(int numMissingBlock, int numMissingChunk,
+                                              int numCorruptChunk) throws IOException {
+    Pair<ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
+        buildTestTreeWithMismatches(config, numMissingBlock, numMissingChunk, numCorruptChunk);
+    ContainerChecksumTreeManager.ContainerDiff expectedDiff = buildResult.getRight();
+    ContainerMerkleTree ourMerkleTree = buildResult.getLeft();
     ContainerMerkleTree peerMerkleTree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, ourMerkleTree);
     ContainerChecksumTreeManager containerChecksumTreeManager = new ContainerChecksumTreeManager(
@@ -330,42 +351,21 @@ class TestContainerChecksumTreeManager {
         .setContainerMerkleTree(peerMerkleTree.toProto()).build();
     ContainerChecksumTreeManager.ContainerDiff diff =
         containerChecksumTreeManager.diff(container, peerChecksumInfo);
-    Assertions.assertTrue(diff.getCorruptChunks().isEmpty());
-    Assertions.assertFalse(diff.getMissingBlocks().isEmpty());
-    Assertions.assertFalse(diff.getMissingChunks().isEmpty());
-
-    Assertions.assertEquals(diff.getMissingBlocks().size(), 1);
-    Assertions.assertEquals(diff.getMissingChunks().size(), 1);
-  }
-
-  @Test
-  public void testContainerDiffWithMissingBlocksAndMismatchChunks() throws IOException {
-    ContainerMerkleTree ourMerkleTree = buildTestTreeWithMismatches(config, true, false, true);
-    ContainerMerkleTree peerMerkleTree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, ourMerkleTree);
-    ContainerChecksumTreeManager containerChecksumTreeManager = new ContainerChecksumTreeManager(
-        new OzoneConfiguration());
-    ContainerProtos.ContainerChecksumInfo peerChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
-        .setContainerID(container.getContainerID())
-        .setContainerMerkleTree(peerMerkleTree.toProto()).build();
-    ContainerChecksumTreeManager.ContainerDiff diff =
-        containerChecksumTreeManager.diff(container, peerChecksumInfo);
-    Assertions.assertFalse(diff.getCorruptChunks().isEmpty());
-    Assertions.assertFalse(diff.getMissingBlocks().isEmpty());
-    Assertions.assertTrue(diff.getMissingChunks().isEmpty());
-
-    Assertions.assertEquals(diff.getCorruptChunks().size(), 1);
-    Assertions.assertEquals(diff.getMissingBlocks().size(), 1);
+    assertContainerDiffMatch(expectedDiff, diff);
   }
 
   /**
    * Test if a peer which has missing blocks and chunks affects our container diff.
    * Only if our merkle tree has missing entries from the peer we need to add it the Container Diff.
    */
-  @Test
-  public void testPeerWithMissingBlockAndMissingChunks() throws IOException {
+  @ParameterizedTest
+  @MethodSource("getParameters")
+  public void testPeerWithMissingBlockAndMissingChunks(int numMissingBlock, int numMissingChunk,
+                                                       int numCorruptChunk) throws IOException {
+    Pair<ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
+        buildTestTreeWithMismatches(config, numMissingBlock, numMissingChunk, numCorruptChunk);
     ContainerMerkleTree ourMerkleTree = buildTestTree(config);
-    ContainerMerkleTree peerMerkleTree = buildTestTreeWithMismatches(config, true, true, true);
+    ContainerMerkleTree peerMerkleTree =  buildResult.getLeft();
     checksumManager.writeContainerDataTree(container, ourMerkleTree);
     ContainerChecksumTreeManager containerChecksumTreeManager = new ContainerChecksumTreeManager(
         new OzoneConfiguration());
@@ -374,11 +374,7 @@ class TestContainerChecksumTreeManager {
         .setContainerMerkleTree(peerMerkleTree.toProto()).build();
     ContainerChecksumTreeManager.ContainerDiff diff =
         containerChecksumTreeManager.diff(container, peerChecksumInfo);
-    Assertions.assertFalse(diff.getCorruptChunks().isEmpty());
-    Assertions.assertTrue(diff.getMissingBlocks().isEmpty());
-    Assertions.assertTrue(diff.getMissingChunks().isEmpty());
-
-    Assertions.assertEquals(diff.getCorruptChunks().size(), 1);
+    assertTrue(diff.isHealthy());
   }
 
   @Test

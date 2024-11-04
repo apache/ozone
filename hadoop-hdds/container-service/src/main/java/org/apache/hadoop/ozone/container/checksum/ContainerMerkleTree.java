@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
@@ -62,6 +63,25 @@ public class ContainerMerkleTree {
     id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
   }
 
+  public void addChunk(long blockID, ContainerProtos.ChunkInfo chunk) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunk(chunk);
+  }
+
+  @VisibleForTesting
+  public BlockMerkleTree getChunks(long blockID) {
+    return id2Block.get(blockID);
+  }
+
+  @VisibleForTesting
+  public BlockMerkleTree get(long blockID) {
+    return id2Block.get(blockID);
+  }
+
+  @VisibleForTesting
+  public BlockMerkleTree remove(long blockID) {
+    return id2Block.remove(blockID);
+  }
+
   /**
    * Uses chunk hashes to compute all remaining hashes in the tree, and returns it as a protobuf object. No checksum
    * computation for the tree happens outside of this method.
@@ -91,7 +111,7 @@ public class ContainerMerkleTree {
   /**
    * Represents a merkle tree for a single block within a container.
    */
-  private static class BlockMerkleTree {
+  public static class BlockMerkleTree {
     // Map of each offset within the block to its chunk info.
     // Chunk order in the checksum is determined by their offset.
     private final SortedMap<Long, ChunkMerkleTree> offset2Chunk;
@@ -112,6 +132,30 @@ public class ContainerMerkleTree {
       for (ContainerProtos.ChunkInfo chunk: chunks) {
         offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
       }
+    }
+
+    public void addChunk(ContainerProtos.ChunkInfo chunk) {
+      offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
+    }
+
+    public void setHealthy(long offset, boolean healthy) {
+      ChunkMerkleTree chunkMerkleTree = offset2Chunk.get(offset);
+      if (chunkMerkleTree == null) {
+        return;
+      }
+      chunkMerkleTree.setHealthy(healthy);
+    }
+
+    public ChunkMerkleTree removeChunk(long offset) {
+      return offset2Chunk.remove(offset);
+    }
+
+    public ChunkMerkleTree getChunk(long offset) {
+      return offset2Chunk.get(offset);
+    }
+
+    public long getBlockId() {
+      return blockID;
     }
 
     /**
@@ -150,11 +194,32 @@ public class ContainerMerkleTree {
    * Each chunk has multiple checksums within it at each "bytesPerChecksum" interval.
    * This class computes one checksum for the whole chunk by aggregating these.
    */
-  private static class ChunkMerkleTree {
-    private final ContainerProtos.ChunkInfo chunk;
+  public static class ChunkMerkleTree {
+    private ContainerProtos.ChunkInfo chunk;
+    private boolean isHealthy = true;
 
     ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
       this.chunk = chunk;
+    }
+
+    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk, boolean isHealthy) {
+      this.chunk = chunk;
+      this.isHealthy = isHealthy;
+    }
+
+    @VisibleForTesting
+    public void setChunk(ContainerProtos.ChunkInfo chunk) {
+      this.chunk = chunk;
+    }
+
+    @VisibleForTesting
+    public void setHealthy(boolean healthy) {
+      this.isHealthy = healthy;
+    }
+
+
+    public ContainerProtos.ChunkInfo getChunkInfo() {
+      return chunk;
     }
 
     /**
@@ -172,6 +237,7 @@ public class ContainerMerkleTree {
       return ContainerProtos.ChunkMerkleTree.newBuilder()
           .setOffset(chunk.getOffset())
           .setLength(chunk.getLen())
+          .setIsHealthy(isHealthy)
           .setChunkChecksum(checksumImpl.getValue())
           .build();
     }
