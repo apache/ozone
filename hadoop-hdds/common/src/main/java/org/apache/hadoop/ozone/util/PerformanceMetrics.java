@@ -43,8 +43,8 @@ public class PerformanceMetrics implements Closeable {
    * @param source the metrics source
    * @param registry the metrics registry
    * @param intervals the intervals for quantiles computation. Note, each
-   * interval in 'intervals' increases memory usage, as it corresponds
-   * to a separate quantile calculator.
+   *        interval in 'intervals' increases memory usage, as it corresponds
+   *        to a separate quantile calculator.
    * @return {@link PerformanceMetrics} instances created, mapped by field name
    */
   public static synchronized <T> Map<String, PerformanceMetrics> initializeMetrics(T source,
