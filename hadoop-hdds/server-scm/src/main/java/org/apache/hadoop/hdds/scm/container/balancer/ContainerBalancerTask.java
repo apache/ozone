@@ -423,7 +423,7 @@ public class ContainerBalancerTask implements Runnable {
         sizeLeavingDataFromNodes
     );
     IterationInfo iterationInfo = new IterationInfo(
-        0,
+        lastIterationNumber + 1,
         null,
         iterationDuration
     );
