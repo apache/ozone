@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -50,15 +52,21 @@ import org.junit.jupiter.api.Test;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static java.lang.System.err;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * FSORepairTool test cases.
@@ -67,14 +75,17 @@ public class TestFSORepairTool {
   public static final Logger LOG =
       LoggerFactory.getLogger(TestFSORepairTool.class);
 
+  private static final String DEFAULT_ENCODING = UTF_8.name();
   private static MiniOzoneHAClusterImpl cluster;
   private static FileSystem fs;
   private static OzoneClient client;
+  private static OzoneConfiguration conf = null;
+
 
   @BeforeAll
   public static void init() throws Exception {
     // Set configs.
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     // deletion services will be triggered manually.
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL,
         1_000_000, TimeUnit.SECONDS);
@@ -98,34 +109,97 @@ public class TestFSORepairTool {
     // Init ofs.
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, cluster.getOzoneManager().getOMServiceId());
-    System.out.println("Rootpath: " + rootPath);
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
     client = OzoneClientFactory.getRpcClient("omservice", conf);
   }
 
-//  @AfterEach
-//  public void cleanNamespace() throws Exception {
-//    if (fs.exists(new Path("/vol1"))) {
-//      fs.delete(new Path("/vol1"), true);
-//    }
-//    if (fs.exists(new Path("/vol2"))) {
-//      fs.delete(new Path("/vol2"), true);
-//    }
-//    runDeletes();
-//    assertFileAndDirTablesEmpty();
-//  }
-
   @AfterEach
   public void cleanNamespace() throws Exception {
     OzoneShell shell = new OzoneShell();
-    String[] args1 = new String[]{"volume", "delete", "-r", "/vol1", "-y"};
-    String[] args2 = new String[]{"volume", "delete", "-r", "/vol2", "-y"};
-    shell.execute(args1);
-    shell.execute(args2);
+
+    if (fs.exists(new Path("/vol1"))) {
+      String[] args1 = new String[]{"volume", "delete", "-r", "-y", "vol1"};
+      int exitC = execute(shell, args1);
+      assertEquals(0, exitC);
+    }
+
+    if (fs.exists(new Path("/vol2"))) {
+      String[] args1 = new String[]{"volume", "delete", "-r", "-y", "vol2"};
+      int exitC = execute(shell, args1);
+      assertEquals(0, exitC);
+    }
 
     runDeletes();
     assertFileAndDirTablesEmpty();
+  }
+
+  private int execute(GenericCli shell, String[] args) {
+    LOG.info("Executing shell command with args {}", Arrays.asList(args));
+    CommandLine cmd = shell.getCmd();
+
+    CommandLine.IExecutionExceptionHandler exceptionHandler =
+            (ex, commandLine, parseResult) -> {
+              new PrintStream(err, true, DEFAULT_ENCODING).println(ex.getMessage());
+              return commandLine.getCommandSpec().exitCodeOnExecutionException();
+            };
+
+    // Since there is no elegant way to pass Ozone config to the shell,
+    // the idea is to use 'set' to place those OM HA configs.
+    String[] argsWithHAConf = getHASetConfStrings(args);
+
+    cmd.setExecutionExceptionHandler(exceptionHandler);
+    return cmd.execute(argsWithHAConf);
+  }
+  private String getSetConfStringFromConf(String key) {
+    return String.format("--set=%s=%s", key, conf.get(key));
+  }
+
+  private String generateSetConfString(String key, String value) {
+    return String.format("--set=%s=%s", key, value);
+  }
+
+  private String[] getHASetConfStrings(int numOfArgs) {
+    assert (numOfArgs >= 0);
+    String[] res = new String[1 + 1 + 1 + numOfArgs];
+    final int indexOmServiceIds = 0;
+    final int indexOmNodes = 1;
+    final int indexOmAddressStart = 2;
+
+    res[indexOmServiceIds] = getSetConfStringFromConf(
+            OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+
+    String omNodesKey = ConfUtils.addKeySuffixes(
+            OMConfigKeys.OZONE_OM_NODES_KEY, "omservice");
+    String omNodesVal = conf.get(omNodesKey);
+    res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
+
+    String[] omNodesArr = omNodesVal.split(",");
+    // Sanity check
+    assert (omNodesArr.length == 1);
+    for (int i = 0; i < 1; i++) {
+      res[indexOmAddressStart + i] =
+              getSetConfStringFromConf(ConfUtils.addKeySuffixes(
+                      OMConfigKeys.OZONE_OM_ADDRESS_KEY, "omservice", omNodesArr[i]));
+    }
+
+    return res;
+  }
+
+  /**
+   * Helper function to create a new set of arguments that contains HA configs.
+   * @param existingArgs Existing arguments to be fed into OzoneShell command.
+   * @return String array.
+   */
+  private String[] getHASetConfStrings(String[] existingArgs) {
+    // Get a String array populated with HA configs first
+    String[] res = getHASetConfStrings(existingArgs.length);
+
+    int indexCopyStart = res.length - existingArgs.length;
+    // Then copy the existing args to the returned String array
+    System.arraycopy(existingArgs, 0, res, indexCopyStart,
+            existingArgs.length);
+    return res;
   }
 
   @AfterAll

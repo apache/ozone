@@ -181,7 +181,7 @@ public class FSORepairTool {
     }
 
     if (volumeFilter != null) {
-      OmVolumeArgs volumeArgs = volumeTable.get(volumeFilter);
+      OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
       if (volumeArgs == null) {
         System.out.println("Volume '" + volumeFilter + "' does not exist.");
         return null;
@@ -205,7 +205,7 @@ public class FSORepairTool {
         System.out.println("Processing volume: " + volumeKey);
 
         if (bucketFilter != null) {
-          OmBucketInfo bucketInfo = bucketTable.get(volumeKey + "/" + bucketFilter);
+          OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
           if (bucketInfo == null) {
             //Bucket does not exist in the volume
             System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
@@ -213,16 +213,11 @@ public class FSORepairTool {
           }
 
           if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-            //LOG.debug("Skipping non-FSO bucket {}", bucketKey);
             System.out.println("Skipping non-FSO bucket " + bucketFilter);
             continue;
           }
 
-          dropReachableTableIfExists();
-          createReachableTable();
-          markReachableObjectsInBucket(volumeEntry.getValue(), bucketInfo);
-          handleUnreachableObjects(volumeEntry.getValue(), bucketInfo);
-          dropReachableTableIfExists();
+          processBucket(volumeEntry.getValue(), bucketInfo);
         } else {
 
         // Iterate all buckets in the volume.
@@ -236,7 +231,6 @@ public class FSORepairTool {
               OmBucketInfo bucketInfo = bucketEntry.getValue();
 
               if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-                //LOG.debug("Skipping non-FSO bucket {}", bucketKey);
                 System.out.println("Skipping non-FSO bucket " + bucketKey);
                 continue;
               }
@@ -247,14 +241,7 @@ public class FSORepairTool {
                 break;
               }
 
-              // Start with a fresh list of reachable files for this bucket.
-              // Also clears partial state if the tool failed on a previous run.
-              dropReachableTableIfExists();
-              createReachableTable();
-              // Process one bucket's FSO tree at a time.
-              markReachableObjectsInBucket(volumeEntry.getValue(), bucketInfo);
-              handleUnreachableObjects(volumeEntry.getValue(), bucketInfo);
-              dropReachableTableIfExists();
+              processBucket(volumeEntry.getValue(), bucketInfo);
             }
           }
         }
@@ -264,6 +251,14 @@ public class FSORepairTool {
     }
 
     return buildReportAndLog();
+  }
+
+  private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
+    dropReachableTableIfExists();
+    createReachableTable();
+    markReachableObjectsInBucket(volume, bucketInfo);
+    handleUnreachableObjects(volume, bucketInfo);
+    dropReachableTableIfExists();
   }
 
   private Report buildReportAndLog() {
@@ -276,14 +271,12 @@ public class FSORepairTool {
         .setUnreachableBytes(unreachableBytes)
         .build();
 
-    //LOG.info("\n{}", report);
     System.out.println("\n" + report);
     return report;
   }
 
   private void markReachableObjectsInBucket(OmVolumeArgs volume,
                                             OmBucketInfo bucket) throws IOException {
-    //LOG.info("Processing bucket {}", bucket.getBucketName());
     System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucket.getBucketName());
     // Only put directories in the stack.
     // Directory keys should have the form /volumeID/bucketID/parentID/name.
@@ -303,8 +296,6 @@ public class FSORepairTool {
       String currentDirKey = dirKeyStack.pop();
       OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
       if (currentDir == null) {
-        //LOG.error("Directory key {} to be processed was not found in the " +
-        //    "directory table", currentDirKey);
         System.out.println("Directory key" + currentDirKey + "to be processed was not found in the " +
               "directory table.");
         continue;
@@ -339,12 +330,10 @@ public class FSORepairTool {
         }
 
         if (!isReachable(dirKey)) {
-          //LOG.debug("Found unreachable directory: {}", dirKey);
           System.out.println("Found unreachable directory: " + dirKey);
           unreachableDirs++;
 
           if (dryRun) {
-            //LOG.debug("Marking unreachable directory {} for deletion.", dirKey);
             System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
             OmDirectoryInfo dirInfo = dirEntry.getValue();
             markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(),
@@ -368,13 +357,11 @@ public class FSORepairTool {
 
         OmKeyInfo fileInfo = fileEntry.getValue();
         if (!isReachable(fileKey)) {
-          //LOG.debug("Found unreachable file: {}", fileKey);
           System.out.println("Found unreachable file: " + fileKey);
           unreachableBytes += fileInfo.getDataSize();
           unreachableFiles++;
 
           if (dryRun) {
-            //LOG.debug("Marking unreachable file {} for deletion.", fileKey);
             System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
             markFileForDeletion(fileKey, fileInfo);
           }
@@ -403,7 +390,6 @@ public class FSORepairTool {
       // is gone. The name of the key does not matter so just use IDs.
       deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
 
-      //LOG.debug("Added entry {} to open key table: {}", fileKey, updatedRepeatedOmKeyInfo);
       System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
       store.commitBatchOperation(batch);
     }
@@ -519,7 +505,6 @@ public class FSORepairTool {
   private void openReachableDB() throws IOException {
     File reachableDBFile = new File(new File(omDBPath).getParentFile(),
         "reachable.db");
-    //LOG.info("Creating database of reachable directories at {}", reachableDBFile);
     System.out.println("Creating database of reachable directories at " + reachableDBFile);
     // Delete the DB from the last run if it exists.
     if (reachableDBFile.exists()) {
@@ -573,12 +558,6 @@ public class FSORepairTool {
   private void createReachableTable() throws IOException {
     reachableCFHandle = reachableDB.createColumnFamily(
         new ColumnFamilyDescriptor(REACHABLE_TABLE_BYTES));
-  }
-
-  private void estimateReplicatedSize() {
-    int replicationFactor = 3;
-    long totalReplicatedSize = (reachableBytes + unreachableBytes) * replicationFactor;
-    System.out.println("Estimated replicated size: " + totalReplicatedSize + " bytes");
   }
 
   /**
@@ -669,7 +648,6 @@ public class FSORepairTool {
       FSORepairTool.Report report = (FSORepairTool.Report) other;
 
       // Useful for testing.
-      //LOG.debug("Comparing reports\nExpect:\n{}\nActual:\n{}", this, report);
       System.out.println("Comparing reports\nExpect:\n" + this + "\nActual:\n" + report);
 
       return reachableBytes == report.reachableBytes &&

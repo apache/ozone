@@ -46,8 +46,9 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
   private String dbPath;
 
   @CommandLine.Option(names = {"--dry-run"},
-        description = "Mode to run the tool in. Read-mode will just log information about unreachable files or " +
-        "directories; otherwise the tool will move those files and directories to the deleted tables.")
+        defaultValue = "true",
+        description = "This tool will run in dry-run mode by default to log unreachable files or directories. " +
+        "Set the value to 'false' to move unreachable files and directories to the deleted tables.")
   private boolean dryRun;
 
   @CommandLine.Option(names = {"--volume"},
