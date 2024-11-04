@@ -21,6 +21,8 @@ if [[ ${SECURITY_ENABLED} == "true" ]]; then
 fi
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
+: ${HADOOP_TEST_VERSIONS:="apache/hadoop:${hadoop2.version} flokkr/hadoop:3.1.2 apache/hadoop:${hadoop.version}"}
+
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
 export OZONE_REPLICATION_FACTOR=3
@@ -42,14 +44,10 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for HADOOP_VERSION in ${hadoop2.version} 3.1.2 ${hadoop.version}; do
-  export HADOOP_VERSION
+for test_version in $HADOOP_TEST_VERSIONS; do
+  export HADOOP_IMAGE="${test_version%%:*}"
+  export HADOOP_VERSION="${test_version##*:}"
   export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
-  if [[ "${HADOOP_VERSION}" == "${hadoop2.version}" ]] || [[ "${HADOOP_VERSION}" == "${hadoop.version}" ]]; then
-    export HADOOP_IMAGE=apache/hadoop
-  else
-    export HADOOP_IMAGE=flokkr/hadoop
-  fi
 
   docker-compose --ansi never --profile hadoop up -d nm rm
 
