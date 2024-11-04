@@ -43,16 +43,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Set;
-import java.util.LinkedHashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -91,7 +85,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
-  private Set<Long> uniqueIDs = new LinkedHashSet<>();
+  Supplier supplier = null;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -110,6 +104,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
     DIR_DELETING_CORE_POOL_SIZE = dirDeletingServiceCorePoolSize;
+    try {
+      supplier = new Supplier();
+    } catch (IOException ex) {
+      LOG.error("Couldn't initialize supplier.");
+    }
   }
 
   private boolean shouldRun() {
@@ -143,64 +142,70 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue =
-        new ArrayBlockingQueue<>(10000);
-    // Iterate the deleted dir table and push the dir omKeyInfo in an Array list.
-    // Using a map to maintain unique elements in the list.
-    int count = 0;
-    final int MAX_COUNT = 10000;
-    try (
-        TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> deleteTableIterator = getOzoneManager().getMetadataManager()
-            .getDeletedDirTable().iterator()) {
-      Table.KeyValue<String, OmKeyInfo> deletedDirInfo;
-      while (count < MAX_COUNT && deleteTableIterator.hasNext()) {
-        deletedDirInfo = deleteTableIterator.next();
-        if (uniqueIDs.add(deletedDirInfo.getValue().getObjectID())) {
-          dirQueue.add(deletedDirInfo);
-          count++;
-        }
-      }
-    } catch (IOException e) {
-      LOG.error(
-          "Error while running delete directories and files " + "background task. Will retry at next run.",
-          e);
+    supplier.reInitItr();
+    for (int i = 0; i < DIR_DELETING_CORE_POOL_SIZE; i++) {
+      queue.add(new DirectoryDeletingService.DirDeletingTask(this));
     }
-    int numThreads = dirQueue.size() < DIR_DELETING_CORE_POOL_SIZE ? 1 :
-        DIR_DELETING_CORE_POOL_SIZE;
-    for (int i = 0; i < numThreads; i++) {
-      queue.add(new DirectoryDeletingService.DirDeletingTask(this, dirQueue));
-    }
-    cleanUniqueIdSet(uniqueIDs);
     return queue;
   }
 
-  private void cleanUniqueIdSet(Set<Long> uniqueIDs) {
-    int count = 0;
-    if (uniqueIDs.size() > 40000) {
-      Iterator<Long> iterator = uniqueIDs.iterator();
-      while (iterator.hasNext()) {
-        iterator.next();
-        iterator.remove();
-        count++;
-        if (count >= 10000)
-          break;
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    supplier.closeItr();
+  }
+
+  private final class Supplier {
+    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+        deleteTableIterator;
+
+    private Supplier() throws IOException {
+      this.deleteTableIterator =
+          getOzoneManager().getMetadataManager().getDeletedDirTable()
+              .iterator();
+    }
+
+    private synchronized Table.KeyValue<String, OmKeyInfo> getItr() {
+      if (deleteTableIterator != null && !deleteTableIterator.hasNext()) {
+        try {
+          if (getOzoneManager().getMetadataManager().getDeletedDirTable()
+              .isEmpty()) {
+            closeItr();
+          } else {
+            reInitItr();
+          }
+        } catch (IOException ex) {
+          LOG.error("Not able to determine if deleted dir table is empty.");
+        }
+      }
+      return deleteTableIterator.next();
+    }
+
+    private void closeItr() {
+      try {
+        deleteTableIterator.close();
+      } catch (IOException ex) {
+        LOG.error("Couldn't close the iterator ", ex);
+      }
+    }
+
+    private void reInitItr() {
+      try {
+        deleteTableIterator.close();
+        deleteTableIterator =
+            getOzoneManager().getMetadataManager().getDeletedDirTable()
+                .iterator();
+      } catch (IOException ex) {
+        LOG.error("Error while running delete directories and files.", ex);
       }
     }
   }
 
   private final class DirDeletingTask implements BackgroundTask {
     private final DirectoryDeletingService directoryDeletingService;
-    BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue =
-        new ArrayBlockingQueue<>(10000);
 
     private DirDeletingTask(DirectoryDeletingService service) {
       this.directoryDeletingService = service;
-    }
-
-    private DirDeletingTask(DirectoryDeletingService service,
-        BlockingQueue<Table.KeyValue<String, OmKeyInfo>> dirQueue) {
-      this.directoryDeletingService = service;
-      this.dirQueue = dirQueue;
     }
 
     @Override
@@ -234,8 +239,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                   .getLatestGlobalSnapshotId();
 
           long startTime = Time.monotonicNow();
-          while (remainNum > 0 && dirQueue.size() > 0) {
-            pendingDeletedDirInfo = dirQueue.poll();
+          while (remainNum > 0) {
+            pendingDeletedDirInfo = supplier.getItr();
             // Do not reclaim if the directory is still being referenced by
             // the previous snapshot.
             if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
