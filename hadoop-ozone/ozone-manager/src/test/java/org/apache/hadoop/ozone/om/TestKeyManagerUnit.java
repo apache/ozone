@@ -135,7 +135,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @BeforeEach
   void init() {
     reset(blockClient, containerClient);
-    startDate = Instant.ofEpochMilli(Instant.now().toEpochMilli());
+    startDate = Instant.now();
   }
 
   @AfterAll
