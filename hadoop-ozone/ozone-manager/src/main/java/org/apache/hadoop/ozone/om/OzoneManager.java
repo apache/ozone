@@ -3058,6 +3058,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public String getNamespace() {
+    return omNodeDetails.getServiceId();
+  }
+
+  @Override
   public String getRpcPort() {
     return "" + omRpcAddress.getPort();
   }
