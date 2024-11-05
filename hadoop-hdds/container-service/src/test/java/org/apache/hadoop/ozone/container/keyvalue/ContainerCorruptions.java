@@ -16,10 +16,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -33,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Currently this class only supports file per block layout.
  */
 public enum ContainerCorruptions {
-  MISSING_CHUNKS_DIR((container, index) -> {
+  MISSING_CHUNKS_DIR((container, blockID) -> {
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
     try {
@@ -45,7 +43,7 @@ public enum ContainerCorruptions {
     assertFalse(chunksDir.exists());
   }, ContainerScanError.FailureType.MISSING_CHUNKS_DIR),
 
-  MISSING_METADATA_DIR((container, index) -> {
+  MISSING_METADATA_DIR((container, blockID) -> {
     File metadataDir =
         new File(container.getContainerData().getContainerPath(),
             "metadata");
@@ -58,13 +56,13 @@ public enum ContainerCorruptions {
     assertFalse(metadataDir.exists());
   }, ContainerScanError.FailureType.MISSING_METADATA_DIR),
 
-  MISSING_CONTAINER_FILE((container, index) -> {
+  MISSING_CONTAINER_FILE((container, blockID) -> {
     File containerFile = container.getContainerFile();
     assertTrue(containerFile.delete());
     assertFalse(containerFile.exists());
   }, ContainerScanError.FailureType.MISSING_CONTAINER_FILE),
 
-  MISSING_CONTAINER_DIR((container, index) -> {
+  MISSING_CONTAINER_DIR((container, blockID) -> {
     File containerDir =
         new File(container.getContainerData().getContainerPath());
     try {
@@ -76,29 +74,28 @@ public enum ContainerCorruptions {
     assertFalse(containerDir.exists());
   }, ContainerScanError.FailureType.MISSING_CONTAINER_DIR),
 
-  MISSING_BLOCK((container, index) -> {
-    File blockFile = getBlockAtIndex(container, index);
+  MISSING_BLOCK((container, blockID) -> {
+    File blockFile = getBlock(container, blockID);
     assertTrue(blockFile.delete());
   }, ContainerScanError.FailureType.MISSING_CHUNK_FILE),
 
-  CORRUPT_CONTAINER_FILE((container, index) -> {
+  CORRUPT_CONTAINER_FILE((container, blockID) -> {
     File containerFile = container.getContainerFile();
     corruptFile(containerFile);
   }, ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE),
 
-  TRUNCATED_CONTAINER_FILE((container, index) -> {
+  TRUNCATED_CONTAINER_FILE((container, blockID) -> {
     File containerFile = container.getContainerFile();
     truncateFile(containerFile);
   }, ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE),
 
-  CORRUPT_BLOCK((container, index) -> {
-    File blockFile = getBlockAtIndex(container, index);
+  CORRUPT_BLOCK((container, blockID) -> {
+    File blockFile = getBlock(container, blockID);
     corruptFile(blockFile);
   }, ContainerScanError.FailureType.CORRUPT_CHUNK),
 
-  TRUNCATED_BLOCK((container, index) -> {
-    File blockFile = getBlockAtIndex(container, index);
-    System.err.println("truncating " + blockFile);
+  TRUNCATED_BLOCK((container, blockID) -> {
+    File blockFile = getBlock(container, blockID);
     truncateFile(blockFile);
   }, ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
@@ -115,8 +112,8 @@ public enum ContainerCorruptions {
     corruption.accept(container,0);
   }
 
-  public void applyTo(Container<?> container, int blockIndex) {
-    corruption.accept(container, blockIndex);
+  public void applyTo(Container<?> container, int blockID) {
+    corruption.accept(container, blockID);
   }
 
   /**
@@ -172,13 +169,10 @@ public enum ContainerCorruptions {
     }
   }
 
-  private static File getBlockAtIndex(Container<?> container, int index) {
+  private static File getBlock(Container<?> container, long blockID) {
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
-    File blockFile = Arrays.stream(Objects.requireNonNull(
-            chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-        .sorted(Comparator.comparing(File::getName))
-        .collect(Collectors.toList()).get(index);
+    File blockFile = new File(chunksDir, blockID + ".block");
     assertTrue(blockFile.exists());
     return blockFile;
   }
