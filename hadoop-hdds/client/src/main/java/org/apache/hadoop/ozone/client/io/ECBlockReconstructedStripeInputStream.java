@@ -826,4 +826,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         .boxed().collect(toCollection(TreeSet::new));
   }
 
+  public boolean validateChecksum(ByteBuffer[] buf) {
+
+  }
+
 }

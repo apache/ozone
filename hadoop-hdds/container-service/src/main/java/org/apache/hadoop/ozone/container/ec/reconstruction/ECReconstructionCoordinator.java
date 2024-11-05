@@ -46,10 +46,10 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -274,8 +274,6 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] emptyBlockStreams =
           new ECBlockOutputStream[notReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
-      List<ByteString> checksums = new ArrayList<>(toReconstructIndexes.size());
-
       try {
         // Create streams and buffers for all indexes that need reconstructed
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
@@ -302,6 +300,7 @@ public class ECReconstructionCoordinator implements Closeable {
             try {
               readLen = sis.recoverChunks(bufs);
               Set<Integer> failedIndexes = sis.getFailedIndexes();
+              
               if (!failedIndexes.isEmpty()) {
                 // There was a problem reading some of the block indexes, but we
                 // did not get an exception as there must have been spare indexes
@@ -331,8 +330,6 @@ public class ECReconstructionCoordinator implements Closeable {
                 CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
                     future = targetBlockStreams[i].write(bufs[i]);
                 checkFailures(targetBlockStreams[i], future);
-                // Store the recreated checksum
-
               }
               bufs[i].clear();
             }
