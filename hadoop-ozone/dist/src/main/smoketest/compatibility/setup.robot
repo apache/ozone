@@ -20,6 +20,7 @@ Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
+${FSO_VERSION}    1.3.0
 
 
 *** Keywords ***

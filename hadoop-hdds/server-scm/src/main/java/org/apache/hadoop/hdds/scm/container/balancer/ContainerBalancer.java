@@ -183,17 +183,19 @@ public class ContainerBalancer extends StatefulService {
    * @return balancer status info if balancer started
    */
   public ContainerBalancerStatusInfo getBalancerStatusInfo() throws IOException {
-    if (isBalancerRunning()) {
-      ContainerBalancerConfigurationProto configProto = readConfiguration(ContainerBalancerConfigurationProto.class);
-      return new ContainerBalancerStatusInfo(
-              this.startedAt,
-              configProto,
-              task.getCurrentIterationsStatistic()
-      );
-    } else {
+    lock.lock();
+    try {
+      if (isBalancerRunning()) {
+        return new ContainerBalancerStatusInfo(
+            this.startedAt,
+            config.toProtobufBuilder().setShouldRun(true).build(),
+            task.getCurrentIterationsStatistic()
+        );
+      }
       return null;
+    } finally {
+      lock.unlock();
     }
-
   }
   /**
    * Checks if ContainerBalancer is in valid state to call stop.
