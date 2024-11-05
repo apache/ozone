@@ -10,7 +10,10 @@ import java.util.Collections;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getDataScanError;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getMetadataScanError;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class TestDataScanResult {
   private static final ContainerMerkleTree TREE = ContainerMerkleTreeTestUtils.buildTestTree(new OzoneConfiguration());

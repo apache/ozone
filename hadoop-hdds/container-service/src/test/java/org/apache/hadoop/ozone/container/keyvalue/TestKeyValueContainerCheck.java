@@ -105,7 +105,7 @@ public class TestKeyValueContainerCheck
   @ParameterizedTest
   @MethodSource("provideMetadataCorruptions")
   public void testExitEarlyOnMetadataError(ContainerTestVersionInfo versionInfo,
-    ContainerCorruptions metadataCorruption) throws Exception {
+      ContainerCorruptions metadataCorruption) throws Exception {
     initTestData(versionInfo);
     long containerID = 101;
     int deletedBlocks = 0;

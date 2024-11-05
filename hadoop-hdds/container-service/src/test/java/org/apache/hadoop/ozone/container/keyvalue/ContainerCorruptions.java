@@ -13,13 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,7 +106,7 @@ public enum ContainerCorruptions {
   }
 
   public void applyTo(Container<?> container) {
-    corruption.accept(container,0);
+    corruption.accept(container, 0);
   }
 
   public void applyTo(Container<?> container, int blockID) {
