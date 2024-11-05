@@ -91,9 +91,9 @@ class TestBackgroundContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
 
-    // If the block is truncated, every chunk in the block will register an error.
-    if (corruption == ContainerCorruptions.TRUNCATED_BLOCK) {
-      corruption.assertLogged(containerID, 2, logCapturer);
+    if (corruption == ContainerCorruptions.TRUNCATED_BLOCK || corruption == ContainerCorruptions.CORRUPT_BLOCK) {
+      // These errors will affect multiple chunks and result in multiple log messages.
+      corruption.assertLogged(containerID, logCapturer);
     } else {
       // Other corruption types will only lead to a single error.
       corruption.assertLogged(containerID, 1, logCapturer);

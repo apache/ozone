@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
@@ -114,20 +115,20 @@ public enum ContainerCorruptions {
     truncateFile(blockFile);
   }, ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
-  private final BiConsumer<Container<?>, Integer> corruption;
+  private final BiConsumer<Container<?>, Long> corruption;
   private final ContainerScanError.FailureType expectedResult;
 
-  ContainerCorruptions(BiConsumer<Container<?>, Integer> corruption, ContainerScanError.FailureType expectedResult) {
+  ContainerCorruptions(BiConsumer<Container<?>, Long> corruption, ContainerScanError.FailureType expectedResult) {
     this.corruption = corruption;
     this.expectedResult = expectedResult;
 
   }
 
   public void applyTo(Container<?> container) {
-    corruption.accept(container, 0);
+    corruption.accept(container, -1L);
   }
 
-  public void applyTo(Container<?> container, int blockID) {
+  public void applyTo(Container<?> container, long blockID) {
     corruption.accept(container, blockID);
   }
 
@@ -137,8 +138,19 @@ public enum ContainerCorruptions {
   public void assertLogged(long containerID, int numErrors, GenericTestUtils.LogCapturer logCapturer) {
     // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
     // The log will have captured lines from all previous tests as well since we re-use the same cluster.
-    Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Scan result has " + numErrors +
+    Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Container has " + numErrors +
         " error.*" + expectedResult.toString());
+    assertThat(logCapturer.getOutput()).containsPattern(logLine);
+  }
+
+  /**
+   * Check that the correct corruption type was written to the container log for the provided container.
+   */
+  public void assertLogged(long containerID, GenericTestUtils.LogCapturer logCapturer) {
+    // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
+    // The log will have captured lines from all previous tests as well since we re-use the same cluster.
+    Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Container has .*error.*" +
+        expectedResult.toString());
     assertThat(logCapturer.getOutput()).containsPattern(logLine);
   }
 
@@ -186,9 +198,17 @@ public enum ContainerCorruptions {
   }
 
   private static File getBlock(Container<?> container, long blockID) {
+    File blockFile;
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
-    File blockFile = new File(chunksDir, blockID + ".block");
+    // Placeholder to get the first block in a container.
+    if (blockID < 0) {
+      blockFile = Arrays.stream(Objects.requireNonNull(
+              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
+          .findFirst().get();
+    } else {
+      blockFile = new File(chunksDir, blockID + ".block");
+    }
     assertTrue(blockFile.exists());
     return blockFile;
   }
