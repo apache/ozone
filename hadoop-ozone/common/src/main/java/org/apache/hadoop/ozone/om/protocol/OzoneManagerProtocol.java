@@ -1175,7 +1175,6 @@ public interface OzoneManagerProtocol
    * @return String
    * @throws IOException
    */
-
   String getQuotaRepairStatus() throws IOException;
 
   /**

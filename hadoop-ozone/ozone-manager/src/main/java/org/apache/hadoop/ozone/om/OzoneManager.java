@@ -4768,9 +4768,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     new QuotaRepairTask(this).repair(buckets);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public Map<String, String> getObjectTagging(final OmKeyArgs args)
       throws IOException {
