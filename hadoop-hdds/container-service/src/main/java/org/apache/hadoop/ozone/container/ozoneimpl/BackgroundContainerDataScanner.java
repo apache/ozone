@@ -96,6 +96,9 @@ public class BackgroundContainerDataScanner extends
         logUnhealthyScanResult(containerId, result, LOG);
 
         // Only increment the number of unhealthy containers if the container was not already unhealthy.
+        // TODO HDDS-11593 (to be merged in to the feature branch from master): Scanner counters will start from zero
+        //  at the beginning of each run, so this will need to be incremented for every unhealthy container seen
+        //  regardless of its previous state.
         if (controller.markContainerUnhealthy(containerId, result)) {
           metrics.incNumUnHealthyContainers();
         }

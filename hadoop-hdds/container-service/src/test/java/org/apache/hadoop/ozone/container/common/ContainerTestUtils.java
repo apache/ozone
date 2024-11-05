@@ -292,6 +292,7 @@ public final class ContainerTestUtils {
   }
 
   /**
+<<<<<<< HEAD
    * Construct a generic scan error that can be used for testing.
    */
   public static ContainerScanError getDataScanError() {
