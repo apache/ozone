@@ -300,7 +300,6 @@ public class ECReconstructionCoordinator implements Closeable {
             try {
               readLen = sis.recoverChunks(bufs);
               Set<Integer> failedIndexes = sis.getFailedIndexes();
-              
               if (!failedIndexes.isEmpty()) {
                 // There was a problem reading some of the block indexes, but we
                 // did not get an exception as there must have been spare indexes
@@ -331,6 +330,8 @@ public class ECReconstructionCoordinator implements Closeable {
                     future = targetBlockStreams[i].write(bufs[i]);
                 checkFailures(targetBlockStreams[i], future);
               }
+              ECValidator validator = new ECValidator(ozoneClientConfig);
+              validator.validateBuffer(bufs[i], targetBlockStreams[i]);
               bufs[i].clear();
             }
             length -= readLen;
