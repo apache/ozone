@@ -292,8 +292,7 @@ public final class ContainerTestUtils {
   }
 
   /**
-<<<<<<< HEAD
-   * Construct a generic scan error that can be used for testing.
+   * Construct a generic data scan error that can be used for testing.
    */
   public static ContainerScanError getDataScanError() {
     return new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CHUNK, new File(""),
@@ -301,7 +300,7 @@ public final class ContainerTestUtils {
   }
 
   /**
-   * Construct a generic scan error that can be used for testing.
+   * Construct a generic metadata scan error that can be used for testing.
    */
   public static ContainerScanError getMetadataScanError() {
     return new ContainerScanError(ContainerScanError.FailureType.CORRUPT_CONTAINER_FILE, new File(""),

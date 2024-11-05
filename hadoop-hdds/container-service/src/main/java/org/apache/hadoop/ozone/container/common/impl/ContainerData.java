@@ -78,7 +78,7 @@ public abstract class ContainerData {
   private String chunksPath;
 
   // State of the Container
-  private volatile ContainerDataProto.State state;
+  private ContainerDataProto.State state;
 
   private final long maxSize;
 
