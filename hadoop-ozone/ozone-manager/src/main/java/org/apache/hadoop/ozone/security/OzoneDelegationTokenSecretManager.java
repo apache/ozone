@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -78,7 +79,7 @@ public class OzoneDelegationTokenSecretManager
   private final long tokenRemoverScanInterval;
   private final String omServiceId;
   private final OzoneManager ozoneManager;
-  private final SecretKeyClient secretKeyClient;
+  private SecretKeyClient secretKeyClient;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
@@ -621,6 +622,11 @@ public class OzoneDelegationTokenSecretManager
     if (this.store != null) {
       this.store.close();
     }
+  }
+
+  @VisibleForTesting
+  public void setSecretKeyClient(SecretKeyClient client) {
+    this.secretKeyClient = client;
   }
 
   /**

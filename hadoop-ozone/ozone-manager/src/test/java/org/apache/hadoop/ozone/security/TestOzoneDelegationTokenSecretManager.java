@@ -373,8 +373,6 @@ public class TestOzoneDelegationTokenSecretManager {
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
-    id.setOmCertSerialId(certificateClient.getCertificate()
-        .getSerialNumber().toString());
     id.setMaxDate(Time.now() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
     id.setSecretKeyId(secretKeyClient.getCurrentSecretKey().getId().toString());
