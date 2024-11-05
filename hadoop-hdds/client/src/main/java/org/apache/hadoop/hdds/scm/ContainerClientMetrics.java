@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 import java.util.Map;
 import java.util.UUID;
@@ -98,6 +99,7 @@ public final class ContainerClientMetrics {
     }
     referenceCount--;
     if (referenceCount == 0) {
+      instance.stop();
       DefaultMetricsSystem.instance().unregisterSource(
           SOURCE_NAME + instanceCount);
       instance = null;
@@ -154,6 +156,17 @@ public final class ContainerClientMetrics {
                   + "s", "client hsync latency to DN in nanoseconds", "ops",
               "latency", interval);
     }
+  }
+
+  public void stop() {
+    MetricUtil.stop(listBlockLatency);
+    MetricUtil.stop(getBlockLatency);
+    MetricUtil.stop(getCommittedBlockLengthLatency);
+    MetricUtil.stop(readChunkLatency);
+    MetricUtil.stop(getSmallFileLatency);
+    MetricUtil.stop(hsyncLatencyNs);
+    MetricUtil.stop(omHsyncLatencyNs);
+    MetricUtil.stop(datanodeHsyncLatencyNs);
   }
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
