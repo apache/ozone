@@ -83,16 +83,14 @@ class TestGrpcReplicationService {
 
   @BeforeEach
   public void setUp() throws Exception {
-    init(false);
+    init();
   }
 
-  public void init(boolean isZeroCopy) throws Exception {
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
 
     ReplicationServer.ReplicationConfig replicationConfig =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
-
-    replicationConfig.setZeroCopyEnable(isZeroCopy);
 
     SecurityConfig secConf = new SecurityConfig(conf);
 
@@ -230,7 +228,7 @@ class TestGrpcReplicationService {
     };
     ContainerImporter importer = mock(ContainerImporter.class);
     GrpcReplicationService subject =
-        new GrpcReplicationService(source, importer, false);
+        new GrpcReplicationService(source, importer);
 
     CopyContainerRequestProto request = CopyContainerRequestProto.newBuilder()
         .setContainerID(1)
