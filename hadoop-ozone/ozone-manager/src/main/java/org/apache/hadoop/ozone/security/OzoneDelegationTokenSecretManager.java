@@ -25,13 +25,19 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.io.Text;
@@ -64,7 +70,7 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSecretManager
     extends OzoneSecretManager<OzoneTokenIdentifier> {
 
-  private static final Logger LOG = LoggerFactory
+  public static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
@@ -73,6 +79,7 @@ public class OzoneDelegationTokenSecretManager
   private final long tokenRemoverScanInterval;
   private final String omServiceId;
   private final OzoneManager ozoneManager;
+  private final SecretKeyClient secretKeyClient;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
@@ -100,8 +107,8 @@ public class OzoneDelegationTokenSecretManager
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.secretKeyClient= b.secretKeyClient;
     loadTokenSecretState(store.loadState());
-
   }
 
   /**
@@ -117,6 +124,7 @@ public class OzoneDelegationTokenSecretManager
     private CertificateClient certClient;
     private String omServiceId;
     private OzoneManager ozoneManager;
+    private SecretKeyClient secretKeyClient;
 
     public OzoneDelegationTokenSecretManager build() throws IOException {
       return new OzoneDelegationTokenSecretManager(this);
@@ -157,6 +165,11 @@ public class OzoneDelegationTokenSecretManager
       return this;
     }
 
+    public Builder setSecretKeyClient(SecretKeyClient client) {
+      this.secretKeyClient = client;
+      return this;
+    }
+
     public Builder setOmServiceId(String serviceId) {
       this.omServiceId = serviceId;
       return this;
@@ -194,10 +207,10 @@ public class OzoneDelegationTokenSecretManager
       throws IOException {
     OzoneTokenIdentifier identifier = createIdentifier(owner, renewer,
         realUser);
+    ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
     updateIdentifierDetails(identifier);
-
-    byte[] password = createPassword(identifier.getBytes(),
-        getCurrentKey().getPrivateKey());
+    identifier.setSecretKeyId(currentSecretKey.getId().toString());
+    byte[] password = currentSecretKey.sign(identifier.getBytes());
     long expiryTime = identifier.getIssueDate() + getTokenRenewInterval();
 
     // For HA ratis will take care of updating.
@@ -252,7 +265,6 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
   }
 
@@ -436,6 +448,21 @@ public class OzoneDelegationTokenSecretManager
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
+    String secretKeyId = identifier.getSecretKeyId();
+    if (StringUtils.isNotEmpty(secretKeyId)) {
+      try {
+        ManagedSecretKey verifyKey = secretKeyClient.getSecretKey(UUID.fromString(secretKeyId));
+        return verifyKey.isValidSignature(identifier.getBytes(), password);
+      } catch (SCMSecurityException e) {
+        LOG.error("verifySignature for identifier {} failed", identifier, e);
+        return false;
+      }
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Verify an asymmetric key signed Token {}", identifier);
+    }
+
     X509Certificate signerCert;
     try {
       signerCert = getCertClient().getCertificate(
@@ -528,8 +555,17 @@ public class OzoneDelegationTokenSecretManager
           "Can't add persisted delegation token to a running SecretManager.");
     }
 
-    byte[] password = createPassword(identifier.getBytes(),
-        getCertClient().getPrivateKey());
+    byte[] password;
+    if (StringUtils.isNotEmpty(identifier.getSecretKeyId())) {
+      ManagedSecretKey signKey = secretKeyClient.getSecretKey(UUID.fromString(identifier.getSecretKeyId()));
+      password = signKey.sign(identifier.getBytes());
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Load an asymmetric key signed Token {}", identifier);
+      }
+      password = createPassword(identifier.getBytes(), getCertClient().getPrivateKey());
+    }
+
     if (identifier.getSequenceNumber() > getDelegationTokenSeqNum()) {
       setDelegationTokenSeqNum(identifier.getSequenceNumber());
     }
