@@ -216,10 +216,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
     List<RaftProtos.RaftPeerProto> newPeers =
         newRaftConfiguration.getPeersList();
-    LOG.info("Received Configuration change notification from Ratis. New Peer" +
-        " list:\n[{}\n]", newPeers.stream().map(peer ->
-            String.format("id: \"%s\"%n address: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
-        .collect(Collectors.joining("\n, ")));
+    List<String> newPeersLogWithoutStartupRole = newPeers.stream()
+        .map(peer -> String.format("id: \"%s\" address: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
+        .collect(Collectors.toList());
+    LOG.info("Received Configuration change notification from Ratis. New Peer list: {}", newPeersLogWithoutStartupRole);
 
     List<String> newPeerIds = new ArrayList<>();
     for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
