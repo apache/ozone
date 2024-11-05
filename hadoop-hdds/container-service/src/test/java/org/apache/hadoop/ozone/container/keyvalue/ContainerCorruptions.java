@@ -153,9 +153,10 @@ public enum ContainerCorruptions {
       Path path = file.toPath();
       final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
 
-      // Corrupt the last byte of the last chunk. This should map to a single error from the scanner.
+      // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
       final byte[] corruptedBytes = Arrays.copyOf(original, length);
       corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
+      corruptedBytes[length / 2] = (byte) (original[length / 2] << 1);
 
       Files.write(path, corruptedBytes,
           StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);

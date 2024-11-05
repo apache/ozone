@@ -163,6 +163,8 @@ public class TestKeyValueContainerCheck
     MISSING_BLOCK.applyTo(container, 2);
     TRUNCATED_BLOCK.applyTo(container, 4);
     List<FailureType> expectedErrors = new ArrayList<>();
+    // Corruption is applied to two different chunks within the block.
+    expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(MISSING_BLOCK.getExpectedResult());
     // When a block file is truncated, all chunks in the block will be reported as missing.
