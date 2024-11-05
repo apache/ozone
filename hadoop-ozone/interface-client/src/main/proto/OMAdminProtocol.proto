@@ -52,6 +52,7 @@ message OMNodeInfo {
     required uint32 rpcPort = 3;
     required uint32 ratisPort = 4;
     optional NodeState nodeState = 5 [default=ACTIVE];
+    optional bool isListener = 6;
 }
 
 enum NodeState {
