@@ -61,10 +61,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -1231,46 +1227,18 @@ public class OMDBInsightEndpoint {
 
     LOG.debug("Applying filters on : {}", entry.getKey());
 
-    long epochMillis =
-        ReconUtils.convertToEpochMillis(paramInfo.getCreationDate(), "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
-    Predicate<Table.KeyValue<String, OmKeyInfo>> keyAgeFilter = keyData -> {
-      try {
-        return keyData.getValue().getCreationTime() >= epochMillis;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    };
-    Predicate<Table.KeyValue<String, OmKeyInfo>> keyReplicationFilter =
-        keyData -> {
-          try {
-            return keyData.getValue().getReplicationConfig().getReplicationType().name()
-                .equals(paramInfo.getReplicationType());
-          } catch (IOException e) {
-            try {
-              throw new IOException(e);
-            } catch (IOException ex) {
-              throw new RuntimeException(ex);
-            }
-          }
-        };
-    Predicate<Table.KeyValue<String, OmKeyInfo>> keySizeFilter = keyData -> {
-      try {
-        return keyData.getValue().getDataSize() >= paramInfo.getKeySize();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    };
+    if (!StringUtils.isEmpty(paramInfo.getCreationDate())
+        && !(entry.getValue().getCreationTime() >= paramInfo.getCreationDateEpoch())) {
+      return false;
+    }
 
-    List<Table.KeyValue<String, OmKeyInfo>> filteredKeyList = Stream.of(entry)
-        .filter(keyData -> !StringUtils.isEmpty(paramInfo.getCreationDate()) ? keyAgeFilter.test(keyData) : true)
-        .filter(
-            keyData -> !StringUtils.isEmpty(paramInfo.getReplicationType()) ? keyReplicationFilter.test(keyData) : true)
-        .filter(keySizeFilter)
-        .collect(Collectors.toList());
+    if (!StringUtils.isEmpty(paramInfo.getReplicationType())
+        && !entry.getValue().getReplicationConfig().getReplicationType().name().equals(
+            paramInfo.getReplicationType())) {
+      return false;
+    }
 
-    LOG.debug("After applying filter on : {}, filtered list size: {}", entry.getKey(), filteredKeyList.size());
-
-    return (filteredKeyList.size() > 0);
+    return entry.getValue().getDataSize() >= paramInfo.getKeySize();
   }
 
   /**
