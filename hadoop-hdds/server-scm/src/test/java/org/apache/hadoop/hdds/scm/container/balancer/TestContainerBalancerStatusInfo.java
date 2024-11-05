@@ -22,6 +22,7 @@ import org.apache.commons.math3.util.ArithmeticUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -91,7 +92,7 @@ class TestContainerBalancerStatusInfo {
   }
 
   @Test
-  void testGetCurrentStatisticsRequestInPeriodBetweenIterations() throws InterruptedException {
+  void testGetCurrentStatisticsRequestInPeriodBetweenIterations() throws Exception {
     MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
@@ -102,7 +103,7 @@ class TestContainerBalancerStatusInfo {
 
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
     // Delay in finishing the first iteration
-    Thread.sleep(1000L);
+    LambdaTestUtils.await(1000, 500, () -> task.getCurrentIterationsStatistic().size() == 2);
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(2, iterationsStatic.size());
 
@@ -183,7 +184,7 @@ class TestContainerBalancerStatusInfo {
   }
 
   @Test
-  void testGetCurrentStatisticsWithDelay() throws InterruptedException {
+  void testGetCurrentStatisticsWithDelay() throws Exception {
     MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
@@ -194,11 +195,32 @@ class TestContainerBalancerStatusInfo {
 
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, true);
     // Delay in finishing the first iteration
-    Thread.sleep(1000L);
+    LambdaTestUtils.await(1000, 500, () -> task.getCurrentIterationsStatistic().size() == 1);
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(1, iterationsStatic.size());
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(0);
     assertEmptyIteration(currentIteration);
+  }
+
+  @Test
+  void testGetCurrentStatisticsWhileBalancingInProgress() throws Exception {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+
+    config.setIterations(3);
+    config.setBalancingInterval(0);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
+    // Get the current iteration statistics when it has information about the containers moving.
+    LambdaTestUtils.await(1000, 10,
+        () -> task.getCurrentIterationsStatistic().size() == 2 &&
+              task.getCurrentIterationsStatistic().get(1).getContainerMovesScheduled() > 0);
+    List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
+    assertEquals(2, iterationsStatic.size());
+    ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(1);
+    assertCurrentIterationStatisticWhileBalancingInProgress(currentIteration);
   }
 
   private static void assertEmptyIteration(ContainerBalancerTaskIterationStatusInfo iterationsStatic) {
@@ -213,6 +235,34 @@ class TestContainerBalancerStatusInfo {
     assertEquals(0, iterationsStatic.getDataSizeMoved());
     assertEquals(0, iterationsStatic.getSizeEnteringNodes().size());
     assertEquals(0, iterationsStatic.getSizeLeavingNodes().size());
+  }
+
+  private static void assertCurrentIterationStatisticWhileBalancingInProgress(
+      ContainerBalancerTaskIterationStatusInfo iterationsStatic
+  ) {
+
+    assertEquals(2, iterationsStatic.getIterationNumber());
+    assertEquals(0, iterationsStatic.getIterationDuration());
+    assertNull(iterationsStatic.getIterationResult());
+    assertTrue(iterationsStatic.getContainerMovesScheduled() > 0);
+    assertTrue(iterationsStatic.getContainerMovesCompleted() > 0);
+    assertEquals(0, iterationsStatic.getContainerMovesFailed());
+    assertEquals(0, iterationsStatic.getContainerMovesTimeout());
+    assertTrue(iterationsStatic.getSizeScheduledForMove() > 0);
+    assertTrue(iterationsStatic.getDataSizeMoved() > 0);
+    assertFalse(iterationsStatic.getSizeEnteringNodes().isEmpty());
+    assertFalse(iterationsStatic.getSizeLeavingNodes().isEmpty());
+    iterationsStatic.getSizeEnteringNodes().forEach((id, size) -> {
+      assertNotNull(id);
+      assertTrue(size > 0);
+    });
+    iterationsStatic.getSizeLeavingNodes().forEach((id, size) -> {
+      assertNotNull(id);
+      assertTrue(size > 0);
+    });
+    Long enteringDataSum = getTotalMovedData(iterationsStatic.getSizeEnteringNodes());
+    Long leavingDataSum = getTotalMovedData(iterationsStatic.getSizeLeavingNodes());
+    assertEquals(enteringDataSum, leavingDataSum);
   }
 
   private void verifyCompletedIteration(

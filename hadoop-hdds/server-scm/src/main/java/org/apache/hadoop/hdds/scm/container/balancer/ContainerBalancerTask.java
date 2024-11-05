@@ -368,8 +368,8 @@ public class ContainerBalancerTask implements Runnable {
    * @return current iteration statistic
    */
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = createCurrentIterationStatistic();
     List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = createCurrentIterationStatistic();
     resultList.add(currentIterationStatistic);
     return resultList;
   }
