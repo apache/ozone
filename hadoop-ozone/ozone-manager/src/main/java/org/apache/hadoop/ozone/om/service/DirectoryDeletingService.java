@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -86,7 +87,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
 
-  private DeletedDirSupplier deletedDirSupplier = null;
+  private final DeletedDirSupplier deletedDirSupplier;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -105,15 +106,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
-    try {
-      deletedDirSupplier = new DeletedDirSupplier();
-    } catch (IOException ex) {
-      LOG.error("Couldn't initialize supplier.");
-    }
-  }
-
-  public DeletedDirSupplier getDeletedDirSupplier() {
-    return deletedDirSupplier;
+    deletedDirSupplier = new DeletedDirSupplier();
   }
 
   private boolean shouldRun() {
@@ -147,7 +140,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    deletedDirSupplier.reInitItr();
     for (int i = 0; i < dirDeletingCorePoolSize; i++) {
       queue.add(new DirectoryDeletingService.DirDeletingTask(this));
     }
@@ -164,49 +156,27 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
-    private DeletedDirSupplier() throws IOException {
-      this.deleteTableIterator =
-          getOzoneManager().getMetadataManager().getDeletedDirTable()
-              .iterator();
-    }
-
-    private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> getDeleteTableIterator() {
-      return deleteTableIterator;
-    }
-
-    private synchronized Table.KeyValue<String, OmKeyInfo> get() {
-      if (deleteTableIterator != null && !deleteTableIterator.hasNext()) {
-        try {
-          if (getOzoneManager().getMetadataManager().getDeletedDirTable()
-              .isEmpty()) {
-            closeItr();
-          } else {
-            reInitItr();
-          }
-        } catch (IOException ex) {
-          LOG.error("Not able to determine if deleted dir table is empty.");
-        }
+    private synchronized Table.KeyValue<String, OmKeyInfo> get()
+        throws IOException {
+      if (deleteTableIterator == null || !deleteTableIterator.hasNext()) {
+        reInitItr();
       }
-      return deleteTableIterator != null ? deleteTableIterator.next() : null;
+      if (deleteTableIterator.hasNext()) {
+        return deleteTableIterator.next();
+      }
+      return null;
     }
 
     private void closeItr() {
-      try {
-        deleteTableIterator.close();
-      } catch (IOException ex) {
-        LOG.error("Couldn't close the iterator ", ex);
-      }
+      IOUtils.closeQuietly(deleteTableIterator);
+      deleteTableIterator = null;
     }
 
-    private void reInitItr() {
-      try {
-        deleteTableIterator.close();
-        deleteTableIterator =
-            getOzoneManager().getMetadataManager().getDeletedDirTable()
-                .iterator();
-      } catch (IOException ex) {
-        LOG.error("Error while running delete directories and files.", ex);
-      }
+    private void reInitItr() throws IOException {
+      closeItr();
+      deleteTableIterator =
+          getOzoneManager().getMetadataManager().getDeletedDirTable()
+              .iterator();
     }
   }
 
