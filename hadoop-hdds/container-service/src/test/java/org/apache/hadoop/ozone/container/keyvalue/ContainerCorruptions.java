@@ -33,6 +33,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
@@ -201,12 +202,15 @@ public enum ContainerCorruptions {
     File blockFile;
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
-    // Placeholder to get the first block in a container.
+    // Negative values are an internal placeholder to get the first block in a container.
     if (blockID < 0) {
-      blockFile = Arrays.stream(Objects.requireNonNull(
+      Optional<File> optionalBlockFile = Arrays.stream(Objects.requireNonNull(
               chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-          .findFirst().get();
+          .findFirst();
+      assertTrue(optionalBlockFile.isPresent());
+      blockFile = optionalBlockFile.get();
     } else {
+      // Get the block by ID.
       blockFile = new File(chunksDir, blockID + ".block");
     }
     assertTrue(blockFile.exists());
