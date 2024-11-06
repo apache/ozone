@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -88,6 +89,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private AtomicBoolean isRunningOnAOS;
 
   private final DeletedDirSupplier deletedDirSupplier;
+  AtomicInteger taskCount = new AtomicInteger(0);
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -107,6 +109,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
     deletedDirSupplier = new DeletedDirSupplier();
+    taskCount.set(0);
   }
 
   private boolean shouldRun() {
@@ -140,6 +143,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    if (taskCount.get() > 0) {
+      LOG.info("{} Directory deleting task(s) already in progress.",
+          taskCount.get());
+      return queue;
+    }
+    try {
+      deletedDirSupplier.reInitItr();
+    } catch (IOException ex) {
+      LOG.error("Unable to get the iterator.", ex);
+    }
+    taskCount.set(dirDeletingCorePoolSize);
     for (int i = 0; i < dirDeletingCorePoolSize; i++) {
       queue.add(new DirectoryDeletingService.DirDeletingTask(this));
     }
@@ -158,21 +172,18 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     private synchronized Table.KeyValue<String, OmKeyInfo> get()
         throws IOException {
-      if (deleteTableIterator == null || !deleteTableIterator.hasNext()) {
-        reInitItr();
-      }
       if (deleteTableIterator.hasNext()) {
         return deleteTableIterator.next();
       }
       return null;
     }
 
-    private void closeItr() {
+    private synchronized void closeItr() {
       IOUtils.closeQuietly(deleteTableIterator);
       deleteTableIterator = null;
     }
 
-    private void reInitItr() throws IOException {
+    private synchronized void reInitItr() throws IOException {
       closeItr();
       deleteTableIterator =
           getOzoneManager().getMetadataManager().getDeletedDirTable()
@@ -278,6 +289,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         }
       }
       // place holder by returning empty results of this call back.
+      taskCount.getAndDecrement();
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
