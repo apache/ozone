@@ -31,6 +31,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -79,6 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -368,7 +370,7 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
 
@@ -553,7 +555,7 @@ class TestObjectPut {
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
           .thenThrow(IOException.class);
 
       // Add copy header, and then call put
@@ -730,5 +732,18 @@ class TestObjectPut {
     // THEN
     assertEquals(S3ErrorTable.NO_OVERWRITE.getCode(), exception.getCode());
     assertEquals(S3ErrorTable.NO_OVERWRITE.getHttpCode(), exception.getHttpCode());
+  }
+
+  @Test
+  public void testPutEmptyObject() throws IOException, OS3Exception {
+    HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
+    String emptyString = "";
+    ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headersWithTags);
+
+    Response putResponse = objectEndpoint.put(BUCKET_NAME, KEY_NAME, emptyString.length(), 1, null, body);
+    assertEquals(200, putResponse.getStatus());
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
+    assertEquals(0, keyDetails.getDataSize());
   }
 }

@@ -204,9 +204,10 @@ public class SCMBlockDeletingService extends BackgroundService
             }
           }
           LOG.info("Totally added {} blocks to be deleted for"
-                  + " {} datanodes, limit per iteration : {}blocks, task elapsed time: {}ms",
+              + " {} datanodes / {} totalnodes, limit per iteration : {}blocks, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
+              included.size(),
               blockDeletionLimit,
               Time.monotonicNow() - startTime);
           if (transactions.getBlocksDeleted() >= blockDeletionLimit) {

@@ -50,8 +50,7 @@ public class TestDBDefinitionFactory {
     definition = DBDefinitionFactory.getDefinition(SCMDBDefinition.get().getName());
     assertInstanceOf(SCMDBDefinition.class, definition);
 
-    definition = DBDefinitionFactory.getDefinition(
-        new ReconSCMDBDefinition().getName());
+    definition = DBDefinitionFactory.getDefinition(ReconSCMDBDefinition.get().getName());
     assertInstanceOf(ReconSCMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(

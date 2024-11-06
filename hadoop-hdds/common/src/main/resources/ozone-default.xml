@@ -3476,9 +3476,9 @@
   <property>
     <name>ozone.s3g.client.buffer.size</name>
     <tag>OZONE, S3GATEWAY</tag>
-    <value>4KB</value>
+    <value>4MB</value>
     <description>
-      The size of the buffer which is for read block. (4KB by default).
+      The size of the buffer which is for read block. (4MB by default).
     </description>
   </property>
   <property>
@@ -4534,14 +4534,6 @@
       quota recalculation trigger when upgrade to the layout version QUOTA.
       while upgrade, re-calculation of quota used will block write operation
       to existing buckets till this operation is completed.
-    </description>
-  </property>
-  <property>
-    <name>ozone.ec.grpc.zerocopy.enabled</name>
-    <value>true</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      Specify if zero-copy should be enabled for EC GRPC protocol.
     </description>
   </property>
   <property>

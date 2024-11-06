@@ -31,6 +31,7 @@ import BucketsTable, { COLUMNS } from '@/v2/components/tables/bucketsTable';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { showDataFetchError } from '@/utils/common';
+import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 import { useDebounce } from '@/v2/hooks/debounce.hook';
 
 import {
@@ -40,26 +41,6 @@ import {
 } from '@/v2/types/bucket.types';
 
 import './buckets.less';
-
-
-const LIMIT_OPTIONS: Option[] = [
-  {
-    label: '1000',
-    value: '1000'
-  },
-  {
-    label: '5000',
-    value: '5000'
-  },
-  {
-    label: '10000',
-    value: '10000'
-  },
-  {
-    label: '20000',
-    value: '20000'
-  }
-]
 
 const SearchableColumnOpts = [{
   label: 'Bucket',
@@ -282,7 +263,7 @@ const Buckets: React.FC<{}> = () => {
           onReload={loadData}
         />
       </div>
-      <div style={{ padding: '24px' }}>
+      <div className='data-container'>
         <div className='content-div'>
           <div className='table-header-section'>
             <div className='table-filter-section'>

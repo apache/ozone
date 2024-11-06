@@ -172,6 +172,7 @@ public class TestHSync {
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
   private static final int SERVICE_INTERVAL = 100;
   private static final int EXPIRE_THRESHOLD_MS = 140;
+  private static final int WAL_HEADER_LEN = 83;
 
   private static OpenKeyCleanupService openKeyCleanupService;
 
@@ -415,6 +416,45 @@ public class TestHSync {
         .getContainer(omKeyLocationInfo.getContainerID()).
         getContainerData().getChunksPath();
     return chunkPath;
+  }
+
+  @Test
+  public void testHSyncSeek() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s.%s/",
+        OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path key1 = new Path(dir, "key-hsync-seek");
+
+    final byte[] data = new byte[1024];
+    final byte[] buffer = new byte[1024];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(data, 0, WAL_HEADER_LEN);
+        // the first hsync will update the correct length in the key info at OM
+        os.hsync();
+        os.write(data, 0, data.length);
+        os.hsync(); // the second hsync will not update the length at OM
+        try (FSDataInputStream in = fs.open(key1)) {
+          // the actual key length is WAL_HEADER_LEN + 1024, but the length in OM is WAL_HEADER_LEN (83)
+          in.seek(WAL_HEADER_LEN + 1);
+          final int n = in.read(buffer, 1, buffer.length - 1);
+          // expect to read 1023 bytes
+          assertEquals(buffer.length - 1, n);
+          for (int i = 1; i < buffer.length; i++) {
+            assertEquals(data[i], buffer[i], "expected at i=" + i);
+          }
+        }
+      } finally {
+        fs.delete(key1, false);
+      }
+    }
   }
 
   @ParameterizedTest
