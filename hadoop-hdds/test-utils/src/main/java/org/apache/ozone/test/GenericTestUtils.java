@@ -90,10 +90,13 @@ public abstract class GenericTestUtils {
   }
 
   /**
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
+   *
    * Get the (created) base directory for tests.
    *
    * @return the absolute directory
    */
+  @Deprecated
   public static File getTestDir() {
     String prop =
         System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
@@ -107,25 +110,33 @@ public abstract class GenericTestUtils {
   }
 
   /**
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
+   *
    * Get an uncreated directory for tests.
    *
    * @return the absolute directory for tests. Caller is expected to create it.
    */
+  @Deprecated
   public static File getTestDir(String subdir) {
     return new File(getTestDir(), subdir).getAbsoluteFile();
   }
 
   /**
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
+   *
    * Get an uncreated directory for tests with a randomized alphanumeric
    * name. This is likely to provide a unique path for tests run in parallel
    *
    * @return the absolute directory for tests. Caller is expected to create it.
    */
+  @Deprecated
   public static File getRandomizedTestDir() {
     return new File(getRandomizedTempPath());
   }
 
   /**
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
+   *
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
@@ -133,6 +144,7 @@ public abstract class GenericTestUtils {
    * @param subpath sub path, with no leading "/" character
    * @return a string to use in paths
    */
+  @Deprecated
   public static String getTempPath(String subpath) {
     String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
         : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
@@ -148,6 +160,8 @@ public abstract class GenericTestUtils {
   }
 
   /**
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
+   *
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
@@ -155,6 +169,7 @@ public abstract class GenericTestUtils {
    * @return a string to use in paths
    */
   @SuppressWarnings("java:S2245") // no need for secure random
+  @Deprecated
   public static String getRandomizedTempPath() {
     return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
         + "-" + randomAlphanumeric(10));

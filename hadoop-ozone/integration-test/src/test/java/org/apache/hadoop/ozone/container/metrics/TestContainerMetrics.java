@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
@@ -72,7 +70,6 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedFunction;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -84,7 +81,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @Timeout(300)
 public class TestContainerMetrics {
-  static final String TEST_DIR = GenericTestUtils.getRandomizedTempPath() + File.separator;
+  @TempDir
+  private static Path testDir;
   @TempDir
   private Path tempDir;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
@@ -96,17 +94,8 @@ public class TestContainerMetrics {
     CONF.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
-    CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, TEST_DIR);
+    CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
 
-  }
-
-  @AfterAll
-  public static void cleanup() {
-    // clean up volume dir
-    File file = new File(TEST_DIR);
-    if (file.exists()) {
-      FileUtil.fullyDelete(file);
-    }
   }
 
   @AfterEach
@@ -185,7 +174,7 @@ public class TestContainerMetrics {
       initConf.accept(pipeline);
 
       DatanodeDetails dn = pipeline.getFirstNode();
-      volumeSet = createVolumeSet(dn, TEST_DIR + dn.getUuidString());
+      volumeSet = createVolumeSet(dn, testDir + dn.getUuidString());
       server = createServer.apply(dn, volumeSet);
       server.start();
       initServer.accept(dn, pipeline);
@@ -249,7 +238,7 @@ public class TestContainerMetrics {
       throws IOException {
     CONF.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
-    final String dir = TEST_DIR + dn.getUuid();
+    final String dir = testDir.resolve(dn.getUuidString()).toString();
     CONF.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         volumeSet);
