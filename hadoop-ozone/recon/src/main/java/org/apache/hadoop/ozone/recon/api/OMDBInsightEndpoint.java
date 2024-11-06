@@ -1228,7 +1228,7 @@ public class OMDBInsightEndpoint {
     LOG.debug("Applying filters on : {}", entry.getKey());
 
     if (!StringUtils.isEmpty(paramInfo.getCreationDate())
-        && !(entry.getValue().getCreationTime() >= paramInfo.getCreationDateEpoch())) {
+        && (entry.getValue().getCreationTime() < paramInfo.getCreationDateEpoch())) {
       return false;
     }
 
