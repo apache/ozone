@@ -89,7 +89,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private AtomicBoolean isRunningOnAOS;
 
   private final DeletedDirSupplier deletedDirSupplier;
-  AtomicInteger taskCount = new AtomicInteger(0);
+
+  private AtomicInteger taskCount = new AtomicInteger(0);
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -122,6 +123,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   public boolean isRunningOnAOS() {
     return isRunningOnAOS.get();
+  }
+
+  public AtomicInteger getTaskCount() {
+    return taskCount;
   }
 
   /**
