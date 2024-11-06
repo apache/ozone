@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -216,10 +215,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
     List<RaftProtos.RaftPeerProto> newPeers =
         newRaftConfiguration.getPeersList();
-    List<String> newPeersLogWithoutStartupRole = newPeers.stream()
-        .map(peer -> String.format("id: \"%s\" address: \"%s\"", peer.getId().toStringUtf8(), peer.getAddress()))
-        .collect(Collectors.toList());
-    LOG.info("Received Configuration change notification from Ratis. New Peer list: {}", newPeersLogWithoutStartupRole);
+    final StringBuilder logBuilder = new StringBuilder(1024)
+        .append("notifyConfigurationChanged from Ratis: term=").append(term)
+        .append(", index=").append(index)
+        .append(", New Peer list: ");
+    newPeers.forEach(peer -> logBuilder.append(peer.getId().toStringUtf8())
+        .append("(")
+        .append(peer.getAddress())
+        .append("), "));
+    LOG.info(logBuilder.substring(0, logBuilder.length() - 2));
 
     List<String> newPeerIds = new ArrayList<>();
     for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
