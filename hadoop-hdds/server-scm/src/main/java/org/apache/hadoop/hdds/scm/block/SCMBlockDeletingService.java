@@ -167,8 +167,9 @@ public class SCMBlockDeletingService extends BackgroundService
           // These nodes will be considered for this iteration.
           final Set<DatanodeDetails> included =
               getDatanodesWithinCommandLimit(datanodes);
+          int blockDeletionLimit = getBlockDeleteTXNum();
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(getBlockDeleteTXNum(), included);
+              deletedBlockLog.getTransactions(blockDeletionLimit, included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -203,10 +204,15 @@ public class SCMBlockDeletingService extends BackgroundService
             }
           }
           LOG.info("Totally added {} blocks to be deleted for"
-                  + " {} datanodes, task elapsed time: {}ms",
+                  + " {} datanodes, limit per iteration : {}blocks, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
+              blockDeletionLimit,
               Time.monotonicNow() - startTime);
+          if (transactions.getBlocksDeleted() >= blockDeletionLimit) {
+            LOG.warn("Limit for no. of keys that can be deleted in one iteration is reached. Current limit: {} = {}",
+                "hdds.scm.block.deletion.per-interval.max", blockDeletionLimit);
+          }
           deletedBlockLog.incrementCount(new ArrayList<>(processedTxIDs));
         } catch (NotLeaderException nle) {
           LOG.warn("Skip current run, since not leader any more.", nle);
