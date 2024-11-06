@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -204,11 +205,10 @@ public enum ContainerCorruptions {
         "chunks");
     // Negative values are an internal placeholder to get the first block in a container.
     if (blockID < 0) {
-      Optional<File> optionalBlockFile = Arrays.stream(Objects.requireNonNull(
-              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-          .findFirst();
-      assertTrue(optionalBlockFile.isPresent());
-      blockFile = optionalBlockFile.get();
+      File[] blockFiles = chunksDir.listFiles((dir, name) -> name.endsWith(".block"));
+      assertNotNull(blockFiles);
+      assertTrue(blockFiles.length > 0);
+      blockFile = blockFiles[0];
     } else {
       // Get the block by ID.
       blockFile = new File(chunksDir, blockID + ".block");
