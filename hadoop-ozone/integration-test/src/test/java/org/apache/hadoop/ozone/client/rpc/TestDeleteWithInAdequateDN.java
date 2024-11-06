@@ -89,7 +89,6 @@ public class TestDeleteWithInAdequateDN {
   private static ObjectStore objectStore;
   private static String volumeName;
   private static String bucketName;
-  private static String path;
   private static XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
