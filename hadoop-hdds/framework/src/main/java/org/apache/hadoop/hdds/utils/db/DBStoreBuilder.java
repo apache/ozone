@@ -420,6 +420,7 @@ public final class DBStoreBuilder {
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
+    dbOptions.setManualWalFlush(rocksDBConfiguration.getManualWalFlush());
 
     return dbOptions;
   }
