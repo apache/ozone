@@ -39,6 +39,60 @@ public class OzoneClientConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientConfig.class);
 
+  public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
+  public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
+  public static final String OZONE_DOMAIN_SOCKET_PATH_DEFAULT = "/var/lib/ozone/dn_socket";
+  public static final String SHORT_CIRCUIT_PREFIX = "read.short-circuit.";
+  public static final short DATA_TRANSFER_VERSION = 28;
+  public static final byte DATA_TRANSFER_MAGIC_CODE = 99;
+
+  @Config(key = "read.short-circuit",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Whether read short-circuit is enabled or not",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private boolean shortCircuitEnabled = OZONE_READ_SHORT_CIRCUIT_DEFAULT;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "buffer.size",
+      defaultValue = "128KB",
+      type = ConfigType.SIZE,
+      description = "Buffer size of reader/writer.",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private int shortCircuitBufferSize = 128 * 1024;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "disable.interval",
+      defaultValue = "600",
+      type = ConfigType.LONG,
+      description = "If some unknown IO error happens on Domain socket read, short circuit read will be disabled " +
+          "temporarily for this period of time(seconds).",
+      tags = { ConfigTag.CLIENT })
+  private long shortCircuitReadDisableInterval = 60 * 10;
+
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
+  }
+
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
+  }
+
+
+  public int getShortCircuitBufferSize() {
+    return shortCircuitBufferSize;
+  }
+
+  public void setShortCircuitBufferSize(int size) {
+    this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
+  }
+
   /**
    * Enum for indicating what mode to use when combining chunk and block
    * checksums to define an aggregate FileChecksum. This should be considered
