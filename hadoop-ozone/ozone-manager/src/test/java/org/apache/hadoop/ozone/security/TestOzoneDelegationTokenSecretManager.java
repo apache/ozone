@@ -51,6 +51,8 @@ import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
@@ -65,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -117,6 +120,9 @@ public class TestOzoneDelegationTokenSecretManager {
     om = mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf, om);
     when(om.getMetadataManager()).thenReturn(metadataManager);
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(versionManager.isAllowed(any(LayoutFeature.class))).thenReturn(true);
+    when(om.getVersionManager()).thenReturn(versionManager);
     s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(new S3SecretStoreMap(s3Secrets),
             mock(S3SecretCache.class)),

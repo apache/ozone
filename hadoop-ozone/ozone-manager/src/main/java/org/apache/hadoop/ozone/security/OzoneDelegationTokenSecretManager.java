@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.security.OzoneSecretStore.OzoneManagerSecretState;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier.TokenInfo;
 import org.apache.hadoop.security.AccessControlException;
@@ -207,10 +208,16 @@ public class OzoneDelegationTokenSecretManager
       throws IOException {
     OzoneTokenIdentifier identifier = createIdentifier(owner, renewer,
         realUser);
-    ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
     updateIdentifierDetails(identifier);
-    identifier.setSecretKeyId(currentSecretKey.getId().toString());
-    byte[] password = currentSecretKey.sign(identifier.getBytes());
+    byte[] password;
+    if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.DELEGATION_TOKEN_SYMMETRIC_SIGN)) {
+      ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
+      identifier.setSecretKeyId(currentSecretKey.getId().toString());
+      password = currentSecretKey.sign(identifier.getBytes());
+    } else {
+      identifier.setOmCertSerialId(getCertSerialId());
+      password = createPassword(identifier.getBytes(), getCurrentKey().getPrivateKey());
+    }
     long expiryTime = identifier.getIssueDate() + getTokenRenewInterval();
 
     // For HA ratis will take care of updating.
