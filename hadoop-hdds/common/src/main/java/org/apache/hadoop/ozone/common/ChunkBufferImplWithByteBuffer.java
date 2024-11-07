@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Function;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
