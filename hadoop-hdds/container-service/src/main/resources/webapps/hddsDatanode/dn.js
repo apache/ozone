@@ -39,8 +39,8 @@
 
             $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=SCMConnectionManager")
                 .then(function (result) {
-                    ctrl.dnmetrics2 = result.data.beans;
-                    ctrl.dnmetrics2.forEach(scm => {
+                    ctrl.heartbeatmetrics = result.data.beans;
+                    ctrl.heartbeatmetrics.forEach(scm => {
                         var scmServers = scm.SCMServers;
                         scmServers.forEach(scmServer => {
                             scmServer.lastSuccessfulHeartbeat = convertTimestampToDate(scmServer.lastSuccessfulHeartbeat)

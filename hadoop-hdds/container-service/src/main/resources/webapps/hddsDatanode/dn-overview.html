@@ -30,14 +30,18 @@
         <th>Last Successful HeartBeat</th>
         <th>Missed Count</th>
         <th>State</th>
+        <th>Type</th>
+        <th>Version Number</th>
     </tr>
     </thead>
     <tbody>
-    <tr ng-repeat="scm in $ctrl.dnmetrics2[0].SCMServers">
+    <tr ng-repeat="scm in $ctrl.heartbeatmetrics[0].SCMServers">
         <td>{{scm.addressString}}</td>
         <td>{{scm.lastSuccessfulHeartbeat}}</td>
         <td>{{scm.missedCount}}</td>
         <td>{{scm.state}}</td>
+        <td>{{scm.type}}</td>
+        <td>{{scm.versionNumber}}</td>
     </tr>
     </tbody>
 </table>

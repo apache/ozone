@@ -51,6 +51,7 @@
     controller: function($http, $scope) {
       var ctrl = this;
 
+      $scope.contentVisible = false;
       $scope.toggleContent = function() {
         $scope.contentVisible = !$scope.contentVisible;
       };
