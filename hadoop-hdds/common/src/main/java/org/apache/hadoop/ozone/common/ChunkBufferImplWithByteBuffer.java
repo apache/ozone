@@ -35,7 +35,6 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
   private final UncheckedAutoCloseable underlying;
-  private final UUID identity = UUID.randomUUID();
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
     this(buffer, null);
@@ -163,6 +162,6 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   @Override
   public String toString() {
     return getClass().getSimpleName() + ":limit=" + buffer.limit()
-        + "@" + identity;
+        + "@" + Integer.toHexString(super.hashCode());
   }
 }
