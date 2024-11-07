@@ -59,7 +59,6 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -180,8 +179,6 @@ public class TestOzoneContainer {
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbDirString.toString());
-    conf.set(OZONE_SCM_DATANODE_ID_DIR,
-        new File(folder.toFile(), UUID.randomUUID().toString()).getAbsoluteFile().toString());
     ContainerTestUtils.enableSchemaV3(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);

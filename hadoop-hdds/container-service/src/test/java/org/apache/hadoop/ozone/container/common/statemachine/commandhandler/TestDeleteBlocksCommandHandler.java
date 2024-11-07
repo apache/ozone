@@ -64,7 +64,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.emptyList;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
@@ -305,7 +304,6 @@ public class TestDeleteBlocksCommandHandler {
     // Setting up the test environment
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
-    configuration.set(OZONE_SCM_DATANODE_ID_DIR, folder.toString());
     DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeConfiguration dnConf =
         configuration.getObject(DatanodeConfiguration.class);

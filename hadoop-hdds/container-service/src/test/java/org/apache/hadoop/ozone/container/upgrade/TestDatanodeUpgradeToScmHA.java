@@ -56,7 +56,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,8 +112,6 @@ public class TestDatanodeUpgradeToScmHA {
     setScmHAEnabled(enableSCMHA);
     // start DN and SCM
     startScmServer();
-    conf.set(OZONE_SCM_DATANODE_ID_DIR,
-        new File(tempFolder.toFile(), UUID.randomUUID().toString()).getAbsoluteFile().toString());
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
@@ -153,8 +150,6 @@ public class TestDatanodeUpgradeToScmHA {
     setScmHAEnabled(enableSCMHA);
     // start DN and SCM
     startScmServer();
-    conf.set(OZONE_SCM_DATANODE_ID_DIR,
-        new File(tempFolder.toFile(), UUID.randomUUID().toString()).getAbsoluteFile().toString());
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
@@ -230,8 +225,6 @@ public class TestDatanodeUpgradeToScmHA {
       throws Exception {
     setScmHAEnabled(enableSCMHA);
     /// SETUP ///
-    conf.set(OZONE_SCM_DATANODE_ID_DIR,
-        new File(tempFolder.toFile(), UUID.randomUUID().toString()).getAbsoluteFile().toString());
     startScmServer();
     String originalScmID = scmServerImpl.getScmId();
     File volume = UpgradeTestHelper.addHddsVolume(conf, tempFolder);
@@ -325,8 +318,6 @@ public class TestDatanodeUpgradeToScmHA {
   public void testFormattingNewVolumes(boolean enableSCMHA) throws Exception {
     setScmHAEnabled(enableSCMHA);
     /// SETUP ///
-    conf.set(OZONE_SCM_DATANODE_ID_DIR,
-        new File(tempFolder.toFile(), UUID.randomUUID().toString()).getAbsoluteFile().toString());
     startScmServer();
     String originalScmID = scmServerImpl.getScmId();
     File preFinVolume1 = UpgradeTestHelper.addHddsVolume(conf, tempFolder);

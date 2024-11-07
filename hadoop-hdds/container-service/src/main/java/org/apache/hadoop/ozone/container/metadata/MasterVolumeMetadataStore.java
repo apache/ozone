@@ -45,7 +45,7 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
         if (instance == null || instance.isClosed()) {
           MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
           instance = new ReferenceCountedDB<>(masterVolumeMetadataStore,
-              masterVolumeMetadataStore.getDbDef().getDBLocation(conf).getAbsolutePath());
+              masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
         }
       }
     }
