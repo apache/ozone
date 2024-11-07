@@ -169,6 +169,9 @@ public class ContainerSet implements Iterable<Container<?>> {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     AtomicReference<Container<?>> removed = new AtomicReference<>();
+    //We need to add to missing container set before removing containerMap since there could be write chunk operation
+    // that could recreate the container in another volume if we remove it from the map before adding to missing
+    // container.
     containerMap.compute(containerId, (cid, value) -> {
       if (markMissing) {
         missingContainerSet.add(containerId);
