@@ -234,6 +234,18 @@ public class DatanodeDetails extends NodeImpl implements
     setPort(new Port(name, port));
   }
 
+  public void setRatisPort(int port) {
+    setPort(Name.RATIS, port);
+  }
+
+  public void setRestPort(int port) {
+    setPort(Name.REST, port);
+  }
+
+  public void setStandalonePort(int port) {
+    setPort(Name.STANDALONE, port);
+  }
+
   /**
    * Returns all the Ports used by DataNode.
    *
@@ -324,19 +336,51 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Port
    */
   public synchronized Port getPort(Port.Name name) {
+    Port ratisPort = null;
     for (Port port : ports) {
       if (port.getName().equals(name)) {
         return port;
       }
+      if (port.getName().equals(Name.RATIS)) {
+        ratisPort = port;
+      }
     }
-    // if no separate admin/server/datastream port, return single Ratis one for
-    // compat
+    // if no separate admin/server/datastream port,
+    // return single Ratis one for compatibility
     if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
         name == Name.RATIS_DATASTREAM) {
-      return getPort(Name.RATIS);
+      return ratisPort;
     }
     return null;
   }
+
+  /**
+   * Helper method to get the Ratis port.
+   * 
+   * @return Port
+   */
+  public Port getRatisPort() {
+    return getPort(Name.RATIS);
+  }
+
+  /**
+   * Helper method to get the REST port.
+   *
+   * @return Port
+   */
+  public Port getRestPort() {
+    return getPort(Name.REST);
+  }
+
+  /**
+   * Helper method to get the Standalone port.
+   *
+   * @return Port
+   */
+  public Port getStandalonePort() {
+    return getPort(Name.STANDALONE);
+  }
+
 
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
@@ -861,6 +905,36 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static Port newPort(Port.Name name, Integer value) {
     return new Port(name, value);
+  }
+
+  /**
+   * Constructs a new Ratis Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRatisPort(Integer portNumber) {
+    return newPort(Name.RATIS, portNumber);
+  }
+
+  /**
+   * Constructs a new REST Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRestPort(Integer portNumber) {
+    return newPort(Name.REST, portNumber);
+  }
+
+  /**
+   * Constructs a new Standalone Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newStandalonePort(Integer portNumber) {
+    return newPort(Name.STANDALONE, portNumber);
   }
 
   /**

@@ -73,7 +73,7 @@ class TestDatanodeIdYaml {
     // if no separate admin/server/datastream port, return single Ratis one for
     // compat
     assertEquals(read.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
-        read.getPort(DatanodeDetails.Port.Name.RATIS));
+        read.getRatisPort());
   }
 
   @Test

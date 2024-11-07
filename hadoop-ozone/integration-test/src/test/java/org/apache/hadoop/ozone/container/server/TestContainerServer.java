@@ -111,7 +111,7 @@ public class TestContainerServer {
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                    .getStandalonePort().getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(datanodeDetails, conf,
             new TestContainerDispatcher(), caClient), (dn, p) -> {
@@ -127,7 +127,7 @@ public class TestContainerServer {
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+        dn.getRatisPort().getValue());
     final String dir = TEST_DIR + dn.getUuid();
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
@@ -224,8 +224,7 @@ public class TestContainerServer {
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
-                pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                pipeline.getFirstNode().getStandalonePort().getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
             hddsDispatcher, caClient), (dn, p) -> {
