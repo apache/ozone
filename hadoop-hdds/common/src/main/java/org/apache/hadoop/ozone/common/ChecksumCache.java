@@ -79,7 +79,7 @@ public class ChecksumCache {
 
     // Start of the checksum index that need to be (re)computed
     final int ciStart = prevChunkLength / bytesPerChecksum;
-    final int ciEnd = currChunkLength / bytesPerChecksum;
+    final int ciEnd = currChunkLength / bytesPerChecksum + (currChunkLength % bytesPerChecksum == 0 ? 0 : 1);
     int i = 0;
     for (ByteBuffer b : data.iterate(bytesPerChecksum)) {
       if (i < ciStart) {
@@ -104,8 +104,8 @@ public class ChecksumCache {
     }
 
     // Sanity check
-    if (i - 1 != ciEnd) {
-      throw new IllegalStateException("Checksum index end does not match expectation");
+    if (i != ciEnd) {
+      throw new IllegalStateException("ChecksumCache: Checksum index end does not match expectation");
     }
 
     // Update last written index

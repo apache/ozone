@@ -182,8 +182,8 @@ public class OzoneClientConfig {
   // TODO: Re-evaluate if this need to be exposed to end-users at all, e.g. to avoid confusion.
   @Config(key = "chunk.checksum.cache.enabled",
       defaultValue = "true",  // TODO: false by default?
-      description = "Increase client-side chunk checksum calculation efficiency in certain cases " +
-          "by caching previously computed checksums in the same block chunk.",
+      description = "Increase client-side chunk checksum calculation efficiency when incremental chunk list is " +
+          "enabled by caching previously computed checksums in the same block chunk.",
       tags = ConfigTag.CLIENT)
   private boolean chunkChecksumCacheEnabled = true;
 
