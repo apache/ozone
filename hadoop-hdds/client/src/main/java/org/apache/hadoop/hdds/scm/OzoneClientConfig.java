@@ -156,7 +156,7 @@ public class OzoneClientConfig {
       description =
           "Indicates the time duration in seconds a client will wait "
               + "before retrying a read key request on encountering "
-              + "a connectivity excepetion from Datanodes . "
+              + "a connectivity exception from Datanodes. "
               + "By default the interval is 1 second",
       tags = ConfigTag.CLIENT)
   private int readRetryInterval = 1;
@@ -178,7 +178,14 @@ public class OzoneClientConfig {
       tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private int bytesPerChecksum = 16 * 1024;
 
-  // TODO: Add block chunk checksum cache client option
+  // Client-side block chunk checksum cache config
+  // TODO: Re-evaluate if this need to be exposed to end-users at all, e.g. to avoid confusion.
+  @Config(key = "chunk.checksum.cache.enabled",
+      defaultValue = "true",  // TODO: false by default?
+      description = "Increase client-side chunk checksum calculation efficiency in certain cases " +
+          "by caching previously computed checksums in the same block chunk.",
+      tags = ConfigTag.CLIENT)
+  private boolean chunkChecksumCacheEnabled = true;
 
   @Config(key = "verify.checksum",
       defaultValue = "true",
@@ -449,6 +456,14 @@ public class OzoneClientConfig {
 
   public void setBytesPerChecksum(int bytesPerChecksum) {
     this.bytesPerChecksum = bytesPerChecksum;
+  }
+
+  public boolean isChunkChecksumCacheEnabled() {
+    return chunkChecksumCacheEnabled;
+  }
+
+  public void setChunkChecksumCacheEnabled(boolean chunkChecksumCacheEnabled) {
+    this.chunkChecksumCacheEnabled = chunkChecksumCacheEnabled;
   }
 
   public boolean isChecksumVerify() {

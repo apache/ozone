@@ -135,6 +135,7 @@ public class BlockOutputStream extends OutputStream {
   private List<ChunkBuffer> bufferList;
 
   private final List<DatanodeDetails> failedServers;
+  private final boolean chunkChecksumCacheEnabled;
   private final Checksum checksum;
 
   //number of buffers used before doing a flush/putBlock.
@@ -231,8 +232,9 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    checksum = new Checksum(config.getChecksumType(),
-        config.getBytesPerChecksum());
+    this.chunkChecksumCacheEnabled = config.isChunkChecksumCacheEnabled();
+    this.checksum = new Checksum(config.getChecksumType(),
+        config.getBytesPerChecksum(), chunkChecksumCacheEnabled);
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
@@ -1066,6 +1068,8 @@ public class BlockOutputStream extends OutputStream {
     addToBlockData(lastChunkInfo);
 
     lastChunkBuffer.clear();
+    // Clear checksum cache associated with lastChunkBuffer? not the right place. TODO: REMOVE THIS
+//    checksum.clearChecksumCache();
     if (lastChunkSize == config.getStreamBufferSize()) {
       lastChunkOffset += config.getStreamBufferSize();
     } else {
@@ -1132,7 +1136,7 @@ public class BlockOutputStream extends OutputStream {
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
     ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer, true);
+        checksum.computeChecksum(lastChunkBuffer, chunkChecksumCacheEnabled);
     // Cache checksum here. This checksum is stored in blockData (and later transferred in PutBlock)
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
