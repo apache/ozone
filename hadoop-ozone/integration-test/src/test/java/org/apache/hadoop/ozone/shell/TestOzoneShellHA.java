@@ -137,7 +137,7 @@ public class TestOzoneShellHA {
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
   @TempDir
-  private static Path path;
+  private static java.nio.file.Path path;
   @TempDir
   private static File kmsDir;
   private static File testFile;
@@ -174,7 +174,6 @@ public class TestOzoneShellHA {
   }
 
   protected static void startKMS() throws Exception {
-    assertTrue(kmsDir.mkdirs());
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
     miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
     miniKMS.start();
