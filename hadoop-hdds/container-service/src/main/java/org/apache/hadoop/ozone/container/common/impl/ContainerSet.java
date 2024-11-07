@@ -50,7 +50,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
@@ -164,7 +163,8 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is removed from containerMap returns true, otherwise
    * false
    */
-  public boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB) throws StorageContainerException {
+  public boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB)
+      throws StorageContainerException {
     Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
