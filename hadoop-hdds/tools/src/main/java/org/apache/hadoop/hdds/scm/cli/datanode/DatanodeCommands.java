@@ -41,7 +41,8 @@ import java.util.concurrent.Callable;
         DecommissionSubCommand.class,
         MaintenanceSubCommand.class,
         RecommissionSubCommand.class,
-        UsageInfoSubcommand.class
+        UsageInfoSubcommand.class,
+        VolumeSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
