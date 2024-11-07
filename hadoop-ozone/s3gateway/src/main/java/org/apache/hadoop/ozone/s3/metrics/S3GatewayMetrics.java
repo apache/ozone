@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.metrics;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -33,12 +34,15 @@ import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
 import org.apache.hadoop.util.Time;
 
+import java.io.Closeable;
+import java.util.Map;
+
 /**
  * This class maintains S3 Gateway related metrics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "S3 Gateway Metrics", context = OzoneConsts.OZONE)
-public final class S3GatewayMetrics implements MetricsSource {
+public final class S3GatewayMetrics implements Closeable, MetricsSource {
 
   public static final String SOURCE_NAME =
       S3GatewayMetrics.class.getSimpleName();
@@ -242,6 +246,8 @@ public final class S3GatewayMetrics implements MetricsSource {
   @Metric(about = "Latency for copy metadata of an key in nanoseconds")
   private PerformanceMetrics copyKeyMetadataLatencyNs;
 
+  private final Map<String, PerformanceMetrics> performanceMetrics;
+
   /**
    * Private constructor.
    */
@@ -249,8 +255,13 @@ public final class S3GatewayMetrics implements MetricsSource {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     int[] intervals = conf.getInts(S3GatewayConfigKeys
         .OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
-    PerformanceMetrics.initializeMetrics(
+    performanceMetrics = PerformanceMetrics.initializeMetrics(
         this, registry, "Ops", "Time", intervals);
+  }
+
+  @Override
+  public void close() {
+    IOUtils.closeQuietly(performanceMetrics.values());
   }
 
   /**
@@ -272,6 +283,7 @@ public final class S3GatewayMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public static void unRegister() {
+    IOUtils.closeQuietly(instance);
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);

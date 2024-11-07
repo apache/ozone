@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -537,6 +538,7 @@ public class OzoneContainer {
     }
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
+    IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
     if (this.masterVolumeMetadataStore != null) {
       this.masterVolumeMetadataStore.decrementReference();
