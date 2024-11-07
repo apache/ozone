@@ -68,7 +68,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +124,7 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
   }
 
   @Override
-  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     OMClientResponse omClientResponse = null;
@@ -145,7 +144,7 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
         encInfo = OmKeyUtils.getFileEncryptionInfo(ozoneManager, bucketInfo).orElse(null);
       }
 
-      long trxnLogIndex = termIndex.getIndex();
+      long trxnLogIndex = exeCtx.getIndex();
       final ReplicationConfig repConfig = OzoneConfigUtil.resolveReplicationConfigPreference(keyArgs.getType(),
           keyArgs.getFactor(), keyArgs.getEcReplicationConfig(), bucketInfo.getDefaultReplicationConfig(),
           ozoneManager);
@@ -177,7 +176,7 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
           .setCmdType(Type.CreateKey);
       omClientResponse = new DummyOMClientResponse(omResponse.build());
       omMetrics.incNumKeyAllocates();
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       omMetrics.incNumKeyAllocateFails();
       exception = ex;
       OMResponse rsp = OmKeyUtils.createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(getOmRequest()), ex);

@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -125,6 +126,17 @@ public final class OMAuditLogger {
     }
   }
 
+  public static void log(OMAuditLogger.Builder builder, ExecutionContext executionContext) {
+    if (builder.isLog.get()) {
+      if (null == builder.getAuditMap()) {
+        builder.setAuditMap(new HashMap<>());
+      }
+      builder.getAuditMap().put("Transaction", "" + executionContext.getIndex());
+      builder.getMessageBuilder().withParams(builder.getAuditMap());
+      builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
+    }
+  }
+
   public static void log(OMAuditLogger.Builder builder) {
     if (builder.isLog.get()) {
       builder.getMessageBuilder().withParams(builder.getAuditMap());
@@ -161,7 +173,7 @@ public final class OMAuditLogger {
   }
 
   public static void log(OMAuditLogger.Builder builder, OMRequestBase request, OzoneManager om,
-                         TermIndex termIndex, Throwable th) {
+                         ExecutionContext executionContext, Throwable th) {
     if (builder.isLog.get()) {
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
       return;
@@ -177,7 +189,7 @@ public final class OMAuditLogger {
     }
     try {
       builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", "" + executionContext.getIndex());
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getOmRequest().getUserInfo());
       builder.setLog(true);

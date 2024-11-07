@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.request.RequestAuditor;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * define methods for request to handle.
@@ -73,7 +72,7 @@ public class OMRequestBase implements RequestAuditor {
   /**
    * perform request processing such as prepare changes, resource validation.
    */
-  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) throws IOException {
+  public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {
     return null;
   }
   public DbChangesRecorder changeRecorder() {

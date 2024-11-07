@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,15 +59,15 @@ public class OMPersistDbRequest extends OMRequestBase {
 
   @SuppressWarnings("methodlength")
   @Override
-  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) throws IOException {
+  public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
+    BatchOperation batchOperation = exeCtx.getBatchOperation();
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     Table<String, OmBucketInfo> bucketTable = metadataManager.getBucketTable();
     Table<String, OmVolumeArgs> volumeTable = metadataManager.getVolumeTable();
     OzoneManagerProtocolProtos.PersistDbRequest dbUpdateRequest = getOmRequest().getPersistDbRequest();
     List<OzoneManagerProtocolProtos.DBTableUpdate> tableUpdatesList = dbUpdateRequest.getTableUpdatesList();
-
-    try (BatchOperation batchOperation = metadataManager.getStore().initBatchOperation()) {
+    try {
       for (OzoneManagerProtocolProtos.DBTableUpdate tblUpdates : tableUpdatesList) {
         // update volume changes
         if (volumeTable.getName().equals(tblUpdates.getTableName())) {
@@ -111,17 +110,16 @@ public class OMPersistDbRequest extends OMRequestBase {
           metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, quota.getVolName(), quota.getBucketName());
         }
       }
-      metadataManager.getStore().commitBatchOperation(batchOperation);
       omResponse.setPersistDbResponse(OzoneManagerProtocolProtos.PersistDbResponse.newBuilder().build());
     } catch (IOException ex) {
-      audit(ozoneManager, getOmRequest(), termIndex, ex);
+      audit(ozoneManager, getOmRequest(), exeCtx, ex);
       LOG.error("Db persist exception", ex);
       return new DummyOMClientResponse(createErrorOMResponse(omResponse, ex));
     } finally {
       bucketTable.cleanupCache(Collections.singletonList(Long.MAX_VALUE));
       volumeTable.cleanupCache(Collections.singletonList(Long.MAX_VALUE));
     }
-    audit(ozoneManager, getOmRequest(), termIndex, null);
+    audit(ozoneManager, getOmRequest(), exeCtx, null);
     return new DummyOMClientResponse(omResponse.build());
   }
 
@@ -163,12 +161,12 @@ public class OMPersistDbRequest extends OMRequestBase {
     }
   }
 
-  public void audit(OzoneManager ozoneManager, OMRequest request, TermIndex termIndex, Throwable th) {
+  public void audit(OzoneManager ozoneManager, OMRequest request, ExecutionContext executionContext, Throwable th) {
     List<Long> indexList = request.getExecutionControlRequest().getRequestInfoList().stream()
         .map(e -> e.getIndex()).collect(Collectors.toList());
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("requestIndexes", indexList.stream().map(String::valueOf).collect(Collectors.joining(",")));
-    auditMap.put("transactionIndex", termIndex.getIndex() + "");
+    auditMap.put("transactionIndex", executionContext.getTermIndex().getIndex() + "");
     if (null != th) {
       ozoneManager.getSystemAuditLogger().logWriteFailure(ozoneManager.buildAuditMessageForFailure(
           OMSystemAction.DBPERSIST, auditMap, th));

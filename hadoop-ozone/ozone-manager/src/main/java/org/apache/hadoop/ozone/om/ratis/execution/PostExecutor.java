@@ -26,10 +26,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.execution.factory.OmRequestFactory;
+import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -64,31 +65,17 @@ public class PostExecutor {
    * @param omRequest OMRequest
    * @return response from OM
    */
-  public OMResponse runCommand(OzoneManagerProtocolProtos.OMRequest omRequest, TermIndex termIndex) {
-    // leader index shared to follower for follower execution
-    if (!omRequest.hasExecutionControlRequest()
-        || omRequest.getExecutionControlRequest().getRequestInfoList().isEmpty()) {
-      LOG.warn("Failed to apply command, Invalid request as do not have control information ");
-      return createErrorResponse(omRequest,
-          new OMException("Request do not have control information", OMException.ResultCodes.INVALID_REQUEST));
-    }
-
+  public OMResponse runCommand(OMRequest omRequest, TermIndex termIndex) {
     try {
-      saveLeaderIndex(omRequest);
-      OMRequestBase omClientRequest = OmRequestFactory.createClientRequest(omRequest, ozoneManager);
-      try {
-        OMClientResponse omClientResponse = captureLatencyNs(
-            ozoneManager.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
-            () -> Objects.requireNonNull(omClientRequest.process(ozoneManager, termIndex),
-                "omClientResponse returned cannot be null"));
-        OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
-        return omClientResponse.getOMResponse();
-      } catch (Throwable th) {
-        OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, termIndex, th);
-        throw th;
+      try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore().initBatchOperation()) {
+        OMResponse omResponse = runCommandInternal(omRequest, termIndex, batchOperation);
+        ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
+        if (null != indexNotifier) {
+          indexNotifier.accept(leaderIndex.get());
+        }
+        return omResponse;
       }
     } catch (IOException e) {
-      LOG.warn("Failed to apply command, Exception occurred ", e);
       return createErrorResponse(omRequest, e);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
@@ -98,15 +85,48 @@ public class PostExecutor {
     return null;
   }
 
+  public OMResponse runCommandInternal(OMRequest omRequest, TermIndex termIndex, BatchOperation batchOperation)
+      throws IOException {
+    if (!omRequest.hasExecutionControlRequest()
+        || omRequest.getExecutionControlRequest().getRequestInfoList().isEmpty()) {
+      LOG.warn("Failed to apply command, Invalid request as do not have control information ");
+      return createErrorResponse(omRequest,
+          new OMException("Request do not have control information", OMException.ResultCodes.INVALID_REQUEST));
+    }
+
+    ExecutionContext executionContext = new ExecutionContext();
+    OMRequestBase omClientRequest = OmRequestFactory.createClientRequest(omRequest, ozoneManager);
+    try {
+      saveLeaderIndex(omRequest, batchOperation);
+      executionContext.setIndex(leaderIndex.get());
+      executionContext.setTermIndex(termIndex);
+      executionContext.setBatchOperation(batchOperation);
+      OMClientResponse omClientResponse = captureLatencyNs(
+          ozoneManager.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
+          () -> Objects.requireNonNull(omClientRequest.process(ozoneManager, executionContext),
+              "omClientResponse returned cannot be null"));
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+      return omClientResponse.getOMResponse();
+    } catch (IOException e) {
+      LOG.warn("Failed to apply command, Exception occurred ", e);
+      return createErrorResponse(omRequest, e);
+    } catch (Throwable th) {
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, executionContext, th);
+      throw th;
+    }
+  }
+
   /**
    * run non ratis request at node.
    * @param request OMRequest
    * @return response from OM
    */
-  public OMResponse runCommandNonRatis(OzoneManagerProtocolProtos.OMRequest request, TermIndex termIndex)
-      throws IOException {
-    OMResponse omResponse = runCommand(request, termIndex);
+  public synchronized OMResponse runCommandNonRatis(
+      OMRequest request, ExecutionContext executionContext) throws IOException {
+    TermIndex termIndex = TermIndex.valueOf(-1, executionContext.getIndex());
+    OMResponse omResponse = null;
     try (BatchOperation batchOperation = ozoneManager.getMetadataManager().getStore().initBatchOperation()) {
+      omResponse = runCommandInternal(request, termIndex, batchOperation);
       ozoneManager.getMetadataManager().getTransactionInfoTable().putWithBatch(
           batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(termIndex));
       ozoneManager.getMetadataManager().getStore().commitBatchOperation(batchOperation);
@@ -114,15 +134,12 @@ public class PostExecutor {
     return omResponse;
   }
 
-  private void saveLeaderIndex(OzoneManagerProtocolProtos.OMRequest request) throws IOException {
+  private void saveLeaderIndex(OMRequest request, BatchOperation batchOperation) throws IOException {
     Long index = request.getExecutionControlRequest().getRequestInfoList().stream().map(e -> e.getIndex())
         .max(Long::compareTo).orElse(0L);
     leaderIndex.set(index > leaderIndex.get() ? index : leaderIndex.get());
-    ozoneManager.getMetadataManager().getTransactionInfoTable().put(LEADER_INDEX_KEY,
+    ozoneManager.getMetadataManager().getTransactionInfoTable().putWithBatch(batchOperation, LEADER_INDEX_KEY,
         TransactionInfo.valueOf(-1, leaderIndex.get()));
-    if (null != indexNotifier) {
-      indexNotifier.accept(leaderIndex.get());
-    }
   }
   public static long initLeaderIndex(OzoneManager ozoneManager) throws IOException {
     TransactionInfo transactionInfo = ozoneManager.getMetadataManager().getTransactionInfoTable().get(LEADER_INDEX_KEY);
@@ -141,9 +158,8 @@ public class PostExecutor {
     indexNotifier.accept(leaderIndex.get());
   }
 
-  private OzoneManagerProtocolProtos.OMResponse createErrorResponse(
-      OzoneManagerProtocolProtos.OMRequest omRequest, IOException exception) {
-    OzoneManagerProtocolProtos.OMResponse.Builder omResponseBuilder = OzoneManagerProtocolProtos.OMResponse.newBuilder()
+  private OMResponse createErrorResponse(OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
         .setTraceID(omRequest.getTraceID())

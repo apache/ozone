@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,7 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,10 +117,11 @@ public class LeaderRequestExecutor {
 
   private void executeRequest(RequestContext ctx, PoolExecutor.CheckedConsumer<RequestContext> nxtStage) {
     OMRequest request = ctx.getRequest();
-    TermIndex termIndex = TermIndex.valueOf(-1, uniqueIndex.incrementAndGet());
-    ctx.setIndex(termIndex);
+    ExecutionContext executionContext = new ExecutionContext();
+    executionContext.setIndex(uniqueIndex.incrementAndGet());
+    ctx.setExecutionContext(executionContext);
     try {
-      handleRequest(ctx, termIndex);
+      handleRequest(ctx, executionContext);
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       ctx.setResponse(createErrorResponse(request, e));
@@ -141,23 +142,23 @@ public class LeaderRequestExecutor {
     }
   }
 
-  private void handleRequest(RequestContext ctx, TermIndex termIndex) throws IOException {
+  private void handleRequest(RequestContext ctx, ExecutionContext exeCtx) throws IOException {
     OMRequestBase omClientRequest = ctx.getRequestBase();
     try {
-      OMClientResponse omClientResponse = omClientRequest.process(ozoneManager, termIndex);
+      OMClientResponse omClientResponse = omClientRequest.process(ozoneManager, exeCtx);
       ctx.setResponse(omClientResponse.getOMResponse());
       if (!omClientResponse.getOMResponse().getSuccess()) {
         omClientRequest.changeRecorder().clear();
-        OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+        OMAuditLogger.log(omClientRequest.getAuditBuilder(), exeCtx);
       } else {
         if (omClientRequest.changeRecorder().getTableRecordsMap().isEmpty()) {
           // if no update, audit log the response
-          OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+          OMAuditLogger.log(omClientRequest.getAuditBuilder(), exeCtx);
         }
       }
     } catch (Throwable th) {
       omClientRequest.changeRecorder().clear();
-      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, termIndex, th);
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, exeCtx, th);
       throw th;
     }
   }
@@ -211,7 +212,7 @@ public class LeaderRequestExecutor {
       recorder.serializeBucketQuota(bucketChangeMap);
       controlReq.addRequestInfo(OzoneManagerProtocolProtos.ClientRequestInfo.newBuilder()
           .setUuidClientId(ctx.getUuidClientId()).setCallId(ctx.getCallId())
-          .setResponse(ctx.getResponse()).setIndex(ctx.getIndex().getIndex()).build());
+          .setResponse(ctx.getResponse()).setIndex(ctx.getExecutionContext().getIndex()).build());
       sendList.add(ctx);
     }
     if (!sendList.isEmpty()) {
@@ -261,7 +262,7 @@ public class LeaderRequestExecutor {
     RequestContext lastReqCtx = sendList.get(sendList.size() - 1);
     OMRequest reqBatch = ctx.getRequest();
     try {
-      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getIndex());
+      OMResponse dbUpdateRsp = sendDbUpdateRequest(reqBatch, lastReqCtx.getExecutionContext());
       if (!dbUpdateRsp.getSuccess()) {
         throw new OMException(dbUpdateRsp.getMessage(),
             OMException.ResultCodes.values()[dbUpdateRsp.getStatus().ordinal()]);
@@ -273,11 +274,11 @@ public class LeaderRequestExecutor {
     }
   }
 
-  private OMResponse sendDbUpdateRequest(OMRequest nextRequest, TermIndex termIndex) throws Exception {
+  private OMResponse sendDbUpdateRequest(OMRequest nextRequest, ExecutionContext executionContext) throws Exception {
     if (!ozoneManager.isRatisEnabled()) {
-      return new PostExecutor(ozoneManager, false).runCommandNonRatis(nextRequest, termIndex);
+      return new PostExecutor(ozoneManager, false).runCommandNonRatis(nextRequest, executionContext);
     }
-    return ozoneManager.getOmRatisServer().submitRequest(nextRequest, clientId, termIndex.getIndex());
+    return ozoneManager.getOmRatisServer().submitRequest(nextRequest, clientId, executionContext.getIndex());
   }
   private OMResponse createErrorResponse(OMRequest omRequest, IOException exception) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
@@ -297,14 +298,14 @@ public class LeaderRequestExecutor {
 
       if (th != null) {
         OMAuditLogger.log(ctx.getRequestBase().getAuditBuilder(), ctx.getRequestBase(), ozoneManager,
-            ctx.getIndex(), th);
+            ctx.getExecutionContext(), th);
         if (th instanceof IOException) {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
         } else {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
         }
       } else {
-        OMAuditLogger.log(ctx.getRequestBase().getAuditBuilder(), ctx.getIndex());
+        OMAuditLogger.log(ctx.getRequestBase().getAuditBuilder(), ctx.getExecutionContext());
         OMResponse newRsp = ctx.getResponse();
         if (leaderOMNodeId != null) {
           newRsp = OMResponse.newBuilder(newRsp).setLeaderOMNodeId(leaderOMNodeId).build();

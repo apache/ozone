@@ -17,10 +17,10 @@
 package org.apache.hadoop.ozone.om.ratis.execution;
 
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * request processing information.
@@ -29,10 +29,10 @@ public final class RequestContext {
   private OMRequest request;
   private OMRequestBase requestBase;
   private OMResponse response;
-  private TermIndex index;
   private CompletableFuture<OMResponse> future;
   private String uuidClientId;
   private long callId;
+  private ExecutionContext executionContext;
 
   public RequestContext() {
   }
@@ -51,14 +51,6 @@ public final class RequestContext {
 
   public void setResponse(OMResponse response) {
     this.response = response;
-  }
-
-  public TermIndex getIndex() {
-    return index;
-  }
-
-  public void setIndex(TermIndex index) {
-    this.index = index;
   }
 
   public CompletableFuture<OMResponse> getFuture() {
@@ -90,5 +82,13 @@ public final class RequestContext {
 
   public long getCallId() {
     return callId;
+  }
+
+  public ExecutionContext getExecutionContext() {
+    return executionContext;
+  }
+
+  public void setExecutionContext(ExecutionContext executionContext) {
+    this.executionContext = executionContext;
   }
 }

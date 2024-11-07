@@ -66,7 +66,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,8 +144,8 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) throws IOException {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {
+    final long trxnLogIndex = exeCtx.getIndex();
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
     KeyArgs commitKeyArgs = commitKeyRequest.getKeyArgs();
 
