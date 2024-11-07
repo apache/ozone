@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -269,7 +270,7 @@ public class TestKeyValueHandler {
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
-      ContainerSet cset = new ContainerSet(1000);
+      ContainerSet cset = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -355,7 +356,7 @@ public class TestKeyValueHandler {
       final String clusterId = UUID.randomUUID().toString();
       final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet(1000);
+      final ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
       final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)

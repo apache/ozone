@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -133,7 +134,7 @@ public class TestUpgradeManager {
           return volumes.get(ii);
         });
 
-    containerSet = new ContainerSet(1000);
+    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     blockManager = new BlockManagerImpl(CONF);
     chunkManager = new FilePerBlockStrategy(true, blockManager, null);

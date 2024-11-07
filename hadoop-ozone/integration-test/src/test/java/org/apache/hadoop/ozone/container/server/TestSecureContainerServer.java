@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
@@ -173,7 +174,7 @@ public class TestSecureContainerServer {
 
   private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
@@ -219,7 +220,7 @@ public class TestSecureContainerServer {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000), Maps.newHashMap()),
         caClient, null);
   }
 

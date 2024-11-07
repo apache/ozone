@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.base.Preconditions;
@@ -110,7 +111,7 @@ public class BlockManagerImpl implements BlockManager {
 
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -233,7 +234,7 @@ public class BlockManagerImpl implements BlockManager {
 
     kvContainer.removeFromPendingPutBlockCache(localID);
 
-    try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(),
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(kvContainer.getContainerData(),
         config)) {
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -250,7 +251,7 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  private void mergeLastChunkForBlockFinalization(BlockID blockId, DBHandle db,
+  private void mergeLastChunkForBlockFinalization(BlockID blockId, DBHandle<DatanodeStore> db,
                          KeyValueContainer kvContainer, BatchOperation batch,
                          long localID) throws IOException {
     // if the chunk list of the block to be finalized was written incremental,
@@ -270,7 +271,7 @@ public class BlockManagerImpl implements BlockManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
     long bcsId = blockID.getBlockCommitSequenceId();
-    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -290,7 +291,7 @@ public class BlockManagerImpl implements BlockManager {
       throws IOException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -343,7 +344,7 @@ public class BlockManagerImpl implements BlockManager {
       List<BlockData> result = null;
       KeyValueContainerData cData =
           (KeyValueContainerData) container.getContainerData();
-      try (DBHandle db = BlockUtils.getDB(cData, config)) {
+      try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
         String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
             : cData.getBlockKey(startLocalID);
@@ -369,7 +370,7 @@ public class BlockManagerImpl implements BlockManager {
     BlockUtils.shutdownCache(config);
   }
 
-  private BlockData getBlockByID(DBHandle db, BlockID blockID,
+  private BlockData getBlockByID(DBHandle<DatanodeStore> db, BlockID blockID,
       KeyValueContainerData containerData) throws IOException {
     String blockKey = containerData.getBlockKey(blockID.getLocalID());
     return db.getStore().getBlockByID(blockID, blockKey);

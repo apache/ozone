@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -68,7 +69,7 @@ public class TestContainerSet {
   public void testAddGetRemoveContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     long containerId = 100L;
     ContainerProtos.ContainerDataProto.State state = ContainerProtos
         .ContainerDataProto.State.CLOSED;
@@ -157,7 +158,7 @@ public class TestContainerSet {
     HddsVolume vol2 = mock(HddsVolume.class);
     when(vol2.getStorageID()).thenReturn("uuid-2");
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     for (int i = 0; i < 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           layout,
@@ -200,7 +201,7 @@ public class TestContainerSet {
     HddsVolume vol = mock(HddsVolume.class);
     when(vol.getStorageID()).thenReturn("uuid-1");
     Random random = new Random();
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     int containerCount = 50;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
@@ -298,7 +299,7 @@ public class TestContainerSet {
   }
 
   private ContainerSet createContainerSet() throws StorageContainerException {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           layoutVersion,

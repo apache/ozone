@@ -128,7 +128,7 @@ public class ContainerImporter {
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         Container container = controller.importContainer(
             containerData, input, packer);
-        containerSet.addContainer(container);
+        containerSet.addContainer(container, true);
       }
     } finally {
       importContainerProgress.remove(containerID);

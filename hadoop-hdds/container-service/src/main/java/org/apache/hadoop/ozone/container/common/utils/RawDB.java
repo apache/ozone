@@ -26,7 +26,7 @@ import java.io.IOException;
  * Just a wrapper for DatanodeStore.
  * This is for container schema v3 which has one rocksdb instance per disk.
  */
-public class RawDB extends DBHandle {
+public class RawDB extends DBHandle<DatanodeStore> {
 
   public RawDB(DatanodeStore store, String containerDBPath) {
     super(store, containerDBPath);

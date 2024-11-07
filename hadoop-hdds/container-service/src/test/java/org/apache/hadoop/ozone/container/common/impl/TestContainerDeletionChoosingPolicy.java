@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -85,7 +86,7 @@ public class TestContainerDeletionChoosingPolicy {
         RandomContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet(1000);
+    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
@@ -148,7 +149,7 @@ public class TestContainerDeletionChoosingPolicy {
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet(1000);
+    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     int numContainers = 10;
     Random random = new Random();

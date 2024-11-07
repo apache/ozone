@@ -17,22 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
@@ -40,30 +34,9 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DatanodeStore extends Closeable {
+public interface DatanodeStore extends AbstractStore {
   String NO_SUCH_BLOCK_ERR_MSG =
           "Unable to find the block.";
-
-  /**
-   * Start datanode manager.
-   *
-   * @param configuration - Configuration
-   * @throws IOException - Unable to start datanode store.
-   */
-  void start(ConfigurationSource configuration) throws IOException;
-
-  /**
-   * Stop datanode manager.
-   */
-  void stop() throws Exception;
-
-  /**
-   * Get datanode store.
-   *
-   * @return datanode store.
-   */
-  @VisibleForTesting
-  DBStore getStore();
 
   /**
    * A Table that keeps the block data.
@@ -100,17 +73,6 @@ public interface DatanodeStore extends Closeable {
    */
   Table<String, BlockData> getLastChunkInfoTable();
 
-  /**
-   * Helper to create and write batch transactions.
-   */
-  BatchOperationHandler getBatchHandler();
-
-  void flushLog(boolean sync) throws IOException;
-
-  void flushDB() throws IOException;
-
-  void compactDB() throws IOException;
-
   BlockIterator<BlockData> getBlockIterator(long containerID)
       throws IOException;
 
@@ -119,15 +81,6 @@ public interface DatanodeStore extends Closeable {
 
   BlockIterator<Long> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException;
-
-  /**
-   * Returns if the underlying DB is closed. This call is thread safe.
-   * @return true if the DB is closed.
-   */
-  boolean isClosed();
-
-  default void compactionIfNeeded() throws Exception {
-  }
 
   default BlockData getBlockByID(BlockID blockID,
       String blockKey) throws IOException {

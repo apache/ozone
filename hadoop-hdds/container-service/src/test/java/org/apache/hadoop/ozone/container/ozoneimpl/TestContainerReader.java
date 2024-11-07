@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.FileUtils;
@@ -104,7 +106,7 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
     volumeSet = mock(MutableVolumeSet.class);
-    containerSet = new ContainerSet(1000);
+    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -152,7 +154,7 @@ public class TestContainerReader {
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
       boolean setMetaData, List<Long> blockNames, int count) throws Exception {
     KeyValueContainerData cData = keyValueContainer.getContainerData();
-    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < count; i++) {
         Table<String, BlockData> blockDataTable =
@@ -183,7 +185,7 @@ public class TestContainerReader {
     long containerId = keyValueContainer.getContainerData().getContainerID();
     KeyValueContainerData cData = keyValueContainer.getContainerData();
     List<Long> blkNames = new ArrayList<>();
-    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < blockCount; i++) {
         // Creating BlockData
@@ -268,7 +270,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(1000);
+    ContainerSet containerSet1 = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
@@ -318,7 +320,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(1000);
+    ContainerSet containerSet1 = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDirDbDelete")).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
@@ -530,7 +532,7 @@ public class TestContainerReader {
 
   private void setBlockCommitSequence(KeyValueContainerData cData, long val)
       throws IOException {
-    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(cData, conf)) {
       metadataStore.getStore().getMetadataTable()
           .put(cData.getBcsIdKey(), val);
       metadataStore.getStore().flushDB();
@@ -575,7 +577,7 @@ public class TestContainerReader {
 
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // verify if newly added container is not present as added
-      try (DBHandle dbHandle = BlockUtils.getDB(
+      try (DBHandle<DatanodeStore> dbHandle = BlockUtils.getDB(
           kvContainer.getContainerData(), conf)) {
         DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
             dbHandle.getStore();
@@ -587,7 +589,7 @@ public class TestContainerReader {
 
   private long addDbEntry(KeyValueContainerData containerData)
       throws Exception {
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+    try (DBHandle<DatanodeStore> dbHandle = BlockUtils.getDB(containerData, conf)) {
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           dbHandle.getStore();
       Table<String, Long> metadataTable = store.getMetadataTable();

@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -211,7 +212,7 @@ public class TestBlockDeletingService {
       ChunkBuffer buffer, ChunkManager chunkManager,
       KeyValueContainer container) {
     BlockID blockID = null;
-    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> metadata = BlockUtils.getDB(data, conf)) {
       for (int j = 0; j < numOfBlocksPerContainer; j++) {
         blockID = ContainerTestHelper.getTestBlockID(containerID);
         String deleteStateName = data.getDeletingBlockKey(
@@ -246,7 +247,7 @@ public class TestBlockDeletingService {
       putChunksInBlock(numOfChunksPerBlock, i, chunks, buffer, chunkManager,
           container, blockID);
       kd.setChunks(chunks);
-      try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
+      try (DBHandle<DatanodeStore> metadata = BlockUtils.getDB(data, conf)) {
         String blockKey = data.getBlockKey(blockID.getLocalID());
         metadata.getStore().getBlockDataTable().put(blockKey, kd);
       } catch (IOException exception) {
@@ -269,7 +270,7 @@ public class TestBlockDeletingService {
 
   private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
       int txnID, long containerID) {
-    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> metadata = BlockUtils.getDB(data, conf)) {
       StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               .newBuilder().setTxID(txnID).setContainerID(containerID)
@@ -331,7 +332,7 @@ public class TestBlockDeletingService {
       KeyValueContainer container, int numOfBlocksPerContainer,
       int numOfChunksPerBlock) {
     long chunkLength = 100;
-    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> metadata = BlockUtils.getDB(data, conf)) {
       container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
@@ -362,7 +363,7 @@ public class TestBlockDeletingService {
    * Get under deletion blocks count from DB,
    * note this info is parsed from container.db.
    */
-  private int getUnderDeletionBlocksCount(DBHandle meta,
+  private int getUnderDeletionBlocksCount(DBHandle<DatanodeStore> meta,
       KeyValueContainerData data) throws IOException {
     if (data.hasSchema(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
@@ -429,7 +430,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(blockDeleteLimit);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     // Create one container with no actual pending delete blocks, but an
     // incorrect metadata value indicating it has enough pending deletes to
@@ -437,7 +438,7 @@ public class TestBlockDeletingService {
     KeyValueContainerData incorrectData =
         createToDeleteBlocks(containerSet,
         0, 1);
-    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(incorrectData, conf)) {
       // Check pre-create state.
       assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
@@ -460,7 +461,7 @@ public class TestBlockDeletingService {
     // Check its metadata was set up correctly.
     assertEquals(correctNumBlocksToDelete,
         correctData.getNumPendingDeletionBlocks());
-    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(correctData, conf)) {
       assertEquals(correctNumBlocksToDelete,
           getUnderDeletionBlocksCount(db, correctData));
       assertEquals(correctNumBlocksToDelete,
@@ -488,7 +489,7 @@ public class TestBlockDeletingService {
     // Pending delete block count in the incorrect container should be fixed
     // and reset to 0.
     assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
-    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(incorrectData, conf)) {
       assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
       assertEquals(0, db.getStore().getMetadataTable()
@@ -497,7 +498,7 @@ public class TestBlockDeletingService {
     // Correct container should not have been processed.
     assertEquals(correctNumBlocksToDelete,
         correctData.getNumPendingDeletionBlocks());
-    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(correctData, conf)) {
       assertEquals(correctNumBlocksToDelete,
           getUnderDeletionBlocksCount(db, correctData));
       assertEquals(correctNumBlocksToDelete,
@@ -512,7 +513,7 @@ public class TestBlockDeletingService {
     // The incorrect container should remain in the same state after being
     // fixed.
     assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
-    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(incorrectData, conf)) {
       assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
       assertEquals(0, db.getStore().getMetadataTable()
@@ -521,7 +522,7 @@ public class TestBlockDeletingService {
     // The correct container should have been processed this run and had its
     // blocks deleted.
     assertEquals(0, correctData.getNumPendingDeletionBlocks());
-    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(correctData, conf)) {
       assertEquals(0, getUnderDeletionBlocksCount(db,
           correctData));
       assertEquals(0, db.getStore().getMetadataTable()
@@ -537,7 +538,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -558,7 +559,7 @@ public class TestBlockDeletingService {
     KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
-    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> meta = BlockUtils.getDB(data, conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       assertBlockDataTableRecordCount(3, meta, filter, data.getContainerID());
       // NOTE: this test assumes that all the container is KetValueContainer and
@@ -663,7 +664,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     createToDeleteBlocks(containerSet, numOfContainers, numOfBlocksPerContainer,
         numOfChunksPerBlock);
@@ -694,7 +695,7 @@ public class TestBlockDeletingService {
     List<Long> unrecordedBlockIds = new ArrayList<>();
     Set<File> unrecordedChunks = new HashSet<>();
 
-    try (DBHandle meta = BlockUtils.getDB(ctr1, conf)) {
+    try (DBHandle<DatanodeStore> meta = BlockUtils.getDB(ctr1, conf)) {
       // create unrecorded blocks in a new txn and update metadata,
       // service shall first choose the top pendingDeletion container
       // if using the TopNOrderedContainerDeletionChoosingPolicy
@@ -773,7 +774,7 @@ public class TestBlockDeletingService {
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 10);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     // Create 1 container with 100 blocks
     createToDeleteBlocks(containerSet, 1, 100, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -804,7 +805,7 @@ public class TestBlockDeletingService {
     blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -846,7 +847,7 @@ public class TestBlockDeletingService {
     KeyValueContainer container =
         (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
-    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
       GenericTestUtils.waitFor(() -> {
         try {
@@ -906,7 +907,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(1);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     int containerCount = 2;
     int chunksPerBlock = 10;
@@ -966,7 +967,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletingMaxLockHoldingTime(Duration.ofMillis(-1));
     dnConf.setBlockDeletionLimit(3);
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
 
     int containerCount = 1;
     int chunksPerBlock = 10;
@@ -1030,7 +1031,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(10);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -1099,7 +1100,7 @@ public class TestBlockDeletingService {
   private void assertBlockDataTableRecordCount(int expectedCount,
       KeyValueContainerData containerData, KeyPrefixFilter filter)
       throws IOException {
-    try (DBHandle handle = BlockUtils.getDB(containerData, conf)) {
+    try (DBHandle<DatanodeStore> handle = BlockUtils.getDB(containerData, conf)) {
       long containerID = containerData.getContainerID();
       assertBlockDataTableRecordCount(expectedCount, handle, filter,
           containerID);
@@ -1116,7 +1117,7 @@ public class TestBlockDeletingService {
    * @throws IOException
    */
   private void assertBlockDataTableRecordCount(int expectedCount,
-      DBHandle handle, KeyPrefixFilter filter, long containerID)
+      DBHandle<DatanodeStore> handle, KeyPrefixFilter filter, long containerID)
       throws IOException {
     long count = 0L;
     try (BlockIterator<BlockData> iterator = handle.getStore().

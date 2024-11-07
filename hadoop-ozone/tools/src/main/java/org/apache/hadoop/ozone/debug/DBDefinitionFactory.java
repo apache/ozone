@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.MasterVolumeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
@@ -56,7 +57,8 @@ public final class DBDefinitionFactory {
 
   static {
     final Map<String, DBDefinition> map = new HashMap<>();
-    Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get())
+    Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get(),
+                  MasterVolumeDBDefinition.get())
         .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
     DB_MAP = Collections.unmodifiableMap(map);
   }

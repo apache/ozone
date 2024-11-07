@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.AbstractStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +36,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * from caller stack. When JDK9 StackWalker is available, we can switch to
  * StackWalker instead of new Exception().printStackTrace().
  */
-public class ReferenceCountedDB extends DBHandle {
+public class ReferenceCountedDB<STORE extends AbstractStore> extends DBHandle<STORE> {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReferenceCountedDB.class);
   private final AtomicInteger referenceCount;
 
-  public ReferenceCountedDB(DatanodeStore store, String containerDBPath) {
+  public ReferenceCountedDB(STORE store, String containerDBPath) {
     super(store, containerDBPath);
     this.referenceCount = new AtomicInteger(0);
   }

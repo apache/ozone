@@ -88,6 +88,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -1333,7 +1334,7 @@ public class KeyValueHandler extends Handler {
   private boolean logBlocksIfNonZero(Container container)
       throws IOException {
     boolean nonZero = false;
-    try (DBHandle dbHandle
+    try (DBHandle<DatanodeStore> dbHandle
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {

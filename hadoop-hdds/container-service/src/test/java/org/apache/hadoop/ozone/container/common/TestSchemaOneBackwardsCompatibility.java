@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -152,7 +153,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testDirectTableIterationDisabled(String schemaVersion)
       throws Exception {
     setup(schemaVersion);
-    try (DBHandle refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       DatanodeStore store = refCountedDB.getStore();
 
       assertTableIteratorUnsupported(store.getMetadataTable());
@@ -178,7 +179,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testBlockIteration(String schemaVersion) throws Exception {
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       assertEquals(TestDB.NUM_DELETED_BLOCKS,
           countDeletedBlocks(refCountedDB, cData));
 
@@ -245,7 +246,7 @@ public class TestSchemaOneBackwardsCompatibility {
     // This simulates them not being there to start with.
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       metadataTable.delete(cData.getBlockCountKey());
@@ -311,7 +312,7 @@ public class TestSchemaOneBackwardsCompatibility {
             TestDB.KEY_COUNT - numBlocksToDelete;
 
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       // Test results via block iteration.
 
       assertEquals(expectedDeletingBlocks,
@@ -358,7 +359,7 @@ public class TestSchemaOneBackwardsCompatibility {
             metrics, c -> {
         });
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               refCountedDB.getStore().getDeletedBlocksTable()
@@ -407,7 +408,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadBlockData(String schemaVersion) throws Exception {
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       Table<String, BlockData> blockDataTable =
           refCountedDB.getStore().getBlockDataTable();
 
@@ -453,7 +454,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadDeletingBlockData(String schemaVersion) throws Exception {
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       Table<String, BlockData> blockDataTable =
           refCountedDB.getStore().getBlockDataTable();
 
@@ -508,7 +509,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadMetadata(String schemaVersion) throws Exception {
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       Table<String, Long> metadataTable =
           refCountedDB.getStore().getMetadataTable();
 
@@ -527,7 +528,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadDeletedBlocks(String schemaVersion) throws Exception {
     setup(schemaVersion);
     KeyValueContainerData cData = newKvData();
-    try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> refCountedDB = BlockUtils.getDB(cData, conf)) {
       Table<String, ChunkInfoList> deletedBlocksTable =
           refCountedDB.getStore().getDeletedBlocksTable();
 
@@ -571,7 +572,7 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   private ContainerSet makeContainerSet() throws Exception {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     KeyValueContainer container = new KeyValueContainer(newKvData(), conf);
     containerSet.addContainer(container);
 
@@ -634,7 +635,7 @@ public class TestSchemaOneBackwardsCompatibility {
             kvData.getNumPendingDeletionBlocks());
   }
 
-  private int countDeletedBlocks(DBHandle refCountedDB,
+  private int countDeletedBlocks(DBHandle<DatanodeStore> refCountedDB,
       KeyValueContainerData cData)
           throws IOException {
     return refCountedDB.getStore().getDeletedBlocksTable()
@@ -643,7 +644,7 @@ public class TestSchemaOneBackwardsCompatibility {
                 cData.getUnprefixedKeyFilter()).size();
   }
 
-  private int countDeletingBlocks(DBHandle refCountedDB,
+  private int countDeletingBlocks(DBHandle<DatanodeStore> refCountedDB,
       KeyValueContainerData cData)
           throws IOException {
     return refCountedDB.getStore().getBlockDataTable()
@@ -652,7 +653,7 @@ public class TestSchemaOneBackwardsCompatibility {
                 cData.getDeletingBlockKeyFilter()).size();
   }
 
-  private int countUnprefixedBlocks(DBHandle refCountedDB,
+  private int countUnprefixedBlocks(DBHandle<DatanodeStore> refCountedDB,
       KeyValueContainerData cData)
           throws IOException {
     return refCountedDB.getStore().getBlockDataTable()

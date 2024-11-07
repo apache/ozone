@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
@@ -549,7 +550,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return;
     }
     int newDeletionBlocks = 0;
-    try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
+    try (DBHandle<DatanodeStore> containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
           containerDB.getStore().getBlockDataTable();
       Table<String, ChunkInfoList> deletedBlocksTable =
@@ -607,7 +608,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   private void updateMetaData(KeyValueContainerData containerData,
       DeletedBlocksTransaction delTX, int newDeletionBlocks,
-      DBHandle containerDB, BatchOperation batchOperation)
+      DBHandle<DatanodeStore> containerDB, BatchOperation batchOperation)
       throws IOException {
     if (newDeletionBlocks > 0) {
       // Finally commit the DB counters.

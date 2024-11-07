@@ -23,12 +23,16 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,10 +69,14 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListMap<>();
   private Clock clock;
   private long recoveringTimeout;
+  private final Table<Long, State> containerIdsTable;
+  private final boolean readOnly;
 
-  public ContainerSet(long recoveringTimeout) {
+  public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout) {
     this.clock = Clock.system(ZoneOffset.UTC);
+    this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
+    this.readOnly = containerIdsTable == null;
   }
 
   public long getCurrentTime() {
@@ -85,22 +93,41 @@ public class ContainerSet implements Iterable<Container<?>> {
     this.recoveringTimeout = recoveringTimeout;
   }
 
+  public boolean addContainer(Container<?> container) throws StorageContainerException {
+    return addContainer(container, false);
+  }
+
   /**
    * Add Container to container map.
    * @param container container to be added
    * @return If container is added to containerMap returns true, otherwise
    * false
    */
-  public boolean addContainer(Container<?> container) throws
+  public boolean addContainer(Container<?> container, boolean overwriteMissingContainers) throws
       StorageContainerException {
+    Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkNotNull(container, "container cannot be null");
 
     long containerId = container.getContainerData().getContainerID();
+    State containerState = container.getContainerData().getState();
+    if (!overwriteMissingContainers && missingContainerSet.contains(containerId)
+        && containerState != State.RECOVERING) {
+      throw new StorageContainerException(String.format("Container with container Id %d is missing in the DN " +
+          "and creation of containers with state %s is not allowed. Only recreation of container in RECOVERING state " +
+          "is allowed.", containerId, containerState.toString()), ContainerProtos.Result.CONTAINER_MISSING);
+
+    }
     if (containerMap.putIfAbsent(containerId, container) == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
+      try {
+        containerIdsTable.put(containerId, containerState);
+      } catch (IOException e) {
+        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
+      }
+      missingContainerSet.remove(containerId);
       // wish we could have done this from ContainerData.setState
       container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
@@ -122,9 +149,12 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return Container
    */
   public Container<?> getContainer(long containerId) {
-    Preconditions.checkState(containerId >= 0,
-        "Container Id cannot be negative.");
+    Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
     return containerMap.get(containerId);
+  }
+
+  public boolean removeContainer(long containerId) {
+    return removeContainer(containerId, false);
   }
 
   /**
@@ -133,10 +163,16 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is removed from containerMap returns true, otherwise
    * false
    */
-  public boolean removeContainer(long containerId) {
+  public boolean removeContainer(long containerId, boolean markMissing) {
+    Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
-    Container<?> removed = containerMap.remove(containerId);
+    Container<?> removed = containerMap.compute(containerId, (cid, value) -> {
+      if (markMissing) {
+        missingContainerSet.add(containerId);
+      }
+      return value;
+    });
     if (removed == null) {
       LOG.debug("Container with containerId {} is not present in " +
           "containerMap", containerId);
@@ -155,6 +191,8 @@ public class ContainerSet implements Iterable<Container<?>> {
    * otherwise false.
    */
   public boolean removeRecoveringContainer(long containerId) {
+    Preconditions.checkState(!readOnly,
+        "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     //it might take a little long time to iterate all the entries
@@ -196,7 +234,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     containerMap.values().forEach(c -> {
       ContainerData data = c.getContainerData();
       if (data.getVolume().isFailed()) {
-        removeContainer(data.getContainerID());
+        removeContainer(data.getContainerID(), true);
         LOG.debug("Removing Container {} as the Volume {} " +
               "has failed", data.getContainerID(), data.getVolume());
         failedVolume.set(true);
@@ -345,6 +383,10 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public Set<Long> getMissingContainerSet() {
     return missingContainerSet;
+  }
+
+  public Table<Long, State> getContainerIdsTable() {
+    return containerIdsTable;
   }
 
   /**

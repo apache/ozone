@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -553,7 +554,7 @@ public class TestDeleteContainerHandler {
 
 
   private void clearBlocksTable(Container container) throws IOException {
-    try (DBHandle dbHandle
+    try (DBHandle<DatanodeStore> dbHandle
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
@@ -565,7 +566,7 @@ public class TestDeleteContainerHandler {
     }
   }
 
-  private void clearTable(DBHandle dbHandle, Table<String, BlockData> table, Container container)
+  private void clearTable(DBHandle<DatanodeStore> dbHandle, Table<String, BlockData> table, Container container)
       throws IOException {
     List<? extends Table.KeyValue<String, BlockData>>
         blocks = table.getRangeKVs(

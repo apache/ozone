@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -296,7 +297,7 @@ public class KeyValueContainerData extends ContainerData {
     return finalizedBlockSet.contains(localID);
   }
 
-  public void clearFinalizedBlock(DBHandle db) throws IOException {
+  public void clearFinalizedBlock(DBHandle<DatanodeStore> db) throws IOException {
     if (!finalizedBlockSet.isEmpty()) {
       // delete from db and clear memory
       // Should never fail.
@@ -353,7 +354,7 @@ public class KeyValueContainerData extends ContainerData {
    * @param releasedBytes - Number of bytes released.
    * @throws IOException
    */
-  public void updateAndCommitDBCounters(DBHandle db,
+  public void updateAndCommitDBCounters(DBHandle<DatanodeStore> db,
       BatchOperation batchOperation, int deletedBlockCount,
       long releasedBytes) throws IOException {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
@@ -370,7 +371,7 @@ public class KeyValueContainerData extends ContainerData {
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
 
-  public void resetPendingDeleteBlockCount(DBHandle db) throws IOException {
+  public void resetPendingDeleteBlockCount(DBHandle<DatanodeStore> db) throws IOException {
     // Reset the in memory metadata.
     numPendingDeletionBlocks.set(0);
     // Reset the metadata on disk.

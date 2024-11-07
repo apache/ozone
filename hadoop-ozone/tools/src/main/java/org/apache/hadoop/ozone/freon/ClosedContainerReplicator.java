@@ -32,8 +32,10 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -82,66 +84,75 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
+  private ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStoreReferenceCountedDB;
 
   private List<ReplicationTask> replicationTasks;
 
   @Override
   public Void call() throws Exception {
 
-    OzoneConfiguration conf = createOzoneConfiguration();
+    try {
+      OzoneConfiguration conf = createOzoneConfiguration();
 
-    final Collection<String> datanodeStorageDirs =
-        HddsServerUtil.getDatanodeStorageDirs(conf);
+      final Collection<String> datanodeStorageDirs =
+          HddsServerUtil.getDatanodeStorageDirs(conf);
 
-    for (String dir : datanodeStorageDirs) {
-      checkDestinationDirectory(dir);
-    }
+      for (String dir : datanodeStorageDirs) {
+        checkDestinationDirectory(dir);
+      }
 
-    final ContainerOperationClient containerOperationClient =
-        new ContainerOperationClient(conf);
+      final ContainerOperationClient containerOperationClient =
+          new ContainerOperationClient(conf);
 
-    final List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
+      final List<ContainerInfo> containerInfos =
+          containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
 
-    //logic same as the download+import on the destination datanode
-    initializeReplicationSupervisor(conf, containerInfos.size() * 2);
+      //logic same as the download+import on the destination datanode
+      initializeReplicationSupervisor(conf, containerInfos.size() * 2);
 
-    replicationTasks = new ArrayList<>();
+      replicationTasks = new ArrayList<>();
 
-    for (ContainerInfo container : containerInfos) {
+      for (ContainerInfo container : containerInfos) {
 
-      final ContainerWithPipeline containerWithPipeline =
-          containerOperationClient
-              .getContainerWithPipeline(container.getContainerID());
+        final ContainerWithPipeline containerWithPipeline =
+            containerOperationClient
+                .getContainerWithPipeline(container.getContainerID());
 
-      if (container.getState() == LifeCycleState.CLOSED) {
+        if (container.getState() == LifeCycleState.CLOSED) {
 
-        final List<DatanodeDetails> datanodesWithContainer =
-            containerWithPipeline.getPipeline().getNodes();
+          final List<DatanodeDetails> datanodesWithContainer =
+              containerWithPipeline.getPipeline().getNodes();
 
-        final List<String> datanodeUUIDs =
-            datanodesWithContainer
-                .stream().map(DatanodeDetails::getUuidString)
-                .collect(Collectors.toList());
+          final List<String> datanodeUUIDs =
+              datanodesWithContainer
+                  .stream().map(DatanodeDetails::getUuidString)
+                  .collect(Collectors.toList());
 
-        //if datanode is specified, replicate only container if it has a
-        //replica.
-        if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
-          replicationTasks.add(new ReplicationTask(
-              ReplicateContainerCommand.fromSources(container.getContainerID(),
-                  datanodesWithContainer), replicator));
+          //if datanode is specified, replicate only container if it has a
+          //replica.
+          if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
+            replicationTasks.add(new ReplicationTask(
+                ReplicateContainerCommand.fromSources(container.getContainerID(),
+                    datanodesWithContainer), replicator));
+          }
         }
+
+      }
+
+      //important: override the max number of tasks.
+      setTestNo(replicationTasks.size());
+
+      init();
+
+      timer = getMetrics().timer("replicate-container");
+      runTests(this::replicateContainer);
+    } finally {
+      if (masterVolumeMetadataStoreReferenceCountedDB != null) {
+        masterVolumeMetadataStoreReferenceCountedDB.close();
+        masterVolumeMetadataStoreReferenceCountedDB.cleanup();
       }
 
     }
-
-    //important: override the max number of tasks.
-    setTestNo(replicationTasks.size());
-
-    init();
-
-    timer = getMetrics().timer("replicate-container");
-    runTests(this::replicateContainer);
     return null;
   }
 
@@ -173,8 +184,12 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-
-    ContainerSet containerSet = new ContainerSet(1000);
+    ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDS =
+        MasterVolumeMetadataStore.get(conf);
+    referenceCountedDS.incrementReference();
+    this.masterVolumeMetadataStoreReferenceCountedDB = referenceCountedDS;
+    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore()
+        .getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -743,7 +744,7 @@ public class TestBlockDeletion {
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
         KeyValueContainerData cData = (KeyValueContainerData) dnContainerSet
             .getContainer(blockID.getContainerID()).getContainerData();
-        try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
           assertNotNull(db.getStore().getBlockDataTable()
               .get(cData.getBlockKey(blockID.getLocalID())));
         }
@@ -759,7 +760,7 @@ public class TestBlockDeletion {
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
         KeyValueContainerData cData = (KeyValueContainerData) dnContainerSet
             .getContainer(blockID.getContainerID()).getContainerData();
-        try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
           Table<String, BlockData> blockDataTable =
               db.getStore().getBlockDataTable();
 

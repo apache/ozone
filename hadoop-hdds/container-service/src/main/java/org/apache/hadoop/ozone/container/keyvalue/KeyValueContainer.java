@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -366,7 +367,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean hasBlocks() throws IOException {
-    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, config)) {
       return !KeyValueContainerUtil.noBlocksInContainer(db.getStore(),
           containerData, bCheckChunksFilePath);
     }

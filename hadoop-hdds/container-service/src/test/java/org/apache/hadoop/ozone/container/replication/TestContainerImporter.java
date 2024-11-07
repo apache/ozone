@@ -34,6 +34,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -86,7 +87,7 @@ class TestContainerImporter {
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     // create containerImporter object
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 0);
     containerSet.addContainer(container);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -117,7 +118,7 @@ class TestContainerImporter {
           return container;
         });
     // create containerImporter object
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 0);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
@@ -156,7 +157,7 @@ class TestContainerImporter {
     doNothing().when(containerData).setChecksumTo0ByteArray();
     // create containerImporter object
     ContainerController controllerMock = mock(ContainerController.class);
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 0);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = spy(new ContainerImporter(conf,

@@ -455,7 +455,7 @@ public class TestKeyValueContainer {
   private void populate(KeyValueContainer container, long numberOfKeysToWrite)
       throws IOException {
     KeyValueContainerData cData = container.getContainerData();
-    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
+    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(cData, CONF)) {
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
 
@@ -486,7 +486,7 @@ public class TestKeyValueContainer {
                                     long numberOfKeysToWrite)
       throws IOException {
     KeyValueContainerData cData = container.getContainerData();
-    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
+    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(cData, CONF)) {
       // Just update metdata, and don't insert in block table
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
@@ -687,7 +687,7 @@ public class TestKeyValueContainer {
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
       long defaultCacheSize = OzoneConsts.GB;
       long cacheSize = Long.parseLong(store
@@ -742,7 +742,7 @@ public class TestKeyValueContainer {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile1;
-    try (DBHandle db1 =
+    try (DBHandle<DatanodeStore> db1 =
              BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
       assertInstanceOf(AbstractDatanodeStore.class, store1);
@@ -763,7 +763,7 @@ public class TestKeyValueContainer {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile2;
-    try (DBHandle db2 =
+    try (DBHandle<DatanodeStore> db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
       assertInstanceOf(AbstractDatanodeStore.class, store2);
@@ -1055,7 +1055,7 @@ public class TestKeyValueContainer {
     KeyValueContainer container = new KeyValueContainer(data, conf);
     container.create(volumeSet, volumeChoosingPolicy, scmId);
     long pendingDeleteBlockCount = 20;
-    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+    try (DBHandle<DatanodeStore> meta = BlockUtils.getDB(data, conf)) {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
       metadataTable.put(data.getPendingDeleteBlockCountKey(),
           pendingDeleteBlockCount);

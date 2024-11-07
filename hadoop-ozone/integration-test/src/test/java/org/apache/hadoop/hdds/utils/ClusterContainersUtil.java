@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +66,7 @@ public final class ClusterContainersUtil {
     // the container.
     KeyValueContainerData containerData =
         (KeyValueContainerData) container.getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf())) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, cluster.getConf())) {
       BlockID blockID = new BlockID(containerID, localID);
       String blockKey = containerData.getBlockKey(localID);
       BlockData blockData = db.getStore().getBlockByID(blockID, blockKey);

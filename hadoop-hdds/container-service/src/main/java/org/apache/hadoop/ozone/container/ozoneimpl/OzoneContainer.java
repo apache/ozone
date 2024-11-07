@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -51,12 +54,14 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -70,6 +75,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -128,6 +134,7 @@ public class OzoneContainer {
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
+  private final ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -143,9 +150,10 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
-      DatanodeDetails datanodeDetails, ConfigurationSource conf,
-      StateContext context, CertificateClient certClient,
-      SecretKeyVerifierClient secretKeyClient) throws IOException {
+                        DatanodeDetails datanodeDetails, ConfigurationSource conf,
+                        StateContext context, CertificateClient certClient,
+                        SecretKeyVerifierClient secretKeyClient,
+                        ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -178,12 +186,13 @@ public class OzoneContainer {
             TimeUnit.MINUTES);
       }
     }
-
     long recoveringContainerTimeout = config.getTimeDuration(
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-
-    containerSet = new ContainerSet(recoveringContainerTimeout);
+    this.masterVolumeMetadataStore = masterVolumeMetadataStore;
+    this.masterVolumeMetadataStore.incrementReference();
+    containerSet = new ContainerSet(masterVolumeMetadataStore.getStore().getContainerIdsTable(),
+        recoveringContainerTimeout);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -296,6 +305,14 @@ public class OzoneContainer {
     this(null, datanodeDetails, conf, context, null, null);
   }
 
+  public OzoneContainer(HddsDatanodeService hddsDatanodeService,
+                        DatanodeDetails datanodeDetails, ConfigurationSource conf,
+                        StateContext context, CertificateClient certClient,
+                        SecretKeyVerifierClient secretKeyClient) throws IOException {
+    this(hddsDatanodeService, datanodeDetails, conf, context, certClient, secretKeyClient,
+        MasterVolumeMetadataStore.get(conf));
+  }
+
   public GrpcTlsConfig getTlsClientConfig() {
     return tlsClientConfig;
   }
@@ -304,7 +321,7 @@ public class OzoneContainer {
    * Build's container map after volume format.
    */
   @VisibleForTesting
-  public void buildContainerSet() {
+  public void buildContainerSet() throws IOException {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
@@ -326,6 +343,14 @@ public class OzoneContainer {
       Thread thread = threadFactory.newThread(containerReader);
       thread.start();
       volumeThreads.add(thread);
+    }
+    try (TableIterator<Long, ? extends Table.KeyValue<Long, ContainerProtos.ContainerDataProto.State>> itr =
+             containerSet.getContainerIdsTable().iterator()) {
+      Map<Long, Long> containerIds = new HashMap<>();
+      while (itr.hasNext()) {
+        containerIds.put(itr.next().getKey(), 0L);
+      }
+      containerSet.buildMissingContainerSetAndValidate(containerIds);
     }
 
     try {
@@ -513,6 +538,10 @@ public class OzoneContainer {
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
+    if (this.masterVolumeMetadataStore != null) {
+      this.masterVolumeMetadataStore.decrementReference();
+      this.masterVolumeMetadataStore.cleanup();
+    }
   }
 
   public void handleVolumeFailures() {

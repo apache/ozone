@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -246,7 +247,7 @@ public class KeyValueContainerCheck {
     onDiskContainerData.setDbFile(dbFile);
 
     try {
-      try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+      try (DBHandle<DatanodeStore> db = BlockUtils.getDB(onDiskContainerData, checkConfig);
           BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
               onDiskContainerData.getContainerID(),
               onDiskContainerData.getUnprefixedKeyFilter())) {
@@ -312,7 +313,7 @@ public class KeyValueContainerCheck {
    * @return blockData in DB
    * @throws IOException
    */
-  private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
+  private BlockData getBlockDataFromDB(DBHandle<DatanodeStore> db, BlockData block)
       throws IOException {
     String blockKey =
         onDiskContainerData.getBlockKey(block.getBlockID().getLocalID());
@@ -329,7 +330,7 @@ public class KeyValueContainerCheck {
    * @return blockData in DB
    * @throws IOException
    */
-  private BlockData getBlockDataFromDBWithLock(DBHandle db, BlockData block)
+  private BlockData getBlockDataFromDBWithLock(DBHandle<DatanodeStore> db, BlockData block)
       throws IOException {
     container.readLock();
     try {

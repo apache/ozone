@@ -17,24 +17,24 @@
  */
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.AbstractStore;
 
 import java.io.Closeable;
 
 /**
  * DB handle abstract class.
  */
-public abstract class DBHandle implements Closeable {
+public abstract class DBHandle<STORE extends AbstractStore> implements Closeable {
 
-  private final DatanodeStore store;
+  private final STORE store;
   private final String containerDBPath;
 
-  public DBHandle(DatanodeStore store, String containerDBPath) {
+  public DBHandle(STORE store, String containerDBPath) {
     this.store = store;
     this.containerDBPath = containerDBPath;
   }
 
-  public DatanodeStore getStore() {
+  public STORE getStore() {
     return this.store;
   }
 
@@ -44,5 +44,13 @@ public abstract class DBHandle implements Closeable {
 
   public boolean cleanup() {
     return true;
+  }
+
+  @Override
+  public String toString() {
+    return "DBHandle{" +
+        "containerDBPath='" + containerDBPath + '\'' +
+        ", store=" + store +
+        '}';
   }
 }

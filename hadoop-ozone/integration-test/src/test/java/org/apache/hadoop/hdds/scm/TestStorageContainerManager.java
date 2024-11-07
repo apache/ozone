@@ -1043,7 +1043,7 @@ public class TestStorageContainerManager {
       OzoneConfiguration conf, Long containerID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
     KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
-    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
 
       List<? extends Table.KeyValue<String, BlockData>> kvs =
           db.getStore().getBlockDataTable()
@@ -1063,7 +1063,7 @@ public class TestStorageContainerManager {
       throws IOException {
     for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
       KeyValueContainerData cData = getContainerMetadata(cluster, entry.getKey());
-      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+      try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
         DatanodeStore ds = db.getStore();
         DatanodeStoreSchemaThreeImpl dnStoreImpl =
             (DatanodeStoreSchemaThreeImpl) ds;
