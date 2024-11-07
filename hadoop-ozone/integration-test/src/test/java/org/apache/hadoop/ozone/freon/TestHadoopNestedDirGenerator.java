@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestHadoopNestedDirGenerator {
   @TempDir
-  private Path path;
+  private java.nio.file.Path path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
