@@ -90,7 +90,6 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -624,7 +623,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateVolumeWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addMetadata("key1", "val1")
@@ -639,7 +638,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateBucketWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);

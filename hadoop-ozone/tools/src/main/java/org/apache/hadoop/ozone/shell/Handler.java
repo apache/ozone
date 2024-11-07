@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -64,12 +63,12 @@ public abstract class Handler implements Callable<Void> {
     return parent.createOzoneConfiguration();
   }
 
-  protected OzoneAddress getAddress() throws OzoneClientException {
+  protected OzoneAddress getAddress() throws IOException {
     return new OzoneAddress();
   }
 
   protected abstract void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException;
+      throws IOException;
 
   /**
    * Checks whether the current command should be executed or not.
@@ -102,7 +101,7 @@ public abstract class Handler implements Callable<Void> {
   }
 
   protected OzoneClient createClient(OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     return address.createClient(conf);
   }
 

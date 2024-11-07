@@ -64,12 +64,12 @@ public class OzoneAddress {
 
   private boolean isPrefix = false;
 
-  public OzoneAddress() throws OzoneClientException {
+  public OzoneAddress() throws IOException {
     this("o3:///");
   }
 
   public OzoneAddress(String address)
-      throws OzoneClientException {
+      throws IOException {
     if (address == null || address.equals("")) {
       address = OZONE_RPC_SCHEME + ":///";
     }
@@ -123,7 +123,7 @@ public class OzoneAddress {
   }
 
   public OzoneClient createClient(MutableConfigurationSource conf)
-      throws IOException, OzoneClientException {
+      throws IOException {
     OzoneClient client;
     String scheme = ozoneURI.getScheme();
     if (ozoneURI.getScheme() == null || scheme.isEmpty()) {
@@ -185,13 +185,12 @@ public class OzoneAddress {
    * @param omServiceID
    * @return OzoneClient
    * @throws IOException
-   * @throws OzoneClientException
    */
   public OzoneClient createClientForS3Commands(
       OzoneConfiguration conf,
       String omServiceID
   )
-      throws IOException, OzoneClientException {
+      throws IOException {
     Collection<String> serviceIds = conf.
         getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
     if (omServiceID != null) {
@@ -227,8 +226,7 @@ public class OzoneAddress {
    * @param uri - UriString
    * @return URI
    */
-  protected URI parseURI(String uri)
-      throws OzoneClientException {
+  protected URI parseURI(String uri) throws IOException {
     if ((uri == null) || uri.isEmpty()) {
       throw new OzoneClientException(
           "Ozone URI is needed to execute this command.");
@@ -338,7 +336,7 @@ public class OzoneAddress {
     return isPrefix;
   }
 
-  public void ensureBucketAddress() throws OzoneClientException {
+  public void ensureBucketAddress() throws IOException {
     if (keyName.length() > 0) {
       throw new OzoneClientException(
           "Invalid bucket name. Delimiters (/) not allowed in bucket name");
@@ -353,7 +351,7 @@ public class OzoneAddress {
 
   // Ensure prefix address with a prefix flag
   // Allow CLI to differentiate key and prefix address
-  public void ensurePrefixAddress() throws OzoneClientException {
+  public void ensurePrefixAddress() throws IOException {
     if (keyName.length() == 0) {
       throw new OzoneClientException(
           "prefix name is missing.");
@@ -367,7 +365,7 @@ public class OzoneAddress {
     isPrefix = true;
   }
 
-  public void ensureKeyAddress() throws OzoneClientException {
+  public void ensureKeyAddress() throws IOException {
     if (keyName.length() == 0) {
       throw new OzoneClientException(
           "Key name is missing.");
@@ -387,10 +385,10 @@ public class OzoneAddress {
    * If the keyName can't be considered
    * a valid snapshot, an exception is thrown.
    *
-   * @throws OzoneClientException
+   * @throws IOException
    */
   public void ensureSnapshotAddress()
-      throws OzoneClientException {
+      throws IOException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         snapshotNameWithIndicator = keyName;
@@ -409,7 +407,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureVolumeAddress() throws OzoneClientException {
+  public void ensureVolumeAddress() throws IOException {
     if (keyName.length() != 0) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
@@ -422,7 +420,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureRootAddress() throws OzoneClientException {
+  public void ensureRootAddress() throws  IOException {
     if (keyName.length() != 0 || bucketName.length() != 0
         || volumeName.length() != 0) {
       throw new OzoneClientException(
@@ -466,7 +464,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureVolumeOrBucketAddress() throws OzoneClientException {
+  public void ensureVolumeOrBucketAddress() throws IOException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         // If snapshot, ensure snapshot URI

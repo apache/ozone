@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.ozone.shell.keys;
 
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Shell;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
+
+import java.io.IOException;
 
 /**
  * URI parameter for key-specific commands.
@@ -40,7 +41,7 @@ public class KeyUri implements CommandLine.ITypeConverter<OzoneAddress> {
   }
 
   @Override
-  public OzoneAddress convert(String str) throws OzoneClientException {
+  public OzoneAddress convert(String str) throws IOException {
     OzoneAddress address = new OzoneAddress(str);
     address.ensureKeyAddress();
     return address;

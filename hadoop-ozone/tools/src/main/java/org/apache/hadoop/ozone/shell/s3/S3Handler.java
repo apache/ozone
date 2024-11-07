@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.shell.s3;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Handler;
 
@@ -43,13 +42,13 @@ public abstract class S3Handler extends Handler {
   }
 
   @Override
-  protected OzoneAddress getAddress() throws OzoneClientException {
+  protected OzoneAddress getAddress() throws IOException {
     return new OzoneAddress();
   }
 
   @Override
   protected OzoneClient createClient(OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     return address.createClientForS3Commands(getConf(), omServiceID);
   }
 

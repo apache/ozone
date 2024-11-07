@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.ozone.shell.common;
 
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
 import picocli.CommandLine;
+
+import java.io.IOException;
 
 /**
  * URI parameter for volume or bucket specific commands.
@@ -41,7 +42,7 @@ public class VolumeBucketUri
   }
 
   @Override
-  public OzoneAddress convert(String str) throws OzoneClientException {
+  public OzoneAddress convert(String str) throws IOException {
     OzoneAddress address = new OzoneAddress(str);
     address.ensureVolumeOrBucketAddress();
     return address;
