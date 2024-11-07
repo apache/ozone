@@ -155,7 +155,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   public boolean removeContainer(long containerId) {
-    return removeContainer(containerId, false);
+    return removeContainer(containerId, false, true);
   }
 
   /**
@@ -164,22 +164,25 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is removed from containerMap returns true, otherwise
    * false
    */
-  public boolean removeContainer(long containerId, boolean markMissing) {
+  public boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB) throws StorageContainerException {
     Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
-    AtomicReference<Container<?>> removed = new AtomicReference<>();
     //We need to add to missing container set before removing containerMap since there could be write chunk operation
     // that could recreate the container in another volume if we remove it from the map before adding to missing
     // container.
-    containerMap.compute(containerId, (cid, value) -> {
-      if (markMissing) {
-        missingContainerSet.add(containerId);
+    if (markMissing) {
+      missingContainerSet.add(containerId);
+    }
+    Container<?> removed = containerMap.remove(containerId);
+    if (removeFromDB) {
+      try {
+        containerIdsTable.delete(containerId);
+      } catch (IOException e) {
+        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
-      removed.set(value);
-      return null;
-    });
-    if (removed.get() == null) {
+    }
+    if (removed == null) {
       LOG.debug("Container with containerId {} is not present in " +
           "containerMap", containerId);
       return false;
@@ -240,7 +243,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     containerMap.values().forEach(c -> {
       ContainerData data = c.getContainerData();
       if (data.getVolume().isFailed()) {
-        removeContainer(data.getContainerID(), true);
+        removeContainer(data.getContainerID(), true, false);
         LOG.debug("Removing Container {} as the Volume {} " +
               "has failed", data.getContainerID(), data.getVolume());
         failedVolume.set(true);
