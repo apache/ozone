@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -153,7 +154,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return containerMap.get(containerId);
   }
 
-  public boolean removeContainer(long containerId) {
+  public boolean removeContainer(long containerId) throws StorageContainerException {
     return removeContainer(containerId, false, true);
   }
 
@@ -237,20 +238,20 @@ public class ContainerSet implements Iterable<Container<?>> {
    *
    * @param  context StateContext
    */
-  public void handleVolumeFailures(StateContext context) {
+  public void handleVolumeFailures(StateContext context) throws StorageContainerException {
     AtomicBoolean failedVolume = new AtomicBoolean(false);
     AtomicInteger containerCount = new AtomicInteger(0);
-    containerMap.values().forEach(c -> {
+    for (Container<?> c : containerMap.values()) {
       ContainerData data = c.getContainerData();
       if (data.getVolume().isFailed()) {
         removeContainer(data.getContainerID(), true, false);
         LOG.debug("Removing Container {} as the Volume {} " +
-              "has failed", data.getContainerID(), data.getVolume());
+            "has failed", data.getContainerID(), data.getVolume());
         failedVolume.set(true);
         containerCount.incrementAndGet();
         ContainerLogger.logLost(data, "Volume failure");
       }
-    });
+    }
 
     if (failedVolume.get()) {
       try {
