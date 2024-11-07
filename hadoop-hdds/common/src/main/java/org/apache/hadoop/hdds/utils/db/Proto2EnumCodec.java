@@ -68,7 +68,7 @@ public final class Proto2EnumCodec<M extends ProtocolMessageEnum>
 
   private M parseFrom(Integer value) throws IOException {
     try {
-      return (M) this.clazz.getMethod("valueOf", Integer.class).invoke(value);
+      return (M) this.clazz.getDeclaredMethod("forNumber", int.class).invoke(null, value);
     } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
       throw new IOException(e);
     }

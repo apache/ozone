@@ -218,7 +218,8 @@ public class TestStorageVolumeChecker {
       ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
     initTest(checkResult, layout);
     LOG.info("Executing {}", testInfo.getTestMethod());
-
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, new File(folder.toString(), UUID.randomUUID().toString())
+        .toString());
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckMinGap(Duration.ofMillis(0));

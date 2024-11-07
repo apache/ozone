@@ -134,7 +134,7 @@ public class OzoneContainer {
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
-  private final ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore;
+  private ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -344,18 +344,18 @@ public class OzoneContainer {
       thread.start();
       volumeThreads.add(thread);
     }
-    try (TableIterator<Long, ? extends Table.KeyValue<Long, ContainerProtos.ContainerDataProto.State>> itr =
-             containerSet.getContainerIdsTable().iterator()) {
-      Map<Long, Long> containerIds = new HashMap<>();
-      while (itr.hasNext()) {
-        containerIds.put(itr.next().getKey(), 0L);
-      }
-      containerSet.buildMissingContainerSetAndValidate(containerIds);
-    }
 
     try {
       for (int i = 0; i < volumeThreads.size(); i++) {
         volumeThreads.get(i).join();
+      }
+      try (TableIterator<Long, ? extends Table.KeyValue<Long, ContainerProtos.ContainerDataProto.State>> itr =
+               containerSet.getContainerIdsTable().iterator()) {
+        Map<Long, Long> containerIds = new HashMap<>();
+        while (itr.hasNext()) {
+          containerIds.put(itr.next().getKey(), 0L);
+        }
+        containerSet.buildMissingContainerSetAndValidate(containerIds);
       }
     } catch (InterruptedException ex) {
       LOG.error("Volume Threads Interrupted exception", ex);
@@ -541,6 +541,7 @@ public class OzoneContainer {
     if (this.masterVolumeMetadataStore != null) {
       this.masterVolumeMetadataStore.decrementReference();
       this.masterVolumeMetadataStore.cleanup();
+      this.masterVolumeMetadataStore = null;
     }
   }
 
