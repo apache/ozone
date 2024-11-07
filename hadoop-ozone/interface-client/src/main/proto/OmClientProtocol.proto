@@ -153,6 +153,7 @@ enum Type {
   GetQuotaRepairStatus = 135;
   StartQuotaRepair = 136;
   SnapshotMoveTableKeys = 137;
+  PersistDb = 138;
 }
 
 enum SafeMode {
@@ -295,6 +296,8 @@ message OMRequest {
   optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
   optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
   optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
+  optional PersistDbRequest          PersistDbRequest        = 136;
+  optional ExecutionControlRequest          ExecutionControlRequest        = 137;
 }
 
 message OMResponse {
@@ -424,6 +427,7 @@ message OMResponse {
   optional QuotaRepairResponse            QuotaRepairResponse        = 134;
   optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
   optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
+  optional PersistDbResponse          PersistDbResponse       = 138;
 }
 
 enum Status {
@@ -2232,6 +2236,7 @@ message BucketQuotaCount {
     required int64 diffUsedBytes = 3;
     required int64 diffUsedNamespace = 4;
     required bool supportOldQuota = 5 [default=false];
+    optional uint64 bucketObjectId = 6;
 }
 
 message QuotaRepairResponse {
@@ -2259,6 +2264,29 @@ message OMLockDetailsProto {
   optional uint64 writeLockNanos   = 4;
 }
 
+message PersistDbRequest {
+  repeated DBTableUpdate tableUpdates = 1;
+  repeated BucketQuotaCount bucketQuotaCount = 3;
+}
+message DBTableUpdate {
+  required string tableName = 1;
+  repeated DBTableRecord records = 2;
+}
+message DBTableRecord {
+  required bytes key = 1;
+  optional bytes value = 2;
+}
+message PersistDbResponse {
+}
+message ExecutionControlRequest {
+  repeated ClientRequestInfo requestInfo = 1;
+}
+message ClientRequestInfo {
+  optional string uuidClientId = 1;
+  optional uint64 callId = 2;
+  optional OMResponse response = 3;
+  optional int64 index = 4;
+}
 /**
  The OM service that takes care of Ozone namespace.
 */

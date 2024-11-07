@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
+import org.apache.hadoop.ozone.om.ratis.execution.LeaderExecutionEnabler;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
@@ -206,6 +208,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
 
+      try {
+        if (LeaderExecutionEnabler.optimizedFlow(request, ozoneManager)) {
+          return ozoneManager.getOmGateway().submit(request, ProtobufRpcEngine.Server.getClientId(),
+              ProtobufRpcEngine.Server.getCallId());
+        }
+      } catch (IOException ex) {
+        return createErrorResponse(request, ex);
+      }
+
       // check retry cache
       final OMResponse cached = omRatisServer.checkRetryCache();
       if (cached != null) {
@@ -290,12 +301,20 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws ServiceException {
     final OMClientResponse omClientResponse;
     try {
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
       } else {
+        try {
+          if (LeaderExecutionEnabler.optimizedFlow(request, ozoneManager)) {
+            return ozoneManager.getOmGateway().submit(request, ProtobufRpcEngine.Server.getClientId(),
+                ProtobufRpcEngine.Server.getCallId());
+          }
+        } catch (IOException ex) {
+          return createErrorResponse(request, ex);
+        }
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
         try {

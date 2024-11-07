@@ -22,7 +22,8 @@ package org.apache.hadoop.ozone.audit;
  * as present for request.
  */
 public enum OMSystemAction implements AuditAction {
-  STARTUP;
+  STARTUP,
+  DBPERSIST;
 
   @Override
   public String getAction() {
