@@ -125,7 +125,7 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
   }
 
   @Override
-  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) throws IOException {
+  public OMClientResponse process(OzoneManager ozoneManager, TermIndex termIndex) {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     OMClientResponse omClientResponse = null;

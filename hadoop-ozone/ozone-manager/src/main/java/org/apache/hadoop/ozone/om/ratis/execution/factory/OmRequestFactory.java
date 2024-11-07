@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.ratis.execution.factory;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMPersistDbRequest;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
