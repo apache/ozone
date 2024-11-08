@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -42,24 +43,27 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
   private static final ConcurrentMap<String, ReferenceCountedDB<MasterVolumeMetadataStore>> INSTANCES =
       new ConcurrentHashMap<>();
 
-  public static ReferenceCountedDB<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
+  public static ReferenceCountedHandle<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
     String dbDirPath = DBStoreBuilder.getDBDirPath(MasterVolumeDBDefinition.get(), conf).getAbsolutePath();
     try {
-      return INSTANCES.compute(dbDirPath, (k, v) -> {
+      return new ReferenceCountedHandle<>(INSTANCES.compute(dbDirPath, (k, v) -> {
         if (v != null) {
           v.incrementReference();
         }
         if (v == null || v.isClosed()) {
           try {
             MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
-            return new ReferenceCountedDB<>(masterVolumeMetadataStore,
-                masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
+            ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDB =
+                new ReferenceCountedDB<>(masterVolumeMetadataStore,
+                    masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
+            referenceCountedDB.incrementReference();
+            return referenceCountedDB;
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
         }
         return v;
-      });
+      }));
     } catch (UncheckedIOException e) {
       throw e.getCause();
     }

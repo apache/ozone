@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -136,7 +136,7 @@ public class OzoneContainer {
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
-  private ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore;
+  private ReferenceCountedHandle<MasterVolumeMetadataStore> masterVolumeMetadataStore;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -531,9 +531,8 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
-    if (this.masterVolumeMetadataStore != null && !this.masterVolumeMetadataStore.isClosed()) {
-      this.masterVolumeMetadataStore.decrementReference();
-      this.masterVolumeMetadataStore.cleanup();
+    if (this.masterVolumeMetadataStore != null) {
+      this.masterVolumeMetadataStore.close();
       this.masterVolumeMetadataStore = null;
     }
   }

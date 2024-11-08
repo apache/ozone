@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
@@ -84,7 +84,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
-  private ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStoreReferenceCountedDB;
+  private ReferenceCountedHandle<MasterVolumeMetadataStore> masterVolumeMetadataStoreReferenceCountedDB;
 
   private List<ReplicationTask> replicationTasks;
 
@@ -149,7 +149,6 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     } finally {
       if (masterVolumeMetadataStoreReferenceCountedDB != null) {
         masterVolumeMetadataStoreReferenceCountedDB.close();
-        masterVolumeMetadataStoreReferenceCountedDB.cleanup();
       }
 
     }
@@ -184,7 +183,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-    ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDS = MasterVolumeMetadataStore.get(conf);
+    ReferenceCountedHandle<MasterVolumeMetadataStore> referenceCountedDS = MasterVolumeMetadataStore.get(conf);
     this.masterVolumeMetadataStoreReferenceCountedDB = referenceCountedDS;
     ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore().getContainerIdsTable(), 1000);
 
