@@ -319,6 +319,9 @@ public class ReconUtils {
                                          ReconOMMetadataManager omMetadataManager) throws IOException {
     StringBuilder fullPath = constructFullPathPrefix(initialParentId, volumeName, bucketName,
         reconNamespaceSummaryManager, omMetadataManager);
+    if (fullPath.length() == 0) {
+      return "";
+    }
     fullPath.append(keyName);
     return fullPath.toString();
   }
