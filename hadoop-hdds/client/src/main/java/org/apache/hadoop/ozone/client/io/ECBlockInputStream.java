@@ -152,7 +152,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * Using the current position, returns the index of the blockStream we should
    * be reading from. This is the index in the internal array holding the
    * stream reference. The block group index will be one greater than this.
-   * @return
    */
   protected int currentStreamIndex() {
     return (int)((position / ecChunkSize) % repConfig.getData());
@@ -206,7 +205,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * to the replicaIndex given based on the EC pipeline fetched from SCM.
    * @param replicaIndex
    * @param refreshFunc
-   * @return
    */
   protected Function<BlockID, BlockLocationInfo> ecPipelineRefreshFunction(
       int replicaIndex, Function<BlockID, BlockLocationInfo> refreshFunc) {
@@ -241,7 +239,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * potentially partial last stripe. Note that the internal block index is
    * numbered starting from 1.
    * @param index - Index number of the internal block, starting from 1
-   * @return
    */
   protected long internalBlockLength(int index) {
     long lastStripe = blockInfo.getLength() % stripeSize;
@@ -344,7 +341,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * strategy buffer. This call may read from several internal BlockInputStreams
    * if there is sufficient space in the buffer.
    * @param strategy
-   * @return
    * @throws IOException
    */
   @Override
@@ -409,7 +405,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * group length.
    * @param stream Stream to read from
    * @param strategy The ReaderStrategy to read data into
-   * @return
    * @throws IOException
    */
   private int readFromStream(BlockExtendedInputStream stream,

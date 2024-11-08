@@ -41,7 +41,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -193,8 +192,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SafeMode;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServerDefaultsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServerDefaultsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -2117,12 +2114,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setGetFileStatusRequest(req)
         .build();
 
-    final GetFileStatusResponse resp;
-    try {
-      resp = handleError(submitRequest(omRequest)).getGetFileStatusResponse();
-    } catch (IOException e) {
-      throw e;
-    }
+    final GetFileStatusResponse resp = handleError(submitRequest(omRequest))
+        .getGetFileStatusResponse();
     return OzoneFileStatus.getFromProtobuf(resp.getStatus());
   }
 
@@ -2561,22 +2554,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     SetSafeModeResponse setSafeModeResponse =
         handleError(submitRequest(omRequest)).getSetSafeModeResponse();
     return setSafeModeResponse.getResponse();
-  }
-
-  @Override
-  public OzoneFsServerDefaults getServerDefaults()
-      throws IOException {
-    ServerDefaultsRequest serverDefaultsRequest =
-        ServerDefaultsRequest.newBuilder().build();
-
-    OMRequest omRequest = createOMRequest(Type.GetServerDefaults)
-        .setServerDefaultsRequest(serverDefaultsRequest).build();
-
-    ServerDefaultsResponse serverDefaultsResponse =
-        handleError(submitRequest(omRequest)).getServerDefaultsResponse();
-
-    return OzoneFsServerDefaults.getFromProtobuf(
-        serverDefaultsResponse.getServerDefaults());
   }
 
   @Override

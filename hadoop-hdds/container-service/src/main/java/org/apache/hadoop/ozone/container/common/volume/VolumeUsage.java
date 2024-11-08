@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -77,11 +78,15 @@ public class VolumeUsage {
   }
 
   /**
+   * <pre>
+   * {@code
    * Calculate available space use method B.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    *              |     fsAvail      |-------other-------|
-   *                          ->|~~~~|<-
+   *                          -&gt;|~~~~|&lt;-
    *                      remainingReserved
+   * }
+   * </pre>
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
   public SpaceUsageSource getCurrentUsage() {
@@ -216,9 +221,8 @@ public class VolumeUsage {
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
       if (words.length < 2) {
-        LOG.error("Reserved space should be configured in a pair, but current value is {}",
-            reserve);
-        continue;
+        throw new ConfigurationException("hdds.datanode.dir.du.reserved - " +
+                "Reserved space should be configured in a pair, but current value is " + reserve);
       }
 
       try {

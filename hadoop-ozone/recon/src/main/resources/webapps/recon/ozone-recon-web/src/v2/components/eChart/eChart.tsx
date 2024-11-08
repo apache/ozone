@@ -28,6 +28,10 @@ export interface EChartProps {
   loading?: boolean;
   theme?: 'light';
   onClick?: () => any | void;
+  eventHandler?: {
+    name: string,
+    handler: (arg0: any) => void
+  };
 }
 
 const EChart = ({
@@ -36,7 +40,8 @@ const EChart = ({
   settings,
   loading,
   theme,
-  onClick
+  onClick,
+  eventHandler
 }: EChartProps): JSX.Element => {
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -46,6 +51,10 @@ const EChart = ({
       chart = init(chartRef.current, theme);
       if (onClick) {
         chart.on('click', onClick);
+      }
+
+      if (eventHandler) {
+        chart.on(eventHandler.name, eventHandler.handler);
       }
     }
 
@@ -70,6 +79,10 @@ const EChart = ({
       chart!.setOption(option, settings);
       if (onClick) {
         chart!.on('click', onClick);
+      }
+
+      if (eventHandler) {
+        chart!.on(eventHandler.name, eventHandler.handler);
       }
     }
   }, [option, settings, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function

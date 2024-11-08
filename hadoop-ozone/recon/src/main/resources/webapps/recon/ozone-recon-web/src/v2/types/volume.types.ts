@@ -40,5 +40,13 @@ export type VolumesState = {
   data: Volume[];
   lastUpdated: number;
   columnOptions: Option[];
-  currentRow: Volume | Record<string, never>;
+}
+
+export type VolumesTableProps = {
+  loading: boolean;
+  data: Volume[];
+  handleAclClick: (arg0: Volume) => void;
+  selectedColumns: Option[];
+  searchColumn: 'volume' | 'owner' | 'admin';
+  searchTerm: string;
 }

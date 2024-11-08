@@ -189,7 +189,6 @@ public class ContainerSet implements Iterable<Container<?>> {
    * Send FCR which will not contain removed containers.
    *
    * @param  context StateContext
-   * @return
    */
   public void handleVolumeFailures(StateContext context) {
     AtomicBoolean failedVolume = new AtomicBoolean(false);
@@ -250,6 +249,21 @@ public class ContainerSet implements Iterable<Container<?>> {
             .getStorageID()))
         .sorted(ContainerDataScanOrder.INSTANCE)
         .iterator();
+  }
+
+  /**
+   * Get the number of containers based on the given volume.
+   *
+   * @param volume hdds volume.
+   * @return number of containers
+   */
+  public long containerCount(HddsVolume volume) {
+    Preconditions.checkNotNull(volume);
+    Preconditions.checkNotNull(volume.getStorageID());
+    String volumeUuid = volume.getStorageID();
+    return containerMap.values().stream()
+        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
+        .getStorageID())).count();
   }
 
   /**

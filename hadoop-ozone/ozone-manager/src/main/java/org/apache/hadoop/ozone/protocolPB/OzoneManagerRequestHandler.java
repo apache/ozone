@@ -130,7 +130,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServerDefaultsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
@@ -375,12 +374,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.SnapshotInfoResponse snapshotInfoResponse =
             getSnapshotInfo(request.getSnapshotInfoRequest());
         responseBuilder.setSnapshotInfoResponse(snapshotInfoResponse);
-        break;
-      case GetServerDefaults:
-        responseBuilder.setServerDefaultsResponse(
-            ServerDefaultsResponse.newBuilder()
-                .setServerDefaults(impl.getServerDefaults().getProtobuf())
-                .build());
         break;
       case GetQuotaRepairStatus:
         OzoneManagerProtocolProtos.GetQuotaRepairStatusResponse quotaRepairStatusRsp =

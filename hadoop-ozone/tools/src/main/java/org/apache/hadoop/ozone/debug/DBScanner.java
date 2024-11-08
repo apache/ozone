@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.utils.Filter;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -73,6 +74,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -127,6 +130,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Comma-separated list of fields needed for each value. " +
           "eg.) \"name,acls.type\" for showing name and type under acls.")
   private String fieldsFilter;
+
+  @CommandLine.Option(names = {"--filter"},
+      description = "Comma-separated list of \"<field>:<operator>:<value>\" where " +
+          "<field> is any valid field of the record, " +
+          "<operator> is [EQUALS,LESSER, GREATER or REGEX]. (EQUALS compares the exact string, " +
+          "REGEX compares with a valid regular expression passed, and LESSER/GREATER works with numeric values), " +
+          "<value> is the value of the field. \n" +
+          "eg.) \"dataSize:equals:1000\" for showing records having the value 1000 for dataSize, \n" +
+          "     \"keyName:regex:^key.*$\" for showing records having keyName that matches the given regex.")
+  private String filter;
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
@@ -252,7 +265,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       logWriter.start();
       processRecords(iterator, dbColumnFamilyDef, logWriter,
           threadPool, schemaV3);
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | IOException e) {
       exception = true;
       Thread.currentThread().interrupt();
     } finally {
@@ -268,7 +281,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private void processRecords(ManagedRocksIterator iterator,
                               DBColumnFamilyDefinition dbColumnFamilyDef,
                               LogWriter logWriter, ExecutorService threadPool,
-                              boolean schemaV3) throws InterruptedException {
+                              boolean schemaV3) throws InterruptedException, IOException {
     if (startKey != null) {
       iterator.get().seek(getValueObject(dbColumnFamilyDef, startKey));
     }
@@ -280,29 +293,56 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     long count = 0;
     List<Future<Void>> futures = new ArrayList<>();
     boolean reachedEnd = false;
+
+    Map<String, Filter> fieldsFilterSplitMap = new HashMap<>();
+    if (filter != null) {
+      for (String field : filter.split(",")) {
+        String[] fieldValue = field.split(":");
+        if (fieldValue.length != 3) {
+          err().println("Error: Invalid format for filter \"" + field
+              + "\". Usage: <field>:<operator>:<value>. Ignoring filter passed");
+        } else {
+          Filter filterValue = new Filter(fieldValue[1], fieldValue[2]);
+          if (filterValue.getOperator() == null) {
+            err().println("Error: Invalid operator for filter \"" + filterValue
+                + "\". <operator> can be one of [EQUALS,LESSER,GREATER]. Ignoring filter passed");
+          } else {
+            String[] subfields = fieldValue[0].split("\\.");
+            getFilterSplit(Arrays.asList(subfields), fieldsFilterSplitMap, filterValue);
+          }
+        }
+      }
+    }
+
     while (withinLimit(count) && iterator.get().isValid() && !exception && !reachedEnd) {
       // if invalid endKey is given, it is ignored
       if (null != endKey && Arrays.equals(iterator.get().key(), getValueObject(dbColumnFamilyDef, endKey))) {
         reachedEnd = true;
       }
-      batch.add(new ByteArrayKeyValue(
-          iterator.get().key(), iterator.get().value()));
-      iterator.get().next();
-      count++;
-      if (batch.size() >= batchSize) {
-        while (logWriter.getInflightLogCount() > threadCount * 10L
-            && !exception) {
-          // Prevents too many unfinished Tasks from
-          // consuming too much memory.
-          Thread.sleep(100);
+
+      Object o = dbColumnFamilyDef.getValueCodec().fromPersistedFormat(iterator.get().value());
+      if (filter == null ||
+          checkFilteredObject(o, dbColumnFamilyDef.getValueType(), fieldsFilterSplitMap)) {
+        // the record passes the filter
+        batch.add(new ByteArrayKeyValue(
+            iterator.get().key(), iterator.get().value()));
+        count++;
+        if (batch.size() >= batchSize) {
+          while (logWriter.getInflightLogCount() > threadCount * 10L
+              && !exception) {
+            // Prevents too many unfinished Tasks from
+            // consuming too much memory.
+            Thread.sleep(100);
+          }
+          Future<Void> future = threadPool.submit(
+              new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
+                  withKey, schemaV3, fieldsFilter));
+          futures.add(future);
+          batch = new ArrayList<>(batchSize);
+          sequenceId++;
         }
-        Future<Void> future = threadPool.submit(
-            new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
-                withKey, schemaV3, fieldsFilter));
-        futures.add(future);
-        batch = new ArrayList<>(batchSize);
-        sequenceId++;
       }
+      iterator.get().next();
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
@@ -317,6 +357,158 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         LOG.error("Task execution failed", e);
       }
     }
+  }
+
+  private void getFilterSplit(List<String> fields, Map<String, Filter> fieldMap, Filter leafValue) throws IOException {
+    int len = fields.size();
+    if (len == 1) {
+      Filter currentValue = fieldMap.get(fields.get(0));
+      if (currentValue != null) {
+        err().println("Cannot pass multiple values for the same field and " +
+            "cannot have filter for both parent and child");
+        throw new IOException("Invalid filter passed");
+      }
+      fieldMap.put(fields.get(0), leafValue);
+    } else {
+      Filter fieldMapGet = fieldMap.computeIfAbsent(fields.get(0), k -> new Filter());
+      if (fieldMapGet.getValue() != null) {
+        err().println("Cannot pass multiple values for the same field and " +
+            "cannot have filter for both parent and child");
+        throw new IOException("Invalid filter passed");
+      }
+      Map<String, Filter> nextLevel = fieldMapGet.getNextLevel();
+      if (nextLevel == null) {
+        fieldMapGet.setNextLevel(new HashMap<>());
+      }
+      getFilterSplit(fields.subList(1, len), fieldMapGet.getNextLevel(), leafValue);
+    }
+  }
+
+  private boolean checkFilteredObject(Object obj, Class<?> clazz, Map<String, Filter> fieldsSplitMap) {
+    for (Map.Entry<String, Filter> field : fieldsSplitMap.entrySet()) {
+      try {
+        Field valueClassField = getRequiredFieldFromAllFields(clazz, field.getKey());
+        Object valueObject = valueClassField.get(obj);
+        Filter fieldValue = field.getValue();
+
+        if (valueObject == null) {
+          // there is no such field in the record. This filter will be ignored for the current record.
+          continue;
+        }
+        if (fieldValue == null) {
+          err().println("Malformed filter. Check input");
+          throw new IOException("Invalid filter passed");
+        } else if (fieldValue.getNextLevel() == null) {
+          // reached the end of fields hierarchy, check if they match the filter
+          try {
+            switch (fieldValue.getOperator()) {
+            case EQUALS:
+              if (!String.valueOf(valueObject).equals(fieldValue.getValue())) {
+                return false;
+              }
+              break;
+            case GREATER:
+              if (Double.parseDouble(String.valueOf(valueObject))
+                  < Double.parseDouble(String.valueOf(fieldValue.getValue()))) {
+                return false;
+              }
+              break;
+            case LESSER:
+              if (Double.parseDouble(String.valueOf(valueObject))
+                  > Double.parseDouble(String.valueOf(fieldValue.getValue()))) {
+                return false;
+              }
+              break;
+            case REGEX:
+              Pattern p = Pattern.compile(String.valueOf(fieldValue.getValue()));
+              Matcher m = p.matcher(String.valueOf(valueObject));
+              if (!m.find()) {
+                return false;
+              }
+              break;
+            default:
+              err().println("Only EQUALS/LESSER/GREATER/REGEX operator is supported currently.");
+              throw new IOException("Invalid filter passed");
+            }
+          } catch (NumberFormatException ex) {
+            err().println("LESSER or GREATER operation can be performed only on numeric values.");
+            throw new IOException("Invalid filter passed");
+          }
+        } else {
+          Map<String, Filter> subfields = fieldValue.getNextLevel();
+          if (Collection.class.isAssignableFrom(valueObject.getClass())) {
+            if (!checkFilteredObjectCollection((Collection) valueObject, subfields)) {
+              return false;
+            }
+          } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
+            Map<?, ?> valueObjectMap = (Map<?, ?>) valueObject;
+            boolean flag = false;
+            for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
+              boolean subflag;
+              if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
+                subflag = checkFilteredObjectCollection((Collection)ob.getValue(), subfields);
+              } else {
+                subflag = checkFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
+              }
+              if (subflag) {
+                // atleast one item in the map/list of the record has matched the filter,
+                // so record passes the filter.
+                flag = true;
+                break;
+              }
+            }
+            if (!flag) {
+              // none of the items in the map/list passed the filter => record doesn't pass the filter
+              return false;
+            }
+          } else {
+            if (!checkFilteredObject(valueObject, valueClassField.getType(), subfields)) {
+              return false;
+            }
+          }
+        }
+      } catch (NoSuchFieldException ex) {
+        err().println("ERROR: no such field: " + field);
+        exception = true;
+        return false;
+      } catch (IllegalAccessException e) {
+        err().println("ERROR: Cannot get field \"" + field + "\" from record.");
+        exception = true;
+        return false;
+      } catch (Exception ex) {
+        err().println("ERROR: field: " + field + ", ex: " + ex);
+        exception = true;
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean checkFilteredObjectCollection(Collection<?> valueObject, Map<String, Filter> fields)
+      throws NoSuchFieldException, IllegalAccessException, IOException {
+    for (Object ob : valueObject) {
+      if (checkFilteredObject(ob, ob.getClass(), fields)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
+    List<Field> classFieldList = ValueSchema.getAllFields(clazz);
+    Field classField = null;
+    for (Field f : classFieldList) {
+      if (f.getName().equals(fieldName)) {
+        classField = f;
+        break;
+      }
+    }
+    if (classField == null) {
+      err().println("Error: Invalid field \"" + fieldName + "\" passed for filter");
+      throw new NoSuchFieldException();
+    }
+    classField.setAccessible(true);
+    return classField;
   }
 
   private boolean withinLimit(long i) {
@@ -474,6 +666,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     private final boolean schemaV3;
     private String valueFields;
 
+    @SuppressWarnings("checkstyle:parameternumber")
     Task(DBColumnFamilyDefinition dbColumnFamilyDefinition,
          ArrayList<ByteArrayKeyValue> batch, LogWriter logWriter,
          long sequenceId, boolean withKey, boolean schemaV3, String valueFields) {
@@ -554,7 +747,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
-            filteredValue.putAll(getFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
+            filteredValue.putAll(getFieldsFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
             sb.append(WRITER.writeValueAsString(filteredValue));
           } else {
             sb.append(WRITER.writeValueAsString(o));
@@ -570,7 +763,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    Map<String, Object> getFilteredObject(Object obj, Class<?> clazz, Map<String, Object> fieldsSplitMap) {
+    Map<String, Object> getFieldsFilteredObject(Object obj, Class<?> clazz, Map<String, Object> fieldsSplitMap) {
       Map<String, Object> valueMap = new HashMap<>();
       for (Map.Entry<String, Object> field : fieldsSplitMap.entrySet()) {
         try {
@@ -583,7 +776,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           } else {
             if (Collection.class.isAssignableFrom(valueObject.getClass())) {
               List<Object> subfieldObjectsList =
-                  getFilteredObjectCollection((Collection) valueObject, subfields);
+                  getFieldsFilteredObjectCollection((Collection) valueObject, subfields);
               valueMap.put(field.getKey(), subfieldObjectsList);
             } else if (Map.class.isAssignableFrom(valueObject.getClass())) {
               Map<Object, Object> subfieldObjectsMap = new HashMap<>();
@@ -591,16 +784,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               for (Map.Entry<?, ?> ob : valueObjectMap.entrySet()) {
                 Object subfieldValue;
                 if (Collection.class.isAssignableFrom(ob.getValue().getClass())) {
-                  subfieldValue = getFilteredObjectCollection((Collection)ob.getValue(), subfields);
+                  subfieldValue = getFieldsFilteredObjectCollection((Collection)ob.getValue(), subfields);
                 } else {
-                  subfieldValue = getFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
+                  subfieldValue = getFieldsFilteredObject(ob.getValue(), ob.getValue().getClass(), subfields);
                 }
                 subfieldObjectsMap.put(ob.getKey(), subfieldValue);
               }
               valueMap.put(field.getKey(), subfieldObjectsMap);
             } else {
               valueMap.put(field.getKey(),
-                  getFilteredObject(valueObject, valueClassField.getType(), subfields));
+                  getFieldsFilteredObject(valueObject, valueClassField.getType(), subfields));
             }
           }
         } catch (NoSuchFieldException ex) {
@@ -612,30 +805,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return valueMap;
     }
 
-    List<Object> getFilteredObjectCollection(Collection<?> valueObject, Map<String, Object> fields)
+    List<Object> getFieldsFilteredObjectCollection(Collection<?> valueObject, Map<String, Object> fields)
         throws NoSuchFieldException, IllegalAccessException {
       List<Object> subfieldObjectsList = new ArrayList<>();
       for (Object ob : valueObject) {
-        Object subfieldValue = getFilteredObject(ob, ob.getClass(), fields);
+        Object subfieldValue = getFieldsFilteredObject(ob, ob.getClass(), fields);
         subfieldObjectsList.add(subfieldValue);
       }
       return subfieldObjectsList;
-    }
-
-    Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
-      List<Field> classFieldList = ValueSchema.getAllFields(clazz);
-      Field classField = null;
-      for (Field f : classFieldList) {
-        if (f.getName().equals(fieldName)) {
-          classField = f;
-          break;
-        }
-      }
-      if (classField == null) {
-        throw new NoSuchFieldException();
-      }
-      classField.setAccessible(true);
-      return classField;
     }
   }
 

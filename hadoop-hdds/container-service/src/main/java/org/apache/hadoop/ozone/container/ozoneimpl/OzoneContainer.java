@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -387,6 +388,18 @@ public class OzoneContainer {
     }
   }
 
+  /**
+   * We need to inject the containerController into the hddsVolume.
+   * because we need to obtain the container count
+   * for each disk based on the container controller.
+   */
+  private void initHddsVolumeContainer() {
+    for (StorageVolume v : volumeSet.getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) v;
+      hddsVolume.setController(controller);
+    }
+  }
+
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
       this.metadataScanner =
@@ -478,12 +491,14 @@ public class OzoneContainer {
     replicationServer.start();
     datanodeDetails.setPort(Name.REPLICATION, replicationServer.getPort());
 
-    writeChannel.start();
-    readChannel.start();
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
+    writeChannel.start();
+    readChannel.start();
     blockDeletingService.start();
     recoveringContainerScrubbingService.start();
+
+    initHddsVolumeContainer();
 
     // mark OzoneContainer as INITIALIZED.
     initializingStatus.set(InitializingStatus.INITIALIZED);
@@ -512,6 +527,7 @@ public class OzoneContainer {
     }
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
+    IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
   }
 

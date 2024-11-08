@@ -77,11 +77,13 @@ public final class LambdaTestUtils {
    * is called. This returns the exception passed in (if any),
    * or generates a new one.
    * <pre>
+   * {@code
    * await(
    *   30 * 1000,
    *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); },
    *   () -> 500),
    *   (timeout, ex) -> ex != null ? ex : new TimeoutException("timeout"));
+   * }
    * </pre>
    *
    * @param timeoutMillis timeout in milliseconds.
@@ -160,9 +162,11 @@ public final class LambdaTestUtils {
    * <p>
    * Example: await for probe to succeed:
    * <pre>
+   * {@code
    * await(
    *   30 * 1000, 500,
    *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); });
+   * }
    * </pre>
    *
    * @param timeoutMillis timeout in milliseconds.

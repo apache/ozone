@@ -50,14 +50,14 @@ public interface UpgradeFinalizer<T> {
    * Represents the current state in which the service is with regards to
    * finalization after an upgrade.
    * The state transitions are the following:
-   * ALREADY_FINALIZED - no entry no exit from this status without restart.
+   * {@code ALREADY_FINALIZED} - no entry no exit from this status without restart.
    * After an upgrade:
-   * FINALIZATION_REQUIRED -(finalize)-> STARTING_FINALIZATION
-   * -> FINALIZATION_IN_PROGRESS -> FINALIZATION_DONE from finalization done
+   * {@code FINALIZATION_REQUIRED -(finalize)-> STARTING_FINALIZATION
+   * -> FINALIZATION_IN_PROGRESS -> FINALIZATION_DONE} from finalization done
    * there is no more move possible, after a restart the service can end up in:
-   * - FINALIZATION_REQUIRED, if the finalization failed and have not reached
-   * FINALIZATION_DONE,
-   * - or it can be ALREADY_FINALIZED if the finalization was successfully done.
+   * {@code FINALIZATION_REQUIRED}, if the finalization failed and have not reached
+   * {@code FINALIZATION_DONE},
+   * - or it can be {@code ALREADY_FINALIZED} if the finalization was successfully done.
    */
   enum Status {
     ALREADY_FINALIZED,

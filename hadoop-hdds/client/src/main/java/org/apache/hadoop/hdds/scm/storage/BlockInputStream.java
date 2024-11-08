@@ -167,6 +167,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         if (blockInfo != null && blockInfo.isUnderConstruction()) {
           // use the block length from DN if block is under construction.
           length = blockData.getSize();
+          LOG.debug("Updated block length to {} for block {}", length, blockID);
         }
         break;
         // If we get a StorageContainerException or an IOException due to
@@ -273,16 +274,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access block {}",
           blockID);
-    }
-
-    DatanodeBlockID.Builder blkIDBuilder =
-        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-
-    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    if (replicaIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicaIndex);
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
