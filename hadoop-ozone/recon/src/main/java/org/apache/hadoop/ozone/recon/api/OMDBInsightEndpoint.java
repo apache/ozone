@@ -1176,6 +1176,9 @@ public class OMDBInsightEndpoint {
         keyIter.seek(paramInfo.getStartPrefix());
       }
 
+      long prevParentID = -1;
+      StringBuilder keyPrefix = null;
+      int keyPrefixLength = 0;
       while (keyIter.hasNext()) {
         Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry = keyIter.next();
         String dbKey = entry.getKey();
@@ -1189,9 +1192,32 @@ public class OMDBInsightEndpoint {
         if (applyFilters(entry, paramInfo)) {
           KeyEntityInfoProtoWrapper keyEntityInfo = entry.getValue();
           keyEntityInfo.setKey(dbKey);
-          keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
-              keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
-              omMetadataManager));
+          if (keyEntityInfo.getParentId() == 0) {
+            // Legacy bucket keys have a parentID of zero. OBS bucket keys have a parentID of the bucketID.
+            // FSO keys have a parent of the immediate parent directory.
+            // Legacy buckets are obsolete, so this code path is not optimized. We don't expect to see many Legacy
+            // buckets in practice.
+            prevParentID = -1;
+            keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
+                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
+                omMetadataManager));
+          } else {
+            // As we iterate keys in sorted order, its highly likely that keys have the same prefix for many keys in a
+            // row. Especially for FSO buckets, its expensive to construct the path for each key. So, we construct the
+            // prefix once and reuse it for each identical parent. Only if the parent changes do we need to construct
+            // a new prefix path.
+            if (prevParentID != keyEntityInfo.getParentId()) {
+              prevParentID = keyEntityInfo.getParentId();
+              keyPrefix = ReconUtils.constructFullPathPrefix(keyEntityInfo.getParentId(),
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
+                  omMetadataManager);
+              keyPrefixLength = keyPrefix.length();
+            }
+            keyPrefix.setLength(keyPrefixLength);
+            keyPrefix.append(keyEntityInfo.getKeyName());
+            keyEntityInfo.setPath(keyPrefix.toString());
+          }
+
           results.add(keyEntityInfo);
           paramInfo.setLastKey(dbKey);
           if (results.size() >= paramInfo.getLimit()) {
