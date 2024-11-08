@@ -228,11 +228,15 @@ public class OpenKeyCleanupService extends BackgroundService {
         });
       }
 
+      long duration = Time.monotonicNow() - startTime;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of expired open keys submitted for deletion: {},"
                 + " for commit: {}, elapsed time: {}ms",
-            numOpenKeys, numHsyncKeys, Time.monotonicNow() - startTime);
+            numOpenKeys, numHsyncKeys, duration);
       }
+      ozoneManager.getDeletionMetrics().setOpenKeyCleanupIterationMetrics(runCount.get(), startTime,
+          duration, numOpenKeys, numHsyncKeys);
+      ozoneManager.getDeletionMetrics().setOpenKeyCleanupTotalMetrics(numOpenKeys, numHsyncKeys);
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;

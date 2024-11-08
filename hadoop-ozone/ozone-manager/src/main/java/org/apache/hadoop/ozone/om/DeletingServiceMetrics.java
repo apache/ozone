@@ -248,4 +248,69 @@ public final class DeletingServiceMetrics {
   public void setNumKeysPurgedInLatestRequest(long numSubKeysPurgedInLastRequest) {
     this.numKeysPurgedInLatestRequest.set(numSubKeysPurgedInLastRequest);
   }
+
+  /*
+   * OpenKeyCleanupService related metrics.
+   */
+
+  @Metric("Last iteration run count of OpenKeyCleanupService")
+  private MutableGaugeLong iterationRunCountOpenKeyCleanup;
+  @Metric("Last iteration start time of OpenKeyCleanupService")
+  private MutableGaugeLong iterationStartTimeOpenKeyCleanup;
+  @Metric("Time taken by the last iteration of OpenKeyCleanupService")
+  private MutableGaugeLong iterationDurationOpenKeyCleanup;
+  @Metric("No. of keys deleted by OpenKeyCleanupService in last iteration")
+  private MutableGaugeLong iterationOpenKeysDeleted;
+  @Metric("No. of keys deleted by OpenKeyCleanupService in last iteration")
+  private MutableGaugeLong iterationOpenKeysCommitted;
+
+  public void setIterationRunCountOpenKeyCleanup(
+      long iterationRunCountOpenKeyCleanup) {
+    this.iterationRunCountOpenKeyCleanup.set(iterationRunCountOpenKeyCleanup);
+  }
+
+  public void setIterationStartTimeOpenKeyCleanup(
+      long iterationStartTimeOpenKeyCleanup) {
+    this.iterationStartTimeOpenKeyCleanup.set(iterationStartTimeOpenKeyCleanup);
+  }
+
+  public void setIterationDurationOpenKeyCleanup(
+      long iterationDurationOpenKeyCleanup) {
+    this.iterationDurationOpenKeyCleanup.set(iterationDurationOpenKeyCleanup);
+  }
+
+  public void setIterationOpenKeysDeleted(long iterationOpenKeysDeleted) {
+    this.iterationOpenKeysDeleted.set(iterationOpenKeysDeleted);
+  }
+
+  public void setIterationOpenKeysCommitted(long iterationOpenKeysCommitted) {
+    this.iterationOpenKeysCommitted.set(iterationOpenKeysCommitted);
+  }
+
+  public void setOpenKeyCleanupIterationMetrics(long runcount, long startTime, long duration,
+                                                long keysDeleted, long keysCommitted) {
+    setIterationRunCountOpenKeyCleanup(runcount);
+    setIterationStartTimeOpenKeyCleanup(startTime);
+    setIterationDurationOpenKeyCleanup(duration);
+    setIterationOpenKeysDeleted(keysDeleted);
+    setIterationOpenKeysCommitted(keysCommitted);
+  }
+
+  @Metric("Total no. of keys deleted by OpenKeyCleanupService since last restart")
+  private MutableGaugeLong totalOpenKeysDeleted;
+  @Metric("Total no. of keys committed by OpenKeyCleanupService since last restart")
+  private MutableGaugeLong totalOpenKeysCommitted;
+
+  public void setTotalOpenKeysDeleted(long openKeysDeleted) {
+    this.totalOpenKeysDeleted.incr(openKeysDeleted);
+  }
+
+  public void setTotalOpenKeysCommitted(long openKeysCommitted) {
+    this.totalOpenKeysCommitted.incr(openKeysCommitted);
+  }
+
+  public void setOpenKeyCleanupTotalMetrics(long keysDeleted, long keysCommitted) {
+    setTotalOpenKeysDeleted(keysDeleted);
+    setTotalOpenKeysCommitted(keysCommitted);
+  }
 }
