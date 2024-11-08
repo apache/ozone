@@ -54,6 +54,15 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of Merkle tree diff failure")
   private MutableCounterLong numMerkleTreeDiffFailure;
 
+  @Metric(about = "Number of Merkle tree diff success")
+  private MutableCounterLong numMerkleTreeDiffSuccess;
+
+  @Metric(about = "Number of healthy container diff")
+  private MutableCounterLong numHealthyContainerDiff;
+
+  @Metric(about = "Number of unhealthy container diff")
+  private MutableCounterLong numUnhealthyContainerDiff;
+
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
@@ -76,6 +85,17 @@ public class ContainerMerkleTreeMetrics {
 
   public void incrementMerkleTreeDiffFailures() {
     this.numMerkleTreeDiffFailure.incr();
+  }
+
+  public void incrementMerkleTreeDiffSuccesses() {
+    this.numMerkleTreeDiffSuccess.incr();
+  }
+
+  public void incrementHealthyContainerDiffs() {
+    this.numHealthyContainerDiff.incr();
+  }
+  public void incrementUnhealthyContainerDiffs() {
+    this.numUnhealthyContainerDiff.incr();
   }
 
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {

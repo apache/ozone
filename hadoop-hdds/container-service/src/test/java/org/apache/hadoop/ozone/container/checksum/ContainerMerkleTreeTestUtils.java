@@ -138,42 +138,21 @@ public final class ContainerMerkleTreeTestUtils {
    * structure is preserved throughout serialization, deserialization, and API calls.
    */
   public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
-    final long blockID1 = 1;
-    final long blockID2 = 2;
-    final long blockID3 = 3;
-    final long blockID4 = 4;
-    final long blockID5 = 5;
-    ContainerProtos.ChunkInfo b1c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ContainerProtos.ChunkInfo b1c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
-    ContainerProtos.ChunkInfo b1c3 = buildChunk(conf, 2, ByteBuffer.wrap(new byte[]{7, 8, 9}));
-    ContainerProtos.ChunkInfo b1c4 = buildChunk(conf, 3, ByteBuffer.wrap(new byte[]{12, 11, 10}));
-    ContainerProtos.ChunkInfo b2c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{13, 14, 15}));
-    ContainerProtos.ChunkInfo b2c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{16, 17, 18}));
-    ContainerProtos.ChunkInfo b2c3 = buildChunk(conf, 2, ByteBuffer.wrap(new byte[]{19, 20, 21}));
-    ContainerProtos.ChunkInfo b2c4 = buildChunk(conf, 3, ByteBuffer.wrap(new byte[]{22, 23, 24}));
-    ContainerProtos.ChunkInfo b3c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{25, 26, 27}));
-    ContainerProtos.ChunkInfo b3c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{28, 29, 30}));
-    ContainerProtos.ChunkInfo b3c3 = buildChunk(conf, 2, ByteBuffer.wrap(new byte[]{31, 32, 33}));
-    ContainerProtos.ChunkInfo b3c4 = buildChunk(conf, 3, ByteBuffer.wrap(new byte[]{34, 35, 36}));
-    ContainerProtos.ChunkInfo b4c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{37, 38, 29}));
-    ContainerProtos.ChunkInfo b4c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{40, 41, 42}));
-    ContainerProtos.ChunkInfo b4c3 = buildChunk(conf, 2, ByteBuffer.wrap(new byte[]{43, 44, 45}));
-    ContainerProtos.ChunkInfo b4c4 = buildChunk(conf, 3, ByteBuffer.wrap(new byte[]{46, 47, 48}));
-    ContainerProtos.ChunkInfo b5c1 = buildChunk(conf, 0, ByteBuffer.wrap(new byte[]{49, 50, 51}));
-    ContainerProtos.ChunkInfo b5c2 = buildChunk(conf, 1, ByteBuffer.wrap(new byte[]{52, 53, 54}));
-    ContainerProtos.ChunkInfo b5c3 = buildChunk(conf, 2, ByteBuffer.wrap(new byte[]{55, 56, 57}));
-    ContainerProtos.ChunkInfo b5c4 = buildChunk(conf, 3, ByteBuffer.wrap(new byte[]{58, 59, 60}));
-
     ContainerMerkleTree tree = new ContainerMerkleTree();
-    tree.addChunks(blockID1, Arrays.asList(b1c1, b1c2, b1c3, b1c4));
-    tree.addChunks(blockID2, Arrays.asList(b2c1, b2c2, b2c3, b2c4));
-    tree.addChunks(blockID3, Arrays.asList(b3c1, b3c2, b3c3, b3c4));
-    tree.addChunks(blockID4, Arrays.asList(b4c1, b4c2, b4c3, b4c4));
-    tree.addChunks(blockID5, Arrays.asList(b5c1, b5c2, b5c3, b5c4));
-
+    byte byteValue = 1;
+    for (int blockIndex = 1; blockIndex <= 5; blockIndex++) {
+      List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
+      for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
+        chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+      }
+      tree.addChunks(blockIndex, chunks);
+    }
     return tree;
   }
 
+  /**
+   * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
+   */
   public static Pair<ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildTestTreeWithMismatches(
       ConfigurationSource conf, int numMissingBlocks, int numMissingChunks, int numCorruptChunks) {
 
@@ -182,7 +161,6 @@ public final class ContainerMerkleTreeTestUtils {
     Random random = new Random();
 
     List<Long> blockIds = new ArrayList<>(Arrays.asList(1L, 2L, 3L, 4L, 5L));
-
     introduceMissingBlocks(tree, diff, blockIds, numMissingBlocks, random);
     introduceMissingChunks(tree, diff, blockIds, numMissingChunks, random);
     introduceCorruptChunks(tree, diff, blockIds, numCorruptChunks, random, conf);
@@ -255,7 +233,7 @@ public final class ContainerMerkleTreeTestUtils {
         ContainerProtos.ChunkInfo corruptChunk = buildChunk(conf, (int) offset, ByteBuffer.wrap(new byte[]{5, 10, 15}));
         tree.addChunk(blockId, corruptChunk);
         blockTree.setHealthy(offset, false);
-        diff.addCorruptChunks(blockId, chunkMerkleTree.toProto());
+        diff.addCorruptChunk(blockId, chunkMerkleTree.toProto());
 
         // Mark this chunk as corrupted for this block
         corruptedChunksPerBlock.computeIfAbsent(blockId, k -> new HashSet<>()).add(offset);
@@ -296,13 +274,8 @@ public final class ContainerMerkleTreeTestUtils {
       assertEquals(expectedBlockMerkleTree.getChunkMerkleTreeCount(),
           actualBlockMerkleTree.getChunkMerkleTreeCount());
       assertEquals(expectedBlockMerkleTree.getBlockChecksum(), actualBlockMerkleTree.getBlockChecksum());
-
-      for (int j = 0; j < expectedBlockMerkleTree.getChunkMerkleTreeCount(); j++) {
-        ContainerProtos.ChunkMerkleTree expectedChunk = expectedBlockMerkleTree.getChunkMerkleTree(j);
-        ContainerProtos.ChunkMerkleTree actualChunk = expectedBlockMerkleTree.getChunkMerkleTree(j);
-        assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(), "Mismatch in chunk offset");
-        assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(), "Mismatch in chunk checksum");
-      }
+      assertEqualsChunkMerkleTree(expectedBlockMerkleTree.getChunkMerkleTreeList(),
+          actualBlockMerkleTree.getChunkMerkleTreeList());
     }
 
     // Check missing chunks
@@ -319,7 +292,7 @@ public final class ContainerMerkleTreeTestUtils {
       assertNotNull(actualChunks, "Missing chunks for block " + blockId + " not found in actual diff");
       assertEquals(expectedChunks.size(), actualChunks.size(),
           "Mismatch in number of missing chunks for block " + blockId);
-
+      assertEqualsChunkMerkleTree(expectedChunks, actualChunks);
       for (int i = 0; i < expectedChunks.size(); i++) {
         ContainerProtos.ChunkMerkleTree expectedChunk = expectedChunks.get(i);
         ContainerProtos.ChunkMerkleTree actualChunk = actualChunks.get(i);
@@ -344,15 +317,18 @@ public final class ContainerMerkleTreeTestUtils {
       assertNotNull(actualChunks, "Corrupt chunks for block " + blockId + " not found in actual diff");
       assertEquals(expectedChunks.size(), actualChunks.size(),
           "Mismatch in number of corrupt chunks for block " + blockId);
+      assertEqualsChunkMerkleTree(expectedChunks, actualChunks);
+    }
+  }
 
-      for (int i = 0; i < expectedChunks.size(); i++) {
-        ContainerProtos.ChunkMerkleTree expectedChunk = expectedChunks.get(i);
-        ContainerProtos.ChunkMerkleTree actualChunk = actualChunks.get(i);
-        assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(),
-            "Mismatch in chunk offset for block " + blockId);
-        assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(),
-            "Mismatch in chunk checksum for block " + blockId);
-      }
+  private static void assertEqualsChunkMerkleTree(List<ContainerProtos.ChunkMerkleTree> expectedChunkMerkleTreeList,
+                                                  List<ContainerProtos.ChunkMerkleTree> actualChunkMerkleTreeList) {
+    assertEquals(expectedChunkMerkleTreeList.size(), actualChunkMerkleTreeList.size());
+    for (int j = 0; j < expectedChunkMerkleTreeList.size(); j++) {
+      ContainerProtos.ChunkMerkleTree expectedChunk = expectedChunkMerkleTreeList.get(j);
+      ContainerProtos.ChunkMerkleTree actualChunk = actualChunkMerkleTreeList.get(j);
+      assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(), "Mismatch in chunk offset");
+      assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(), "Mismatch in chunk checksum");
     }
   }
 
