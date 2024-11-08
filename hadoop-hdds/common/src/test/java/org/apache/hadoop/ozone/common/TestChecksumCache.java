@@ -50,9 +50,9 @@ class TestChecksumCache {
 
     final Function<ByteBuffer, ByteString> function = Algorithm.valueOf(checksumType).newChecksumFunction();
 
-    int i_end = size / bytesPerChecksum + (size % bytesPerChecksum == 0 ? 0 : 1);
+    int iEnd = size / bytesPerChecksum + (size % bytesPerChecksum == 0 ? 0 : 1);
     List<ByteString> lastRes = null;
-    for (int i = 0; i < i_end; i++) {
+    for (int i = 0; i < iEnd; i++) {
       int byteBufferLength = Integer.min(byteArray.length, bytesPerChecksum * (i + 1));
       ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, byteBufferLength);
 
