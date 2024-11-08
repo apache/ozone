@@ -96,49 +96,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <skip>${maven.shade.skip}</skip>
-              <transformers>
-                <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
-                  <resources>
-                    <resource>META-INF/BC1024KE.DSA</resource>
-                    <resource>META-INF/BC2048KE.DSA</resource>
-                    <resource>META-INF/BC1024KE.SF</resource>
-                    <resource>META-INF/BC2048KE.SF</resource>
-                  </resources>
-                </transformer>
-                <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                <transformer
-                    implementation="org.apache.maven.plugins.shade.resource.XmlAppendingTransformer">
-                  <resource>ozone-default-generated.xml</resource>
-                </transformer>
-              </transformers>
-              <relocations>
-                <relocation>
-                  <pattern>com.google.protobuf</pattern>
-                  <shadedPattern>
-                    org.apache.hadoop.shaded.com.google.protobuf
-                  </shadedPattern>
-                  <includes>
-                    <include>com.google.protobuf.*</include>
-                  </includes>
-                </relocation>
-              </relocations>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
