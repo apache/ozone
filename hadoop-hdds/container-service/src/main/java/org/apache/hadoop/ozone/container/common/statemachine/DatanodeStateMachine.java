@@ -59,10 +59,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Reco
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
-import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -133,8 +131,6 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
-  private final ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore;
-
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -182,11 +178,10 @@ public class DatanodeStateMachine implements Closeable {
     // OzoneContainer instance is used in a non-thread safe way by the context
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.
-    this.masterVolumeMetadataStore = MasterVolumeMetadataStore.get(conf);
     constructionLock.writeLock().lock();
     try {
       container = new OzoneContainer(hddsDatanodeService, this.datanodeDetails,
-          conf, context, certClient, secretKeyClient, masterVolumeMetadataStore);
+          conf, context, certClient, secretKeyClient);
     } finally {
       constructionLock.writeLock().unlock();
     }
@@ -451,10 +446,6 @@ public class DatanodeStateMachine implements Closeable {
 
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
-    }
-
-    if (masterVolumeMetadataStore != null) {
-      masterVolumeMetadataStore.cleanup();
     }
   }
 

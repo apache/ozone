@@ -46,6 +46,9 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
     String dbDirPath = DBStoreBuilder.getDBDirPath(MasterVolumeDBDefinition.get(), conf).getAbsolutePath();
     try {
       return INSTANCES.compute(dbDirPath, (k, v) -> {
+        if (v != null) {
+          v.incrementReference();
+        }
         if (v == null || v.isClosed()) {
           try {
             MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);

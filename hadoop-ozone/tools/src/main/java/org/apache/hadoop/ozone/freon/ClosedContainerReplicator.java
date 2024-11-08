@@ -184,12 +184,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-    ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDS =
-        MasterVolumeMetadataStore.get(conf);
-    referenceCountedDS.incrementReference();
+    ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDS = MasterVolumeMetadataStore.get(conf);
     this.masterVolumeMetadataStoreReferenceCountedDB = referenceCountedDS;
-    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore()
-        .getContainerIdsTable(), 1000);
+    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore().getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

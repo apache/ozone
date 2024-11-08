@@ -152,10 +152,9 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
-                        DatanodeDetails datanodeDetails, ConfigurationSource conf,
-                        StateContext context, CertificateClient certClient,
-                        SecretKeyVerifierClient secretKeyClient,
-                        ReferenceCountedDB<MasterVolumeMetadataStore> masterVolumeMetadataStore) throws IOException {
+      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      StateContext context, CertificateClient certClient,
+      SecretKeyVerifierClient secretKeyClient) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -191,8 +190,7 @@ public class OzoneContainer {
     long recoveringContainerTimeout = config.getTimeDuration(
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    this.masterVolumeMetadataStore = masterVolumeMetadataStore;
-    this.masterVolumeMetadataStore.incrementReference();
+    this.masterVolumeMetadataStore = MasterVolumeMetadataStore.get(conf);
     containerSet = new ContainerSet(masterVolumeMetadataStore.getStore().getContainerIdsTable(),
         recoveringContainerTimeout);
     metadataScanner = null;
@@ -305,14 +303,6 @@ public class OzoneContainer {
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context) throws IOException {
     this(null, datanodeDetails, conf, context, null, null);
-  }
-
-  public OzoneContainer(HddsDatanodeService hddsDatanodeService,
-                        DatanodeDetails datanodeDetails, ConfigurationSource conf,
-                        StateContext context, CertificateClient certClient,
-                        SecretKeyVerifierClient secretKeyClient) throws IOException {
-    this(hddsDatanodeService, datanodeDetails, conf, context, certClient, secretKeyClient,
-        MasterVolumeMetadataStore.get(conf));
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -541,7 +531,7 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
-    if (this.masterVolumeMetadataStore != null) {
+    if (this.masterVolumeMetadataStore != null && !this.masterVolumeMetadataStore.isClosed()) {
       this.masterVolumeMetadataStore.decrementReference();
       this.masterVolumeMetadataStore.cleanup();
       this.masterVolumeMetadataStore = null;
