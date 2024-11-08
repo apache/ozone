@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -58,7 +59,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -989,7 +989,7 @@ public class OMDBInsightEndpoint {
       listKeysResponse = (ListKeysResponse) response.getEntity();
     }
 
-    List<KeyEntityInfo> keyInfoList = listKeysResponse.getKeys();
+    List<KeyEntityInfoProtoWrapper> keyInfoList = listKeysResponse.getKeys();
     if (!keyInfoList.isEmpty()) {
       listKeysResponse.setLastKey(keyInfoList.get(keyInfoList.size() - 1).getKey());
     }
@@ -1003,38 +1003,24 @@ public class OMDBInsightEndpoint {
       listKeysResponse.setPath(paramInfo.getStartPrefix());
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
-      boolean keysFound = false; // Flag to track if any keys are found
 
       // Search keys from non-FSO layout.
-      Map<String, OmKeyInfo> obsKeys;
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getKeyTable(BucketLayout.LEGACY);
-      obsKeys = retrieveKeysFromTable(keyTable, paramInfo);
-      for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
-        keysFound = true;
-        KeyEntityInfo keyEntityInfo =
-            createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
+      Table<String, KeyEntityInfoProtoWrapper> keyTable =
+          omMetadataManager.getKeyTableLite(BucketLayout.LEGACY);
+      retrieveKeysFromTable(keyTable, paramInfo, listKeysResponse.getKeys());
 
-        listKeysResponse.getKeys().add(keyEntityInfo);
-        replicatedTotal += entry.getValue().getReplicatedSize();
-        unreplicatedTotal += entry.getValue().getDataSize();
-      }
 
       // Search keys from FSO layout.
-      Map<String, OmKeyInfo> fsoKeys = searchKeysInFSO(paramInfo);
-      for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
-        keysFound = true;
-        KeyEntityInfo keyEntityInfo =
-            createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
-
-        listKeysResponse.getKeys().add(keyEntityInfo);
-        replicatedTotal += entry.getValue().getReplicatedSize();
-        unreplicatedTotal += entry.getValue().getDataSize();
-      }
+      searchKeysInFSO(paramInfo, listKeysResponse.getKeys());
 
       // If no keys were found, return a response indicating that no keys matched
-      if (!keysFound) {
+      if (listKeysResponse.getKeys().isEmpty()) {
         return ReconResponseUtils.noMatchedKeysResponse(paramInfo.getStartPrefix());
+      }
+
+      for (KeyEntityInfoProtoWrapper keyEntityInfo : listKeysResponse.getKeys()) {
+        replicatedTotal += keyEntityInfo.getReplicatedSize();
+        unreplicatedTotal += keyEntityInfo.getSize();
       }
 
       // Set the aggregated totals in the response
@@ -1042,27 +1028,24 @@ public class OMDBInsightEndpoint {
       listKeysResponse.setUnReplicatedDataSize(unreplicatedTotal);
 
       return Response.ok(listKeysResponse).build();
-    } catch (IOException e) {
-      return ReconResponseUtils.createInternalServerErrorResponse(
-          "Error listing keys from OM DB: " + e.getMessage());
     } catch (RuntimeException e) {
+      LOG.error("Error generating listKeys response", e);
       return ReconResponseUtils.createInternalServerErrorResponse(
           "Unexpected runtime error while searching keys in OM DB: " + e.getMessage());
     } catch (Exception e) {
+      LOG.error("Error generating listKeys response", e);
       return ReconResponseUtils.createInternalServerErrorResponse(
           "Error listing keys from OM DB: " + e.getMessage());
     }
   }
 
-  public Map<String, OmKeyInfo> searchKeysInFSO(ParamInfo paramInfo)
+  public void searchKeysInFSO(ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
       throws IOException {
-    int originalLimit = paramInfo.getLimit();
-    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertStartPrefixPathToObjectIdPath(paramInfo.getStartPrefix());
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, OmKeyInfo> fileTable =
-        omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    Table<String, KeyEntityInfoProtoWrapper> fileTable =
+        omMetadataManager.getKeyTableLite(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the level above bucket level hence
     // no need to find parent or extract id's or find subpaths as the fileTable is
@@ -1075,7 +1058,7 @@ public class OMDBInsightEndpoint {
       NSSummary parentSummary =
           reconNamespaceSummaryManager.getNSSummary(parentId);
       if (parentSummary == null) {
-        return matchedKeys;
+        return;
       }
       List<String> subPaths = new ArrayList<>();
       // Add the initial search prefix object path because it can have both files and subdirectories with files.
@@ -1087,21 +1070,17 @@ public class OMDBInsightEndpoint {
       // Iterate over the subpaths and retrieve the files
       for (String subPath : subPaths) {
         paramInfo.setStartPrefix(subPath);
-        matchedKeys.putAll(
-            retrieveKeysFromTable(fileTable, paramInfo));
-        paramInfo.setLimit(originalLimit - matchedKeys.size());
-        if (matchedKeys.size() >= originalLimit) {
+        retrieveKeysFromTable(fileTable, paramInfo, results);
+        if (results.size() >= paramInfo.getLimit()) {
           break;
         }
       }
-      return matchedKeys;
+      return;
     }
 
     paramInfo.setStartPrefix(startPrefixObjectPath);
     // Iterate over for bucket and volume level search
-    matchedKeys.putAll(
-        retrieveKeysFromTable(fileTable, paramInfo));
-    return matchedKeys;
+    retrieveKeysFromTable(fileTable, paramInfo, results);
   }
 
 
@@ -1174,32 +1153,31 @@ public class OMDBInsightEndpoint {
    * @return A map of keys and their corresponding OmKeyInfo objects.
    * @throws IOException If there are problems accessing the table.
    */
-  private Map<String, OmKeyInfo> retrieveKeysFromTable(
-      Table<String, OmKeyInfo> table, ParamInfo paramInfo)
+  private void retrieveKeysFromTable(
+      Table<String, KeyEntityInfoProtoWrapper> table, ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
-    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, KeyEntityInfoProtoWrapper>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;
-        Table.KeyValue<String, OmKeyInfo> seekKeyValue =
+        Table.KeyValue<String, KeyEntityInfoProtoWrapper> seekKeyValue =
             keyIter.seek(seekKey);
 
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
         // In case of an empty prevKeyPrefix, all the keys are returned
         if (seekKeyValue == null || (!seekKeyValue.getKey().equals(paramInfo.getPrevKey()))) {
-          return matchedKeys;
+          return;
         }
       } else {
         keyIter.seek(paramInfo.getStartPrefix());
       }
 
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
+        Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry = keyIter.next();
         String dbKey = entry.getKey();
         if (!dbKey.startsWith(paramInfo.getStartPrefix())) {
           break; // Exit the loop if the key no longer matches the prefix
@@ -1209,9 +1187,14 @@ public class OMDBInsightEndpoint {
           continue;
         }
         if (applyFilters(entry, paramInfo)) {
-          matchedKeys.put(dbKey, entry.getValue());
+          KeyEntityInfoProtoWrapper keyEntityInfo = entry.getValue();
+          keyEntityInfo.setKey(dbKey);
+          keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
+              keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
+              omMetadataManager));
+          results.add(keyEntityInfo);
           paramInfo.setLastKey(dbKey);
-          if (matchedKeys.size() >= paramInfo.getLimit()) {
+          if (results.size() >= paramInfo.getLimit()) {
             break;
           }
         }
@@ -1220,10 +1203,10 @@ public class OMDBInsightEndpoint {
       LOG.error("Error retrieving keys from table for path: {}", paramInfo.getStartPrefix(), exception);
       throw exception;
     }
-    return matchedKeys;
   }
 
-  private boolean applyFilters(Table.KeyValue<String, OmKeyInfo> entry, ParamInfo paramInfo) throws IOException {
+  private boolean applyFilters(Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry, ParamInfo paramInfo)
+      throws IOException {
 
     LOG.debug("Applying filters on : {}", entry.getKey());
 
@@ -1238,7 +1221,7 @@ public class OMDBInsightEndpoint {
       return false;
     }
 
-    return entry.getValue().getDataSize() >= paramInfo.getKeySize();
+    return entry.getValue().getSize() >= paramInfo.getKeySize();
   }
 
   /**
