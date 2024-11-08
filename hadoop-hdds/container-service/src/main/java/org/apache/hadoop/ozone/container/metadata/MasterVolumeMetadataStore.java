@@ -30,26 +30,17 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import java.io.IOException;
 
 /**
- * Singleton class for interacting with database in the master volume of a datanode.
+ * Class for interacting with database in the master volume of a datanode.
  */
 public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolumeDBDefinition>
     implements MetadataStore {
 
   private Table<Long, ContainerProtos.ContainerDataProto.State> containerIdsTable;
 
-  private static ReferenceCountedDB<MasterVolumeMetadataStore> instance = null;
-
   public static ReferenceCountedDB<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
-    if (instance == null || instance.isClosed()) {
-      synchronized (MasterVolumeMetadataStore.class) {
-        if (instance == null || instance.isClosed()) {
-          MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
-          instance = new ReferenceCountedDB<>(masterVolumeMetadataStore,
-              masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
-        }
-      }
-    }
-    return instance;
+    MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
+    return new ReferenceCountedDB<>(masterVolumeMetadataStore,
+        masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
   }
 
   private MasterVolumeMetadataStore(ConfigurationSource config, boolean openReadOnly) throws IOException {

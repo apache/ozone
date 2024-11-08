@@ -276,7 +276,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         getMissingContainerSet().remove(containerID);
       }
     }
-    if (cmdType != Type.CreateContainer && !HddsUtils.isReadOnly(msg) && getMissingContainerSet().contains(containerID)) {
+    if (cmdType != Type.CreateContainer && !HddsUtils.isReadOnly(msg)
+        && getMissingContainerSet().contains(containerID)) {
       StorageContainerException sce = new StorageContainerException(
           "ContainerID " + containerID
               + " has been lost and cannot be recreated on this DataNode",
