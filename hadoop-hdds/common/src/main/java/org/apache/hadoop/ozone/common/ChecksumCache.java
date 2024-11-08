@@ -68,11 +68,17 @@ public class ChecksumCache {
     // Indicates how much data the current chunk buffer holds
     final int currChunkLength = data.limit();
 
+    if (currChunkLength == prevChunkLength) {
+      LOG.debug("ChunkBuffer data limit same as last time ({}). No new checksums need to be computed", prevChunkLength);
+      return checksums;
+    }
+
     // Sanity check
-    if (currChunkLength <= prevChunkLength) {
+    if (currChunkLength < prevChunkLength) {
       // If currChunkLength <= lastChunkLength, it indicates a bug that needs to be addressed.
       // It means BOS has not properly clear()ed the cache when a new chunk is started in that code path.
-      throw new IllegalArgumentException("ChunkBuffer data limit must be larger than the last time");
+      throw new IllegalArgumentException("ChunkBuffer data limit (" + currChunkLength + ")" +
+          " must not be smaller than last time (" + prevChunkLength + ")");
     }
 
     // One or more checksums need to be computed

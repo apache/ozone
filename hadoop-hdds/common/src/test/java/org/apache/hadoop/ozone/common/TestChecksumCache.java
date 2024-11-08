@@ -59,7 +59,7 @@ class TestChecksumCache {
       try (ChunkBuffer chunkBuffer = ChunkBuffer.wrap(byteBuffer.asReadOnlyBuffer())) {
         List<ByteString> res = checksumCache.computeChecksum(chunkBuffer, function);
         System.out.println(res);
-        // Verify that every entry in the res list except the last one is the same as the lastRes list
+        // Verify that every entry in the res list except the last one is the same as the one in lastRes list
         if (i > 0) {
           for (int j = 0; j < res.size() - 1; j++) {
             Assertions.assertEquals(lastRes.get(j), res.get(j));

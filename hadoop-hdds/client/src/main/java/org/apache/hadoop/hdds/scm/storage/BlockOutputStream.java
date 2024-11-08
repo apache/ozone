@@ -1047,9 +1047,11 @@ public class BlockOutputStream extends OutputStream {
           lastChunkBuffer.capacity() - lastChunkBuffer.position();
       appendLastChunkBuffer(chunk, 0, remainingBufferSize);
       updateBlockDataWithLastChunkBuffer();
-//      checksum.clearChecksumCache();  // New chunk, clear the checksum cache
+
+      // New chunk, need to clear checksum cache
+      checksum.clearChecksumCache();
       // TODO: Can make the cache impl a bit more robust by associating ChecksumCache with ChunkBuffer/ByteBuffer rather
-      //  than the Checksum object.
+      //  than the Checksum object?
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
@@ -1066,10 +1068,10 @@ public class BlockOutputStream extends OutputStream {
     LOG.debug("lastChunkInfo = {}", lastChunkInfo);
     long lastChunkSize = lastChunkInfo.getLen();
     addToBlockData(lastChunkInfo);
-
+    // This sets ByteBuffer limit to capacity, pos to 0. Does NOT erase data
+    // TODO: This could be put inside createChunkInfo() to be more clear.
     lastChunkBuffer.clear();
-    // Clear checksum cache associated with lastChunkBuffer? TODO: Double check
-    checksum.clearChecksumCache();
+
     if (lastChunkSize == config.getStreamBufferSize()) {
       lastChunkOffset += config.getStreamBufferSize();
     } else {
