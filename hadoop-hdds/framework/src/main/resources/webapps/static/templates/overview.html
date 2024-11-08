@@ -14,7 +14,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<h1>Overview</h1>
+<h1>Overview <small ng-if="$ctrl.jmx.Hostname">({{$ctrl.jmx.Hostname}})</small> </h1>
 <table class="table table-bordered table-striped">
     <tbody>
     <tr ng-if="$ctrl.jmx.Namespace && $ctrl.jmx.Namespace !== ''">
