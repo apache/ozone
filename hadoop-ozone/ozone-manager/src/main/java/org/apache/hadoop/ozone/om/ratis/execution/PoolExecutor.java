@@ -31,6 +31,7 @@ import java.util.function.BiConsumer;
 public class PoolExecutor <T, Q> {
   private final Thread[] threadPool;
   private final List<BlockingQueue<T>> queues;
+  private final String threadPrefix;
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
   private BiConsumer<Collection<T>, CheckedConsumer<Q>> handler = null;
   private CheckedConsumer<Q> submitter;
@@ -38,11 +39,10 @@ public class PoolExecutor <T, Q> {
   private PoolExecutor(int poolSize, int queueSize, String threadPrefix) {
     threadPool = new Thread[poolSize];
     queues = new ArrayList<>(poolSize);
+    this.threadPrefix = threadPrefix;
     for (int i = 0; i < poolSize; ++i) {
       LinkedBlockingQueue<T> queue = new LinkedBlockingQueue<>(queueSize);
       queues.add(queue);
-      threadPool[i] = new Thread(() -> execute(queue), threadPrefix + "-" + i);
-      threadPool[i].start();
     }
   }
   public PoolExecutor(
@@ -53,8 +53,10 @@ public class PoolExecutor <T, Q> {
     this.submitter = submitter;
   }
   public void start() {
-    for (Thread thread : threadPool) {
-      thread.start();
+    for (int i = 0; i < threadPool.length; ++i) {
+      BlockingQueue<T> queue = queues.get(i);
+      threadPool[i] = new Thread(() -> execute(queue), threadPrefix + "-" + i);
+      threadPool[i].start();
     }
   }
   public void submit(int idx, T task) throws InterruptedException {
