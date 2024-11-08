@@ -356,6 +356,7 @@ public class ReconUtils {
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
+        fullPath.setLength(0);
         return fullPath;
       }
       if (nsSummary.getParentId() == -1) {
@@ -363,6 +364,7 @@ public class ReconUtils {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
         log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        fullPath.setLength(0);
         return fullPath;
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
