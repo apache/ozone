@@ -2063,6 +2063,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return statefulServiceStateManager;
   }
 
+  @Override
+  public String getNamespace() {
+    return scmHANodeDetails.getLocalNodeDetails().getServiceId();
+  }
   /**
    * Get the safe mode status of all rules.
    *

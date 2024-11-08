@@ -691,7 +691,7 @@ public class ContainerBalancerTask implements Runnable {
         moveSelectionToFutureMap.values();
     if (!futures.isEmpty()) {
       CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
-          futures.toArray(new CompletableFuture[futures.size()]));
+          futures.toArray(new CompletableFuture[0]));
       try {
         allFuturesResult.get(config.getMoveTimeout().toMillis(),
             TimeUnit.MILLISECONDS);

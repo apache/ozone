@@ -205,17 +205,6 @@ public class ReconNodeManager extends SCMNodeManager {
         EMPTY_DATANODE_DETAILS).getRevision();
   }
 
-  /**
-   * Returns the build date of the given node.
-   *
-   * @param datanodeDetails DatanodeDetails
-   * @return buildDate
-   */
-  public String getBuildDate(DatanodeDetails datanodeDetails) {
-    return inMemDatanodeDetails.getOrDefault(datanodeDetails.getUuid(),
-        EMPTY_DATANODE_DETAILS).getBuildDate();
-  }
-
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher ignored) {

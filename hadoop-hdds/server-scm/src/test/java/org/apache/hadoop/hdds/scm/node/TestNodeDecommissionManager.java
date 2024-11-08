@@ -440,6 +440,10 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 3);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -489,6 +493,10 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
@@ -537,6 +545,10 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
@@ -637,6 +649,7 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
         dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), false);
     assertFalse(error.get(0).getHostname().contains("AllHosts"));
+    assertTrue(error.get(0).getError().contains("The host was not found in SCM"));
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -673,6 +686,11 @@ public class TestNodeDecommissionManager {
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), 100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        2);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -768,6 +786,11 @@ public class TestNodeDecommissionManager {
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
         100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        4);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -869,6 +892,11 @@ public class TestNodeDecommissionManager {
     // it should not be allowed as for EC, maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
 

@@ -34,6 +34,15 @@ package org.apache.hadoop.hdds.server;
 public interface ServiceRuntimeInfo {
 
   /**
+   * Gets the namespace of Ozone.
+   *
+   * @return the namespace
+   */
+  default String getNamespace() {
+    return "";
+  };
+
+  /**
    * Gets the version of Hadoop.
    *
    * @return the version
@@ -46,13 +55,6 @@ public interface ServiceRuntimeInfo {
    * @return a string representing the version
    */
   String getSoftwareVersion();
-
-  /**
-   * Get the compilation information which contains date, user and branch.
-   *
-   * @return the compilation information, as a JSON string.
-   */
-  String getCompileInfo();
 
   /**
    * Gets the NN start time in milliseconds.

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -65,9 +66,6 @@ import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketCh
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT;
 
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
@@ -134,13 +132,9 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
-    final boolean zeroCopyEnabled = conf.getBoolean(
-        OZONE_EC_GRPC_ZERO_COPY_ENABLED,
-        OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT);
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
-    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher,
-        zeroCopyEnabled);
+    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -185,7 +179,16 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      server.start();
+      try {
+        server.start();
+      } catch (IOException e) {
+        LOG.error("Error while starting the server", e);
+        if (e.getMessage().contains("Failed to bind to address")) {
+          throw new BindException(e.getMessage());
+        } else {
+          throw e;
+        }
+      }
       int realPort = server.getPort();
 
       if (port == 0) {

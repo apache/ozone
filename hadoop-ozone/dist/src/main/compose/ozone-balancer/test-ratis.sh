@@ -24,10 +24,12 @@ export OM=om1
 export SCM=scm1
 export OZONE_REPLICATION_FACTOR=3
 
+export DATANODE2_REPLICA=0
+export DATANODE5_REPLICA=0
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-# We need 4 dataNodes in this tests
-start_docker_env 4
+start_docker_env
 
-execute_robot_test ${OM} balancer/testBalancer.robot
+execute_robot_test ${OM} -v REPLICATION:THREE -v TYPE:RATIS -v LOWER_LIMIT:3 -v UPPER_LIMIT:3.5 -N ozone-balancer-RATIS balancer/testBalancer.robot

@@ -21,6 +21,12 @@ if [[ ${SECURITY_ENABLED} == "true" ]]; then
 fi
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
+# need temp variables because maven filtering replaces only one item per line
+hadoop2_version="${hadoop2.version}"
+hadoop_version="${hadoop.version}"
+
+: ${HADOOP_TEST_VERSIONS:="apache/hadoop:${hadoop2_version} flokkr/hadoop:3.1.2 apache/hadoop:${hadoop_version}"}
+
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
 export OZONE_REPLICATION_FACTOR=3

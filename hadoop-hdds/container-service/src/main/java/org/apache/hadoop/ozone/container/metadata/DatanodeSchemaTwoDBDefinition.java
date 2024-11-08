@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -44,45 +43,35 @@ public class DatanodeSchemaTwoDBDefinition
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   "block_data",
-                  String.class,
                   StringCodec.get(),
-                  BlockData.class,
                   BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
           new DBColumnFamilyDefinition<>(
           "metadata",
-          String.class,
           StringCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "delete_txns",
-          Long.class,
           LongCodec.get(),
-          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
           "finalize_blocks",
-          String.class,
           FixedLengthStringCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
           "last_chunk_info",
-          String.class,
           FixedLengthStringCodec.get(),
-          BlockData.class,
           BlockData.getCodec());
 
   public DatanodeSchemaTwoDBDefinition(String dbPath,
