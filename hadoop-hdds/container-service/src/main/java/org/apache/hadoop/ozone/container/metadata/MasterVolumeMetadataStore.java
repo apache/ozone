@@ -28,6 +28,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Class for interacting with database in the master volume of a datanode.
@@ -36,11 +39,27 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
     implements MetadataStore {
 
   private Table<Long, ContainerProtos.ContainerDataProto.State> containerIdsTable;
+  private static final ConcurrentMap<String, ReferenceCountedDB<MasterVolumeMetadataStore>> INSTANCES =
+      new ConcurrentHashMap<>();
 
   public static ReferenceCountedDB<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
-    MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
-    return new ReferenceCountedDB<>(masterVolumeMetadataStore,
-        masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
+    String dbDirPath = DBStoreBuilder.getDBDirPath(MasterVolumeDBDefinition.get(), conf).getAbsolutePath();
+    try {
+      return INSTANCES.compute(dbDirPath, (k, v) -> {
+        if (v == null || v.isClosed()) {
+          try {
+            MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
+            return new ReferenceCountedDB<>(masterVolumeMetadataStore,
+                masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        }
+        return v;
+      });
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
   }
 
   private MasterVolumeMetadataStore(ConfigurationSource config, boolean openReadOnly) throws IOException {
