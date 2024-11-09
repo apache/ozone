@@ -70,13 +70,18 @@ public class ContainerSet implements Iterable<Container<?>> {
   private Clock clock;
   private long recoveringTimeout;
   private final Table<Long, State> containerIdsTable;
-  private final boolean readOnly;
 
   public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout) {
+    this(continerIdsTable, recoveringTimeout, false);
+  }
+
+  public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout, boolean readOnly) {
     this.clock = Clock.system(ZoneOffset.UTC);
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
-    this.readOnly = containerIdsTable == null;
+    if (!readOnly && containerIdsTable == null) {
+      throw new IllegalArgumentException("Container table cannot be null when container set is not read only");
+    }
   }
 
   public long getCurrentTime() {
@@ -105,7 +110,6 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public boolean addContainer(Container<?> container, boolean overwriteMissingContainers) throws
       StorageContainerException {
-    Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkNotNull(container, "container cannot be null");
 
     long containerId = container.getContainerData().getContainerID();
@@ -123,7 +127,9 @@ public class ContainerSet implements Iterable<Container<?>> {
             containerId);
       }
       try {
-        containerIdsTable.put(containerId, containerState);
+        if (containerIdsTable != null) {
+          containerIdsTable.put(containerId, containerState);
+        }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
@@ -165,7 +171,6 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB)
       throws StorageContainerException {
-    Preconditions.checkState(!readOnly, "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     //We need to add to missing container set before removing containerMap since there could be write chunk operation
@@ -177,7 +182,9 @@ public class ContainerSet implements Iterable<Container<?>> {
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
       try {
-        containerIdsTable.delete(containerId);
+        if (containerIdsTable != null) {
+          containerIdsTable.delete(containerId);
+        }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
@@ -200,8 +207,6 @@ public class ContainerSet implements Iterable<Container<?>> {
    * otherwise false.
    */
   public boolean removeRecoveringContainer(long containerId) {
-    Preconditions.checkState(!readOnly,
-        "Container Set is read-only.");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     //it might take a little long time to iterate all the entries
