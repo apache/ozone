@@ -93,6 +93,8 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -120,8 +122,6 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -355,6 +355,15 @@ public class KeyValueHandler extends Handler {
     }
 
     long containerID = request.getContainerID();
+    State containerState = request.getCreateContainer().getState();
+
+    if (containerSet.getMissingContainerSet().contains(containerID) && containerState != RECOVERING) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(String.format("Container with " + "container Id %d is " +
+          "missing in the DN and creation of containers with state %s is not allowed. Only recreation of container " +
+              "in RECOVERING state is allowed.", containerID, containerState.toString()),
+              ContainerProtos.Result.CONTAINER_MISSING), request);
+    }
 
     ContainerLayoutVersion layoutVersion =
         ContainerLayoutVersion.getConfiguredVersion(conf);
@@ -379,7 +388,7 @@ public class KeyValueHandler extends Handler {
     try {
       if (containerSet.getContainer(containerID) == null) {
         newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
-        created = containerSet.addContainer(newContainer);
+        created = containerSet.addContainer(newContainer, RECOVERING == newContainer.getContainerState());
       } else {
         // The create container request for an already existing container can
         // arrive in case the ContainerStateMachine reapplies the transaction
@@ -1071,7 +1080,7 @@ public class KeyValueHandler extends Handler {
      * might already be in closing state here.
      */
     if (containerState == State.OPEN || containerState == State.CLOSING
-        || containerState == State.RECOVERING) {
+        || containerState == RECOVERING) {
       return;
     }
 

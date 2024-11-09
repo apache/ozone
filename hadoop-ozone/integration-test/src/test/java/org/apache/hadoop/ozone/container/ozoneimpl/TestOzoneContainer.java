@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -31,11 +32,13 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -160,6 +163,134 @@ public class TestOzoneContainer {
     }
   }
 
+  @Test
+  public void testOzoneContainerWithMissingContainer() throws Exception {
+    MiniOzoneCluster cluster = null;
+    try {
+      long containerID =
+          ContainerTestHelper.getTestContainerID();
+      OzoneConfiguration conf = newOzoneConfiguration();
+
+      // Start ozone container Via Datanode create.
+      cluster = MiniOzoneCluster.newBuilder(conf)
+          .setNumDatanodes(1)
+          .build();
+      cluster.waitForClusterToBeReady();
+
+      runTestOzoneContainerWithMissingContainer(cluster, containerID);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  private void runTestOzoneContainerWithMissingContainer(
+      MiniOzoneCluster cluster, long testContainerID) throws Exception {
+    ContainerProtos.ContainerCommandRequestProto
+        request, writeChunkRequest, putBlockRequest,
+        updateRequest1, updateRequest2;
+    ContainerProtos.ContainerCommandResponseProto response,
+        updateResponse1, updateResponse2;
+    XceiverClientGrpc client = null;
+    try {
+      // This client talks to ozone container via datanode.
+      client = createClientForTesting(cluster);
+      client.connect();
+      Pipeline pipeline = client.getPipeline();
+      createContainerForTesting(client, testContainerID);
+      writeChunkRequest = writeChunkForContainer(client, testContainerID,
+          1024);
+
+      DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+      File containerPath =
+          new File(cluster.getHddsDatanode(datanodeDetails).getDatanodeStateMachine()
+              .getContainer().getContainerSet().getContainer(testContainerID)
+              .getContainerData().getContainerPath());
+      cluster.getHddsDatanode(datanodeDetails).stop();
+      FileUtils.deleteDirectory(containerPath);
+
+      // Restart & Check if the container has been marked as missing, since the container directory has been deleted.
+      cluster.restartHddsDatanode(datanodeDetails, false);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return cluster.getHddsDatanode(datanodeDetails).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getMissingContainerSet().contains(testContainerID);
+        } catch (IOException e) {
+          return false;
+        }
+      }, 1000, 30000);
+
+      // Read Chunk
+      request = ContainerTestHelper.getReadChunkRequest(
+          pipeline, writeChunkRequest.getWriteChunk());
+
+      response = client.sendCommand(request);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+
+      response = createContainerForTesting(client, testContainerID);
+      assertEquals(ContainerProtos.Result.CONTAINER_MISSING, response.getResult());
+
+      // Put Block
+      putBlockRequest = ContainerTestHelper.getPutBlockRequest(
+          pipeline, writeChunkRequest.getWriteChunk());
+
+
+      response = client.sendCommand(putBlockRequest);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.CONTAINER_MISSING, response.getResult());
+
+      // Get Block
+      request = ContainerTestHelper.
+          getBlockRequest(pipeline, putBlockRequest.getPutBlock());
+      response = client.sendCommand(request);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+
+      // Delete Block and Delete Chunk are handled by BlockDeletingService
+      // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
+      // are deprecated
+
+      //Update an existing container
+      Map<String, String> containerUpdate = new HashMap<String, String>();
+      containerUpdate.put("container_updated_key", "container_updated_value");
+      updateRequest1 = ContainerTestHelper.getUpdateContainerRequest(
+          testContainerID, containerUpdate);
+      updateResponse1 = client.sendCommand(updateRequest1);
+      assertNotNull(updateResponse1);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
+          response.getResult());
+
+      //Update an non-existing container
+      long nonExistingContinerID =
+          ContainerTestHelper.getTestContainerID();
+      updateRequest2 = ContainerTestHelper.getUpdateContainerRequest(
+          nonExistingContinerID, containerUpdate);
+      updateResponse2 = client.sendCommand(updateRequest2);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
+          updateResponse2.getResult());
+
+      // Restarting again & checking if the container is still not present on disk and marked as missing, this is to
+      // ensure the previous write request didn't inadvertently create the container data.
+      cluster.restartHddsDatanode(datanodeDetails, false);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return cluster.getHddsDatanode(datanodeDetails).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getMissingContainerSet().contains(testContainerID);
+        } catch (IOException e) {
+          return false;
+        }
+      }, 1000, 30000);
+
+    } finally {
+      if (client != null) {
+        client.close();
+      }
+    }
+  }
+
   public static void runTestOzoneContainerViaDataNode(
       long testContainerID, XceiverClientSpi client) throws Exception {
     ContainerProtos.ContainerCommandRequestProto
@@ -174,6 +305,7 @@ public class TestOzoneContainer {
       createContainerForTesting(client, testContainerID);
       writeChunkRequest = writeChunkForContainer(client, testContainerID,
           1024);
+
 
       // Read Chunk
       request = ContainerTestHelper.getReadChunkRequest(
@@ -506,10 +638,14 @@ public class TestOzoneContainer {
       MiniOzoneCluster cluster) {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines().iterator().next();
+    return createClientForTesting(pipeline, cluster);
+  }
+
+  private static XceiverClientGrpc createClientForTesting(Pipeline pipeline, MiniOzoneCluster cluster) {
     return new XceiverClientGrpc(pipeline, cluster.getConf());
   }
 
-  public static void createContainerForTesting(XceiverClientSpi client,
+  public static ContainerProtos.ContainerCommandResponseProto createContainerForTesting(XceiverClientSpi client,
       long containerID) throws Exception {
     // Create container
     ContainerProtos.ContainerCommandRequestProto request =
@@ -518,6 +654,7 @@ public class TestOzoneContainer {
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(request);
     assertNotNull(response);
+    return response;
   }
 
   public static ContainerProtos.ContainerCommandRequestProto

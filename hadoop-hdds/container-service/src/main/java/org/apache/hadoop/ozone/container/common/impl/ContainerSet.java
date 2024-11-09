@@ -114,8 +114,7 @@ public class ContainerSet implements Iterable<Container<?>> {
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
-    if (!overwriteMissingContainers && missingContainerSet.contains(containerId)
-        && containerState != State.RECOVERING) {
+    if (!overwriteMissingContainers && missingContainerSet.contains(containerId)) {
       throw new StorageContainerException(String.format("Container with container Id %d is missing in the DN " +
           "and creation of containers with state %s is not allowed. Only recreation of container in RECOVERING state " +
           "is allowed.", containerId, containerState.toString()), ContainerProtos.Result.CONTAINER_MISSING);
