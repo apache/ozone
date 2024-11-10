@@ -275,10 +275,15 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void initialize(
-      RaftServer server, RaftGroupId id, RaftStorage raftStorage)
-      throws IOException {
+  public void initialize(RaftServer server, RaftGroupId id, RaftStorage raftStorage) throws IOException {
     super.initialize(server, id, raftStorage);
+    RaftPeer selfId = server.getPeer();
+    Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
+    if (peers.stream().noneMatch(raftPeer -> raftPeer != null && raftPeer.equals(selfId))) {
+      throw new StateMachineException(String.format("Current datanodeId: %s is not part of the group : %s with " +
+              "quorum: %s", selfId, id, peers));
+    }
+
     storage.init(raftStorage);
     ratisServer.notifyGroupAdd(id);
 

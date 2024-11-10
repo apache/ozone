@@ -80,6 +80,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
       SCMConfigurator scmConfigurator,
@@ -87,8 +88,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
-      ReconServer reconServer) {
-    super(conf, scmConfigurator, hddsDatanodes, reconServer);
+      ReconServer reconServer,
+      boolean terminateJVMOnDNTerminate) {
+    super(conf, scmConfigurator, hddsDatanodes, reconServer, terminateJVMOnDNTerminate);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
@@ -432,7 +434,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           scmConfigurator, omService, scmService, hddsDatanodes, path,
-          reconServer);
+          reconServer, terminateJVMOnDatanodeExit);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();

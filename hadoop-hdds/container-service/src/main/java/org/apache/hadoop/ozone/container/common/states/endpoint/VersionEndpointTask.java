@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,10 +59,9 @@ public class VersionEndpointTask implements
    * Computes a result, or throws an exception if unable to do so.
    *
    * @return computed result
-   * @throws Exception if unable to compute a result
    */
   @Override
-  public EndpointStateMachine.EndPointStates call() throws Exception {
+  public EndpointStateMachine.EndPointStates call() {
     rpcEndPoint.lock();
 
     try {
@@ -105,7 +105,7 @@ public class VersionEndpointTask implements
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
       }
-    } catch (DiskOutOfSpaceException | BindException ex) {
+    } catch (DiskOutOfSpaceException | BindException | RaftException ex) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
       rpcEndPoint.logIfNeeded(ex);

@@ -105,9 +105,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       OMHAService omService, SCMHAService scmService,
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
-      Set<Class<? extends Failures>> clazzes) {
+      Set<Class<? extends Failures>> clazzes, boolean terminateJVMOnDNTerminate) {
     super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
-        clusterPath, null);
+        clusterPath, null, terminateJVMOnDNTerminate);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -304,7 +304,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,
-              path, clazzes);
+              path, clazzes, terminateJVMOnDatanodeExit);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();

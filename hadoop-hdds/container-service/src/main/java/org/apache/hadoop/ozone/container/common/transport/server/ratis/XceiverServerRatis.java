@@ -85,6 +85,7 @@ import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
@@ -562,7 +563,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
-      server.start();
+      try {
+        server.start();
+      } catch (Exception e) {
+        throw new RaftException(e);
+      }
 
       RaftServerRpc serverRpc = server.getServerRpc();
       clientPort = getRealPort(serverRpc.getClientServerAddress(),

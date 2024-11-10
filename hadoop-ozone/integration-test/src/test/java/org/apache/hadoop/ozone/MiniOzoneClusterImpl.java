@@ -139,6 +139,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final List<HddsDatanodeService> hddsDatanodes;
   private ReconServer reconServer;
   private Gateway s3g;
+  private final boolean terminateJVMOnDNTerminate;
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
@@ -150,13 +151,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   /**
    * Creates a new MiniOzoneCluster with Recon.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   private MiniOzoneClusterImpl(OzoneConfiguration conf,
       SCMConfigurator scmConfigurator,
       OzoneManager ozoneManager,
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
       ReconServer reconServer,
-      Gateway s3g) {
+      Gateway s3g, boolean terminateJVMOnDNTerminate) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -164,6 +166,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
     this.s3g = s3g;
+    this.terminateJVMOnDNTerminate = terminateJVMOnDNTerminate;
   }
 
   /**
@@ -173,11 +176,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * OzoneManagers and StorageContainerManagers.
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf, SCMConfigurator scmConfigurator,
-      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
+      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer, boolean terminateJVMOnDNTerminate) {
     this.scmConfigurator = scmConfigurator;
     this.conf = conf;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
+    this.terminateJVMOnDNTerminate = terminateJVMOnDNTerminate;
   }
 
   public SCMConfigurator getSCMConfigurator() {
@@ -448,7 +452,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // wait for node to be removed from SCM healthy node list.
       waitForHddsDatanodeToStop(datanodeService.getDatanodeDetails());
     }
-    HddsDatanodeService service = new HddsDatanodeService(NO_ARGS);
+    HddsDatanodeService service = new HddsDatanodeService(NO_ARGS, terminateJVMOnDNTerminate);
     service.setConfiguration(config);
     hddsDatanodes.add(i, service);
     startHddsDatanode(service);
@@ -659,7 +663,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
-            hddsDatanodes, reconServer, s3g);
+            hddsDatanodes, reconServer, s3g, terminateJVMOnDatanodeExit);
 
         cluster.setCAClient(certClient);
         cluster.setSecretKeyClient(secretKeyClient);
@@ -875,7 +879,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
 
-        HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
+        HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS, terminateJVMOnDatanodeExit);
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
@@ -934,6 +938,5 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       OzoneConfigurationHolder.setConfiguration(conf);
     }
-
   }
 }
