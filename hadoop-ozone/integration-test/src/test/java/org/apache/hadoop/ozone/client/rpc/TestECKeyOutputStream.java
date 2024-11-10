@@ -192,7 +192,6 @@ public class TestECKeyOutputStream {
   @Test
   public void testECKeyCreatetWithDatanodeIdChange()
       throws Exception {
-    AtomicReference<Boolean> mock = new AtomicReference<>(false);
     AtomicReference<Boolean> failed = new AtomicReference<>(false);
     AtomicReference<MiniOzoneCluster> miniOzoneCluster = new AtomicReference<>();
     OzoneClient client1 = null;
