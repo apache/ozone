@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React, { useRef, useState } from 'react';
+import React, { ChangeEvent, useRef, useState } from 'react';
 import moment, { Moment } from 'moment';
 import { Row, Button, Menu, Input, Dropdown, DatePicker, Form, Result, message, Spin } from 'antd';
 import { MenuProps } from 'antd/es/menu';
@@ -29,6 +29,8 @@ import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState, InputPathV
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
+import { useLocation } from 'react-router-dom';
+import { AxiosResponse } from 'axios';
 
 let minSize = Infinity;
 let maxSize = 0;
@@ -56,11 +58,31 @@ const Heatmap: React.FC<{}> = () => {
 
   const [isLoading, setLoading] = useState<boolean>(false);
   const [treeEndpointFailed, setTreeEndpointFailed] = useState<boolean>(false);
-  const [isHeatmapEnabled, setHeatmapEnabled] = useState<boolean>(false);
 
+  const location = useLocation();
   const cancelSignal = useRef<AbortController>();
+  const cancelDisabledFeatureSignal = useRef<AbortController>();
 
-  function handleChange(e) {
+  function getIsHeatmapEnabled() {
+    let heatmapEnabled = false;
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    const { request, controller } = AxiosGetHelper(
+      disabledfeaturesEndpoint,
+      cancelDisabledFeatureSignal.current
+    )
+    cancelDisabledFeatureSignal.current = controller;
+    request.then(response => {
+      heatmapEnabled = !(response?.data?.includes('HEATMAP'));
+    }).catch(error => {
+      showDataFetchError((error as Error).toString());
+    });
+    return heatmapEnabled;
+  }
+
+  const isHeatmapEnabled = useRef<boolean>(location?.state?.isHeatmapEnabled ?? getIsHeatmapEnabled());
+
+
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     // Only allow letters, numbers,underscores and forward slashes and hyphen
     const regex = /^[a-zA-Z0-9_/-]*$/;
@@ -78,8 +100,7 @@ const Heatmap: React.FC<{}> = () => {
     });
   }
 
-  function handleSubmit(e) {
-    console.log(e);
+  function handleSubmit() {
     updateHeatmap(inputPathState.inputPath, state.entityType, state.date);
   }
 
@@ -130,51 +151,52 @@ const Heatmap: React.FC<{}> = () => {
     if (obj.hasOwnProperty('children')) {
       (obj as HeatmapResponse)?.children.forEach(child => updateSize(child));
     }
-    return obj;
+    return obj as HeatmapResponse;
   };
 
   const updateHeatmap = (path: string, entityType: string, date: string | number) => {
-    setLoading(true);
+    // Only perform requests if the heatmap is enabled
+    if (isHeatmapEnabled.current) {
+      setLoading(true);
+      // We want to ensure these are not empty as they will be passed as path params
+      if (date && path && entityType) {
+        const { request, controller } = AxiosGetHelper(
+          `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`,
+          cancelSignal.current
+        );
+        cancelSignal.current = controller;
 
-    // We want to ensure these are not empty as they will be passed as path params
-    if (date && path && entityType) {
-      const { request, controller } = AxiosGetHelper(
-        `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`,
-        cancelSignal.current
-      );
-      cancelSignal.current = controller;
-
-      request.then(response => {
-        if (response?.status === 200) {
-          minSize = response.data.minAccessCount;
-          maxSize = response.data.maxAccessCount;
-          const heatmapResponse: HeatmapResponse = updateSize(response.data);
+        request.then(response => {
+          if (response?.status === 200) {
+            minSize = response.data.minAccessCount;
+            maxSize = response.data.maxAccessCount;
+            const heatmapResponse: HeatmapResponse = updateSize(response.data);
+            setLoading(false);
+            setState(prevState => ({
+              ...prevState,
+              heatmapResponse: heatmapResponse
+            }));
+          } else {
+            const error = new Error((response.status).toString()) as IResponseError;
+            error.status = response.status;
+            error.message = `Failed to fetch Heatmap Response with status ${error.status}`
+            throw error;
+          }
+        }).catch(error => {
           setLoading(false);
-          setHeatmapEnabled(true);
-          setState(prevState => ({
+          setInputPathState(prevState => ({
             ...prevState,
-            heatmapResponse: heatmapResponse
+            inputPath: CONSTANTS.ROOT_PATH
           }));
-        } else {
-          const error = new Error((response.status).toString()) as IResponseError;
-          error.status = response.status;
-          error.message = `Failed to fetch Heatmap Response with status ${error.status}`
-          throw error;
-        }
-      }).catch(error => {
+          setTreeEndpointFailed(true);
+          if (error.response.status !== 404) {
+            showDataFetchError(error.message.toString());
+          }
+        });
+      } else {
         setLoading(false);
-        setInputPathState(prevState => ({
-          ...prevState,
-          inputPath: CONSTANTS.ROOT_PATH
-        }));
-        setTreeEndpointFailed(true);
-        setHeatmapEnabled((error.response.status === 404) ? false : true);
-        if (error.response.status !== 404) {
-          showDataFetchError(error.message.toString());
-        }
-      });
-    } else {
-      setLoading(false);
+      }
+
     }
   }
 
@@ -271,7 +293,7 @@ const Heatmap: React.FC<{}> = () => {
   );
 
   function getErrorContent() {
-    if (!isHeatmapEnabled) {
+    if (!isHeatmapEnabled.current) {
       return <Result
         status='error'
         title='Heatmap Not Available'
@@ -281,7 +303,8 @@ const Heatmap: React.FC<{}> = () => {
     if (treeEndpointFailed) {
       return <Result
         status='error'
-        title='Failed to fetch Heatmap' />
+        title='Failed to fetch Heatmap'
+        subTitle='Check for any failed requests for more information' />
     }
   }
 
@@ -291,11 +314,11 @@ const Heatmap: React.FC<{}> = () => {
         Heatmap
       </div>
       <div className='data-container'>
-        <div className='content-div'>
-          {
-            (!isHeatmapEnabled || treeEndpointFailed)
-              ? getErrorContent()
-              : <div className='heatmap-header-section'>
+        {
+          (!isHeatmapEnabled.current || treeEndpointFailed)
+            ? getErrorContent()
+            : <div className='content-div'>
+              <div className='heatmap-header-section'>
                 <div className='heatmap-filter-section'>
                   <div className='path-input-container'>
                     <h4 style={{ paddingTop: '2%' }}>Path</h4>
@@ -306,7 +329,7 @@ const Heatmap: React.FC<{}> = () => {
                         name="inputPath"
                         value={inputPath}
                         onChange={handleChange}
-                        onSearch={handleSubmit}/>
+                        onSearch={handleSubmit} />
                     </Form.Item>
                   </div>
                   <div className='entity-dropdown-button'>
@@ -339,23 +362,22 @@ const Heatmap: React.FC<{}> = () => {
                   </div>
                 </div>
               </div>
-          }
-          {
-            isLoading
-              ? <Spin size='large' />
-              : (Object.keys(heatmapResponse).length > 0 && (heatmapResponse.label !== null || heatmapResponse.path !== null))
-                ? <div id="heatmap-plot-container">
-                  <HeatmapPlot
-                    data={heatmapResponse}
-                    onClick={updateHeatmapParent}
-                    colorScheme={CONSTANTS.colourScheme['amberAlert']}
-                    entityType={entityType} />
-                </div>
-                : <Result
-                  status='warning'
-                  title='No Data available' />
-          }
-        </div>
+              {isLoading
+                ? <Spin size='large' />
+                : (Object.keys(heatmapResponse).length > 0 && (heatmapResponse.label !== null || heatmapResponse.path !== null))
+                  ? <div id="heatmap-plot-container">
+                    <HeatmapPlot
+                      data={heatmapResponse}
+                      onClick={updateHeatmapParent}
+                      colorScheme={CONSTANTS.colourScheme['amberAlert']}
+                      entityType={entityType} />
+                  </div>
+                  : <Result
+                    status='warning'
+                    title='No Data available' />
+              }
+            </div>
+        }
       </div>
     </>
   );
