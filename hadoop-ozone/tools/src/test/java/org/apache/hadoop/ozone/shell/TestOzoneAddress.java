@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -53,7 +52,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkRootUrlType(String prefix) throws IOException {
+  public void checkRootUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress("");
     address.ensureRootAddress();
 
@@ -63,7 +62,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkVolumeUrlType(String prefix) throws IOException {
+  public void checkVolumeUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1");
     address.ensureVolumeAddress();
     assertEquals("vol1", address.getVolumeName());
@@ -71,7 +70,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkBucketUrlType(String prefix) throws IOException {
+  public void checkBucketUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket");
     address.ensureBucketAddress();
     assertEquals("vol1", address.getVolumeName());
@@ -85,7 +84,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkKeyUrlType(String prefix) throws IOException {
+  public void checkKeyUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket/key");
     address.ensureKeyAddress();
     assertEquals("vol1", address.getVolumeName());
@@ -108,7 +107,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkPrefixUrlType(String prefix) throws IOException {
+  public void checkPrefixUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket/prefix");
     address.ensurePrefixAddress();
     assertEquals("vol1", address.getVolumeName());
@@ -119,7 +118,7 @@ public class TestOzoneAddress {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void checkSnapshotUrlType(String prefix) throws IOException {
+  public void checkSnapshotUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket/.snapshot/snap1");
     address.ensureSnapshotAddress();
     assertEquals("vol1", address.getVolumeName());

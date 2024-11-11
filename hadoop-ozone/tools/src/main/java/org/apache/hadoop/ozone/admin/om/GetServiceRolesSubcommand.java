@@ -93,8 +93,6 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       } else {
         printOmServerRoles(ozoneManagerClient.getServiceList());
       }
-    } catch (IOException ex) {
-      System.out.printf("Error: %s", ex.getMessage());
     } finally {
       if (ozoneManagerClient != null) {
         ozoneManagerClient.close();

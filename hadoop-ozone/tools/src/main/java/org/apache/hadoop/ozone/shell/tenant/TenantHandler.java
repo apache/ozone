@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -40,7 +41,7 @@ public abstract class TenantHandler extends Handler {
   }
 
   @Override
-  protected OzoneAddress getAddress() throws IOException {
+  protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress();
   }
 

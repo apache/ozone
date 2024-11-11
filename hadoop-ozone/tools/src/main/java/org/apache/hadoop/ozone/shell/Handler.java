@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -63,7 +64,7 @@ public abstract class Handler implements Callable<Void> {
     return parent.createOzoneConfiguration();
   }
 
-  protected OzoneAddress getAddress() throws IOException {
+  protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress();
   }
 

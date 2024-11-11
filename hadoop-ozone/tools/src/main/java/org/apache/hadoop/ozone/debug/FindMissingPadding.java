@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
@@ -95,7 +96,7 @@ public class FindMissingPadding extends Handler implements SubcommandWithParent 
   private final Set<OzoneKey> affectedKeys = new HashSet<>();
 
   @Override
-  protected OzoneAddress getAddress() throws IOException {
+  protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress(uri);
   }
 

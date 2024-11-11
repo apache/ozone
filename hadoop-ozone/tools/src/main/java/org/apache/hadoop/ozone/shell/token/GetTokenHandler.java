@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell.token;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -53,7 +54,7 @@ public class GetTokenHandler extends Handler {
   private TokenOption tokenFile;
 
   @Override
-  protected OzoneAddress getAddress() throws IOException {
+  protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress(uri);
   }
 

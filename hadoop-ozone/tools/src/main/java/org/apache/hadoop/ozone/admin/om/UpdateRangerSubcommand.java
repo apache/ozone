@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
-import java.io.IOException;
 import java.util.concurrent.Callable;
 
 /**
@@ -86,9 +85,6 @@ public class UpdateRangerSubcommand implements Callable<Void> {
         System.err.println("Operation completed with errors. "
             + "Check OM log for details");
       }
-
-    } catch (IOException ex) {
-      System.err.printf("Error: %s", ex.getMessage());
     }
     return null;
   }

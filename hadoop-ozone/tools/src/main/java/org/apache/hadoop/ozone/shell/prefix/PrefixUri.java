@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.ozone.shell.prefix;
 
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Shell;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
-
-import java.io.IOException;
 
 /**
  * URI parameter for prefix-specific commands.
@@ -41,7 +40,7 @@ public class PrefixUri implements CommandLine.ITypeConverter<OzoneAddress> {
   }
 
   @Override
-  public OzoneAddress convert(String str) throws IOException {
+  public OzoneAddress convert(String str) throws OzoneClientException {
     OzoneAddress address = new OzoneAddress(str);
     address.ensurePrefixAddress();
     return address;

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -56,7 +57,7 @@ public class ListVolumeHandler extends Handler {
   private String userName;
 
   @Override
-  protected OzoneAddress getAddress() throws IOException {
+  protected OzoneAddress getAddress() throws OzoneClientException {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureRootAddress();
     return address;

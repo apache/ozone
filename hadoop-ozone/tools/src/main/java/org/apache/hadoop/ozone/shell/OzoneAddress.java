@@ -64,12 +64,12 @@ public class OzoneAddress {
 
   private boolean isPrefix = false;
 
-  public OzoneAddress() throws IOException {
+  public OzoneAddress() throws OzoneClientException {
     this("o3:///");
   }
 
   public OzoneAddress(String address)
-      throws IOException {
+      throws OzoneClientException {
     if (address == null || address.equals("")) {
       address = OZONE_RPC_SCHEME + ":///";
     }
@@ -226,7 +226,7 @@ public class OzoneAddress {
    * @param uri - UriString
    * @return URI
    */
-  protected URI parseURI(String uri) throws IOException {
+  protected URI parseURI(String uri) throws OzoneClientException {
     if ((uri == null) || uri.isEmpty()) {
       throw new OzoneClientException(
           "Ozone URI is needed to execute this command.");
@@ -336,7 +336,7 @@ public class OzoneAddress {
     return isPrefix;
   }
 
-  public void ensureBucketAddress() throws IOException {
+  public void ensureBucketAddress() throws OzoneClientException {
     if (keyName.length() > 0) {
       throw new OzoneClientException(
           "Invalid bucket name. Delimiters (/) not allowed in bucket name");
@@ -351,7 +351,7 @@ public class OzoneAddress {
 
   // Ensure prefix address with a prefix flag
   // Allow CLI to differentiate key and prefix address
-  public void ensurePrefixAddress() throws IOException {
+  public void ensurePrefixAddress() throws OzoneClientException {
     if (keyName.length() == 0) {
       throw new OzoneClientException(
           "prefix name is missing.");
@@ -365,7 +365,7 @@ public class OzoneAddress {
     isPrefix = true;
   }
 
-  public void ensureKeyAddress() throws IOException {
+  public void ensureKeyAddress() throws OzoneClientException {
     if (keyName.length() == 0) {
       throw new OzoneClientException(
           "Key name is missing.");
@@ -385,10 +385,10 @@ public class OzoneAddress {
    * If the keyName can't be considered
    * a valid snapshot, an exception is thrown.
    *
-   * @throws IOException
+   * @throws OzoneClientException
    */
   public void ensureSnapshotAddress()
-      throws IOException {
+      throws OzoneClientException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         snapshotNameWithIndicator = keyName;
@@ -407,7 +407,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureVolumeAddress() throws IOException {
+  public void ensureVolumeAddress() throws OzoneClientException {
     if (keyName.length() != 0) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
@@ -420,7 +420,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureRootAddress() throws  IOException {
+  public void ensureRootAddress() throws  OzoneClientException {
     if (keyName.length() != 0 || bucketName.length() != 0
         || volumeName.length() != 0) {
       throw new OzoneClientException(
@@ -464,7 +464,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureVolumeOrBucketAddress() throws IOException {
+  public void ensureVolumeOrBucketAddress() throws OzoneClientException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         // If snapshot, ensure snapshot URI

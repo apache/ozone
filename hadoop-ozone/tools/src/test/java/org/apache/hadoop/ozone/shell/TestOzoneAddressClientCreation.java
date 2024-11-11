@@ -184,11 +184,11 @@ public class TestOzoneAddressClientCreation {
     private boolean simpleCreation;
     private String serviceId;
 
-    TestableOzoneAddress(String address) throws IOException {
+    TestableOzoneAddress(String address) throws OzoneClientException {
       super(address);
     }
 
-    TestableOzoneAddress() throws IOException {
+    TestableOzoneAddress() throws OzoneClientException {
     }
 
     @Override
