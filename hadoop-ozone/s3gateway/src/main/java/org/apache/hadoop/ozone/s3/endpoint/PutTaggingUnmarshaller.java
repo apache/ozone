@@ -27,7 +27,9 @@ import javax.xml.bind.UnmarshallerHandler;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.InputStream;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read Tagging request body.
@@ -61,7 +63,7 @@ public class PutTaggingUnmarshaller {
       filter.parse(new InputSource(inputStream));
       return (S3Tagging) unmarshallerHandler.getResult();
     } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
+      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
     }
   }
 

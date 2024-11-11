@@ -137,19 +137,19 @@ public class S3Tagging {
    */
   public void validate() {
     if (tagSet == null) {
-      throw new WebApplicationException("TagSet needs to be specified");
+      throw new IllegalArgumentException("TagSet needs to be specified");
     }
 
     if (tagSet.getTags().isEmpty()) {
-      throw new WebApplicationException("Tags need to be specified and cannot be empty");
+      throw new IllegalArgumentException("Tags need to be specified and cannot be empty");
     }
 
     for (Tag tag: tagSet.getTags()) {
       if (tag.getKey() == null) {
-        throw new WebApplicationException("Some tag keys are not specified");
+        throw new IllegalArgumentException("Some tag keys are not specified");
       }
       if (tag.getValue() == null) {
-        throw new WebApplicationException("Tag value for tag " + tag.getKey() + " is not specified");
+        throw new IllegalArgumentException("Tag value for tag " + tag.getKey() + " is not specified");
       }
     }
   }
