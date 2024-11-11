@@ -63,23 +63,7 @@ const Heatmap: React.FC<{}> = () => {
   const cancelSignal = useRef<AbortController>();
   const cancelDisabledFeatureSignal = useRef<AbortController>();
 
-  function getIsHeatmapEnabled() {
-    let heatmapEnabled = false;
-    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
-    const { request, controller } = AxiosGetHelper(
-      disabledfeaturesEndpoint,
-      cancelDisabledFeatureSignal.current
-    )
-    cancelDisabledFeatureSignal.current = controller;
-    request.then(response => {
-      heatmapEnabled = !(response?.data?.includes('HEATMAP'));
-    }).catch(error => {
-      showDataFetchError((error as Error).toString());
-    });
-    return heatmapEnabled;
-  }
-
-  const isHeatmapEnabled = useRef<boolean>(location?.state?.isHeatmapEnabled ?? getIsHeatmapEnabled());
+  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(location?.state?.isHeatmapEnabled);
 
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
@@ -156,7 +140,7 @@ const Heatmap: React.FC<{}> = () => {
 
   const updateHeatmap = (path: string, entityType: string, date: string | number) => {
     // Only perform requests if the heatmap is enabled
-    if (isHeatmapEnabled.current) {
+    if (isHeatmapEnabled) {
       setLoading(true);
       // We want to ensure these are not empty as they will be passed as path params
       if (date && path && entityType) {
@@ -211,13 +195,31 @@ const Heatmap: React.FC<{}> = () => {
     return current > moment() || current < moment().subtract(90, 'day');
   }
 
+  function getIsHeatmapEnabled() {
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    const { request, controller } = AxiosGetHelper(
+      disabledfeaturesEndpoint,
+      cancelDisabledFeatureSignal.current
+    )
+    cancelDisabledFeatureSignal.current = controller;
+    request.then(response => {
+      setIsHeatmapEnabled(!response?.data?.includes('HEATMAP'));
+    }).catch(error => {
+      showDataFetchError((error as Error).toString());
+    });
+  }
+
   React.useEffect(() => {
+    // We do not know if heatmap is enabled or not, so set it
+    if (isHeatmapEnabled === undefined) {
+      getIsHeatmapEnabled();
+    }
     updateHeatmap(inputPathState.inputPath, state.entityType, state.date);
 
     return (() => {
       cancelSignal.current && cancelSignal.current.abort();
     })
-  }, [state.entityType, state.date]);
+  }, [isHeatmapEnabled, state.entityType, state.date]);
 
   const handleDatePickerChange = (date: moment.MomentInput) => {
     setState(prevState => ({
@@ -293,7 +295,7 @@ const Heatmap: React.FC<{}> = () => {
   );
 
   function getErrorContent() {
-    if (!isHeatmapEnabled.current) {
+    if (!isHeatmapEnabled) {
       return <Result
         status='error'
         title='Heatmap Not Available'
@@ -315,7 +317,7 @@ const Heatmap: React.FC<{}> = () => {
       </div>
       <div className='data-container'>
         {
-          (!isHeatmapEnabled.current || treeEndpointFailed)
+          (!isHeatmapEnabled || treeEndpointFailed)
             ? getErrorContent()
             : <div className='content-div'>
               <div className='heatmap-header-section'>
