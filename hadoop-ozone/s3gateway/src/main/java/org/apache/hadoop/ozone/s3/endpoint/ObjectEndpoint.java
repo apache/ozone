@@ -1437,9 +1437,9 @@ public class ObjectEndpoint extends EndpointBase {
       volume.getBucket(bucketName).putObjectTagging(keyName, tags);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyName);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyName);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, keyName);
       } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
