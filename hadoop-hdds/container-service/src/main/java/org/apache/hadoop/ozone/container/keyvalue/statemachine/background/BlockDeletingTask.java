@@ -257,6 +257,8 @@ public class BlockDeletingTask implements BackgroundTask {
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
+        metrics.incrSuccessCountInLastIteration(deletedBlocksCount);
+        metrics.incrSuccessBytesInLastIteration(releasedBytes);
       }
 
       if (!succeedBlocks.isEmpty()) {
@@ -271,6 +273,7 @@ public class BlockDeletingTask implements BackgroundTask {
       LOG.warn("Deletion operation was not successful for container: " +
           container.getContainerData().getContainerID(), exception);
       metrics.incrFailureCount();
+      metrics.incrFailureCountInLastIteration();
       throw exception;
     }
   }
@@ -408,6 +411,8 @@ public class BlockDeletingTask implements BackgroundTask {
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
+        metrics.incrSuccessCountInLastIteration(deletedBlocksCount);
+        metrics.incrSuccessBytesInLastIteration(releasedBytes);
       }
 
       LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
@@ -419,6 +424,7 @@ public class BlockDeletingTask implements BackgroundTask {
       LOG.warn("Deletion operation was not successful for container: " +
           container.getContainerData().getContainerID(), exception);
       metrics.incrFailureCount();
+      metrics.incrFailureCountInLastIteration();
       throw exception;
     }
   }

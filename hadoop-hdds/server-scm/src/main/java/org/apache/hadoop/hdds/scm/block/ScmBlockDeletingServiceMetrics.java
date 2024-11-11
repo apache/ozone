@@ -196,6 +196,90 @@ public final class ScmBlockDeletingServiceMetrics {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
+/*
+  @Metric(about = "Total number of individual delete transaction commands sent " +
+      "to all DN in last iteration.")
+  private MutableGaugeLong numBlockDeletionCommandSentInLastIteration;
+
+  @Metric(about = "Total number of success ACK of delete transaction commands in last iteration.")
+  private MutableGaugeLong numBlockDeletionCommandSuccessInLastIteration;
+
+  @Metric(about = "Total number of failure ACK of delete transaction commands in last iteration.")
+  private MutableGaugeLong numBlockDeletionCommandFailureInLastIteration;
+
+  @Metric(about = "Total number of individual delete transactions sent to " +
+      "all DN in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionSentInLastIteration;
+
+  @Metric(about = "Total number of success execution of delete transactions in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionSuccessInLastIteration;
+
+  @Metric(about = "Total number of failure execution of delete transactions in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionFailureInLastIteration;
+
+  @Metric(about = "Total number of completed txs which are removed from DB in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionCompletedInLastIteration;
+
+  @Metric(about = "Total number of created txs which are added into DB in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionCreatedInLastIteration;
+
+  @Metric(about = "Total number of skipped transactions in last iteration")
+  private MutableGaugeLong numSkippedTransactionsInLastIteration;
+
+  @Metric(about = "Total number of processed transactions in last iteration")
+  private MutableGaugeLong numProcessedTransactionsInLastIteration;
+
+  public void setNumBlockDeletionCommandSentInLastIteration(
+      long numBlockDeletionCommandSentInLastIteration) {
+    this.numBlockDeletionCommandSentInLastIteration.set(numBlockDeletionCommandSentInLastIteration);
+  }
+
+  public void setNumBlockDeletionCommandSuccessInLastIteration(
+      long numBlockDeletionCommandSuccessInLastIteration) {
+    this.numBlockDeletionCommandSuccessInLastIteration.set(numBlockDeletionCommandSuccessInLastIteration);
+  }
+
+  public void setNumBlockDeletionCommandFailureInLastIteration(
+      long numBlockDeletionCommandFailureInLastIteration) {
+    this.numBlockDeletionCommandFailureInLastIteration.set(numBlockDeletionCommandFailureInLastIteration);
+  }
+
+  public void setNumBlockDeletionTransactionSentInLastIteration(
+      long numBlockDeletionTransactionSentInLastIteration) {
+    this.numBlockDeletionTransactionSentInLastIteration.set(numBlockDeletionTransactionSentInLastIteration);
+  }
+
+  public void setNumBlockDeletionTransactionSuccessInLastIteration(
+      long numBlockDeletionTransactionSuccessInLastIteration) {
+    this.numBlockDeletionTransactionSuccessInLastIteration.set(numBlockDeletionTransactionSuccessInLastIteration);
+  }
+
+  public void setNumBlockDeletionTransactionFailureInLastIteration(
+      long numBlockDeletionTransactionFailureInLastIteration) {
+    this.numBlockDeletionTransactionFailureInLastIteration.set(numBlockDeletionTransactionFailureInLastIteration);
+  }
+
+  public void setNumBlockDeletionTransactionCompletedInLastIteration(
+      long numBlockDeletionTransactionCompletedInLastIteration) {
+    this.numBlockDeletionTransactionCompletedInLastIteration.set(numBlockDeletionTransactionCompletedInLastIteration);
+  }
+
+  public void setNumBlockDeletionTransactionCreatedInLastIteration(
+      long numBlockDeletionTransactionCreatedInLastIteration) {
+    this.numBlockDeletionTransactionCreatedInLastIteration.set(numBlockDeletionTransactionCreatedInLastIteration);
+  }
+
+  public void setNumSkippedTransactionsInLastIteration(
+      long numSkippedTransactionsInLastIteration) {
+    this.numSkippedTransactionsInLastIteration.set(numSkippedTransactionsInLastIteration);
+  }
+
+  public void setNumProcessedTransactionsInLastIteration(
+      long numProcessedTransactionsInLastIteration) {
+    this.numProcessedTransactionsInLastIteration.set(numProcessedTransactionsInLastIteration);
+  }
+*/
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();

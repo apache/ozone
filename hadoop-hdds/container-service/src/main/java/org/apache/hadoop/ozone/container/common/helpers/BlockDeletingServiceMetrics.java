@@ -78,6 +78,29 @@ public final class BlockDeletingServiceMetrics {
       " to container lock wait timeout.")
   private MutableGaugeLong totalLockTimeoutTransactionCount;
 
+  // Iteration specific metrics.
+  @Metric("Start time of last iteration of BlockDeletingService")
+  private MutableGaugeLong startTimeOfLastIteration;
+
+  @Metric("Total time taken by the last iteration of BlockDeletingService")
+  private MutableGaugeLong durationOfLastIteration;
+
+  @Metric(about = "Total number of blocks chosen to be deleted in latest iteration.")
+  private MutableGaugeLong blockChosenCountInLastIteration;
+
+  @Metric(about = "Total number of containers chosen to be deleted in the latest iteration.")
+  private MutableGaugeLong containerChosenCountInLastIteration;
+
+  @Metric(about = "Total number of successful delete blocks in latest iteration.")
+  private MutableCounterLong successCountInLastIteration;
+
+  @Metric(about = "The total bytes for blocks successfully deleted in the latest iteration.")
+  private MutableCounterLong successBytesInLastIteration;
+
+  @Metric(about = "The number of failed delete blocks in the latest iteration.")
+  private MutableCounterLong failureCountInLastIteration;
+
+
   private BlockDeletingServiceMetrics() {
   }
 
@@ -182,6 +205,42 @@ public final class BlockDeletingServiceMetrics {
 
   public long getTotalLockTimeoutTransactionCount() {
     return totalLockTimeoutTransactionCount.value();
+  }
+
+  public void setStartTimeOfLastIteration(long startTimeOfLastIteration) {
+    this.startTimeOfLastIteration.set(startTimeOfLastIteration);
+  }
+
+  public void setDurationOfLastIteration(long durationOfLastIteration) {
+    this.durationOfLastIteration.set(durationOfLastIteration);
+  }
+
+  public void setBlockChosenCountInLastIteration(
+      long blockChosenCountInLastIteration) {
+    this.blockChosenCountInLastIteration.set(blockChosenCountInLastIteration);
+  }
+
+  public void setContainerChosenCountInLastIteration(
+      long containerChosenCountInLastIteration) {
+    this.containerChosenCountInLastIteration.set(containerChosenCountInLastIteration);
+  }
+
+  public void resetLastIterationCounts() {
+    this.successCountInLastIteration.incr(-1L * this.successCountInLastIteration.value());
+    this.successBytesInLastIteration.incr(-1L * this.successBytesInLastIteration.value());
+    this.failureCountInLastIteration.incr(-1L * this.failureCountInLastIteration.value());
+  }
+
+  public void incrSuccessCountInLastIteration(long successCountInLastIteration) {
+    this.successCountInLastIteration.incr(successCountInLastIteration);
+  }
+
+  public void incrSuccessBytesInLastIteration(long successBytesInLastIteration) {
+    this.successBytesInLastIteration.incr(successBytesInLastIteration);
+  }
+
+  public void incrFailureCountInLastIteration() {
+    this.failureCountInLastIteration.incr();
   }
 
   @Override

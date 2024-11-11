@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,12 +128,14 @@ public class BlockDeletingService extends BackgroundService {
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
+    metrics.resetLastIterationCounts();
     try {
       // We at most list a number of containers a time,
       // in case there are too many containers and start too many workers.
       // We must ensure there is no empty container in this result.
       // The chosen result depends on what container deletion policy is
       // configured.
+      long startTime = Time.monotonicNow();
       List<ContainerBlockInfo> containers =
           chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
               containerDeletionPolicy);
@@ -150,6 +153,10 @@ public class BlockDeletingService extends BackgroundService {
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
       }
+      metrics.setDurationOfLastIteration(Time.monotonicNow() - startTime);
+      metrics.setStartTimeOfLastIteration(startTime);
+      metrics.setBlockChosenCountInLastIteration(totalBlocks);
+      metrics.setContainerChosenCountInLastIteration(containers.size());
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
