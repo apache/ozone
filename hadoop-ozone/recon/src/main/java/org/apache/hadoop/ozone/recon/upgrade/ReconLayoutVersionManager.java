@@ -49,12 +49,12 @@ public class ReconLayoutVersionManager {
   private int currentMLV;
 
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
-                                   ReconContext reconContext, Injector injector)
+                                   ReconContext reconContext)
       throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.reconContext = reconContext;
-    ReconLayoutFeature.registerUpgradeActions(injector);  // Register actions via annotation
+    ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
   }
 
   /**

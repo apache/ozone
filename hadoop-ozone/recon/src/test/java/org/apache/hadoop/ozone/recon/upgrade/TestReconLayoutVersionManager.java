@@ -80,8 +80,7 @@ public class TestReconLayoutVersionManager {
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
-        mock(Injector.class));
+    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
   }
 
   @AfterEach
@@ -216,9 +215,9 @@ public class TestReconLayoutVersionManager {
 
     // Verify that the actions were executed in the correct order using InOrder
     InOrder inOrder = inOrder(action1, action2, action3);
-    inOrder.verify(action1).execute(); // Should be executed first
-    inOrder.verify(action2).execute(); // Should be executed second
-    inOrder.verify(action3).execute(); // Should be executed third
+    inOrder.verify(action1).execute(mock(ReconStorageContainerManagerFacade.class)); // Should be executed first
+    inOrder.verify(action2).execute(mock(ReconStorageContainerManagerFacade.class)); // Should be executed second
+    inOrder.verify(action3).execute(mock(ReconStorageContainerManagerFacade.class)); // Should be executed third
   }
 
   /**
@@ -228,8 +227,7 @@ public class TestReconLayoutVersionManager {
   @Test
   public void testNoUpgradeActionsNeeded() throws SQLException {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
-        mock(Injector.class));
+    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
     layoutVersionManager.finalizeLayoutFeatures(mock(
         ReconStorageContainerManagerFacade.class));
 
@@ -290,11 +288,11 @@ public class TestReconLayoutVersionManager {
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);
 
     // Verify that action1 and action2 were not executed again.
-    verify(action1, times(1)).execute();  // Still should have been executed only once
-    verify(action2, times(1)).execute();  // Still should have been executed only once
+    verify(action1, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));  // Still should have been executed only once
+    verify(action2, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));  // Still should have been executed only once
 
     // Verify that the upgrade action for feature 3 was executed.
-    verify(action3, times(1)).execute();
+    verify(action3, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));
   }
 
 }

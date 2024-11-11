@@ -163,7 +163,7 @@ public class ReconServer extends GenericCli {
           injector.getInstance(ReconSchemaVersionTableManager.class);
 
       ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext, injector);
+          new ReconLayoutVersionManager(versionTableManager, reconContext);
       // Run the upgrade framework to finalize layout features if needed
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
           (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();

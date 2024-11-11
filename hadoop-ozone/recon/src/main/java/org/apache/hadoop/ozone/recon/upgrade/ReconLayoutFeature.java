@@ -78,13 +78,13 @@ public enum ReconLayoutFeature {
    * This method dynamically loads and registers all upgrade actions based on their
    * annotations.
    */
-  public static void registerUpgradeActions(Injector injector) {
+  public static void registerUpgradeActions() {
     Reflections reflections = new Reflections("org.apache.hadoop.ozone.recon.upgrade");
     Set<Class<?>> actionClasses = reflections.getTypesAnnotatedWith(UpgradeActionRecon.class);
 
     for (Class<?> actionClass : actionClasses) {
       try {
-        ReconUpgradeAction action = (ReconUpgradeAction) injector.getInstance(actionClass);
+        ReconUpgradeAction action = (ReconUpgradeAction) actionClass.getDeclaredConstructor().newInstance();
         UpgradeActionRecon annotation = actionClass.getAnnotation(UpgradeActionRecon.class);
         annotation.feature().addAction(annotation.type(), action);
       } catch (Exception e) {
