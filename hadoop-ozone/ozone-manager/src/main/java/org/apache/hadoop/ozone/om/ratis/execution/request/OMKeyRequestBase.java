@@ -39,7 +39,6 @@ public abstract class OMKeyRequestBase extends OMRequestBase {
 
   public OmBucketInfo resolveBucket(OzoneManager ozoneManager, String volume, String bucket) throws IOException {
     String bucketKey = ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
-
     CacheValue<OmBucketInfo> value = ozoneManager.getMetadataManager().getBucketTable()
         .getCacheValue(new CacheKey<>(bucketKey));
     if (value == null || value.getCacheValue() == null) {

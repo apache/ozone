@@ -29,9 +29,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -41,6 +44,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -80,10 +85,10 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
@@ -96,19 +101,56 @@ public final class OmKeyUtils {
   private OmKeyUtils() {
   }
 
+  /**
+   * resolve bucket with direct cached value.
+   * @param metadataManager ozone manager metadata instance
+   * @param volName volume name
+   * @param buckName bucket name
+   * @param visited list of volume and bucket visited
+   * @return OmBucketInfo
+   * @throws OMException exception
+   */
+  public static OmBucketInfo resolveBucketLink(
+      OMMetadataManager metadataManager, String volName, String buckName, Set<Pair<String, String>> visited)
+      throws OMException {
+    String bucketKey = metadataManager.getBucketKey(volName, buckName);
+    CacheValue<OmBucketInfo> value = metadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey));
+    if (value == null || value.getCacheValue() == null) {
+      throw new OMException("Bucket not found: " + volName + "/" + buckName, OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
+    // If this is a link bucket, we fetch the BucketLayout from the source bucket.
+    if (value.getCacheValue().isLink()) {
+      // Check if this bucket was already visited - to avoid loops
+      if (!visited.add(Pair.of(volName, buckName))) {
+        throw new OMException("Detected loop in bucket links. Bucket name: " + buckName + ", Volume name: " + volName,
+            DETECTED_LOOP_IN_BUCKET_LINKS);
+      }
+      return resolveBucketLink(metadataManager, value.getCacheValue().getSourceVolume(),
+          value.getCacheValue().getSourceBucket(), visited);
+    }
+    return value.getCacheValue();
+  }
+
   public static void checkKeyAcls(
       OzoneManager ozoneManager, String volume, String bucket, String key, IAccessAuthorizer.ACLType aclType,
       OzoneObj.ResourceType resourceType, OMRequest omRequest) throws IOException {
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType, volume, bucket, key, omRequest);
-      // Additional bucket ACL check for create key
+      // 1. validate all bucket in link
       try (ReferenceCounted<IOmMetadataReader> rcMetadataReader = ozoneManager.getOmMetadataReader()) {
-        OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(), OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.READ, volume, bucket, null,
-            ozoneManager.getVolumeOwner(volume, aclType, OzoneObj.ResourceType.BUCKET),
-            ozoneManager.getBucketOwner(volume, bucket, aclType, OzoneObj.ResourceType.BUCKET),
-            createUGIForApi(omRequest), getRemoteAddress(omRequest), getHostName(omRequest));
+        Set<Pair<String, String>> bucketSet = new HashSet<>();
+        OmBucketInfo bucketInfo = resolveBucketLink(ozoneManager.getMetadataManager(), volume, bucket, bucketSet);
+        bucketSet.add(Pair.of(bucketInfo.getVolumeName(), bucketInfo.getBucketName()));
+        for (Pair<String, String> pair : bucketSet) {
+          OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(), OzoneObj.ResourceType.BUCKET,
+              OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.READ, pair.getKey(), pair.getValue(), null,
+              ozoneManager.getVolumeOwner(pair.getKey(), aclType, OzoneObj.ResourceType.BUCKET),
+              ozoneManager.getBucketOwner(pair.getKey(), pair.getValue(), aclType, OzoneObj.ResourceType.BUCKET),
+              createUGIForApi(omRequest), getRemoteAddress(omRequest), getHostName(omRequest));
+        }
       }
+
+      // 2. validate key
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType, volume, bucket, key, omRequest);
     }
   }
   @SuppressWarnings("parameternumber")

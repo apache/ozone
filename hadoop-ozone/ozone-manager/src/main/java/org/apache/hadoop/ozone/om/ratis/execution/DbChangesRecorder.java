@@ -17,9 +17,13 @@
 package org.apache.hadoop.ozone.om.ratis.execution;
 
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -30,9 +34,17 @@ public class DbChangesRecorder {
   private final Map<String, Map<String, CodecBuffer>> tableRecordsMap = new HashMap<>();
   private final Map<Long, BucketChangeInfo> bucketUsedQuotaMap = new HashMap<>();
 
-  public void add(String name, String recordKey, CodecBuffer omKeyCodecBuffer) {
+  public void delete(String name, String recordKey) {
     Map<String, CodecBuffer> recordMap = tableRecordsMap.computeIfAbsent(name, k -> new HashMap<>());
-    recordMap.put(recordKey, omKeyCodecBuffer);
+    recordMap.put(recordKey, null);
+  }
+  public <K, V> void add(Table<K, V> tbl, String recordKey, V recordVal) throws IOException {
+    if (tbl instanceof TypedTable) {
+      CodecBuffer codecBuffer = ((TypedTable<K, V>) tbl).encodeValueCodecBuffer(recordVal);
+      Map<String, CodecBuffer> recordMap = tableRecordsMap.computeIfAbsent(tbl.getName(), k -> new HashMap<>());
+      recordMap.put(recordKey, codecBuffer);
+    }
+    throw new OMException("Incorrect Table type passed", OMException.ResultCodes.INTERNAL_ERROR);
   }
 
   public void add(OmBucketInfo omBucketInfo, long incUsedBytes, long incNamespace) {

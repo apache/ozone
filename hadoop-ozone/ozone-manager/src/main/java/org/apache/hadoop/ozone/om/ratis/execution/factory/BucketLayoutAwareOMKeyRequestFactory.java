@@ -21,15 +21,16 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
+import java.util.HashSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMKeyRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OmKeyUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.slf4j.Logger;
@@ -81,7 +82,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // Get the bucket layout of the bucket being accessed by this request.
     // While doing this we make sure we are resolving the real bucket in case of
     // link buckets.
-    OmBucketInfo bucketInfo = OzoneManagerUtils.getResolvedBucketInfo(omMetadataManager, volumeName, bucketName);
+    OmBucketInfo bucketInfo = OmKeyUtils.resolveBucketLink(omMetadataManager, volumeName, bucketName, new HashSet<>());
     BucketLayout bucketLayout = bucketInfo.getBucketLayout();
 
     // Get the CmdType.

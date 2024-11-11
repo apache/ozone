@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -249,8 +248,7 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
         dbOpenKeyUpdate.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
         dbOpenKeyUpdate.setModificationTime(Time.now());
         dbOpenKeyUpdate.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-        CodecBuffer openKeyBuf = OmKeyInfo.getCodec(true).toDirectCodecBuffer(dbOpenKeyUpdate);
-        changeRecorder().add(omMetadataManager.getOpenKeyTable(getBucketLayout()).getName(), dbOpenKeyName, openKeyBuf);
+        changeRecorder().add(omMetadataManager.getOpenKeyTable(getBucketLayout()), dbOpenKeyName, dbOpenKeyUpdate);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -306,8 +304,7 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(pseudoObjId, dbOzoneKey);
         // filterOutBlocksStillInUse(omKeyInfo, blocksToRemove);
-        CodecBuffer oldVerInfoBuf = RepeatedOmKeyInfo.getCodec(true).toDirectCodecBuffer(blocksToRemove);
-        changeRecorder().add(omMetadataManager.getDeletedTable().getName(), delKeyName, oldVerInfoBuf);
+        changeRecorder().add(omMetadataManager.getDeletedTable(), delKeyName, blocksToRemove);
       }
 
       omBucketInfo.incrUsedNamespace(nameSpaceUsed);
@@ -317,7 +314,7 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
 
       // Add to cache of open key table and key table.
       if (!isHSync) {
-        changeRecorder().add(omMetadataManager.getKeyTable(getBucketLayout()).getName(), dbOpenKey, null);
+        changeRecorder().delete(omMetadataManager.getKeyTable(getBucketLayout()).getName(), dbOpenKey);
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
         if (isRecovery) {
@@ -325,12 +322,10 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
         }
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
-        CodecBuffer newOpenKeyBuf = OmKeyInfo.getCodec(true).toDirectCodecBuffer(newOpenKeyInfo);
-        changeRecorder().add(omMetadataManager.getOpenKeyTable(getBucketLayout()).getName(), dbOpenKey, newOpenKeyBuf);
+        changeRecorder().add(omMetadataManager.getOpenKeyTable(getBucketLayout()), dbOpenKey, newOpenKeyInfo);
       }
 
-      CodecBuffer omKeyBuf = OmKeyInfo.getCodec(true).toDirectCodecBuffer(omKeyInfo);
-      changeRecorder().add(omMetadataManager.getKeyTable(getBucketLayout()).getName(), dbOzoneKey, omKeyBuf);
+      changeRecorder().add(omMetadataManager.getKeyTable(getBucketLayout()), dbOzoneKey, omKeyInfo);
 
       omClientResponse = new DummyOMClientResponse(omResponse.build());
       result = OMClientRequest.Result.SUCCESS;

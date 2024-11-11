@@ -42,18 +42,20 @@ public class OmLockOpr {
   private static final long MONITOR_LOCK_THRESHOLD_NS = 10 * 60 * 1000_000_000L;
   private final KeyLock keyLocking;
   private final KeyLock bucketLocking;
-  private final ScheduledExecutorService executorService;
+  private final String threadNamePrefix;
+  private ScheduledExecutorService executorService;
   private final Map<OmLockInfo, OmLockInfo> lockMonitorMap = new ConcurrentHashMap<>();
 
   public OmLockOpr(String threadNamePrefix) {
+    this.threadNamePrefix = threadNamePrefix;
     keyLocking = new KeyLock(102400);
     bucketLocking = new KeyLock(1024);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat(threadNamePrefix + "OmLockOpr-Monitor-%d").build();
-    executorService = Executors.newScheduledThreadPool(1, threadFactory);
   }
 
   public void start() {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
+        .setNameFormat(threadNamePrefix + "OmLockOpr-Monitor-%d").build();
+    executorService = Executors.newScheduledThreadPool(1, threadFactory);
     executorService.scheduleWithFixedDelay(this::monitor, 0, MONITOR_DELAY, TimeUnit.MILLISECONDS);
   }
 
