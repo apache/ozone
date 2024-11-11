@@ -59,11 +59,11 @@ public final class DeletingServiceMetrics {
   /*
    * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
    */
-  @Metric("Total no. of directories deleted")
+  @Metric("Total no. of deleted directories sent for purge")
   private MutableGaugeLong numDirDeleted;
-  @Metric("Total no. of directories moved to deletedDirectoryTable")
+  @Metric("Total no. of sub-directories sent for purge")
   private MutableGaugeLong numDirsMoved;
-  @Metric("Total no. of files moved to deletedTable")
+  @Metric("Total no. of sub-files sent for purge")
   private MutableGaugeLong numFilesMoved;
 
   public void incrNumDirDeleted(long dirDel) {
@@ -97,9 +97,9 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong iterationDirDeleted;
   @Metric("No. of sub-directories deleted in last iteration")
   private MutableGaugeLong iterationSubDirDeleted;
-  @Metric("No. of sub-directories moved to deletedDirectoryTable in last iteration")
+  @Metric("No. of sub-directories sent for purge in last iteration")
   private MutableGaugeLong iterationSubDirsMoved;
-  @Metric("No. of files moved to deletedTable in last iteration")
+  @Metric("No. of files sent for purge in last iteration")
   private MutableGaugeLong iterationFilesMoved;
 
   public void setIterationDirRunCount(long runcount) {
@@ -151,6 +151,8 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numKeysDeletionRequest;
   @Metric("Total no. of keys deleted successfully")
   private MutableGaugeLong numKeysDeleteSuccess;
+  @Metric("Total no. of deleted keys sent for purge")
+  private MutableGaugeLong numKeysSentForPurge;
 
   public void incrNumKeysProcessed(long keysProcessed) {
     this.numKeysProcessed.incr(keysProcessed);
@@ -162,6 +164,10 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysDeleteSuccess(long keysDeleteSuccess) {
     this.numKeysDeleteSuccess.incr(keysDeleteSuccess);
+  }
+
+  public void incrNumKeysSentForPurge(long keysPurge) {
+    this.numKeysSentForPurge.incr(keysPurge);
   }
 
   /*
@@ -179,6 +185,8 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong iterationKeysDeletionRequest;
   @Metric("Total no. of keys deleted successfully")
   private MutableGaugeLong iterationKeysDeleteSuccess;
+  @Metric("Total no. of deleted keys sent for purge")
+  private MutableGaugeLong iterationKeysSentForPurge;
 
   public void setIterationKeyRunCount(long iterationKeyRunCount) {
     this.iterationKeyRunCount.set(iterationKeyRunCount);
@@ -204,6 +212,10 @@ public final class DeletingServiceMetrics {
     this.iterationKeysDeleteSuccess.set(iterationKeysDeleteSuccess);
   }
 
+  public void setIterationKeysSentForPurge(long keysPurge) {
+    this.iterationKeysSentForPurge.set(keysPurge);
+  }
+
   /*
    * Directory purge request metrics.
    */
@@ -211,10 +223,6 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numDirPurged;
   @Metric("Total no. of subFiles purged")
   private MutableGaugeLong numSubKeysPurged;
-  @Metric("No. of directories purged in latest request")
-  private MutableGaugeLong numDirPurgedInLatestRequest;
-  @Metric("No. of subFiles purged in latest request")
-  private MutableGaugeLong numSubKeysPurgedInLatestRequest;
 
   public void incrNumDirPurged(long dirPurged) {
     this.numDirPurged.incr(dirPurged);
@@ -222,14 +230,6 @@ public final class DeletingServiceMetrics {
 
   public void incrNumSubKeysPurged(long subKeysPurged) {
     this.numSubKeysPurged.incr(subKeysPurged);
-  }
-
-  public void setNumDirPurgedInLatestRequest(long numDirPurgedInLastRequest) {
-    this.numDirPurgedInLatestRequest.set(numDirPurgedInLastRequest);
-  }
-
-  public void setNumSubKeysPurgedInLatestRequest(long numSubKeysPurgedInLastRequest) {
-    this.numSubKeysPurgedInLatestRequest.set(numSubKeysPurgedInLastRequest);
   }
 
   /*
@@ -261,7 +261,7 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong iterationDurationOpenKeyCleanup;
   @Metric("No. of keys deleted by OpenKeyCleanupService in last iteration")
   private MutableGaugeLong iterationOpenKeysDeleted;
-  @Metric("No. of keys deleted by OpenKeyCleanupService in last iteration")
+  @Metric("No. of hsync keys committed by OpenKeyCleanupService in last iteration")
   private MutableGaugeLong iterationOpenKeysCommitted;
 
   public void setIterationRunCountOpenKeyCleanup(

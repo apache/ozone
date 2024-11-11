@@ -231,7 +231,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             metrics.setIterationKeyStartTime(startTime);
             metrics.setIterationKeyDuration(Time.monotonicNow() - startTime);
             metrics.setIterationKeysProcessed(keyBlocksList.size());
+            metrics.setIterationKeysSentForPurge(delCount);
             metrics.incrNumKeysProcessed(keyBlocksList.size());
+            metrics.incrNumKeysSentForPurge(delCount);
           }
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
