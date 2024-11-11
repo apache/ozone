@@ -183,7 +183,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy"
+          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
