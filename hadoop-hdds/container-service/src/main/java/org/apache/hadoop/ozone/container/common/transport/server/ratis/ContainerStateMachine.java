@@ -277,11 +277,11 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public void initialize(RaftServer server, RaftGroupId id, RaftStorage raftStorage) throws IOException {
     super.initialize(server, id, raftStorage);
-    RaftPeer selfId = server.getPeer();
+    RaftPeerId selfId = server.getId();
     Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
     // If peers list is empty then it means  Ratis hasn't created any raft--meta file containing the last applied
     // transaction.
-    if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null && raftPeer.equals(selfId))) {
+    if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null && raftPeer.getId().equals(selfId))) {
       throw new StateMachineException(String.format("Current datanodeId: %s is not part of the group : %s with " +
               "quorum: %s", selfId, id, peers));
     }

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -565,7 +566,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       try {
         server.start();
-      } catch (Exception e) {
+      } catch (CompletionException e) {
         throw new RaftException(e);
       }
 
