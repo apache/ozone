@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,7 +110,8 @@ public class TestReconLayoutVersionManager {
    */
   @Test
   public void testFinalizeLayoutFeaturesWithMockedValues() throws SQLException {
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
 
     // Verify that schema versions are updated for our custom features
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
@@ -139,7 +141,8 @@ public class TestReconLayoutVersionManager {
   @Test
   public void testNoLayoutFeatures() throws SQLException {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
   }
 
@@ -158,7 +161,8 @@ public class TestReconLayoutVersionManager {
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
 
     // Simulate an exception being thrown during the upgrade action execution
-    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute();
+    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute(mock(
+        ReconStorageContainerManagerFacade.class));
     when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
         .thenReturn(Optional.of(action1));
 
@@ -167,7 +171,8 @@ public class TestReconLayoutVersionManager {
 
     // Execute the layout feature finalization
     try {
-      layoutVersionManager.finalizeLayoutFeatures();
+      layoutVersionManager.finalizeLayoutFeatures(mock(
+          ReconStorageContainerManagerFacade.class));
     } catch (Exception e) {
     }
     // Verify that schema version update was never called due to the exception
@@ -206,7 +211,8 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature2, feature3, feature1});
 
     // Execute the layout feature finalization
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
 
     // Verify that the actions were executed in the correct order using InOrder
     InOrder inOrder = inOrder(action1, action2, action3);
@@ -224,7 +230,8 @@ public class TestReconLayoutVersionManager {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
     layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
         mock(Injector.class));
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
 
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
   }
@@ -256,7 +263,8 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
     // Finalize the first two features.
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
 
     // Verify that the schema versions for the first two features were updated.
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
@@ -275,7 +283,8 @@ public class TestReconLayoutVersionManager {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
 
     // Finalize again, but only feature 3 should be finalized.
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(mock(
+        ReconStorageContainerManagerFacade.class));
 
     // Verify that the schema version for feature 3 was updated.
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);

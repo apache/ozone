@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +80,7 @@ public class ReconLayoutVersionManager {
    * Finalizes the layout features that need to be upgraded, by executing the upgrade action for each
    * feature that is registered for finalization.
    */
-  public void finalizeLayoutFeatures() {
+  public void finalizeLayoutFeatures(ReconStorageContainerManagerFacade scmFacade) {
     // Get features that need finalization, sorted by version
     List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
 
@@ -89,7 +90,7 @@ public class ReconLayoutVersionManager {
         Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
         if (action.isPresent()) {
           // Execute the upgrade action & update the schema version in the DB
-          action.get().execute();
+          action.get().execute(scmFacade);
           updateSchemaVersion(feature.getVersion());
           LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
         }

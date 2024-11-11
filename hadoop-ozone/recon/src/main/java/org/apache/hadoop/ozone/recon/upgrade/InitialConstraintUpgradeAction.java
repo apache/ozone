@@ -1,6 +1,7 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import com.google.inject.Inject;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -28,16 +29,12 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
 
-  private final DataSource dataSource;
+  private DataSource dataSource;
   private DSLContext dslContext;
 
-  @Inject
-  public InitialConstraintUpgradeAction(DataSource dataSource) {
-    this.dataSource = dataSource;
-  }
-
   @Override
-  public void execute() throws SQLException {
+  public void execute(ReconStorageContainerManagerFacade scmFacade) throws SQLException {
+    this.dataSource = scmFacade.getDataSource();
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;

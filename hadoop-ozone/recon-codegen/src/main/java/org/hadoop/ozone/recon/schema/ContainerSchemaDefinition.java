@@ -70,7 +70,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
       createUnhealthyContainersTable();
     }
   }
