@@ -50,6 +50,10 @@ Put object tagging
     ${tagCount} =       Execute and checkrc        echo '${result}' | jq -r '.TagCount'    0
                         Should Be Equal            ${tagCount}    2
 
+# Calling put-object-tagging on non-existent key
+    ${result} =         Execute AWSS3APICli and checkrc    put-object-tagging --bucket ${BUCKET} --key ${PREFIX}/nonexistent --tagging '{"TagSet": [{ "Key": "tag-key1", "Value": "tag-value1" }]}'   255
+                        Should contain             ${result}    NoSuchKey
+
 #This test depends on the previous test case. Can't be executes alone
 Get object tagging
 
