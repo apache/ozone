@@ -174,7 +174,7 @@ public class TestContainerMetrics {
       initConf.accept(pipeline);
 
       DatanodeDetails dn = pipeline.getFirstNode();
-      volumeSet = createVolumeSet(dn, testDir + dn.getUuidString());
+      volumeSet = createVolumeSet(dn, testDir.resolve(dn.getUuidString()).toString());
       server = createServer.apply(dn, volumeSet);
       server.start();
       initServer.accept(dn, pipeline);

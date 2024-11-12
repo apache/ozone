@@ -90,11 +90,11 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   *
    * Get the (created) base directory for tests.
    *
    * @return the absolute directory
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @Deprecated
   public static File getTestDir() {
@@ -110,11 +110,11 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   *
    * Get an uncreated directory for tests.
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @Deprecated
   public static File getTestDir(String subdir) {
@@ -122,12 +122,12 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   *
    * Get an uncreated directory for tests with a randomized alphanumeric
    * name. This is likely to provide a unique path for tests run in parallel
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @Deprecated
   public static File getRandomizedTestDir() {
@@ -135,14 +135,14 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   *
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
    *
    * @param subpath sub path, with no leading "/" character
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @Deprecated
   public static String getTempPath(String subpath) {
@@ -160,13 +160,13 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   *
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
    *
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @SuppressWarnings("java:S2245") // no need for secure random
   @Deprecated

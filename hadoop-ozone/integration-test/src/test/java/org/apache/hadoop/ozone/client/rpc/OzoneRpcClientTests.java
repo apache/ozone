@@ -4813,8 +4813,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testUploadWithStreamAndMemoryMappedBuffer(@TempDir Path dir) throws IOException {
-    // create a local dir
-    GenericTestUtils.assertDirCreation(new File(dir.toString()));
 
     // create a local file
     final int chunkSize = 1024;
