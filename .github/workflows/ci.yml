@@ -613,6 +613,9 @@ jobs:
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
             args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
           fi
+          if [[ "${{ matrix.profile }}" != "filesystem" ]]; then
+            args="$args -DskipShade"
+          fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
         env:
