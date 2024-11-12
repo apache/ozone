@@ -114,7 +114,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
-          deletingServiceMetrics.incrNumDirPurged(1);
           numDirDeleted++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
@@ -158,7 +157,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
 
           omMetrics.decNumKeys();
-          deletingServiceMetrics.incrNumSubKeysPurged(1);
           numSubFilesDeleted++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
@@ -199,6 +197,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap, deletingServiceMetrics);
   }
 }

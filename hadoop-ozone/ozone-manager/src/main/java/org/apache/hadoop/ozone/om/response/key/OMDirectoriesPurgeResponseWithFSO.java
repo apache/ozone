@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -64,18 +65,21 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
   private Map<String, OmKeyInfo> openKeyInfoMap;
+  private DeletingServiceMetrics deletingServiceMetrics;
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
+      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap, DeletingServiceMetrics metrics) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;
     this.volBucketInfoMap = volBucketInfoMap;
     this.fromSnapshotInfo = fromSnapshotInfo;
     this.openKeyInfoMap = openKeyInfoMap;
+    this.deletingServiceMetrics = metrics;
   }
 
   public OMDirectoriesPurgeResponseWithFSO(OMResponse omResponse) {
@@ -126,6 +130,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       final List<OzoneManagerProtocolProtos.KeyInfo> markDeletedSubDirsList =
           path.getMarkDeletedSubDirsList();
 
+      long subDirPurged = 0;
       // Add all sub-directories to deleted directory table.
       for (OzoneManagerProtocolProtos.KeyInfo key : markDeletedSubDirsList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
@@ -138,13 +143,16 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
             ozoneDbKey);
+        subDirPurged++;
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("markDeletedDirList KeyName: {}, DBKey: {}",
               keyInfo.getKeyName(), ozoneDbKey);
         }
       }
+      deletingServiceMetrics.incrNumSubDirectoriesPurged(subDirPurged);
 
+      long subKeyPurged = 0;
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
         String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
@@ -168,7 +176,9 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
+        subKeyPurged++;
       }
+      deletingServiceMetrics.incrNumSubKeysPurged(subKeyPurged);
 
       if (!openKeyInfoMap.isEmpty()) {
         for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
@@ -181,6 +191,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       if (path.hasDeletedDir()) {
         omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation,
             path.getDeletedDir());
+        deletingServiceMetrics.incrNumDirPurged(1);
 
         if (LOG.isDebugEnabled()) {
           LOG.info("Purge Deleted Directory DBKey: {}", path.getDeletedDir());

@@ -223,6 +223,8 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numDirPurged;
   @Metric("Total no. of subFiles purged")
   private MutableGaugeLong numSubKeysPurged;
+  @Metric("Total no. of subDirectories purged")
+  private MutableGaugeLong numSubDirectoriesPurged;
 
   public void incrNumDirPurged(long dirPurged) {
     this.numDirPurged.incr(dirPurged);
@@ -230,6 +232,9 @@ public final class DeletingServiceMetrics {
 
   public void incrNumSubKeysPurged(long subKeysPurged) {
     this.numSubKeysPurged.incr(subKeysPurged);
+  }
+  public void incrNumSubDirectoriesPurged(long subDirectoriesPurged) {
+    this.numSubDirectoriesPurged.incr(subDirectoriesPurged);
   }
 
   /*
