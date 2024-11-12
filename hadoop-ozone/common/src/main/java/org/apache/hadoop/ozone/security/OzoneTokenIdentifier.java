@@ -31,7 +31,6 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
@@ -89,35 +88,6 @@ public class OzoneTokenIdentifier extends
     return KIND_NAME;
   }
 
-  /** Instead of relying on proto serialization, this
-   *  provides  explicit serialization for OzoneTokenIdentifier.
-   * @return byte[]
-   */
-  public byte[] toUniqueSerializedKey() {
-    DataOutputBuffer buf = new DataOutputBuffer();
-    try {
-      super.write(buf);
-      WritableUtils.writeVInt(buf, getTokenType().getNumber());
-      // Set s3 specific fields.
-      if (getTokenType().equals(S3AUTHINFO)) {
-        WritableUtils.writeString(buf, getAwsAccessId());
-        WritableUtils.writeString(buf, getSignature());
-        WritableUtils.writeString(buf, getStrToSign());
-      } else {
-        if (StringUtils.isNotEmpty(getOmCertSerialId())) {
-          WritableUtils.writeString(buf, getOmCertSerialId());
-        } else {
-          WritableUtils.writeString(buf, getSecretKeyId());
-        }
-        WritableUtils.writeString(buf, getOmServiceId());
-      }
-    } catch (java.io.IOException e) {
-      throw new IllegalArgumentException(
-          "Can't encode the the raw data ", e);
-    }
-    return buf.getData();
-  }
-
   /** Instead of relying on proto deserialization, this
    *  provides  explicit deserialization for OzoneTokenIdentifier.
    * @return byte[]
@@ -148,14 +118,7 @@ public class OzoneTokenIdentifier extends
     return this;
   }
 
-  /**
-   * Overrides default implementation to write using Protobuf.
-   *
-   * @param out output stream
-   * @throws IOException
-   */
-  @Override
-  public void write(DataOutput out) throws IOException {
+  public OMTokenProto toProtoBuf() throws IOException {
     OMTokenProto.Builder builder = OMTokenProto.newBuilder()
         .setMaxDate(getMaxDate())
         .setType(getTokenType())
@@ -182,9 +145,18 @@ public class OzoneTokenIdentifier extends
         builder.setOmServiceId(getOmServiceId());
       }
     }
+    return builder.build();
+  }
 
-    OMTokenProto token = builder.build();
-    out.write(token.toByteArray());
+  /**
+   * Overrides default implementation to write using Protobuf.
+   *
+   * @param out output stream
+   * @throws IOException
+   */
+  @Override
+  public void write(DataOutput out) throws IOException {
+    out.write(toProtoBuf().toByteArray());
   }
 
   /**
