@@ -151,6 +151,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
       }
       deletingServiceMetrics.incrNumSubDirectoriesPurged(subDirPurged);
+      deletingServiceMetrics.setNumSubDirectoriesPurgedInLatestRequest(subDirPurged);
 
       long subKeyPurged = 0;
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
@@ -179,6 +180,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         subKeyPurged++;
       }
       deletingServiceMetrics.incrNumSubKeysPurged(subKeyPurged);
+      deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(subKeyPurged);
 
       if (!openKeyInfoMap.isEmpty()) {
         for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
@@ -192,10 +194,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation,
             path.getDeletedDir());
         deletingServiceMetrics.incrNumDirPurged(1);
+        deletingServiceMetrics.setNumDirPurgedInLatestRequest(1);
 
         if (LOG.isDebugEnabled()) {
           LOG.info("Purge Deleted Directory DBKey: {}", path.getDeletedDir());
         }
+      } else {
+        deletingServiceMetrics.setNumDirPurgedInLatestRequest(0);
       }
     }
   }

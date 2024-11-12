@@ -60,22 +60,22 @@ public final class DeletingServiceMetrics {
    * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
    */
   @Metric("Total no. of deleted directories sent for purge")
-  private MutableGaugeLong numDirDeleted;
+  private MutableGaugeLong numDirsSentForPurge;
   @Metric("Total no. of sub-directories sent for purge")
-  private MutableGaugeLong numDirsMoved;
+  private MutableGaugeLong numSubDirsSentForPurge;
   @Metric("Total no. of sub-files sent for purge")
-  private MutableGaugeLong numFilesMoved;
+  private MutableGaugeLong numSubFilesSentForPurge;
 
   public void incrNumDirDeleted(long dirDel) {
-    numDirDeleted.incr(dirDel);
+    numDirsSentForPurge.incr(dirDel);
   }
 
   public void incrNumDirsMoved(long dirMove) {
-    numDirsMoved.incr(dirMove);
+    numSubDirsSentForPurge.incr(dirMove);
   }
 
   public void incrNumFilesMoved(long filesMove) {
-    numFilesMoved.incr(filesMove);
+    numSubFilesSentForPurge.incr(filesMove);
   }
 
   public void incrementDirectoryDeletionTotalMetrics(long dirDel, long dirMove, long filesMove) {
@@ -94,13 +94,13 @@ public final class DeletingServiceMetrics {
   @Metric("Total time taken by the last iteration of DirectoryDeletingService")
   private MutableGaugeLong iterationDirDuration;
   @Metric("No. of directories deleted in last iteration")
-  private MutableGaugeLong iterationDirDeleted;
+  private MutableGaugeLong iterationDirsDeleted;
   @Metric("No. of sub-directories deleted in last iteration")
-  private MutableGaugeLong iterationSubDirDeleted;
+  private MutableGaugeLong iterationSubDirsDeleted;
   @Metric("No. of sub-directories sent for purge in last iteration")
-  private MutableGaugeLong iterationSubDirsMoved;
+  private MutableGaugeLong iterationSubDirsSentForPurge;
   @Metric("No. of files sent for purge in last iteration")
-  private MutableGaugeLong iterationFilesMoved;
+  private MutableGaugeLong iterationFilesSentForPurge;
 
   public void setIterationDirRunCount(long runcount) {
     iterationDirRunCount.set(runcount);
@@ -115,19 +115,19 @@ public final class DeletingServiceMetrics {
   }
 
   public void setIterationDirDeleted(long dirDel) {
-    iterationDirDeleted.set(dirDel);
+    iterationDirsDeleted.set(dirDel);
   }
 
   public void setIterationSubDirDeleted(long subdirDel) {
-    iterationSubDirDeleted.set(subdirDel);
+    iterationSubDirsDeleted.set(subdirDel);
   }
 
-  public void setIterationSubDirsMoved(long filesMove) {
-    iterationFilesMoved.set(filesMove);
+  public void setIterationFilesSentForPurge(long filesMove) {
+    iterationFilesSentForPurge.set(filesMove);
   }
 
-  public void setIterationFilesMoved(long subdirMove) {
-    iterationSubDirsMoved.set(subdirMove);
+  public void setIterationSubDirsSentForPurge(long subdirMove) {
+    iterationSubDirsSentForPurge.set(subdirMove);
   }
 
   public void setDirectoryDeletionIterationMetrics(long runcount, long startTime, long duration,
@@ -138,8 +138,8 @@ public final class DeletingServiceMetrics {
     setIterationDirDuration(duration);
     setIterationDirDeleted(dirDel);
     setIterationSubDirDeleted(subdirDel);
-    setIterationFilesMoved(filesMove);
-    setIterationSubDirsMoved(subdirMove);
+    setIterationFilesSentForPurge(filesMove);
+    setIterationSubDirsSentForPurge(subdirMove);
   }
 
   /*
@@ -179,7 +179,7 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong iterationKeyStartTime;
   @Metric("Total time taken by the last iteration of KeyDeletingService")
   private MutableGaugeLong iterationKeyDuration;
-  @Metric("No. of keys processed in last iteration")
+  @Metric("Total no. of keys processed in last iteration")
   private MutableGaugeLong iterationKeysProcessed;
   @Metric("Total no. of keys sent to scm for deletion")
   private MutableGaugeLong iterationKeysDeletionRequest;
@@ -220,21 +220,36 @@ public final class DeletingServiceMetrics {
    * Directory purge request metrics.
    */
   @Metric("Total no. of directories purged")
-  private MutableGaugeLong numDirPurged;
+  private MutableGaugeLong numDirsPurged;
   @Metric("Total no. of subFiles purged")
   private MutableGaugeLong numSubKeysPurged;
   @Metric("Total no. of subDirectories purged")
-  private MutableGaugeLong numSubDirectoriesPurged;
+  private MutableGaugeLong numSubDirsPurged;
+  @Metric("No. of directories purged in latest request")
+  private MutableGaugeLong numDirsPurgedInLatestRequest;
+  @Metric("No. of subFiles purged in latest request")
+  private MutableGaugeLong numSubKeysPurgedInLatestRequest;
+  @Metric("No. of subDirectories purged in latest request")
+  private MutableGaugeLong numSubDirsPurgedInLatestRequest;
 
   public void incrNumDirPurged(long dirPurged) {
-    this.numDirPurged.incr(dirPurged);
+    this.numDirsPurged.incr(dirPurged);
   }
-
   public void incrNumSubKeysPurged(long subKeysPurged) {
     this.numSubKeysPurged.incr(subKeysPurged);
   }
   public void incrNumSubDirectoriesPurged(long subDirectoriesPurged) {
-    this.numSubDirectoriesPurged.incr(subDirectoriesPurged);
+    this.numSubDirsPurged.incr(subDirectoriesPurged);
+  }
+  public void setNumDirPurgedInLatestRequest(long dirPurged) {
+    this.numDirsPurgedInLatestRequest.incr(dirPurged);
+  }
+
+  public void setNumSubKeysPurgedInLatestRequest(long subKeysPurged) {
+    this.numSubKeysPurgedInLatestRequest.incr(subKeysPurged);
+  }
+  public void setNumSubDirectoriesPurgedInLatestRequest(long subDirectoriesPurged) {
+    this.numSubDirsPurgedInLatestRequest.incr(subDirectoriesPurged);
   }
 
   /*
