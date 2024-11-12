@@ -196,20 +196,28 @@ public final class ScmBlockDeletingServiceMetrics {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
-/*
+
+  @Metric(about = "Start time taken of last iteration of ScmBlockDeletingService")
+  private MutableGaugeLong startTimeOfLastIteration;
+
+  @Metric(about = "Total time taken by the last iteration of ScmBlockDeletingService.")
+  private MutableGaugeLong durationOfLastIteration;
+
   @Metric(about = "Total number of individual delete transaction commands sent " +
       "to all DN in last iteration.")
   private MutableGaugeLong numBlockDeletionCommandSentInLastIteration;
+
+  @Metric(about = "Total number of individual delete transactions sent to " +
+      "all DN in last iteration.")
+  private MutableGaugeLong numBlockDeletionTransactionSentInLastIteration;
+
+/*
 
   @Metric(about = "Total number of success ACK of delete transaction commands in last iteration.")
   private MutableGaugeLong numBlockDeletionCommandSuccessInLastIteration;
 
   @Metric(about = "Total number of failure ACK of delete transaction commands in last iteration.")
   private MutableGaugeLong numBlockDeletionCommandFailureInLastIteration;
-
-  @Metric(about = "Total number of individual delete transactions sent to " +
-      "all DN in last iteration.")
-  private MutableGaugeLong numBlockDeletionTransactionSentInLastIteration;
 
   @Metric(about = "Total number of success execution of delete transactions in last iteration.")
   private MutableGaugeLong numBlockDeletionTransactionSuccessInLastIteration;
