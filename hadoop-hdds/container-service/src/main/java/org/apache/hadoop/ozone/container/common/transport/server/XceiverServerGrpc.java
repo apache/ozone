@@ -65,6 +65,7 @@ import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketCh
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
@@ -80,7 +81,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private final ContainerDispatcher storageContainer;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
-  private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
   private Class<? extends ServerChannel> channelType;
 
@@ -90,7 +90,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    * @param conf - Configuration
    */
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
-      ConfigurationSource conf,
+      ConfigurationSource conf, ThreadPoolExecutor executor,
       ContainerDispatcher dispatcher, CertificateClient caClient) {
     Preconditions.checkNotNull(conf);
 
@@ -104,19 +104,23 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
-    final int threadCountPerDisk =
-        conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
-    final int numberOfDisks =
-        HddsServerUtil.getDatanodeStorageDirs(conf).size();
-    final int poolSize = threadCountPerDisk * numberOfDisks;
+    ThreadPoolExecutor readExecutors = executor;
+    if (readExecutors == null) {
+      // this branch is to avoid updating all existing related tests
+      final int threadCountPerDisk =
+          conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
+      final int numberOfDisks =
+          HddsServerUtil.getDatanodeStorageDirs(conf).size();
+      final int poolSize = threadCountPerDisk * numberOfDisks;
 
-    readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
-        60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat(datanodeDetails.threadNamePrefix() +
-                "ChunkReader-%d")
-            .build());
+      readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
+          60, TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(),
+          new ThreadFactoryBuilder().setDaemon(true)
+              .setNameFormat(datanodeDetails.threadNamePrefix() +
+                  "ChunkReader-%d")
+              .build());
+    }
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -125,10 +129,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .build();
 
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
+      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
       channelType = EpollServerSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
+      eventLoopGroup = new NioEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
 
@@ -158,6 +162,12 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     }
     server = nettyServerBuilder.build();
     storageContainer = dispatcher;
+  }
+
+  @VisibleForTesting
+  public XceiverServerGrpc(DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      ContainerDispatcher dispatcher, CertificateClient caClient) {
+    this(datanodeDetails, conf, null, dispatcher, caClient);
   }
 
   @Override
@@ -207,8 +217,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
-        readExecutors.shutdown();
-        readExecutors.awaitTermination(5L, TimeUnit.SECONDS);
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
         eventLoopGroup.shutdownGracefully().sync();
@@ -218,6 +226,11 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       }
       isStarted = false;
     }
+  }
+
+  @Override
+  public boolean isStarted() {
+    return isStarted;
   }
 
   @Override

@@ -23,8 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
@@ -32,65 +30,44 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
 /**
- * Replication configuration for Ratis replication.
+ * Replication configuration for SHORT_CIRCUIT replication.
  */
 @Immutable
-public final class RatisReplicationConfig
-    implements ReplicatedReplicationConfig {
+public final class ShortCircuitReplicationConfig implements
+    ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
-  private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;
+  private static final String REPLICATION_TYPE = "SHORT_CIRCUIT";
 
-  private static final RatisReplicationConfig RATIS_ONE_CONFIG =
-      new RatisReplicationConfig(ONE);
+  private static final ShortCircuitReplicationConfig SHORT_CIRCUIT_ONE_CONFIG =
+      new ShortCircuitReplicationConfig(ONE);
 
-  private static final RatisReplicationConfig RATIS_THREE_CONFIG =
-      new RatisReplicationConfig(THREE);
+  private static final ShortCircuitReplicationConfig SHORT_CIRCUIT_THREE_CONFIG =
+      new ShortCircuitReplicationConfig(THREE);
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(RatisReplicationConfig.class);
   /**
-   * Get an instance of Ratis Replication Config with the requested factor.
+   * Get an instance of Short-circuit Replication Config with the requested factor.
    * The same static instance will be returned for all requests for the same
    * factor.
    * @param factor Replication Factor requested
-   * @return RatisReplicationConfig object of the requested factor
+   * @return ShortCircuitReplicationConfig object of the requested factor
    */
-  public static RatisReplicationConfig getInstance(ReplicationFactor factor) {
+  public static ShortCircuitReplicationConfig getInstance(
+      ReplicationFactor factor) {
     if (factor == ONE) {
-      return RATIS_ONE_CONFIG;
+      return SHORT_CIRCUIT_ONE_CONFIG;
     } else if (factor == THREE) {
-      return RATIS_THREE_CONFIG;
+      return SHORT_CIRCUIT_THREE_CONFIG;
     }
-    return new RatisReplicationConfig(factor);
+    return new ShortCircuitReplicationConfig(factor);
   }
 
   /**
-   * Use the static getInstance method rather than the private constructor.
+   * Use the static getInstance method instead of the private constructor.
    * @param replicationFactor
    */
-  private RatisReplicationConfig(ReplicationFactor replicationFactor) {
+  private ShortCircuitReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
-  }
-
-  public static boolean hasFactor(ReplicationConfig replicationConfig,
-      ReplicationFactor factor) {
-    if (replicationConfig instanceof RatisReplicationConfig) {
-      return ((RatisReplicationConfig) replicationConfig).getReplicationFactor()
-          .equals(factor);
-    }
-    return false;
-  }
-
-  @Override
-  @JsonProperty("replicationType")
-  public ReplicationType getReplicationType() {
-    return REPLICATION_TYPE;
-  }
-
-  @Override
-  public int getRequiredNodes() {
-    return replicationFactor.getNumber();
   }
 
   @Override
@@ -99,9 +76,28 @@ public final class RatisReplicationConfig
   }
 
   @Override
+  public int getRequiredNodes() {
+    return replicationFactor.getNumber();
+  }
+
+  @Override
   @JsonIgnore
   public String getReplication() {
-    return String.valueOf(replicationFactor);
+    return String.valueOf(this.replicationFactor);
+  }
+
+  @Override
+  public ReplicationType getReplicationType() {
+    return ReplicationType.SHORT_CIRCUIT;
+  }
+
+  /**
+   * This method is here only to allow the string value for replicationType to
+   * be output in JSON.
+   */
+  @JsonProperty("replicationType")
+  public String replicationType() {
+    return REPLICATION_TYPE;
   }
 
   @Override
@@ -112,7 +108,7 @@ public final class RatisReplicationConfig
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    RatisReplicationConfig that = (RatisReplicationConfig) o;
+    ShortCircuitReplicationConfig that = (ShortCircuitReplicationConfig) o;
     return replicationFactor == that.replicationFactor;
   }
 
@@ -123,16 +119,11 @@ public final class RatisReplicationConfig
 
   @Override
   public String toString() {
-    return REPLICATION_TYPE.name() + "/" + replicationFactor;
+    return REPLICATION_TYPE + "/" + replicationFactor;
   }
 
   @Override
   public String configFormat() {
     return toString();
-  }
-
-  @Override
-  public int getMinimumNodes() {
-    return 1;
   }
 }

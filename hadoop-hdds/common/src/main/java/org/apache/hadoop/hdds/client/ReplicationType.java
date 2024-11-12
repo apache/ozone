@@ -27,7 +27,8 @@ public enum ReplicationType {
   RATIS,
   STAND_ALONE,
   CHAINED,
-  EC;
+  EC,
+  SHORT_CIRCUIT;
 
   public static ReplicationType fromProto(
       HddsProtos.ReplicationType replicationType) {
@@ -43,6 +44,8 @@ public enum ReplicationType {
       return ReplicationType.CHAINED;
     case EC:
       return ReplicationType.EC;
+    case SHORT_CIRCUIT:
+      return ReplicationType.SHORT_CIRCUIT;
     default:
       throw new IllegalArgumentException(
           "Unsupported ProtoBuf replication type: " + replicationType);
@@ -63,6 +66,8 @@ public enum ReplicationType {
       return HddsProtos.ReplicationType.CHAINED;
     case EC:
       return HddsProtos.ReplicationType.EC;
+    case SHORT_CIRCUIT:
+      return HddsProtos.ReplicationType.SHORT_CIRCUIT;
     default:
       throw new IllegalArgumentException(
           "Unsupported replication type: " + replicationType);
