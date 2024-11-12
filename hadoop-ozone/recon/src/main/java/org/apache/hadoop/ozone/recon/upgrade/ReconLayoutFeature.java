@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import com.google.inject.Injector;
 import org.reflections.Reflections;
 
 import java.util.EnumMap;

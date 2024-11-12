@@ -31,7 +31,6 @@ import org.jooq.impl.SQLDataType;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Arrays;
 
 /**
  * Class used to create tables that are required for tracking containers.
@@ -73,23 +72,6 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
       createUnhealthyContainersTable();
     }
-  }
-
-  /**
-   * Add the updated constraint to the table.
-   */
-  private void addUpdatedConstraint() {
-    // Get all enum values as a list of strings
-    String[] enumStates = Arrays.stream(UnHealthyContainerStates.values())
-        .map(Enum::name)
-        .toArray(String[]::new);
-
-    // Alter the table to add the updated constraint
-    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
-        .add(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
-            .check(field(name("container_state"))
-                .in(enumStates)))
-        .execute();
   }
 
   /**

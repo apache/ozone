@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;

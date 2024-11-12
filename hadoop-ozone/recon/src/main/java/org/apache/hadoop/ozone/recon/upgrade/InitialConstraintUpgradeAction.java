@@ -1,6 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import com.google.inject.Inject;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
@@ -28,7 +47,6 @@ import static org.jooq.impl.DSL.name;
 public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
-
   private DataSource dataSource;
   private DSLContext dslContext;
 
@@ -40,7 +58,7 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
         return;
       }
       dslContext = DSL.using(conn);
-      // Drop the existing constraint if it exists
+      // Drop the existing constraint
       dropConstraint();
       // Add the updated constraint with all enum states
       addUpdatedConstraint();
@@ -75,12 +93,22 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
         .in(enumStates)))
         .execute();
 
-    LOG.info("Added the updated constraint to the table for enum state values: {}",
+    LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
         Arrays.toString(enumStates));
   }
 
   @Override
   public UpgradeActionType getType() {
     return FINALIZE;
+  }
+
+  @VisibleForTesting
+  public void setDataSource(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
+
+  @VisibleForTesting
+  public void setDslContext(DSLContext dslContext) {
+    this.dslContext = dslContext;
   }
 }

@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -288,8 +287,8 @@ public class TestReconLayoutVersionManager {
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);
 
     // Verify that action1 and action2 were not executed again.
-    verify(action1, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));  // Still should have been executed only once
-    verify(action2, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));  // Still should have been executed only once
+    verify(action1, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));
+    verify(action2, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));
 
     // Verify that the upgrade action for feature 3 was executed.
     verify(action3, times(1)).execute(mock(ReconStorageContainerManagerFacade.class));
