@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell.snapshot;
 import java.io.IOException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
@@ -50,7 +49,7 @@ public class RenameSnapshotHandler extends Handler {
   }
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) throws IOException, OzoneClientException {
+  protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
     OmUtils.validateSnapshotName(snapshotNewName);
