@@ -60,6 +60,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -85,6 +86,7 @@ import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -320,6 +322,23 @@ public class TestOMKeyRequest {
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
     return snapshotInfo;
+  }
+
+  @Test
+  public void testValidateKeyArgs() {
+    OMKeyRequest.ValidateKeyArgs validateKeyArgs1 = new OMKeyRequest.ValidateKeyArgs.Builder()
+        .setKeyName("tmpKey").setSnapshotReservedWord("tmpSnapshotReservedWord").build();
+    assertTrue("tmpSnapshotReservedWord".equals(validateKeyArgs1.getSnapshotReservedWord()));
+    assertTrue("tmpKey".equals(validateKeyArgs1.getKeyName()));
+    assertTrue(validateKeyArgs1.isValidateKeyName());
+    assertTrue(validateKeyArgs1.isValidateSnapshotReserved());
+
+    OMKeyRequest.ValidateKeyArgs validateKeyArgs2 = new OMKeyRequest.ValidateKeyArgs.Builder()
+        .setKeyName("tmpKey2").build();
+    assertTrue(null == validateKeyArgs2.getSnapshotReservedWord());
+    assertTrue("tmpKey2".equals(validateKeyArgs2.getKeyName()));
+    assertTrue(validateKeyArgs2.isValidateKeyName());
+    assertTrue(!validateKeyArgs2.isValidateSnapshotReserved());
   }
 
 }
