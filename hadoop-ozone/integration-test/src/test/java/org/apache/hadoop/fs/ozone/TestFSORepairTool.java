@@ -41,9 +41,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.repair.om.FSORepairTool;
 import org.apache.hadoop.ozone.shell.OzoneShell;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -54,18 +54,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.System.err;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -80,23 +80,22 @@ public class TestFSORepairTool {
   private static FileSystem fs;
   private static OzoneClient client;
   private static OzoneConfiguration conf = null;
-
+  private static FSORepairTool tool;
 
   @BeforeAll
   public static void init() throws Exception {
     // Set configs.
     conf = new OzoneConfiguration();
     // deletion services will be triggered manually.
-    conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL,
-        1_000_000, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1_000_000,
-        TimeUnit.SECONDS);
-    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 10);
-    conf.setInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK, 10);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
+    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+            TimeUnit.MILLISECONDS);
+    conf.setInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK, 20);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     // Since delete services use RocksDB iterators, make sure the double
     // buffer is flushed between runs.
-    conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 1);
+    conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 2);
 
     // Build cluster.
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
@@ -130,6 +129,7 @@ public class TestFSORepairTool {
       assertEquals(0, exitC);
     }
 
+    cluster.getOzoneManager().prepareOzoneManager(120L, 5L);
     runDeletes();
     assertFileAndDirTablesEmpty();
   }
@@ -151,6 +151,7 @@ public class TestFSORepairTool {
     cmd.setExecutionExceptionHandler(exceptionHandler);
     return cmd.execute(argsWithHAConf);
   }
+
   private String getSetConfStringFromConf(String key) {
     return String.format("--set=%s=%s", key, conf.get(key));
   }
@@ -212,12 +213,12 @@ public class TestFSORepairTool {
 
   @Test
   public void testConnectedTreeOneBucket() throws Exception {
-    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
+    FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
 
     // Test the connected tree in debug mode.
-    FSORepairTool fsoTool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
-    FSORepairTool.Report debugReport = fsoTool.run();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), true, false, null, null);
+    FSORepairTool.Report debugReport = tool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -225,9 +226,9 @@ public class TestFSORepairTool {
 
     // Running again in repair mode should give same results since the tree
     // is connected.
-    fsoTool = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report repairReport = fsoTool.run();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    FSORepairTool.Report repairReport = tool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -240,29 +241,103 @@ public class TestFSORepairTool {
     FSORepairTool.Report report2 = buildConnectedTree("vol1", "bucket2", 10);
     FSORepairTool.Report expectedReport = new FSORepairTool.Report(report1, report2);
 
-    FSORepairTool
-        repair = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    FSORepairTool.Report debugReport = repair.run();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    FSORepairTool.Report debugReport = tool.run();
     Assertions.assertEquals(expectedReport, debugReport);
+  }
+
+  /**
+   * Test to verify how the tool processes the volume and bucket
+   * filters.
+   */
+  @Test
+  public void testVolumeAndBucketFilter() throws Exception {
+    FSORepairTool.Report report1 = buildDisconnectedTree("vol1", "bucket1", 10);
+    FSORepairTool.Report report2 = buildConnectedTree("vol2", "bucket2", 10);
+    FSORepairTool.Report expectedReport1 = new FSORepairTool.Report(report1);
+    FSORepairTool.Report expectedReport2 = new FSORepairTool.Report(report2);
+
+    // When volume filter is passed
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, "/vol1", null);
+    FSORepairTool.Report result1 = tool.run();
+    Assertions.assertEquals(expectedReport1, result1);
+
+    // When both volume and bucket filters are passed
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, "/vol2", "bucket2");
+    FSORepairTool.Report result2 = tool.run();
+    Assertions.assertEquals(expectedReport2, result2);
+
+    PrintStream originalOut = System.out;
+
+    // When a non-existent bucket filter is passed
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+         PrintStream ps = new PrintStream(outputStream)) {
+      System.setOut(ps);
+      tool = new FSORepairTool(getOmDB(),
+              getOmDBLocation(), false, true, "/vol1", "bucket2");
+      tool.run();
+      String output = outputStream.toString();
+      Assertions.assertTrue(output.contains("Bucket 'bucket2' does not exist in volume '/vol1'."));
+    } finally {
+      System.setOut(originalOut);
+    }
+
+    // When a non-existent volume filter is passed
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+         PrintStream ps = new PrintStream(outputStream)) {
+      System.setOut(ps);
+      tool = new FSORepairTool(getOmDB(),
+              getOmDBLocation(), false, true, "/vol3", "bucket2");
+      tool.run();
+      String output = outputStream.toString();
+      Assertions.assertTrue(output.contains("Volume '/vol3' does not exist."));
+    } finally {
+      System.setOut(originalOut);
+    }
+
+    // When bucket filter is passed without the volume filter.
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+         PrintStream ps = new PrintStream(outputStream)) {
+      System.setOut(ps);
+      tool = new FSORepairTool(getOmDB(),
+              getOmDBLocation(), false, true, null, "bucket2");
+      tool.run();
+      String output = outputStream.toString();
+      Assertions.assertTrue(output.contains("--bucket flag cannot be used without specifying --volume."));
+    } finally {
+      System.setOut(originalOut);
+    }
+
   }
 
   @Test
   public void testMultipleBucketsAndVolumes() throws Exception {
+    Table<String, OmDirectoryInfo> dirTable =
+            cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, OmKeyInfo> keyTable =
+            cluster.getOzoneManager().getMetadataManager().getKeyTable(getFSOBucketLayout());
     FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket2");
-    FSORepairTool.Report expectedAggregateReport = new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report(
+    FSORepairTool.Report expectedAggregateReport = new FSORepairTool.Report(
         report1, report2);
 
-    org.apache.hadoop.ozone.repair.om.FSORepairTool
-        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    FSORepairTool.Report generatedReport = tool.run();
 
     Assertions.assertEquals(generatedReport, expectedAggregateReport);
     assertConnectedTreeReadable("vol1", "bucket1");
     assertDisconnectedTreePartiallyReadable("vol2", "bucket2");
-    assertDisconnectedObjectsMarkedForDelete(1);
+
+    // This assertion ensures that only specific directories and keys remain in the active tables,
+    // as the remaining entries are expected to be moved to the deleted tables by the background service.
+    // However, since the timing of the background deletion service is not predictable,
+    // assertions on the deleted tables themselves may lead to flaky tests.
+    assertEquals(4, countTableEntries(dirTable));
+    assertEquals(5, countTableEntries(keyTable));
   }
 
   /**
@@ -271,6 +346,11 @@ public class TestFSORepairTool {
    */
   @Test
   public void testDeleteOverwrite() throws Exception {
+    Table<String, OmKeyInfo> keyTable =
+            cluster.getOzoneManager().getMetadataManager().getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable =
+            cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+
     // Create files and dirs under dir1. To make sure they are added to the
     // delete table, the keys must have data.
     buildConnectedTree("vol1", "bucket1", 10);
@@ -289,25 +369,28 @@ public class TestFSORepairTool {
     ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/file2"));
     disconnectDirectory("dir1");
 
-    org.apache.hadoop.ozone.repair.om.FSORepairTool
-        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    FSORepairTool.Report generatedReport = tool.run();
 
     Assertions.assertEquals(1, generatedReport.getUnreachableDirs());
     Assertions.assertEquals(3, generatedReport.getUnreachableFiles());
 
-    assertDisconnectedObjectsMarkedForDelete(2);
+    // This assertion ensures that only specific directories and keys remain in the active tables,
+    // as the remaining entries are expected to be moved to the deleted tables by the background service.
+    // However, since the timing of the background deletion service is not predictable,
+    // assertions on the deleted tables themselves may lead to flaky tests.
+    assertEquals(1, countTableEntries(keyTable));
+    assertEquals(1, countTableEntries(dirTable));
   }
 
   @Test
   public void testEmptyFileTrees() throws Exception {
     // Run when there are no file trees.
-    org.apache.hadoop.ozone.repair.om.FSORepairTool
-        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
-    Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    FSORepairTool.Report generatedReport = tool.run();
+    Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
     assertDeleteTablesEmpty();
 
     // Create an empty volume and bucket.
@@ -315,11 +398,10 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol2/bucket1"));
 
     // Run on an empty volume and bucket.
-    repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
-    generatedReport = repair.run();
-    Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
-    assertDeleteTablesEmpty();
+    tool = new FSORepairTool(getOmDB(),
+        getOmDBLocation(), false, true, null, null);
+    generatedReport = tool.run();
+    Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
   }
 
   @Test
@@ -349,15 +431,14 @@ public class TestFSORepairTool {
       legacyStream.close();
 
       // Add an FSO bucket with data.
-      org.apache.hadoop.ozone.repair.om.FSORepairTool.Report connectReport = buildConnectedTree("vol1", "fso" +
-          "-bucket");
+      FSORepairTool.Report connectReport =
+          buildConnectedTree("vol1", "fso-bucket");
 
       // Even in repair mode there should be no action. legacy and obs buckets
       // will be skipped and FSO tree is connected.
-      org.apache.hadoop.ozone.repair.om.FSORepairTool
-          repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
-          getOmDBLocation(), false, null, null);
-      org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
+      tool = new FSORepairTool(getOmDB(),
+          getOmDBLocation(), false, true, null, null);
+      FSORepairTool.Report generatedReport = tool.run();
 
       Assertions.assertEquals(connectReport, generatedReport);
       assertConnectedTreeReadable("vol1", "fso-bucket");
@@ -372,7 +453,7 @@ public class TestFSORepairTool {
   }
 
 
-  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildConnectedTree(String volume, String bucket)
+  private FSORepairTool.Report buildConnectedTree(String volume, String bucket)
       throws Exception {
     return buildConnectedTree(volume, bucket, 0);
   }
@@ -380,8 +461,7 @@ public class TestFSORepairTool {
   /**
    * Creates a tree with 3 reachable directories and 4 reachable files.
    */
-  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildConnectedTree(String volume, String bucket,
-                                                                                    int fileSize)
+  private FSORepairTool.Report buildConnectedTree(String volume, String bucket, int fileSize)
       throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
@@ -445,17 +525,17 @@ public class TestFSORepairTool {
     Assertions.assertTrue(fs.exists(file4));
   }
 
-  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildDisconnectedTree(String volume, String bucket)
+  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket)
       throws Exception {
     return buildDisconnectedTree(volume, bucket, 0);
   }
 
   /**
-   * Creates a tree with 2 reachable directories, 1 reachable file, 1
+   * Creates a tree with 1 reachable directory, 1 reachable file, 1
    * unreachable directory, and 3 unreachable files.
    */
-  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildDisconnectedTree(String volume, String bucket,
-                                                                                       int fileSize) throws Exception {
+  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket,
+      int fileSize) throws Exception {
     buildConnectedTree(volume, bucket, fileSize);
 
     // Manually remove dir1. This should disconnect 3 of the files and 1 of
@@ -516,91 +596,61 @@ public class TestFSORepairTool {
     Assertions.assertTrue(fs.exists(file4));
   }
 
-  /**
-   * Checks that the disconnected tree's unreachable objects are correctly
-   * moved to the delete table. If the tree was written and deleted multiple
-   * times, it makes sure the delete entries with the same name are preserved.
-   */
-  private void assertDisconnectedObjectsMarkedForDelete(int numWrites)
-      throws Exception {
-
-    Map<String, Integer> pendingDeleteDirCounts = new HashMap<>();
-
-    // Check deleted directory table.
+  private void assertDeleteTablesEmpty() throws Exception {
     OzoneManager leader = cluster.getOMLeader();
-    Table<String, OmKeyInfo> deletedDirTable =
-        leader.getMetadataManager().getDeletedDirTable();
-    try (TableIterator<String, ?
-        extends Table.KeyValue<String, OmKeyInfo>> iterator =
-            deletedDirTable.iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-        String key = entry.getKey();
-        OmKeyInfo value = entry.getValue();
 
-        String dirName = key.split("/")[4];
-        LOG.info("In deletedDirTable, extracting directory name {}  from DB " +
-            "key {}", dirName, key);
-
-        // Check that the correct dir info was added.
-        // FSO delete path will fill in the whole path to the key in the
-        // proto when it is deleted. Once the tree is disconnected that can't
-        // be done, so just make sure the dirName contained in the key name
-        // somewhere.
-        Assertions.assertTrue(value.getKeyName().contains(dirName));
-
-        int count = pendingDeleteDirCounts.getOrDefault(dirName, 0);
-        pendingDeleteDirCounts.put(dirName, count + 1);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return leader.getMetadataManager().getDeletedDirTable().isEmpty();
+      } catch (Exception e) {
+        LOG.error("DB failure!", e);
+        fail("DB failure!");
+        return false;
       }
-    }
-
-    // 1 directory is disconnected in the tree. dir1 was totally deleted so
-    // the repair tool will not see it.
-    Assertions.assertEquals(1, pendingDeleteDirCounts.size());
-    Assertions.assertEquals(numWrites, pendingDeleteDirCounts.get("dir2"));
-
-    // Check that disconnected files were put in deleting tables.
-    Map<String, Integer> pendingDeleteFileCounts = new HashMap<>();
-
-    Table<String, RepeatedOmKeyInfo> deletedFileTable =
-        leader.getMetadataManager().getDeletedTable();
-    try (TableIterator<String, ?
-        extends Table.KeyValue<String, RepeatedOmKeyInfo>> iterator =
-            deletedFileTable.iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> entry = iterator.next();
-        String key = entry.getKey();
-        RepeatedOmKeyInfo value = entry.getValue();
-
-        String[] keyParts = key.split("/");
-        String fileName = keyParts[keyParts.length - 1];
-
-        LOG.info("In deletedTable, extracting file name {}  from DB " +
-            "key {}", fileName, key);
-
-        for (OmKeyInfo fileInfo: value.getOmKeyInfoList()) {
-          // Check that the correct file info was added.
-          Assertions.assertTrue(fileInfo.getKeyName().contains(fileName));
-
-          int count = pendingDeleteFileCounts.getOrDefault(fileName, 0);
-          pendingDeleteFileCounts.put(fileName, count + 1);
-        }
+    }, 1000, 120000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return leader.getMetadataManager().getDeletedTable().isEmpty();
+      } catch (Exception e) {
+        LOG.error("DB failure!", e);
+        fail("DB failure!");
+        return false;
       }
-    }
-
-    // 3 files are disconnected in the tree.
-    // TODO: dir2 ended up in here with count = 1. file3 also had count=1
-    //  Likely that the dir2/file3 entry got split in two.
-    Assertions.assertEquals(3, pendingDeleteFileCounts.size());
-    Assertions.assertEquals(numWrites, pendingDeleteFileCounts.get("file1"));
-    Assertions.assertEquals(numWrites, pendingDeleteFileCounts.get("file2"));
-    Assertions.assertEquals(numWrites, pendingDeleteFileCounts.get("file3"));
+    }, 1000, 120000);
   }
 
-  private void assertDeleteTablesEmpty() throws IOException {
+  private void assertFileAndDirTablesEmpty() throws Exception {
     OzoneManager leader = cluster.getOMLeader();
-    Assertions.assertTrue(leader.getMetadataManager().getDeletedDirTable().isEmpty());
-    Assertions.assertTrue(leader.getMetadataManager().getDeletedTable().isEmpty());
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return leader.getMetadataManager().getDirectoryTable().isEmpty();
+      } catch (Exception e) {
+        LOG.error("DB failure!", e);
+        fail("DB failure!");
+        return false;
+      }
+    }, 1000, 120000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return leader.getMetadataManager().getFileTable().isEmpty();
+      } catch (Exception e) {
+        LOG.error("DB failure!", e);
+        fail("DB failure!");
+        return false;
+      }
+    }, 1000, 120000);
+  }
+
+  private DBStore getOmDB() {
+    return cluster.getOMLeader().getMetadataManager().getStore();
+  }
+
+  private String getOmDBLocation() {
+    return cluster.getOMLeader().getMetadataManager().getStore().getDbLocation().toString();
+  }
+
+  private static BucketLayout getFSOBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   private void runDeletes() throws Exception {
@@ -623,17 +673,15 @@ public class TestFSORepairTool {
     }
   }
 
-  private void assertFileAndDirTablesEmpty() throws Exception {
-    OzoneManager leader = cluster.getOMLeader();
-    Assertions.assertTrue(leader.getMetadataManager().getDirectoryTable().isEmpty());
-    Assertions.assertTrue(leader.getMetadataManager().getFileTable().isEmpty());
-  }
-
-  private DBStore getOmDB() {
-    return cluster.getOMLeader().getMetadataManager().getStore();
-  }
-
-  private String getOmDBLocation() {
-    return cluster.getOMLeader().getMetadataManager().getStore().getDbLocation().toString();
+  private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
+    int count = 0;
+    try (TableIterator<K, ? extends Table.KeyValue<K, V>> iterator = table.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        count++;
+      }
+    }
+    System.out.println("Total number of entries: " + count);
+    return count;
   }
 }

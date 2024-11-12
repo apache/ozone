@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.ratis.util.Preconditions;
@@ -95,6 +96,7 @@ public class FSORepairTool {
   private final Table<String, OmKeyInfo> fileTable;
   private final Table<String, OmKeyInfo> deletedDirectoryTable;
   private final Table<String, RepeatedOmKeyInfo> deletedTable;
+  private final Table<String, SnapshotInfo> snapshotInfoTable;
   private final String volumeFilter;
   private final String bucketFilter;
   // The temporary DB is used to track which items have been seen.
@@ -113,10 +115,10 @@ public class FSORepairTool {
   private long unreachableBytes;
   private long unreachableFiles;
   private long unreachableDirs;
-  private boolean dryRun;
+  private final boolean dryRun;
 
-  public FSORepairTool(String dbPath, boolean dryRun, String volume, String bucket) throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, dryRun, volume, bucket);
+  public FSORepairTool(String dbPath, boolean dryRun, boolean repair, String volume, String bucket) throws IOException {
+    this(getStoreFromPath(dbPath), dbPath, dryRun, repair, volume, bucket);
   }
 
   /**
@@ -124,7 +126,7 @@ public class FSORepairTool {
    * class for testing.
    */
   @VisibleForTesting
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, String volume, String bucket)
+  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, boolean isRepair, String volume, String bucket)
       throws IOException {
     dryRun = isDryRun;
     // Counters to track as we walk the tree.
@@ -159,6 +161,10 @@ public class FSORepairTool {
         OmMetadataManagerImpl.DELETED_TABLE,
         String.class,
         RepeatedOmKeyInfo.class);
+    snapshotInfoTable = store.getTable(
+        OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
+        String.class,
+        SnapshotInfo.class);
   }
 
   protected static DBStore getStoreFromPath(String dbPath) throws IOException {
@@ -173,7 +179,6 @@ public class FSORepairTool {
   }
 
   public org.apache.hadoop.ozone.repair.om.FSORepairTool.Report run() throws IOException {
-    System.out.println("Disclaimer: This tool currently does not support snapshots.");
 
     if (bucketFilter != null && volumeFilter == null) {
       System.out.println("--bucket flag cannot be used without specifying --volume.");
@@ -217,6 +222,17 @@ public class FSORepairTool {
             continue;
           }
 
+          // Check for snapshots in the specified bucket
+          if (checkIfSnapshotExistsForBucket(volumeFilter, bucketFilter)) {
+            if (dryRun) {
+              System.out.println("Snapshot detected in bucket '" + bucketFilter + "'");
+            } else {
+              System.out.println("Snapshot exists in bucket '" + bucketFilter + "'. " +
+                  "Repair is not allowed if snapshots exist.");
+              return null;
+            }
+          }
+
           processBucket(volumeEntry.getValue(), bucketInfo);
         } else {
 
@@ -253,7 +269,37 @@ public class FSORepairTool {
     return buildReportAndLog();
   }
 
+  private boolean checkIfSnapshotExistsForBucket(String volumeName, String bucketName) throws IOException {
+    if (snapshotInfoTable == null) {
+      return false;
+    }
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
+            snapshotInfoTable.iterator()) {
+      while (iterator.hasNext()) {
+        SnapshotInfo snapshotInfo = iterator.next().getValue();
+        String snapshotPath = (volumeName + "/" + bucketName).replaceFirst("^/", "");
+        if (snapshotInfo.getSnapshotPath().equals(snapshotPath)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
+    System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
+    if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
+      if (dryRun) {
+        System.out.println(
+            "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
+      } else {
+        System.out.println(
+            "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
+            "due to snapshot presence.");
+        return;
+      }
+    }
     dropReachableTableIfExists();
     createReachableTable();
     markReachableObjectsInBucket(volume, bucketInfo);
@@ -277,7 +323,6 @@ public class FSORepairTool {
 
   private void markReachableObjectsInBucket(OmVolumeArgs volume,
                                             OmBucketInfo bucket) throws IOException {
-    System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucket.getBucketName());
     // Only put directories in the stack.
     // Directory keys should have the form /volumeID/bucketID/parentID/name.
     Stack<String> dirKeyStack = new Stack<>();
@@ -335,6 +380,8 @@ public class FSORepairTool {
 
           if (dryRun) {
             System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
+          } else {
+            System.out.println("Deleting unreachable directory " + dirKey);
             OmDirectoryInfo dirInfo = dirEntry.getValue();
             markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(),
                 dirKey, dirInfo);
@@ -363,6 +410,8 @@ public class FSORepairTool {
 
           if (dryRun) {
             System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
+          } else {
+            System.out.println("Deleting unreachable file " + fileKey);
             markFileForDeletion(fileKey, fileInfo);
           }
         } else {
@@ -384,7 +433,7 @@ public class FSORepairTool {
       RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
           fileInfo, fileInfo.getUpdateID(), true);
       // NOTE: The FSO code seems to write the open key entry with the whole
-      // path, using the object's names instead of their ID. This would onyl
+      // path, using the object's names instead of their ID. This would only
       // be possible when the file is deleted explicitly, and not part of a
       // directory delete. It is also not possible here if the file's parent
       // is gone. The name of the key does not matter so just use IDs.
@@ -517,12 +566,19 @@ public class FSORepairTool {
   private RocksDatabase buildReachableRocksDB(File reachableDBFile) throws IOException {
     DBProfile profile = new OzoneConfiguration().getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE);
     Set<TableConfig> tableConfigs = new HashSet<>();
-    tableConfigs.add(new TableConfig("default", profile.getColumnFamilyOptions()));
 
-    return RocksDatabase.open(reachableDBFile,
-        profile.getDBOptions(),
-        new ManagedWriteOptions(),
-        tableConfigs, false);
+    try {
+      tableConfigs.add(new TableConfig("default", profile.getColumnFamilyOptions()));
+
+      return RocksDatabase.open(reachableDBFile,
+          profile.getDBOptions(),
+          new ManagedWriteOptions(),
+          tableConfigs, false);
+    } finally {
+      for (TableConfig config : tableConfigs) {
+        config.close();
+      }
+    }
   }
 
   private void closeReachableDB() {

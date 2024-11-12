@@ -47,12 +47,16 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--dry-run"},
         defaultValue = "true",
-        description = "This tool will run in dry-run mode by default to log unreachable files or directories. " +
-        "Set the value to 'false' to move unreachable files and directories to the deleted tables.")
+        description = "Run in dry-run mode to log information about unreachable files or directories.")
   private boolean dryRun;
 
+  @CommandLine.Option(names = {"--repair"},
+        defaultValue = "false",
+        description = "Run in repair mode to move unreachable files and directories to deleted tables.")
+  private boolean repair;
+
   @CommandLine.Option(names = {"--volume"},
-      description = "Filter by volume name")
+      description = "Filter by volume name. Add '/' before the volume name.")
   private String volume;
 
   @CommandLine.Option(names = {"--bucket"},
@@ -66,9 +70,15 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws Exception {
+    if (repair) {
+      dryRun = false; //Disable dry-run if repair is passed.
+      System.out.println("FSO Repair Tool is running in repair mode");
+    } else {
+      System.out.println("FSO Repair Tool is running in debug mode");
+    }
     try {
       FSORepairTool
-          repairTool = new FSORepairTool(dbPath, dryRun, volume, bucket);
+          repairTool = new FSORepairTool(dbPath, dryRun, repair, volume, bucket);
       repairTool.run();
     } catch (Exception ex) {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
@@ -86,4 +96,3 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
     return OzoneRepair.class;
   }
 }
-
