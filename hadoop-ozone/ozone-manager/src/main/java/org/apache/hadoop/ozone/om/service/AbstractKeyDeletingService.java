@@ -280,7 +280,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId) {
+                                  UUID expectedPreviousSnapshotId, long rnCnt) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -305,7 +305,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -394,13 +394,26 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
+  public long optimizeDirDeletesAndSubmitRequests(long remainNum, long dirNum,
+      long subDirNum, long subFileNum,
+      List<Pair<String, OmKeyInfo>> allSubDirList,
+      List<PurgePathRequest> purgePathRequestList, String snapTableKey,
+      long startTime, int remainingBufLimit, KeyManager keyManager,
+      UUID expectedPreviousSnapshotId) {
+    return optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
+        subFileNum, allSubDirList, purgePathRequestList, snapTableKey,
+        startTime, remainingBufLimit, keyManager, expectedPreviousSnapshotId,
+        getRunCount().get());
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public long optimizeDirDeletesAndSubmitRequest(long remainNum,
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
       int remainingBufLimit, KeyManager keyManager,
-      UUID expectedPreviousSnapshotId) {
+      UUID expectedPreviousSnapshotId, long rnCnt) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -442,7 +455,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -455,7 +468,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               "DeletedDirectoryTable, iteration elapsed: {}ms," +
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-          Time.monotonicNow() - startTime, getRunCount());
+          Time.monotonicNow() - startTime, rnCnt);
     }
     return remainNum;
   }

@@ -215,7 +215,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.debug("Running DirectoryDeletingService");
         }
         isRunningOnAOS.set(true);
-        getRunCount().incrementAndGet();
+        long rnCnt = getRunCount().incrementAndGet();
         long dirNum = 0L;
         long subDirNum = 0L;
         long subFileNum = 0L;
@@ -282,7 +282,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestList, null, startTime,
               ratisByteLimit - consumedSize,
-              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId);
+              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId, rnCnt);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +

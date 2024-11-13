@@ -2052,7 +2052,7 @@ public class KeyManagerImpl implements KeyManager {
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table dirTable = metadataManager.getDirectoryTable();
+    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDirectoryInfo>>
         iterator = dirTable.iterator()) {
