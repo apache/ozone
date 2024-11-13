@@ -49,7 +49,10 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
 
-  download_hadoop_aws "${HADOOP_AWS_DIR}"
+  if ! download_hadoop_aws "${HADOOP_AWS_DIR}"; then
+    echo "Failed to download Hadoop ${HADOOP_VERSION}" > "${REPORT_DIR}/summary.txt"
+    exit 1
+  fi
 fi
 
 export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
