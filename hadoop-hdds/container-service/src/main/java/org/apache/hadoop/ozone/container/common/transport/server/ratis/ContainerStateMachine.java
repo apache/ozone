@@ -272,20 +272,16 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (this.peersValidated.get()) {
       return;
     }
-    synchronized (peersValidated) {
-      if (!peersValidated.get()) {
-        RaftPeerId selfId = server.getId();
-        Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
-        // If peers list is empty then it means  Ratis hasn't created any raft--meta file containing the last applied
-        // transaction. Then the peer list can be only validated on apply transaction.
-        if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null
-            && raftPeer.getId().equals(selfId))) {
-          throw new StorageContainerException(String.format("Current datanodeId: %s is not part of the " +
-              "group : %s with quorum: %s", selfId, id, peers), ContainerProtos.Result.INVALID_CONFIG);
-        } else if (!peers.isEmpty()) {
-          peersValidated.set(true);
-        }
-      }
+    RaftPeerId selfId = server.getId();
+    Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
+    // If peers list is empty then it means  Ratis hasn't created any raft--meta file containing the last applied
+    // transaction. Then the peer list can be only validated on apply transaction.
+    if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null
+        && raftPeer.getId().equals(selfId))) {
+      throw new StorageContainerException(String.format("Current datanodeId: %s is not part of the " +
+          "group : %s with quorum: %s", selfId, id, peers), ContainerProtos.Result.INVALID_CONFIG);
+    } else if (!peers.isEmpty()) {
+      peersValidated.set(true);
     }
   }
 

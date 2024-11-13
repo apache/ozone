@@ -291,7 +291,6 @@ public class TestContainerStateMachineFailures {
               pipeline));
 
       DatanodeDetails dn = datanodes.get(0).getDatanodeDetails();
-      int index = cluster.getHddsDatanodeIndex(dn);
 
       // Delete all data volumes.
       cluster.getHddsDatanode(dn).getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList()
