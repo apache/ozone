@@ -184,10 +184,10 @@ public class ContainerChecksumTreeManager {
     }
 
     // Update Container Diff metrics based on the diff report.
-    if (report.isHealthy()) {
-      metrics.incrementHealthyContainerDiffs();
-    } else {
+    if (report.needsRepair()) {
       metrics.incrementUnhealthyContainerDiffs();
+    } else {
+      metrics.incrementHealthyContainerDiffs();
     }
     metrics.incrementMerkleTreeDiffSuccesses();
     return report;
@@ -409,11 +409,12 @@ public class ContainerChecksumTreeManager {
     }
 
     /**
-     * If isHealthy is true, It means current replica is healthy. The peer replica still may have corruption,
-     * which it will fix when it reconciles with other peers.
+     * If needRepair is true, It means current replica needs blocks/chunks from the peer to repair
+     * it's container replica. The peer replica still may have corruption, which it will fix when
+     * it reconciles with other peers.
      */
-    public boolean isHealthy() {
-      return missingBlocks.isEmpty() && missingChunks.isEmpty() && corruptChunks.isEmpty();
+    public boolean needsRepair() {
+      return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
     }
   }
 }

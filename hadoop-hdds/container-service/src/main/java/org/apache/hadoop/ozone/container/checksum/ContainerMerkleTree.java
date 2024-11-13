@@ -68,11 +68,6 @@ public class ContainerMerkleTree {
   }
 
   @VisibleForTesting
-  public BlockMerkleTree getChunks(long blockID) {
-    return id2Block.get(blockID);
-  }
-
-  @VisibleForTesting
   public BlockMerkleTree get(long blockID) {
     return id2Block.get(blockID);
   }
@@ -150,14 +145,6 @@ public class ContainerMerkleTree {
       return offset2Chunk.remove(offset);
     }
 
-    public ChunkMerkleTree getChunk(long offset) {
-      return offset2Chunk.get(offset);
-    }
-
-    public long getBlockId() {
-      return blockID;
-    }
-
     /**
      * Uses chunk hashes to compute a block hash for this tree, and returns it as a protobuf object. All block checksum
      * computation for the tree happens within this method.
@@ -202,24 +189,9 @@ public class ContainerMerkleTree {
       this.chunk = chunk;
     }
 
-    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk, boolean isHealthy) {
-      this.chunk = chunk;
-      this.isHealthy = isHealthy;
-    }
-
-    @VisibleForTesting
-    public void setChunk(ContainerProtos.ChunkInfo chunk) {
-      this.chunk = chunk;
-    }
-
     @VisibleForTesting
     public void setHealthy(boolean healthy) {
       this.isHealthy = healthy;
-    }
-
-
-    public ContainerProtos.ChunkInfo getChunkInfo() {
-      return chunk;
     }
 
     /**
