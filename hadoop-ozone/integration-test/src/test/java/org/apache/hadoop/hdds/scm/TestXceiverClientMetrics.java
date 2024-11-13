@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,7 @@ public class TestXceiverClientMetrics {
   }
 
   @Test
+  @Flaky("HDDS-11646")
   public void testMetrics(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
