@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Represents a type of container corruption that can be injected into a container for testing.
  * Currently this class only supports file per block layout.
  */
-public enum ContainerCorruptions {
+public enum TestContainerCorruptions {
   MISSING_CHUNKS_DIR((container, blockID) -> {
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
@@ -118,7 +118,7 @@ public enum ContainerCorruptions {
   private final BiConsumer<Container<?>, Long> corruption;
   private final ContainerScanError.FailureType expectedResult;
 
-  ContainerCorruptions(BiConsumer<Container<?>, Long> corruption, ContainerScanError.FailureType expectedResult) {
+  TestContainerCorruptions(BiConsumer<Container<?>, Long> corruption, ContainerScanError.FailureType expectedResult) {
     this.corruption = corruption;
     this.expectedResult = expectedResult;
 
@@ -162,10 +162,10 @@ public enum ContainerCorruptions {
    * Get all container corruption types as parameters for junit 4
    * parameterized tests, except the ones specified.
    */
-  public static Set<ContainerCorruptions> getAllParamsExcept(
-      ContainerCorruptions... exclude) {
-    Set<ContainerCorruptions> includeSet =
-        EnumSet.allOf(ContainerCorruptions.class);
+  public static Set<TestContainerCorruptions> getAllParamsExcept(
+      TestContainerCorruptions... exclude) {
+    Set<TestContainerCorruptions> includeSet =
+        EnumSet.allOf(TestContainerCorruptions.class);
     Arrays.asList(exclude).forEach(includeSet::remove);
     return includeSet;
   }

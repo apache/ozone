@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerCorruptions;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -49,11 +49,11 @@ class TestBackgroundContainerMetadataScannerIntegration
   private final GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
-  static Collection<ContainerCorruptions> supportedCorruptionTypes() {
-    return ContainerCorruptions.getAllParamsExcept(
-        ContainerCorruptions.MISSING_BLOCK,
-        ContainerCorruptions.CORRUPT_BLOCK,
-        ContainerCorruptions.TRUNCATED_BLOCK);
+  static Collection<TestContainerCorruptions> supportedCorruptionTypes() {
+    return TestContainerCorruptions.getAllParamsExcept(
+        TestContainerCorruptions.MISSING_BLOCK,
+        TestContainerCorruptions.CORRUPT_BLOCK,
+        TestContainerCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeAll
@@ -86,7 +86,7 @@ class TestBackgroundContainerMetadataScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypes")
-  void testCorruptionDetected(ContainerCorruptions corruption)
+  void testCorruptionDetected(TestContainerCorruptions corruption)
       throws Exception {
     // Write data to an open and closed container.
     long closedContainerID = writeDataThenCloseContainer();
