@@ -33,6 +33,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -142,6 +143,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -177,9 +180,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private FaultInjector injector;
+  private long maxKeyListSize;
+
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
+    this.maxKeyListSize = om.getConfiguration().getLong(OZONE_OM_SERVER_LIST_MAX_SIZE,
+      OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT);
+    if (this.maxKeyListSize <= 0) {
+      this.maxKeyListSize = Integer.MAX_VALUE;
+    }
   }
 
   //TODO simplify it to make it shorter
@@ -736,7 +746,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        request.getCount());
+        (int)Math.min(this.maxKeyListSize, request.getCount()));
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
@@ -754,7 +764,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        request.getCount());
+        (int)Math.min(this.maxKeyListSize, request.getCount()));
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
@@ -1225,7 +1235,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), request.getNumEntries(),
+            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
