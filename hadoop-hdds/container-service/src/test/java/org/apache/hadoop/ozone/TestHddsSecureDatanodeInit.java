@@ -112,7 +112,7 @@ public class TestHddsSecureDatanodeInit {
     conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT1S"); // 1s
     securityConfig = new SecurityConfig(conf);
 
-    service = new HddsDatanodeService(args, true) {
+    service = new HddsDatanodeService(args) {
       @Override
       SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient()
           throws IOException {

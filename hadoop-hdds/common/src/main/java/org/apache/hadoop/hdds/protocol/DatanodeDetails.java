@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.protocol;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -577,6 +578,15 @@ public class DatanodeDetails extends NodeImpl implements
   public boolean equals(Object obj) {
     return obj instanceof DatanodeDetails &&
         uuid.equals(((DatanodeDetails) obj).uuid);
+  }
+
+
+  public boolean validateNodeValue(DatanodeDetails datanodeDetails) {
+    if (this == datanodeDetails || super.equals(datanodeDetails)) {
+      return true;
+    }
+    return Objects.equals(ipAddress, datanodeDetails.ipAddress)
+        && Objects.equals(hostName, datanodeDetails.hostName) && Objects.equals(ports, datanodeDetails.ports);
   }
 
   @Override

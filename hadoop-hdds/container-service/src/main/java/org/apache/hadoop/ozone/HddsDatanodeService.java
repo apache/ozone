@@ -101,7 +101,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
-  private final boolean terminateJVMOnDatanodeTerminate;
 
   private OzoneConfiguration conf;
   private SecurityConfig secConf;
@@ -125,9 +124,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private ReconfigurationHandler reconfigurationHandler;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService() {
-    this.terminateJVMOnDatanodeTerminate = true;
-  }
+  public HddsDatanodeService() { }
 
   /**
    * Create a Datanode instance based on the supplied command-line arguments.
@@ -138,8 +135,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * @param args      command line arguments.
    */
   @VisibleForTesting
-  public HddsDatanodeService(String[] args, boolean terminateJVMOnDatanodeTerminate) {
-    this(terminateJVMOnDatanodeTerminate, false, args);
+  public HddsDatanodeService(String[] args) {
+    this(false, args);
   }
 
   /**
@@ -148,9 +145,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
    */
-  private HddsDatanodeService(boolean terminateJVMOnDatanodeTerminate, boolean printBanner, String[] args) {
+  private HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
-    this.terminateJVMOnDatanodeTerminate = terminateJVMOnDatanodeTerminate;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
@@ -159,7 +155,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
       HddsDatanodeService hddsDatanodeService =
-          new HddsDatanodeService(true, true, args);
+          new HddsDatanodeService(true, args);
       hddsDatanodeService.run(args);
     } catch (Throwable e) {
       LOG.error("Exception in HddsDatanodeService.", e);
@@ -528,9 +524,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public void terminateDatanode() {
     stop();
-    if (terminateJVMOnDatanodeTerminate) {
-      terminate(1);
-    }
+    terminate(1);
   }
 
   @Override

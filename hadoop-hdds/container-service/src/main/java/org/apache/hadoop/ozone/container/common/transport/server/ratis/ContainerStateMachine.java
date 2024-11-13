@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
@@ -202,6 +203,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final boolean waitOnBothFollowers;
   private final HddsDatanodeService datanodeService;
   private static Semaphore semaphore = new Semaphore(1);
+  private final AtomicBoolean peersValidated;
 
   /**
    * CSM metrics.
@@ -252,6 +254,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             HDDS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
+    this.peersValidated = new AtomicBoolean(false);
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(
@@ -265,6 +268,27 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   }
 
+  private void validatePeers(RaftServer server, RaftGroupId id) throws IOException {
+    if (this.peersValidated.get()) {
+      return;
+    }
+    synchronized (peersValidated) {
+      if (!peersValidated.get()) {
+        RaftPeerId selfId = server.getId();
+        Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
+        // If peers list is empty then it means  Ratis hasn't created any raft--meta file containing the last applied
+        // transaction. Then the peer list can be only validated on apply transaction.
+        if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null
+            && raftPeer.getId().equals(selfId))) {
+          throw new StorageContainerException(String.format("Current datanodeId: %s is not part of the " +
+              "group : %s with quorum: %s", selfId, id, peers), ContainerProtos.Result.INVALID_CONFIG);
+        } else if (!peers.isEmpty()) {
+          peersValidated.set(true);
+        }
+      }
+    }
+  }
+
   @Override
   public StateMachineStorage getStateMachineStorage() {
     return storage;
@@ -275,17 +299,10 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void initialize(RaftServer server, RaftGroupId id, RaftStorage raftStorage) throws IOException {
+  public void initialize(
+      RaftServer server, RaftGroupId id, RaftStorage raftStorage)
+      throws IOException {
     super.initialize(server, id, raftStorage);
-    RaftPeerId selfId = server.getId();
-    Collection<RaftPeer> peers = server.getDivision(id).getGroup().getPeers();
-    // If peers list is empty then it means  Ratis hasn't created any raft--meta file containing the last applied
-    // transaction.
-    if (!peers.isEmpty() && peers.stream().noneMatch(raftPeer -> raftPeer != null && raftPeer.getId().equals(selfId))) {
-      throw new StateMachineException(String.format("Current datanodeId: %s is not part of the group : %s with " +
-              "quorum: %s", selfId, id, peers));
-    }
-
     storage.init(raftStorage);
     ratisServer.notifyGroupAdd(id);
 
@@ -969,6 +986,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
+            try {
+              this.validatePeers(this.ratisServer.getServer(), getGroupId());
+            } catch (StorageContainerException e) {
+              return ContainerUtils.logAndReturnError(LOG, e, request);
+            }
             long timeNow = Time.monotonicNowNanos();
             long queueingDelay = timeNow - context.getStartTime();
             metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);

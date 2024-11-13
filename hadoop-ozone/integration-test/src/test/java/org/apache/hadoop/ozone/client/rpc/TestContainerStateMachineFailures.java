@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -72,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -177,7 +175,7 @@ public class TestContainerStateMachineFailures {
     conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setTerminateJVMOnDatanodeExit(false)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
@@ -310,25 +308,12 @@ public class TestContainerStateMachineFailures {
       boolean deleted = datanodeIdFile.delete();
       assertTrue(deleted);
       cluster.restartHddsDatanode(dn, false);
-      GenericTestUtils.waitFor(() -> cluster.getHddsDatanodes().get(index).getDatanodeStateMachine()
-          .getContext().getState() == DatanodeStateMachine.DatanodeStates.SHUTDOWN, 1000, 30000);
-      key.write("ratis".getBytes(UTF_8));
-      // Delete raft meta and restart dn, now datanode should come up.
-      cluster.getHddsDatanodes().get(index)
-          .getDatanodeStateMachine().getContainer().getMetaVolumeSet().getVolumesList()
-          .stream().forEach(v -> {
-            try {
-              FileUtils.deleteDirectory(v.getStorageDir());
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          });
-      cluster.restartHddsDatanode(index, true);
-
       GenericTestUtils.waitFor(() -> {
         try {
-          return cluster.getStorageContainerManager().getPipelineManager().getPipeline(pipeline.getId()).isClosed();
-        } catch (PipelineNotFoundException e) {
+          key.write("ratis".getBytes(UTF_8));
+          key.flush();
+          return groupOutputStream.getLocationInfoList().size() > 1;
+        } catch (IOException e) {
           throw new UncheckedIOException(e);
         }
       }, 1000, 30000);

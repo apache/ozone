@@ -122,7 +122,7 @@ public class TestOzoneDatanodeShell {
 
   private static class TestHddsDatanodeService extends HddsDatanodeService {
     TestHddsDatanodeService(String[] args) {
-      super(args, true);
+      super(args);
     }
 
     @Override

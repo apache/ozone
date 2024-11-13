@@ -307,13 +307,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
     protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
-    protected boolean terminateJVMOnDatanodeExit = true;
+
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
-
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -339,16 +338,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       clusterId = UUID.randomUUID().toString();
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
-    }
-
-    /**
-     * For tests where datanode failure is to be tested.
-     * @param terminateJVMOnDatanodeExit if false will prevent datanode from terminating.
-     * @return
-     */
-    public Builder setTerminateJVMOnDatanodeExit(boolean terminateJVMOnDatanodeExit) {
-      this.terminateJVMOnDatanodeExit = terminateJVMOnDatanodeExit;
-      return this;
     }
 
     /**
