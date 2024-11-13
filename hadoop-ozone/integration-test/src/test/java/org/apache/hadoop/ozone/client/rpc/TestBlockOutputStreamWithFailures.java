@@ -751,7 +751,7 @@ class TestBlockOutputStreamWithFailures {
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
       assertEquals(0, keyOutputStream.getLocationInfoList().size());
-      PIPELINE = pipeline;
+
       cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
 
       // Written the same data twice
