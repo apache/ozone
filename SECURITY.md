@@ -2,20 +2,7 @@
 
 ## Supported Versions
 
-The first stable release of Apache Ozone is 1.0, the previous alpha and beta releases are not supported by the community.
-
-| Version       | Supported          |
-|---------------| ------------------ |
-| 0.3.0 (alpha) | :x:                |
-| 0.4.0 (alpha) | :x:                |
-| 0.4.1 (alpha) | :x:                |
-| 0.5.0 (beta)  | :x:                |
-| 1.0.0         | :x:                |
-| 1.1.0         | :x:                |
-| 1.2.1         | :x:                |
-| 1.3.0         | :x:                |
-| 1.4.0         | :white_check_mark: |
-| 1.4.1         | :white_check_mark: |
+Supported versions of Apache Ozone can be found on the [Apache Ozone Downloads](https://ozone.apache.org/downloads/).
 
 ## Reporting a Vulnerability
 
