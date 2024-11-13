@@ -466,14 +466,17 @@ public class SCMDeletedBlockTransactionStatusManager {
 
     ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
     Set<UUID> dnsWithCommittedTxn;
+    int numTransactionsSuccess = 0, numTransactionsFail = 0;
     for (DeleteBlockTransactionResult transactionResult :
         transactionResults) {
       if (isTransactionFailed(transactionResult)) {
         metrics.incrBlockDeletionTransactionFailure();
+        numTransactionsFail++;
         continue;
       }
       try {
         metrics.incrBlockDeletionTransactionSuccess();
+        numTransactionsSuccess++;
         long txID = transactionResult.getTxID();
         // set of dns which have successfully committed transaction txId.
         dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
@@ -524,7 +527,12 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     try {
       deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
-      metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
+      int numTransactionsCompleted = txIDsToBeDeleted.size();
+      metrics.incrBlockDeletionTransactionCompleted(numTransactionsCompleted);
+      metrics.setNumBlockDeletionTransactionCompletedInLastIteration(numTransactionsCompleted);
+      metrics.setNumBlockDeletionTransactionSuccessInLastIteration(numTransactionsSuccess);
+      metrics.setNumBlockDeletionTransactionFailureInLastIteration(numTransactionsFail);
+
     } catch (IOException e) {
       LOG.warn("Could not commit delete block transactions: "
           + txIDsToBeDeleted, e);

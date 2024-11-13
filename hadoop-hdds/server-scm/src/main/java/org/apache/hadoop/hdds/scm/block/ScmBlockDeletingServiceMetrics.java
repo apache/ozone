@@ -196,7 +196,6 @@ public final class ScmBlockDeletingServiceMetrics {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
-
   @Metric(about = "Start time taken of last iteration of ScmBlockDeletingService")
   private MutableGaugeLong startTimeOfLastIteration;
 
@@ -211,14 +210,6 @@ public final class ScmBlockDeletingServiceMetrics {
       "all DN in last iteration.")
   private MutableGaugeLong numBlockDeletionTransactionSentInLastIteration;
 
-/*
-
-  @Metric(about = "Total number of success ACK of delete transaction commands in last iteration.")
-  private MutableGaugeLong numBlockDeletionCommandSuccessInLastIteration;
-
-  @Metric(about = "Total number of failure ACK of delete transaction commands in last iteration.")
-  private MutableGaugeLong numBlockDeletionCommandFailureInLastIteration;
-
   @Metric(about = "Total number of success execution of delete transactions in last iteration.")
   private MutableGaugeLong numBlockDeletionTransactionSuccessInLastIteration;
 
@@ -228,28 +219,17 @@ public final class ScmBlockDeletingServiceMetrics {
   @Metric(about = "Total number of completed txs which are removed from DB in last iteration.")
   private MutableGaugeLong numBlockDeletionTransactionCompletedInLastIteration;
 
-  @Metric(about = "Total number of created txs which are added into DB in last iteration.")
-  private MutableGaugeLong numBlockDeletionTransactionCreatedInLastIteration;
+  public void setStartTimeOfLastIteration(long startTimeOfLastIteration) {
+    this.startTimeOfLastIteration.set(startTimeOfLastIteration);
+  }
 
-  @Metric(about = "Total number of skipped transactions in last iteration")
-  private MutableGaugeLong numSkippedTransactionsInLastIteration;
-
-  @Metric(about = "Total number of processed transactions in last iteration")
-  private MutableGaugeLong numProcessedTransactionsInLastIteration;
+  public void setDurationOfLastIteration(long durationOfLastIteration) {
+    this.durationOfLastIteration.set(durationOfLastIteration);
+  }
 
   public void setNumBlockDeletionCommandSentInLastIteration(
       long numBlockDeletionCommandSentInLastIteration) {
     this.numBlockDeletionCommandSentInLastIteration.set(numBlockDeletionCommandSentInLastIteration);
-  }
-
-  public void setNumBlockDeletionCommandSuccessInLastIteration(
-      long numBlockDeletionCommandSuccessInLastIteration) {
-    this.numBlockDeletionCommandSuccessInLastIteration.set(numBlockDeletionCommandSuccessInLastIteration);
-  }
-
-  public void setNumBlockDeletionCommandFailureInLastIteration(
-      long numBlockDeletionCommandFailureInLastIteration) {
-    this.numBlockDeletionCommandFailureInLastIteration.set(numBlockDeletionCommandFailureInLastIteration);
   }
 
   public void setNumBlockDeletionTransactionSentInLastIteration(
@@ -271,22 +251,6 @@ public final class ScmBlockDeletingServiceMetrics {
       long numBlockDeletionTransactionCompletedInLastIteration) {
     this.numBlockDeletionTransactionCompletedInLastIteration.set(numBlockDeletionTransactionCompletedInLastIteration);
   }
-
-  public void setNumBlockDeletionTransactionCreatedInLastIteration(
-      long numBlockDeletionTransactionCreatedInLastIteration) {
-    this.numBlockDeletionTransactionCreatedInLastIteration.set(numBlockDeletionTransactionCreatedInLastIteration);
-  }
-
-  public void setNumSkippedTransactionsInLastIteration(
-      long numSkippedTransactionsInLastIteration) {
-    this.numSkippedTransactionsInLastIteration.set(numSkippedTransactionsInLastIteration);
-  }
-
-  public void setNumProcessedTransactionsInLastIteration(
-      long numProcessedTransactionsInLastIteration) {
-    this.numProcessedTransactionsInLastIteration.set(numProcessedTransactionsInLastIteration);
-  }
-*/
 
   @Override
   public String toString() {
