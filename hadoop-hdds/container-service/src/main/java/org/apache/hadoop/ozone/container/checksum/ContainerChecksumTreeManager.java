@@ -85,7 +85,7 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(ContainerData data, ContainerProtos.ContainerMerkleTree tree) throws IOException {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
@@ -103,7 +103,7 @@ public class ContainerChecksumTreeManager {
 
       checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
+          .setContainerMerkleTree(tree);
       write(data, checksumInfoBuilder.build());
       LOG.debug("Data merkle tree for container {} updated", containerID);
     } finally {
@@ -177,9 +177,9 @@ public class ContainerChecksumTreeManager {
 
     // Update Container Diff metrics based on the diff report.
     if (report.needsRepair()) {
-      metrics.incrementUnhealthyContainerDiffs();
+      metrics.incrementRepairContainerDiffs();
     } else {
-      metrics.incrementHealthyContainerDiffs();
+      metrics.incrementNoRepairContainerDiffs();
     }
     metrics.incrementMerkleTreeDiffSuccesses();
     return report;
@@ -417,7 +417,7 @@ public class ContainerChecksumTreeManager {
 
     /**
      * If needRepair is true, It means current replica needs blocks/chunks from the peer to repair
-     * it's container replica. The peer replica still may have corruption, which it will fix when
+     * its container replica. The peer replica still may have corruption, which it will fix when
      * it reconciles with other peers.
      */
     public boolean needsRepair() {

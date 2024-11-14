@@ -137,6 +137,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
@@ -563,7 +564,8 @@ public class KeyValueHandler extends Handler {
           merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
         }
       }
-      checksumManager.writeContainerDataTree(containerData, merkleTree);
+      checksumManager.writeContainerDataTree(containerData, captureLatencyNs(
+          checksumManager.getMetrics().getCreateMerkleTreeLatencyNS(), merkleTree::toProto));
     } catch (IOException ex) {
       LOG.error("Cannot create container checksum for container {} , Exception: ",
           container.getContainerData().getContainerID(), ex);

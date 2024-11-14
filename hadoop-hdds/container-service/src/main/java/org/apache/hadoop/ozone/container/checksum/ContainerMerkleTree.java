@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
@@ -61,20 +60,6 @@ public class ContainerMerkleTree {
    */
   public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
     id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
-  }
-
-  public void addChunk(long blockID, ContainerProtos.ChunkInfo chunk) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunk(chunk);
-  }
-
-  @VisibleForTesting
-  public BlockMerkleTree get(long blockID) {
-    return id2Block.get(blockID);
-  }
-
-  @VisibleForTesting
-  public BlockMerkleTree remove(long blockID) {
-    return id2Block.remove(blockID);
   }
 
   /**
@@ -129,22 +114,6 @@ public class ContainerMerkleTree {
       }
     }
 
-    public void addChunk(ContainerProtos.ChunkInfo chunk) {
-      offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
-    }
-
-    public void setHealthy(long offset, boolean healthy) {
-      ChunkMerkleTree chunkMerkleTree = offset2Chunk.get(offset);
-      if (chunkMerkleTree == null) {
-        return;
-      }
-      chunkMerkleTree.setHealthy(healthy);
-    }
-
-    public ChunkMerkleTree removeChunk(long offset) {
-      return offset2Chunk.remove(offset);
-    }
-
     /**
      * Uses chunk hashes to compute a block hash for this tree, and returns it as a protobuf object. All block checksum
      * computation for the tree happens within this method.
@@ -187,11 +156,6 @@ public class ContainerMerkleTree {
 
     ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
       this.chunk = chunk;
-    }
-
-    @VisibleForTesting
-    public void setHealthy(boolean healthy) {
-      this.isHealthy = healthy;
     }
 
     /**

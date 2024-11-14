@@ -284,7 +284,7 @@ public class TestContainerCommandReconciliation {
           (KeyValueContainer) dn.getDatanodeStateMachine().getContainer().getController()
               .getContainer(containerID);
       keyValueHandler.getChecksumManager().writeContainerDataTree(
-          keyValueContainer.getContainerData(), tree);
+          keyValueContainer.getContainerData(), tree.toProto());
     }
   }
 }

@@ -153,103 +153,99 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
    */
-  public static Pair<ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildTestTreeWithMismatches(
-      ConfigurationSource conf, int numMissingBlocks, int numMissingChunks, int numCorruptChunks) {
+  public static Pair<ContainerProtos.ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff>
+      buildTestTreeWithMismatches(ContainerMerkleTree originalTree, int numMissingBlocks, int numMissingChunks,
+                                  int numCorruptChunks) {
 
-    ContainerMerkleTree tree = buildTestTree(conf);
+    ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
     ContainerChecksumTreeManager.ContainerDiff diff = new ContainerChecksumTreeManager.ContainerDiff();
+
+    introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
+    introduceMissingChunks(treeBuilder, numMissingChunks, diff);
+    introduceCorruptChunks(treeBuilder, numCorruptChunks, diff);
+    ContainerProtos.ContainerMerkleTree build = treeBuilder.build();
+    return Pair.of(build, diff);
+  }
+
+  /**
+   * Introduces missing blocks by removing random blocks from the tree.
+   */
+  private static void introduceMissingBlocks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
+                                             int numMissingBlocks,
+                                             ContainerChecksumTreeManager.ContainerDiff diff) {
+    // Set to track unique blocks selected for mismatches
+    Set<Integer> selectedBlocks = new HashSet<>();
+    Random random = new Random();
+    for (int i = 0; i < numMissingBlocks; i++) {
+      int randomBlockIndex;
+      do {
+        randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
+      } while (selectedBlocks.contains(randomBlockIndex));
+      selectedBlocks.add(randomBlockIndex);
+      ContainerProtos.BlockMerkleTree blockMerkleTree = treeBuilder.getBlockMerkleTree(randomBlockIndex);
+      diff.addMissingBlock(blockMerkleTree);
+      treeBuilder.removeBlockMerkleTree(randomBlockIndex);
+      treeBuilder.setDataChecksum(random.nextLong());
+    }
+  }
+
+  /**
+   * Introduces missing chunks by removing random chunks from selected blocks.
+   */
+  private static void introduceMissingChunks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
+                                             int numMissingChunks,
+                                             ContainerChecksumTreeManager.ContainerDiff diff) {
+    // Set to track unique blocks selected for mismatches
+    Random random = new Random();
+    for (int i = 0; i < numMissingChunks; i++) {
+      int randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
+
+      // Work on the chosen block to remove a random chunk
+      ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(randomBlockIndex);
+      if (blockBuilder.getChunkMerkleTreeCount() > 0) {
+        int randomChunkIndex = random.nextInt(blockBuilder.getChunkMerkleTreeCount());
+        ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(randomChunkIndex);
+        diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
+        blockBuilder.removeChunkMerkleTree(randomChunkIndex);
+        blockBuilder.setBlockChecksum(random.nextLong());
+        treeBuilder.setDataChecksum(random.nextLong());
+      }
+    }
+  }
+
+  /**
+   * Introduces corrupt chunks by altering the checksum and setting them as unhealthy,
+   * ensuring each chunk in a block is only selected once for corruption.
+   */
+  private static void introduceCorruptChunks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
+                                             int numCorruptChunks,
+                                             ContainerChecksumTreeManager.ContainerDiff diff) {
+    Map<Integer, Set<Integer>> corruptedChunksByBlock = new HashMap<>();
     Random random = new Random();
 
-    List<Long> blockIds = new ArrayList<>(Arrays.asList(1L, 2L, 3L, 4L, 5L));
-    introduceMissingBlocks(tree, diff, blockIds, numMissingBlocks, random);
-    introduceMissingChunks(tree, diff, blockIds, numMissingChunks, random);
-    introduceCorruptChunks(tree, diff, blockIds, numCorruptChunks, random, conf);
+    for (int i = 0; i < numCorruptChunks; i++) {
+      // Select a random block
+      int randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
+      ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(randomBlockIndex);
 
-    return Pair.of(tree, diff);
-  }
+      // Ensure each chunk in the block is only corrupted once
+      Set<Integer> corruptedChunks = corruptedChunksByBlock.computeIfAbsent(randomBlockIndex, k -> new HashSet<>());
+      if (corruptedChunks.size() < blockBuilder.getChunkMerkleTreeCount()) {
+        int randomChunkIndex;
+        do {
+          randomChunkIndex = random.nextInt(blockBuilder.getChunkMerkleTreeCount());
+        } while (corruptedChunks.contains(randomChunkIndex));
+        corruptedChunks.add(randomChunkIndex);
 
-  private static void introduceMissingBlocks(ContainerMerkleTree tree,
-                                             ContainerChecksumTreeManager.ContainerDiff diff,
-                                             List<Long> blockIds,
-                                             int numMissingBlocks,
-                                             Random random) {
-    for (int i = 0; i < numMissingBlocks && !blockIds.isEmpty(); i++) {
-      int index = random.nextInt(blockIds.size());
-      long blockId = blockIds.remove(index);
-      ContainerMerkleTree.BlockMerkleTree blockTree = tree.remove(blockId);
-      diff.addMissingBlock(blockTree.toProto());
-    }
-  }
-
-  private static void introduceMissingChunks(ContainerMerkleTree tree,
-                                             ContainerChecksumTreeManager.ContainerDiff diff,
-                                             List<Long> blockIds,
-                                             int numMissingChunks,
-                                             Random random) {
-    for (int i = 0; i < numMissingChunks && !blockIds.isEmpty(); i++) {
-      long blockId = blockIds.get(random.nextInt(blockIds.size()));
-      ContainerMerkleTree.BlockMerkleTree blockTree = tree.get(blockId);
-      List<Long> chunkOffsets = getChunkOffsets(blockTree);
-
-      if (!chunkOffsets.isEmpty()) {
-        long offset = chunkOffsets.remove(random.nextInt(chunkOffsets.size()));
-        ContainerMerkleTree.ChunkMerkleTree chunkTree = blockTree.removeChunk(offset);
-        diff.addMissingChunk(blockId, chunkTree.toProto());
+        // Corrupt the selected chunk
+        ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(randomChunkIndex);
+        diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
+        chunkBuilder.setChunkChecksum(chunkBuilder.getChunkChecksum() + random.nextInt(1000) + 1);
+        chunkBuilder.setIsHealthy(false);
+        blockBuilder.setBlockChecksum(random.nextLong());
+        treeBuilder.setDataChecksum(random.nextLong());
       }
     }
-  }
-
-  private static void introduceCorruptChunks(ContainerMerkleTree tree,
-                                             ContainerChecksumTreeManager.ContainerDiff diff,
-                                             List<Long> blockIds,
-                                             int numCorruptChunks,
-                                             Random random,
-                                             ConfigurationSource conf) {
-    // Create a map to keep track of corrupted chunks per block
-    Map<Long, Set<Long>> corruptedChunksPerBlock = new HashMap<>();
-
-    int corruptionsIntroduced = 0;
-    while (corruptionsIntroduced < numCorruptChunks && !blockIds.isEmpty()) {
-      // Randomly select a block
-      int blockIndex = random.nextInt(blockIds.size());
-      long blockId = blockIds.get(blockIndex);
-      ContainerMerkleTree.BlockMerkleTree blockTree = tree.get(blockId);
-
-      // Get available chunk offsets for this block
-      List<Long> availableChunkOffsets = getChunkOffsets(blockTree);
-
-      // Remove already corrupted chunks for this block
-      availableChunkOffsets.removeAll(corruptedChunksPerBlock.getOrDefault(blockId, new HashSet<>()));
-
-      if (!availableChunkOffsets.isEmpty()) {
-        // Randomly select an available chunk offset
-        int chunkIndex = random.nextInt(availableChunkOffsets.size());
-        long offset = availableChunkOffsets.get(chunkIndex);
-
-        // Remove the original chunk
-        ContainerMerkleTree.ChunkMerkleTree chunkMerkleTree = blockTree.removeChunk(offset);
-
-        // Create and add corrupt chunk
-        ContainerProtos.ChunkInfo corruptChunk = buildChunk(conf, (int) offset, ByteBuffer.wrap(new byte[]{5, 10, 15}));
-        tree.addChunk(blockId, corruptChunk);
-        blockTree.setHealthy(offset, false);
-        diff.addCorruptChunk(blockId, chunkMerkleTree.toProto());
-
-        // Mark this chunk as corrupted for this block
-        corruptedChunksPerBlock.computeIfAbsent(blockId, k -> new HashSet<>()).add(offset);
-
-        corruptionsIntroduced++;
-      } else {
-        // If no available chunks in this block, remove it from consideration
-        blockIds.remove(blockIndex);
-      }
-    }
-  }
-
-  private static List<Long> getChunkOffsets(ContainerMerkleTree.BlockMerkleTree blockTree) {
-    return blockTree.toProto().getChunkMerkleTreeList().stream()
-        .map(ContainerProtos.ChunkMerkleTree::getOffset)
-        .collect(Collectors.toList());
   }
 
   public static void assertContainerDiffMatch(ContainerChecksumTreeManager.ContainerDiff expectedDiff,
@@ -261,7 +257,7 @@ public final class ContainerMerkleTreeTestUtils {
     assertEquals(expectedDiff.getMissingChunks().size(), actualDiff.getMissingChunks().size(),
         "Mismatch in number of missing chunks");
     assertEquals(expectedDiff.getCorruptChunks().size(), actualDiff.getCorruptChunks().size(),
-        "Mismatch in number of corrupt blocks");
+        "Mismatch in number of corrupt chunks");
 
     List<ContainerProtos.BlockMerkleTree> expectedMissingBlocks = expectedDiff.getMissingBlocks().stream().sorted(
                 Comparator.comparing(ContainerProtos.BlockMerkleTree::getBlockID)).collect(Collectors.toList());
