@@ -108,7 +108,7 @@ public class PipelineReportHandler implements
   private void handlePipelineNotFoundException(final PipelineReport report,
       final DatanodeDetails dn, final EventPublisher publisher) {
     final PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
-    LOGGER.error("Pipeline {}, reported by datanode {} is not found.", pipelineID, dn);
+    LOGGER.info("Pipeline {}, reported by datanode {} is not found.", pipelineID, dn);
     if (scmContext.isLeader()) {
       try {
         final SCMCommand<?> command = new ClosePipelineCommand(pipelineID);
