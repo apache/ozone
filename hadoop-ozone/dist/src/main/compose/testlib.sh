@@ -138,7 +138,7 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --ansi never down
+  docker-compose --ansi never down --remove-orphans
 
   trap stop_docker_env EXIT HUP INT TERM
 
@@ -367,7 +367,7 @@ stop_docker_env(){
     down_repeats=3
     for i in $(seq 1 $down_repeats)
     do
-      if docker-compose --ansi never down; then
+      if docker-compose --ansi never --profile "*" down --remove-orphans; then
         return
       fi
       if [[ ${i} -eq 1 ]]; then
