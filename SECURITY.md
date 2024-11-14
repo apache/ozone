@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Supported versions of Apache Ozone can be found on the [Apache Ozone Downloads](https://ozone.apache.org/downloads/).
+Please check the Apache Ozone [website](https://ozone.apache.org/downloads/) for the list of versions currently supported.
 
 ## Reporting a Vulnerability
 
