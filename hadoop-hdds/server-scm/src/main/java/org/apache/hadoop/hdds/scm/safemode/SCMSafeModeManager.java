@@ -91,8 +91,8 @@ public class SCMSafeModeManager implements SafeModeManager {
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
   private AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
 
-  private Map<String, SafeModeExitRule> exitRules;
-  private Set<String> preCheckRules;
+  private Map<String, SafeModeExitRule> exitRules = new HashMap<>(1);
+  private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";

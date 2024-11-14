@@ -46,15 +46,6 @@ class TestSafeModeRuleFactory {
   }
 
   @Test
-  public void testSingleton() {
-    initializeSafeModeRuleFactory();
-    final SafeModeRuleFactory factoryOne = SafeModeRuleFactory.getInstance();
-    initializeSafeModeRuleFactory();
-    final SafeModeRuleFactory factoryTwo = SafeModeRuleFactory.getInstance();
-    Assertions.assertSame(factoryOne, factoryTwo, "The objects are not equal.");
-  }
-
-  @Test
   public void testLoadedSafeModeRules() {
     initializeSafeModeRuleFactory();
     final SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
