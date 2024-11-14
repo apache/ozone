@@ -118,12 +118,8 @@ public final class SafeModeRuleFactory {
       final SCMSafeModeManager safeModeManager,
       final PipelineManager pipelineManager,
       final ContainerManager containerManager) {
-    if (instance == null) {
-      instance = new SafeModeRuleFactory(config, scmContext, eventQueue,
+    instance = new SafeModeRuleFactory(config, scmContext, eventQueue,
           safeModeManager, pipelineManager, containerManager);
-    } else {
-      LOG.warn("SafeMode Rules already initialized.");
-    }
   }
 
   public List<SafeModeExitRule<?>> getSafeModeRules() {
