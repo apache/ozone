@@ -270,6 +270,7 @@ public class ECReconstructionCoordinator implements Closeable {
         this.blockInputStreamFactory, byteBufferPool,
         this.ecReconstructReadExecutor,
         clientConfig)) {
+      ecValidator.setBlockLength(blockLocationInfo.getLength());
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
@@ -294,8 +295,10 @@ public class ECReconstructionCoordinator implements Closeable {
         }
 
         if (toReconstructIndexes.size() > 0) {
-          sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
-              .collect(Collectors.toSet()));
+          Set<Integer> recoveryIndexes = toReconstructIndexes.stream().map(i -> (i - 1))
+            .collect(Collectors.toSet());
+          sis.setRecoveryIndexes(recoveryIndexes);
+          ecValidator.setReconstructionIndexes(recoveryIndexes);
           long length = safeBlockGroupLength;
           while (length > 0) {
             int readLen;
@@ -332,7 +335,6 @@ public class ECReconstructionCoordinator implements Closeable {
                     future = targetBlockStreams[i].write(bufs[i]);
                 checkFailures(targetBlockStreams[i], future);
               }
-              ecValidator.validateBuffer(bufs[i], targetBlockStreams[i], i);
               bufs[i].clear();
             }
             length -= readLen;
@@ -341,6 +343,7 @@ public class ECReconstructionCoordinator implements Closeable {
         List<ECBlockOutputStream> allStreams = new ArrayList<>(Arrays.asList(targetBlockStreams));
         allStreams.addAll(Arrays.asList(emptyBlockStreams));
         for (ECBlockOutputStream targetStream : allStreams) {
+          ecValidator.validateBuffer(targetStream);
           targetStream.executePutBlock(true, true, blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream, targetStream.getCurrentPutBlkResponseFuture());
         }
