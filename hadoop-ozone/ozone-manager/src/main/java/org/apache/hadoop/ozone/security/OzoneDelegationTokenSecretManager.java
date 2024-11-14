@@ -452,6 +452,11 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Validates if given hash is valid.
+   * HDDS-8829 changes the delegation token from sign by OM's RSA private key to secret key supported by SCM.
+   * The default delegation token lifetime is 7 days.
+   * In the 7 days period after OM is upgraded from version without HDDS-8829 to version with HDDS-8829, tokens
+   * signed by RSA private key, and tokens signed by secret key will coexist. After 7 days, there will be only
+   * tokens signed by secrete key still valid. Following logic will handle both types of tokens.
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
@@ -545,6 +550,14 @@ public class OzoneDelegationTokenSecretManager
 
   }
 
+  /**
+   * Load delegation tokens from DB into memory.
+   * HDDS-8829 changes the delegation token from sign by OM's RSA private key to secret key supported by SCM.
+   * The default delegation token lifetime is 7 days. After OM is upgraded from version without HDDS-8829 to
+   * version with HDDS-8829 and restarts, tokens signed by RSA private key will be loaded from DB into memory.
+   * Next OM restarts, if after 7 days, there will be only tokens signed by secret key loaded into memory.
+   * Both types of token loading should be supported.
+   */
   private void loadTokenSecretState(
       OzoneManagerSecretState<OzoneTokenIdentifier> state) throws IOException {
     LOG.info("Loading token state into token manager.");
