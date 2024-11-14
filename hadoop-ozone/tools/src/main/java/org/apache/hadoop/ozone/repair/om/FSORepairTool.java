@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.repair.om;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -86,7 +85,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public class FSORepairTool {
   public static final Logger LOG =
-      LoggerFactory.getLogger(org.apache.hadoop.ozone.repair.om.FSORepairTool.class);
+      LoggerFactory.getLogger(FSORepairTool.class);
 
   private final String omDBPath;
   private final DBStore store;
@@ -121,7 +120,6 @@ public class FSORepairTool {
    * Allows passing RocksDB instance from a MiniOzoneCluster directly to this
    * class for testing.
    */
-  @VisibleForTesting
   public FSORepairTool(DBStore dbStore, String dbPath, boolean repair, String volume, String bucket)
       throws IOException {
     this.reachableStats = new ReportStatistics(0, 0, 0);
@@ -169,7 +167,7 @@ public class FSORepairTool {
         new File(dbPath).getParentFile());
   }
 
-  public org.apache.hadoop.ozone.repair.om.FSORepairTool.Report run() throws IOException {
+  public FSORepairTool.Report run() throws IOException {
 
     if (bucketFilter != null && volumeFilter == null) {
       System.out.println("--bucket flag cannot be used without specifying --volume.");
@@ -363,7 +361,7 @@ public class FSORepairTool {
 
         if (!isReachable(dirKey)) {
           System.out.println("Found unreachable directory: " + dirKey);
-          unreachableStats.add(new ReportStatistics(1, 0, 0));
+          unreachableStats.addDir();
 
           if (!repair) {
             System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
@@ -392,7 +390,7 @@ public class FSORepairTool {
         OmKeyInfo fileInfo = fileEntry.getValue();
         if (!isReachable(fileKey)) {
           System.out.println("Found unreachable file: " + fileKey);
-          unreachableStats.add(new ReportStatistics(0, 1, fileInfo.getDataSize()));
+          unreachableStats.addFile(fileInfo.getDataSize());
 
           if (!repair) {
             System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
@@ -404,7 +402,7 @@ public class FSORepairTool {
           // NOTE: We are deserializing the proto of every reachable file
           // just to log it's size. If we don't need this information we could
           // save time by skipping this step.
-          reachableStats.add(new ReportStatistics(0, 1, fileInfo.getDataSize()));
+          reachableStats.addFile(fileInfo.getDataSize());
         }
       }
     }
@@ -470,7 +468,7 @@ public class FSORepairTool {
         // This directory was reached by search.
         addReachableEntry(volume, bucket, childDirEntry.getValue());
         childDirs.add(childDirKey);
-        reachableStats.add(new ReportStatistics(1, 0, 0));
+        reachableStats.addDir();
       }
     }
 
@@ -611,17 +609,17 @@ public class FSORepairTool {
     /**
      * Builds one report that is the aggregate of multiple others.
      */
-    public Report(org.apache.hadoop.ozone.repair.om.FSORepairTool.Report... reports) {
+    public Report(FSORepairTool.Report... reports) {
       reachable = new ReportStatistics();
       unreachable = new ReportStatistics();
 
-      for (org.apache.hadoop.ozone.repair.om.FSORepairTool.Report report : reports) {
+      for (FSORepairTool.Report report : reports) {
         reachable.add(report.reachable);
         unreachable.add(report.unreachable);
       }
     }
 
-    private Report(org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder builder) {
+    private Report(FSORepairTool.Report.Builder builder) {
       this.reachable = builder.reachable;
       this.unreachable = builder.unreachable;
     }
@@ -744,6 +742,15 @@ public class FSORepairTool {
     @Override
     public int hashCode() {
       return Objects.hash(bytes, files, dirs);
+    }
+
+    public void addDir() {
+      dirs++;
+    }
+
+    public void addFile(long size) {
+      files++;
+      bytes += size;
     }
   }
 }

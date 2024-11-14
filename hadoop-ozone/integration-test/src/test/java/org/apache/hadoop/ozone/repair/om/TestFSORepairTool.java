@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.repair.om.FSORepairTool;
 import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -499,7 +498,7 @@ public class TestFSORepairTool {
 
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(3, 4, fileSize * 4L);
-    return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
+    return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
         .build();
   }
@@ -551,7 +550,7 @@ public class TestFSORepairTool {
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
     FSORepairTool.ReportStatistics unreachableCount =
             new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
-    return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
+    return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
         .setUnreachable(unreachableCount)
         .build();
