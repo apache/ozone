@@ -109,16 +109,12 @@ public class FSORepairTool {
   private ColumnFamilyHandle reachableCFHandle;
   private RocksDatabase reachableDB;
 
-  private long reachableBytes;
-  private long reachableFiles;
-  private long reachableDirs;
-  private long unreachableBytes;
-  private long unreachableFiles;
-  private long unreachableDirs;
-  private final boolean dryRun;
+  private final ReportStatistics reachableStats;
+  private final ReportStatistics unreachableStats;
+  private final boolean repair;
 
-  public FSORepairTool(String dbPath, boolean dryRun, boolean repair, String volume, String bucket) throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, dryRun, repair, volume, bucket);
+  public FSORepairTool(String dbPath, boolean repair, String volume, String bucket) throws IOException {
+    this(getStoreFromPath(dbPath), dbPath, repair, volume, bucket);
   }
 
   /**
@@ -126,19 +122,14 @@ public class FSORepairTool {
    * class for testing.
    */
   @VisibleForTesting
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean isDryRun, boolean isRepair, String volume, String bucket)
+  public FSORepairTool(DBStore dbStore, String dbPath, boolean repair, String volume, String bucket)
       throws IOException {
-    dryRun = isDryRun;
-    // Counters to track as we walk the tree.
-    reachableBytes = 0;
-    reachableFiles = 0;
-    reachableDirs = 0;
-    unreachableBytes = 0;
-    unreachableFiles = 0;
-    unreachableDirs = 0;
+    this.reachableStats = new ReportStatistics(0, 0, 0);
+    this.unreachableStats = new ReportStatistics(0, 0, 0);
 
     this.store = dbStore;
     this.omDBPath = dbPath;
+    this.repair = repair;
     this.volumeFilter = volume;
     this.bucketFilter = bucket;
     volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
@@ -224,7 +215,7 @@ public class FSORepairTool {
 
           // Check for snapshots in the specified bucket
           if (checkIfSnapshotExistsForBucket(volumeFilter, bucketFilter)) {
-            if (dryRun) {
+            if (!repair) {
               System.out.println("Snapshot detected in bucket '" + bucketFilter + "'");
             } else {
               System.out.println("Snapshot exists in bucket '" + bucketFilter + "'. " +
@@ -290,7 +281,7 @@ public class FSORepairTool {
   private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
     System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
     if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
-      if (dryRun) {
+      if (!repair) {
         System.out.println(
             "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
       } else {
@@ -309,12 +300,8 @@ public class FSORepairTool {
 
   private Report buildReportAndLog() {
     Report report = new Report.Builder()
-        .setReachableDirs(reachableDirs)
-        .setReachableFiles(reachableFiles)
-        .setReachableBytes(reachableBytes)
-        .setUnreachableDirs(unreachableDirs)
-        .setUnreachableFiles(unreachableFiles)
-        .setUnreachableBytes(unreachableBytes)
+        .setReachable(reachableStats)
+        .setUnreachable(unreachableStats)
         .build();
 
     System.out.println("\n" + report);
@@ -376,9 +363,9 @@ public class FSORepairTool {
 
         if (!isReachable(dirKey)) {
           System.out.println("Found unreachable directory: " + dirKey);
-          unreachableDirs++;
+          unreachableStats.add(new ReportStatistics(1, 0, 0));
 
-          if (dryRun) {
+          if (!repair) {
             System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
           } else {
             System.out.println("Deleting unreachable directory " + dirKey);
@@ -405,10 +392,9 @@ public class FSORepairTool {
         OmKeyInfo fileInfo = fileEntry.getValue();
         if (!isReachable(fileKey)) {
           System.out.println("Found unreachable file: " + fileKey);
-          unreachableBytes += fileInfo.getDataSize();
-          unreachableFiles++;
+          unreachableStats.add(new ReportStatistics(0, 1, fileInfo.getDataSize()));
 
-          if (dryRun) {
+          if (!repair) {
             System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
           } else {
             System.out.println("Deleting unreachable file " + fileKey);
@@ -418,8 +404,7 @@ public class FSORepairTool {
           // NOTE: We are deserializing the proto of every reachable file
           // just to log it's size. If we don't need this information we could
           // save time by skipping this step.
-          reachableBytes += fileInfo.getDataSize();
-          reachableFiles++;
+          reachableStats.add(new ReportStatistics(0, 1, fileInfo.getDataSize()));
         }
       }
     }
@@ -485,7 +470,7 @@ public class FSORepairTool {
         // This directory was reached by search.
         addReachableEntry(volume, bucket, childDirEntry.getValue());
         childDirs.add(childDirKey);
-        reachableDirs++;
+        reachableStats.add(new ReportStatistics(1, 0, 0));
       }
     }
 
@@ -620,77 +605,37 @@ public class FSORepairTool {
    * Define a Report to be created.
    */
   public static class Report {
-    private long reachableBytes;
-    private long reachableFiles;
-    private long reachableDirs;
-    private long unreachableBytes;
-    private long unreachableFiles;
-    private long unreachableDirs;
+    private final ReportStatistics reachable;
+    private final ReportStatistics unreachable;
 
     /**
      * Builds one report that is the aggregate of multiple others.
      */
     public Report(org.apache.hadoop.ozone.repair.om.FSORepairTool.Report... reports) {
-      reachableBytes = 0;
-      reachableFiles = 0;
-      reachableDirs = 0;
-      unreachableBytes = 0;
-      unreachableFiles = 0;
-      unreachableDirs = 0;
+      reachable = new ReportStatistics();
+      unreachable = new ReportStatistics();
 
-      for (org.apache.hadoop.ozone.repair.om.FSORepairTool.Report report: reports) {
-        reachableBytes += report.reachableBytes;
-        reachableFiles += report.reachableFiles;
-        reachableDirs += report.reachableDirs;
-        unreachableBytes += report.unreachableBytes;
-        unreachableFiles += report.unreachableFiles;
-        unreachableDirs += report.unreachableDirs;
+      for (org.apache.hadoop.ozone.repair.om.FSORepairTool.Report report : reports) {
+        reachable.add(report.reachable);
+        unreachable.add(report.unreachable);
       }
     }
 
     private Report(org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder builder) {
-      reachableBytes = builder.reachableBytes;
-      reachableFiles = builder.reachableFiles;
-      reachableDirs = builder.reachableDirs;
-      unreachableBytes = builder.unreachableBytes;
-      unreachableFiles = builder.unreachableFiles;
-      unreachableDirs = builder.unreachableDirs;
+      this.reachable = builder.reachable;
+      this.unreachable = builder.unreachable;
     }
 
-    public long getReachableBytes() {
-      return reachableBytes;
+    public ReportStatistics getReachable() {
+      return reachable;
     }
 
-    public long getReachableFiles() {
-      return reachableFiles;
+    public ReportStatistics getUnreachable() {
+      return unreachable;
     }
 
-    public long getReachableDirs() {
-      return reachableDirs;
-    }
-
-    public long getUnreachableBytes() {
-      return unreachableBytes;
-    }
-
-    public long getUnreachableFiles() {
-      return unreachableFiles;
-    }
-
-    public long getUnreachableDirs() {
-      return unreachableDirs;
-    }
-
-    @Override
     public String toString() {
-      return "Reachable:" +
-          "\n\tDirectories: " + reachableDirs +
-          "\n\tFiles: " + reachableFiles +
-          "\n\tBytes: " + reachableBytes +
-          "\nUnreachable:" +
-          "\n\tDirectories: " + unreachableDirs +
-          "\n\tFiles: " + unreachableFiles +
-          "\n\tBytes: " + unreachableBytes;
+      return "Reachable: " + reachable + "\nUnreachable: " + unreachable;
     }
 
     @Override
@@ -706,77 +651,99 @@ public class FSORepairTool {
       // Useful for testing.
       System.out.println("Comparing reports\nExpect:\n" + this + "\nActual:\n" + report);
 
-      return reachableBytes == report.reachableBytes &&
-          reachableFiles == report.reachableFiles &&
-          reachableDirs == report.reachableDirs &&
-          unreachableBytes == report.unreachableBytes &&
-          unreachableFiles == report.unreachableFiles &&
-          unreachableDirs == report.unreachableDirs;
+      return reachable.equals(report.reachable) && unreachable.equals(report.unreachable);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(reachableBytes,
-          reachableFiles,
-          reachableDirs,
-          unreachableBytes,
-          unreachableFiles,
-          unreachableDirs);
+      return Objects.hash(reachable, unreachable);
     }
 
     /**
      * Builder class for a Report.
      */
     public static final class Builder {
-      private long reachableBytes;
-      private long reachableFiles;
-      private long reachableDirs;
-      private long unreachableBytes;
-      private long unreachableFiles;
-      private long unreachableDirs;
+      private ReportStatistics reachable = new ReportStatistics();
+      private ReportStatistics unreachable = new ReportStatistics();
 
       public Builder() {
       }
 
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setReachableBytes(long reachableBytes) {
-        this.reachableBytes = reachableBytes;
+      public Builder setReachable(ReportStatistics reachable) {
+        this.reachable = reachable;
         return this;
       }
 
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setReachableFiles(long reachableFiles) {
-        this.reachableFiles = reachableFiles;
-        return this;
-      }
-
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setReachableDirs(long reachableDirs) {
-        this.reachableDirs = reachableDirs;
-        return this;
-      }
-
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setUnreachableBytes(long unreachableBytes) {
-        this.unreachableBytes = unreachableBytes;
-        return this;
-      }
-
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setUnreachableFiles(long unreachableFiles) {
-        this.unreachableFiles = unreachableFiles;
-        return this;
-      }
-
-      @SuppressWarnings("checkstyle:hiddenfield")
-      public Builder setUnreachableDirs(long unreachableDirs) {
-        this.unreachableDirs = unreachableDirs;
+      public Builder setUnreachable(ReportStatistics unreachable) {
+        this.unreachable = unreachable;
         return this;
       }
 
       public Report build() {
         return new Report(this);
       }
+    }
+  }
+
+  /**
+   * Represents the statistics of reachable and unreachable data.
+   * This gives the count of dirs, files and bytes.
+   */
+
+  public static class ReportStatistics {
+    private long dirs;
+    private long files;
+    private long bytes;
+
+    public ReportStatistics() { }
+
+    public ReportStatistics(long dirs, long files, long bytes) {
+      this.dirs = dirs;
+      this.files = files;
+      this.bytes = bytes;
+    }
+
+    public void add(ReportStatistics other) {
+      this.dirs += other.dirs;
+      this.files += other.files;
+      this.bytes += other.bytes;
+    }
+
+    public long getDirs() {
+      return dirs;
+    }
+
+    public long getFiles() {
+      return files;
+    }
+
+    public long getBytes() {
+      return bytes;
+    }
+
+    @Override
+    public String toString() {
+      return "\n\tDirectories: " + dirs +
+              "\n\tFiles: " + files +
+              "\n\tBytes: " + bytes;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (other == this) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      ReportStatistics stats = (ReportStatistics) other;
+
+      return bytes == stats.bytes && files == stats.files && dirs == stats.dirs;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(bytes, files, dirs);
     }
   }
 }

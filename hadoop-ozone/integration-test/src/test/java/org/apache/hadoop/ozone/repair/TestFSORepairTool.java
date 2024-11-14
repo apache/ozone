@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone.repair;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -80,7 +80,7 @@ public class TestFSORepairTool {
   private static FileSystem fs;
   private static OzoneClient client;
   private static OzoneConfiguration conf = null;
-  private static FSORepairTool tool;
+  private FSORepairTool tool;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -217,7 +217,7 @@ public class TestFSORepairTool {
 
     // Test the connected tree in debug mode.
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, false, null, null);
+        getOmDBLocation(), false, null, null);
     FSORepairTool.Report debugReport = tool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
@@ -227,7 +227,7 @@ public class TestFSORepairTool {
     // Running again in repair mode should give same results since the tree
     // is connected.
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+        getOmDBLocation(), true, null, null);
     FSORepairTool.Report repairReport = tool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
@@ -242,7 +242,7 @@ public class TestFSORepairTool {
     FSORepairTool.Report expectedReport = new FSORepairTool.Report(report1, report2);
 
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+        getOmDBLocation(), true, null, null);
     FSORepairTool.Report debugReport = tool.run();
     Assertions.assertEquals(expectedReport, debugReport);
   }
@@ -260,13 +260,13 @@ public class TestFSORepairTool {
 
     // When volume filter is passed
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, "/vol1", null);
+        getOmDBLocation(), true, "/vol1", null);
     FSORepairTool.Report result1 = tool.run();
     Assertions.assertEquals(expectedReport1, result1);
 
     // When both volume and bucket filters are passed
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, "/vol2", "bucket2");
+        getOmDBLocation(), true, "/vol2", "bucket2");
     FSORepairTool.Report result2 = tool.run();
     Assertions.assertEquals(expectedReport2, result2);
 
@@ -274,12 +274,12 @@ public class TestFSORepairTool {
 
     // When a non-existent bucket filter is passed
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-         PrintStream ps = new PrintStream(outputStream)) {
+         PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
       tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), false, true, "/vol1", "bucket2");
+              getOmDBLocation(), true, "/vol1", "bucket2");
       tool.run();
-      String output = outputStream.toString();
+      String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("Bucket 'bucket2' does not exist in volume '/vol1'."));
     } finally {
       System.setOut(originalOut);
@@ -287,12 +287,12 @@ public class TestFSORepairTool {
 
     // When a non-existent volume filter is passed
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-         PrintStream ps = new PrintStream(outputStream)) {
+         PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
       tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), false, true, "/vol3", "bucket2");
+              getOmDBLocation(), true, "/vol3", "bucket2");
       tool.run();
-      String output = outputStream.toString();
+      String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("Volume '/vol3' does not exist."));
     } finally {
       System.setOut(originalOut);
@@ -300,12 +300,12 @@ public class TestFSORepairTool {
 
     // When bucket filter is passed without the volume filter.
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-         PrintStream ps = new PrintStream(outputStream)) {
+         PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
       tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), false, true, null, "bucket2");
+              getOmDBLocation(), true, null, "bucket2");
       tool.run();
-      String output = outputStream.toString();
+      String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("--bucket flag cannot be used without specifying --volume."));
     } finally {
       System.setOut(originalOut);
@@ -325,7 +325,7 @@ public class TestFSORepairTool {
         report1, report2);
 
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+        getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
 
     Assertions.assertEquals(generatedReport, expectedAggregateReport);
@@ -370,11 +370,11 @@ public class TestFSORepairTool {
     disconnectDirectory("dir1");
 
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+       getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
 
-    Assertions.assertEquals(1, generatedReport.getUnreachableDirs());
-    Assertions.assertEquals(3, generatedReport.getUnreachableFiles());
+    Assertions.assertEquals(1, generatedReport.getUnreachable().getDirs());
+    Assertions.assertEquals(3, generatedReport.getUnreachable().getFiles());
 
     // This assertion ensures that only specific directories and keys remain in the active tables,
     // as the remaining entries are expected to be moved to the deleted tables by the background service.
@@ -388,7 +388,7 @@ public class TestFSORepairTool {
   public void testEmptyFileTrees() throws Exception {
     // Run when there are no file trees.
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+        getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
     Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
     assertDeleteTablesEmpty();
@@ -399,9 +399,10 @@ public class TestFSORepairTool {
 
     // Run on an empty volume and bucket.
     tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, true, null, null);
+        getOmDBLocation(), true, null, null);
     generatedReport = tool.run();
     Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
+    assertDeleteTablesEmpty();
   }
 
   @Test
@@ -437,7 +438,7 @@ public class TestFSORepairTool {
       // Even in repair mode there should be no action. legacy and obs buckets
       // will be skipped and FSO tree is connected.
       tool = new FSORepairTool(getOmDB(),
-          getOmDBLocation(), false, true, null, null);
+          getOmDBLocation(), true, null, null);
       FSORepairTool.Report generatedReport = tool.run();
 
       Assertions.assertEquals(connectReport, generatedReport);
@@ -496,10 +497,10 @@ public class TestFSORepairTool {
 
     assertConnectedTreeReadable(volume, bucket);
 
+    FSORepairTool.ReportStatistics reachableCount =
+            new FSORepairTool.ReportStatistics(3, 4, fileSize * 4L);
     return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
-        .setReachableDirs(3)
-        .setReachableFiles(4)
-        .setReachableBytes(fileSize * 4L)
+        .setReachable(reachableCount)
         .build();
   }
 
@@ -544,15 +545,15 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
+    // dir1 does not count towards the unreachable directories the tool
+    // will see. It was deleted completely so the tool will never see it.
+    FSORepairTool.ReportStatistics reachableCount =
+            new FSORepairTool.ReportStatistics(1, 1, fileSize);
+    FSORepairTool.ReportStatistics unreachableCount =
+            new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
     return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
-        .setReachableDirs(1)
-        .setReachableFiles(1)
-        .setReachableBytes(fileSize)
-        // dir1 does not count towards the unreachable directories the tool
-        // will see. It was deleted completely so the tool will never see it.
-        .setUnreachableDirs(1)
-        .setUnreachableFiles(3)
-        .setUnreachableBytes(fileSize * 3L)
+        .setReachable(reachableCount)
+        .setUnreachable(unreachableCount)
         .build();
   }
 
