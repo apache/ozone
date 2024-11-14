@@ -168,15 +168,7 @@ public class ContainerChecksumTreeManager {
         }
 
         ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfoBuilder.get().build();
-
-        ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
-        ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
-
-        Set<Long> thisDeletedBlockSet = new HashSet<>(thisChecksumInfo.getDeletedBlocksList());
-        Set<Long> peerDeletedBlockSet = new HashSet<>(peerChecksumInfo.getDeletedBlocksList());
-        // Common deleted blocks between two merkle trees;
-        thisDeletedBlockSet.retainAll(peerDeletedBlockSet);
-        compareContainerMerkleTree(thisMerkleTree, peerMerkleTree, thisDeletedBlockSet, report);
+        compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
     } catch (IOException ex) {
       metrics.incrementMerkleTreeDiffFailures();
@@ -193,10 +185,13 @@ public class ContainerChecksumTreeManager {
     return report;
   }
 
-  private void compareContainerMerkleTree(ContainerProtos.ContainerMerkleTree thisMerkleTree,
-                                                   ContainerProtos.ContainerMerkleTree peerMerkleTree,
-                                                   Set<Long> commonDeletedBlockSet,
-                                                   ContainerDiff report) {
+  private void compareContainerMerkleTree(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
+                                          ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
+                                          ContainerDiff report) {
+    ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
+    ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
+    Set<Long> thisDeletedBlockSet = new HashSet<>(thisChecksumInfo.getDeletedBlocksList());
+    Set<Long> peerDeletedBlockSet = new HashSet<>(peerChecksumInfo.getDeletedBlocksList());
 
     if (thisMerkleTree.getDataChecksum() == peerMerkleTree.getDataChecksum()) {
       return;
@@ -212,9 +207,15 @@ public class ContainerChecksumTreeManager {
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerBlockMerkleTreeList.get(peerIdx);
 
       if (thisBlockMerkleTree.getBlockID() == peerBlockMerkleTree.getBlockID()) {
-        // Matching block ID; check checksum
-        if (!commonDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID())
-            && thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
+        // Matching block ID; check if the block is deleted and handle the cases;
+        // 1) If the block is deleted in both the block merkle tree, We can ignore comparing them.
+        // 2) If the block is only deleted in our merkle tree, The BG service should have deleted our
+        //    block and the peer's BG service hasn't run yet. We can ignore comparing them.
+        // 3) If the block is only deleted in peer merkle tree, we can't reconcile for this block. It might be
+        //    deleted by peer's BG service. We can ignore comparing them.
+        if (!thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
+            !peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
+            thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
           compareBlockMerkleTree(thisBlockMerkleTree, peerBlockMerkleTree, report);
         }
         thisIdx++;
@@ -223,15 +224,21 @@ public class ContainerChecksumTreeManager {
         // This block's ID is smaller; advance thisIdx to catch up
         thisIdx++;
       } else {
-        // Peer block's ID is smaller; record missing block and advance peerIdx
-        report.addMissingBlock(peerBlockMerkleTree);
+        // Peer block's ID is smaller; record missing block if peerDeletedBlockSet doesn't contain the blockId
+        // and advance peerIdx
+        if (!peerDeletedBlockSet.contains(peerBlockMerkleTree.getBlockID())) {
+          report.addMissingBlock(peerBlockMerkleTree);
+        }
         peerIdx++;
       }
     }
 
     // Step 2: Process remaining blocks in the peer list
     while (peerIdx < peerBlockMerkleTreeList.size()) {
-      report.addMissingBlock(peerBlockMerkleTreeList.get(peerIdx));
+      ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerBlockMerkleTreeList.get(peerIdx);
+      if (!peerDeletedBlockSet.contains(peerBlockMerkleTree.getBlockID())) {
+        report.addMissingBlock(peerBlockMerkleTree);
+      }
       peerIdx++;
     }
   }
