@@ -90,7 +90,6 @@ public final class OmDBUserPrincipalInfo {
   /**
    * Builder for OmDBUserPrincipalInfo.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private Set<String> accessIds;
 

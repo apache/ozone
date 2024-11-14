@@ -152,28 +152,28 @@ public class NodeEndpoint {
         }
       });
       try {
-        builder.withContainers(nodeManager.getContainerCount(datanode));
-        builder.withOpenContainers(openContainers.get());
+        builder.setContainers(nodeManager.getContainerCount(datanode));
+        builder.setOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
 
       DatanodeInfo dnInfo = (DatanodeInfo) datanode;
-      datanodes.add(builder.withHostname(nodeManager.getHostName(datanode))
-          .withDatanodeStorageReport(storageReport)
-          .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
-          .withState(nodeState)
-          .withOperationalState(nodeOpState)
-          .withPipelines(pipelines)
-          .withLeaderCount(leaderCount.get())
-          .withUUid(datanode.getUuidString())
-          .withVersion(nodeManager.getVersion(datanode))
-          .withSetupTime(nodeManager.getSetupTime(datanode))
-          .withRevision(nodeManager.getRevision(datanode))
-          .withLayoutVersion(
+      datanodes.add(builder.setHostname(nodeManager.getHostName(datanode))
+          .setDatanodeStorageReport(storageReport)
+          .setLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
+          .setState(nodeState)
+          .setOperationalState(nodeOpState)
+          .setPipelines(pipelines)
+          .setLeaderCount(leaderCount.get())
+          .setUuid(datanode.getUuidString())
+          .setVersion(nodeManager.getVersion(datanode))
+          .setSetupTime(nodeManager.getSetupTime(datanode))
+          .setRevision(nodeManager.getRevision(datanode))
+          .setLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
-          .withNetworkLocation(datanode.getNetworkLocation())
+          .setNetworkLocation(datanode.getNetworkLocation())
           .build());
     });
 
@@ -220,26 +220,26 @@ public class NodeEndpoint {
         try {
           if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
             nodeManager.removeNode(nodeByUuid);
             LOG.info("Node {} removed successfully !!!", uuid);
           } else {
             failedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withOperationalState(nodeByUuid.getPersistedOpState())
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setOperationalState(nodeByUuid.getPersistedOpState())
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
           }
         } catch (NodeNotFoundException nnfe) {
           LOG.error("Selected node {} not found : {} ", uuid, nnfe);
           notFoundDatanodes.add(DatanodeMetadata.newBuilder()
-                  .withHostname("")
-                  .withState(NodeState.DEAD)
-              .withUUid(uuid).build());
+                  .setHostname("")
+                  .setState(NodeState.DEAD)
+              .setUuid(uuid).build());
         }
       }
     } catch (Exception exp) {

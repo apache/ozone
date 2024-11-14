@@ -41,9 +41,11 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +99,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           .setName(dbFile.getName())
           .setPath(dbFile.toPath().getParent());
       addOMTablesAndCodecs(dbStoreBuilder);
+      dbStoreBuilder.addCodec(KeyEntityInfoProtoWrapper.class, KeyEntityInfoProtoWrapper.getCodec());
       setStore(dbStoreBuilder.build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
@@ -107,6 +110,12 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
       omTablesInitialized = true;
     }
+  }
+
+  @Override
+  public Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException {
+    String tableName = bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE;
+    return getStore().getTable(tableName, String.class, KeyEntityInfoProtoWrapper.class);
   }
 
   @Override

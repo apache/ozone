@@ -291,11 +291,64 @@ public class ReconUtils {
    */
   public static String constructFullPath(OmKeyInfo omKeyInfo,
                                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager)
-      throws IOException {
+                                         ReconOMMetadataManager omMetadataManager)  throws IOException {
+    return constructFullPath(omKeyInfo.getKeyName(), omKeyInfo.getParentObjectID(), omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), reconNamespaceSummaryManager, omMetadataManager);
+  }
 
-    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
-    long parentId = omKeyInfo.getParentObjectID();
+  /**
+   * Constructs the full path of a key from its key name and parent ID using a bottom-up approach, starting from the
+   * leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param keyName The name of the key
+   * @param initialParentId The parent ID of the key
+   * @param volumeName The name of the volume
+   * @param bucketName The name of the bucket
+   * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
+   *         the path cannot be constructed at this time.
+   * @throws IOException
+   */
+  public static String constructFullPath(String keyName, long initialParentId, String volumeName, String bucketName,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                         ReconOMMetadataManager omMetadataManager) throws IOException {
+    StringBuilder fullPath = constructFullPathPrefix(initialParentId, volumeName, bucketName,
+        reconNamespaceSummaryManager, omMetadataManager);
+    if (fullPath.length() == 0) {
+      return "";
+    }
+    fullPath.append(keyName);
+    return fullPath.toString();
+  }
+
+
+  /**
+   * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
+   * leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param initialParentId The parent ID of the key
+   * @param volumeName The name of the volume
+   * @param bucketName The name of the bucket
+   * @return A StringBuilder containing the constructed prefix path of the key, or an empty string builder if a rebuild
+   *         is in progress.
+   * @throws IOException
+   */
+  public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
+      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      ReconOMMetadataManager omMetadataManager) throws IOException {
+    StringBuilder fullPath = new StringBuilder();
+    long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
     while (parentId != 0) {
@@ -303,16 +356,21 @@ public class ReconUtils {
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
-        return "";
+        fullPath.setLength(0);
+        return fullPath;
       }
       if (nsSummary.getParentId() == -1) {
         if (rebuildTriggered.compareAndSet(false, true)) {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
         log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
-        return "";
+        fullPath.setLength(0);
+        return fullPath;
       }
-      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+      // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
+      if (!nsSummary.getDirName().isEmpty()) {
+        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+      }
 
       // Move to the parent ID of the current directory
       parentId = nsSummary.getParentId();
@@ -320,13 +378,19 @@ public class ReconUtils {
     }
 
     // Prepend the volume and bucket to the constructed path
-    String volumeName = omKeyInfo.getVolumeName();
-    String bucketName = omKeyInfo.getBucketName();
     fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
+    //        but its not clear how they get there. This normalize call is quite expensive as it
+    //        creates several objects (URI, PATH, back to string). There was a bug fixed above
+    //        where the last parent dirName was empty, which always caused a double // after the
+    //        bucket name, but with that fixed, it seems like this should not be needed. All tests
+    //        pass without it for key listing.
     if (isDirectoryPresent) {
-      return OmUtils.normalizeKey(fullPath.toString(), true);
+      String path = fullPath.toString();
+      fullPath.setLength(0);
+      fullPath.append(OmUtils.normalizeKey(path, true));
     }
-    return fullPath.toString();
+    return fullPath;
   }
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,

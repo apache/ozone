@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
-Resource            ../commonlib.robot
-Test Timeout        5 minutes
+# This workflow periodically updates dependency cache.
 
-*** Test Cases ***
+name: scheduled-cache-update
 
-Check om admin command
-    ${result} =        Execute and ignore error         ozone admin om roles -id=omServiceIdDefault
-                       Should Contain                   ${result}  This command works only on OzoneManager HA cluster.
+on:
+  schedule:
+    - cron: '20 3 * * *'
+
+jobs:
+  update:
+    uses: ./.github/workflows/populate-cache.yml
+    secrets: inherit
