@@ -113,4 +113,20 @@ public class ContainerMerkleTreeMetrics {
   public MutableRate getMerkleTreeDiffLatencyNS() {
     return this.merkleTreeDiffLatencyNS;
   }
+
+  public long getNoRepairContainerDiffs() {
+    return this.numNoRepairContainerDiff.value();
+  }
+
+  public long getRepairContainerDiffs() {
+    return this.numRepairContainerDiff.value();
+  }
+
+  public long getMerkleTreeDiffSuccess() {
+    return this.numMerkleTreeDiffSuccess.value();
+  }
+
+  public long getMerkleTreeDiffFailure() {
+    return this.numMerkleTreeDiffFailure.value();
+  }
 }

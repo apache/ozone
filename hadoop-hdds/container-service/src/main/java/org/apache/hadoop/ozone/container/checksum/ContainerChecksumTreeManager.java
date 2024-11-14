@@ -150,7 +150,7 @@ public class ContainerChecksumTreeManager {
   }
 
   public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo peerChecksumInfo)
-      throws IOException {
+      throws Exception {
     ContainerDiff report = new ContainerDiff();
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
@@ -170,9 +170,9 @@ public class ContainerChecksumTreeManager {
         ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfoBuilder.get().build();
         compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incrementMerkleTreeDiffFailures();
-      throw new IOException("Container Diff failed for container #" + thisContainer.getContainerID(), ex);
+      throw new Exception("Container Diff failed for container #" + thisContainer.getContainerID(), ex);
     }
 
     // Update Container Diff metrics based on the diff report.
@@ -221,7 +221,8 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
         peerIdx++;
       } else if (thisBlockMerkleTree.getBlockID() < peerBlockMerkleTree.getBlockID()) {
-        // This block's ID is smaller; advance thisIdx to catch up
+        // this block merkle tree's block id is smaller. Which means our merkle tree has some blocks which the peer
+        // doesn't have. We can skip these, the peer will pick up these block when it reconciles with our merkle tree.
         thisIdx++;
       } else {
         // Peer block's ID is smaller; record missing block if peerDeletedBlockSet doesn't contain the blockId
@@ -241,6 +242,9 @@ public class ContainerChecksumTreeManager {
       }
       peerIdx++;
     }
+
+    // If we have remaining block in thisMerkleTree, we can skip these blocks. The peers will pick this block from
+    // us when they reconcile.
   }
 
   private void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
@@ -258,7 +262,7 @@ public class ContainerChecksumTreeManager {
 
       if (thisChunkMerkleTree.getOffset() == peerChunkMerkleTree.getOffset()) {
         // Possible state when this Checksum != peer Checksum:
-        // thisTree = Healthy, peerTree = Healthy -> We don't know what is healthy. Skip.
+        // thisTree = Healthy, peerTree = Healthy -> Both are healthy, No repair needed. Skip.
         // thisTree = Unhealthy, peerTree = Healthy -> Add to corrupt chunk.
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
@@ -269,7 +273,8 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
         peerIdx++;
       } else if (thisChunkMerkleTree.getOffset() < peerChunkMerkleTree.getOffset()) {
-        // This chunk's offset is smaller; advance thisIdx
+        // this chunk merkle tree's offset is smaller. Which means our merkle tree has some chunks which the peer
+        // doesn't have. We can skip these, the peer will pick up these chunks when it reconciles with our merkle tree.
         thisIdx++;
       } else {
         // Peer chunk's offset is smaller; record missing chunk and advance peerIdx
@@ -283,6 +288,9 @@ public class ContainerChecksumTreeManager {
       report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTreeList.get(peerIdx));
       peerIdx++;
     }
+
+    // If we have remaining chunks in thisBlockMerkleTree, we can skip these chunks. The peers will pick these
+    // chunks from us when they reconcile.
   }
 
   /**

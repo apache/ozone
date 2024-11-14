@@ -72,7 +72,6 @@ class TestContainerChecksumTreeManager {
    */
   public static Stream<Arguments> getContainerDiffMismatches() {
     return Stream.of(
-        Arguments.of(0, 0, 0),
         Arguments.of(0, 0, 1),
         Arguments.of(0, 1, 0),
         Arguments.of(1, 0, 0),
@@ -327,7 +326,7 @@ class TestContainerChecksumTreeManager {
   }
 
   @Test
-  public void testContainerWithNoDiff() throws IOException {
+  public void testContainerWithNoDiff() throws Exception {
     ContainerMerkleTree ourMerkleTree = buildTestTree(config);
     ContainerMerkleTree peerMerkleTree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, ourMerkleTree.toProto());
@@ -337,6 +336,8 @@ class TestContainerChecksumTreeManager {
     ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
     assertTrue(checksumManager.getMetrics().getMerkleTreeDiffLatencyNS().lastStat().total() > 0);
     assertFalse(diff.needsRepair());
+    assertTrue(checksumManager.getMetrics().getNoRepairContainerDiffs() > 0);
+    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
   }
 
   /**
@@ -346,7 +347,7 @@ class TestContainerChecksumTreeManager {
   @ParameterizedTest(name = "Missing blocks: {0}, Missing chunks: {1}, Corrupt chunks: {2}")
   @MethodSource("getContainerDiffMismatches")
   public void testContainerDiffWithMismatches(int numMissingBlock, int numMissingChunk,
-                                              int numCorruptChunk) throws IOException {
+                                              int numCorruptChunk) throws Exception {
     ContainerMerkleTree peerMerkleTree = buildTestTree(config);
     Pair<ContainerProtos.ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
         buildTestTreeWithMismatches(peerMerkleTree, numMissingBlock, numMissingChunk, numCorruptChunk);
@@ -359,6 +360,8 @@ class TestContainerChecksumTreeManager {
     ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
     assertTrue(metrics.getMerkleTreeDiffLatencyNS().lastStat().total() > 0);
     assertContainerDiffMatch(expectedDiff, diff);
+    assertTrue(checksumManager.getMetrics().getRepairContainerDiffs() > 0);
+    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
   }
 
   /**
@@ -369,7 +372,7 @@ class TestContainerChecksumTreeManager {
   @ParameterizedTest(name = "Missing blocks: {0}, Missing chunks: {1}, Corrupt chunks: {2}")
   @MethodSource("getContainerDiffMismatches")
   public void testPeerWithMismatchesHasNoDiff(int numMissingBlock, int numMissingChunk,
-                                              int numCorruptChunk) throws IOException {
+                                              int numCorruptChunk) throws Exception {
     ContainerMerkleTree ourMerkleTree = buildTestTree(config);
     Pair<ContainerProtos.ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
         buildTestTreeWithMismatches(ourMerkleTree, numMissingBlock, numMissingChunk, numCorruptChunk);
@@ -380,6 +383,14 @@ class TestContainerChecksumTreeManager {
         .setContainerMerkleTree(peerMerkleTree).build();
     ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
     assertFalse(diff.needsRepair());
+    assertTrue(checksumManager.getMetrics().getNoRepairContainerDiffs() > 0);
+    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
+  }
+
+  @Test
+  public void testFailureContainerMerkleTreeMetric() {
+    assertThrows(Exception.class, () -> checksumManager.diff(container, null));
+    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffFailure() > 0);
   }
 
   @Test
