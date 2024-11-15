@@ -1881,7 +1881,7 @@ abstract class AbstractOzoneFileSystemTest {
   private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
                                 String linkBucket) throws IOException {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setBucketLayout(BucketLayout.DEFAULT)
+    builder.setBucketLayout(BucketLayout.OBJECT_STORE)
         .setSourceVolume(sourceVolume.getName())
         .setSourceBucket(sourceBucket);
     sourceVolume.createBucket(linkBucket, builder.build());

@@ -244,7 +244,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     long preRunCount = dirDeletingService.getRunCount().get();
 
-    dirDeletingService.setRatisByteLimit(100);
+    dirDeletingService.setRatisByteLimit(1000);
 
     long numPurgeDirRequests =
         cluster.getOzoneManager().getMetrics().getNumSuccessfulIterationsDirDeletingService();
@@ -621,7 +621,7 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return i.callRealMethod();
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), anyList(), eq(null), anyLong(), anyInt(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyInt(),
         Mockito.any(), any());
 
     Mockito.doAnswer(i -> {

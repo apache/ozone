@@ -573,6 +573,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     public VALUE getValue() throws IOException {
       return decodeValue(rawKeyValue.getValue());
     }
+
+    public byte[] getRawKey() throws IOException {
+      return rawKeyValue.getKey();
+    }
+
+    public byte[] getRawValue() throws IOException {
+      return rawKeyValue.getValue();
+    }
+
   }
 
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
@@ -597,9 +606,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
           throws IOException {
-        final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
-        final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
-        return Table.newKeyValue(key, value);
+        CodecBuffer keyCodecBuffer = raw.getKey();
+        final KEY key = keyCodec.fromCodecBuffer(keyCodecBuffer);
+        CodecBuffer valueCodecBuffer = raw.getValue();
+        final VALUE value = valueCodec.fromCodecBuffer(valueCodecBuffer);
+        return Table.newKeyValue(key, value, keyCodecBuffer.getArray(), valueCodecBuffer.getArray());
       }
     };
   }

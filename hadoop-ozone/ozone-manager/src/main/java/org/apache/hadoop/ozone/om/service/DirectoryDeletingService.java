@@ -194,44 +194,33 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               continue;
             }
 
-            PurgePathRequest request = prepareDeleteDirRequest(
-                remainNum, pendingDeletedDirInfo.getValue(),
-                pendingDeletedDirInfo.getKey(), allSubDirList,
-                getOzoneManager().getKeyManager());
-            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                request.getSerializedSize())) {
-              if (currentPurgePathRequestList.size() != 0) {
-                // if message buffer reaches max limit, avoid sending further
-                purgePathRequestBatches.add(currentPurgePathRequestList);
-                currentPurgePathRequestList = new ArrayList<>();
-                consumedSize = 0;
-              } else {
-                // if directory itself is having a lot of keys / files,
-                // reduce capacity to minimum level
-                request = prepareDeleteDirRequest(MIN_ERR_LIMIT_PER_TASK,
+            List<List<PurgePathRequest>> purgeRequestBatches =
+                prepareDeleteDirRequest(remainNum,
                     pendingDeletedDirInfo.getValue(),
                     pendingDeletedDirInfo.getKey(), allSubDirList,
-                    getOzoneManager().getKeyManager());
-              }
-            }
-            consumedSize += request.getSerializedSize();
-            currentPurgePathRequestList.add(request);
+                    getOzoneManager().getKeyManager(), ratisByteLimit - consumedSize);
             // reduce remain count for self, sub-files, and sub-directories
             remainNum = remainNum - 1;
-            remainNum = remainNum - request.getDeletedSubFilesCount();
-            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-            // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null
-                && !request.getDeletedDir().isEmpty()) {
-              dirNum++;
+
+            for (List<PurgePathRequest> purgeRequests : purgeRequestBatches) {
+              for (PurgePathRequest request : purgeRequests) {
+                remainNum = remainNum - request.getDeletedSubFilesCount();
+                remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+                // Count up the purgeDeletedDir, subDirs and subFiles
+                if (request.getDeletedDir() != null && !request.getDeletedDir().isEmpty()) {
+                  dirNum++;
+                }
+                subDirNum += request.getMarkDeletedSubDirsCount();
+                subFileNum += request.getDeletedSubFilesCount();
+              }
+              purgePathRequestBatches.add(purgeRequests);
             }
-            subDirNum += request.getMarkDeletedSubDirsCount();
-            subFileNum += request.getDeletedSubFilesCount();
           }
+
 
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, currentPurgePathRequestList, purgePathRequestBatches,
+              allSubDirList, purgePathRequestBatches,
               null, startTime,
               ratisByteLimit - consumedSize,
               getOzoneManager().getKeyManager(), expectedPreviousSnapshotId);
