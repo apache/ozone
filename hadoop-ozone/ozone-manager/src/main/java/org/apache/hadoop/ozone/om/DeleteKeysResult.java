@@ -21,11 +21,15 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.util.List;
 
+/**
+ * Used in {@link org.apache.hadoop.ozone.om.service.DirectoryDeletingService}
+ * to capture the result of each delete task.
+ */
 public class DeleteKeysResult {
 
-  List<OmKeyInfo> keysToDelete;
-  String nextKey;
-  long consumedSize;
+  private List<OmKeyInfo> keysToDelete;
+  private String nextKey;
+  private long consumedSize;
 
   public DeleteKeysResult(List<OmKeyInfo> keysToDelete, String nextKey,
       long consumedSize) {

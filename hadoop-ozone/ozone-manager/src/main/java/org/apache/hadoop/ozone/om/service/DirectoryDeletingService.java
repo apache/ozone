@@ -168,7 +168,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subFileNum = 0L;
         long remainNum = pathLimitPerTask;
         int consumedSize = 0;
-        List<PurgePathRequest> currentPurgePathRequestList = new ArrayList<>();
         // Batch will be split as per RATIS request proto byte limit
         List<List<PurgePathRequest>> purgePathRequestBatches = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList

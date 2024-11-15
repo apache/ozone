@@ -421,7 +421,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         currentPurgePathRequestBatch = new ArrayList<>();
         consumedSize = 0;
       }
-    } while (remainNum > 0 && (nextSubfile!=null || nextSubdir!=null));
+    } while (remainNum > 0 && (nextSubfile != null || nextSubdir != null));
     purgeRequestBatches.add(currentPurgePathRequestBatch);
     return purgeRequestBatches;
   }
