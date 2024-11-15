@@ -114,9 +114,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private UUID globalPreviousSnapshotId;
   private String snapshotPath; // snapshot mask
   private String checkpointDir;
-  private boolean isLinked;
-  private String linkedVolumeName;
-  private String linkedBucketName;
   /**
    * RocksDB's transaction sequence number at the time of checkpoint creation.
    */
@@ -151,9 +148,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveReplicatedSize = b.exclusiveReplicatedSize;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
     this.lastTransactionInfo = b.lastTransactionInfo;
-    this.linkedVolumeName = b.linkedVolumeName;
-    this.linkedBucketName = b.linkedBucketName;
-    this.isLinked = b.isLinked;
   }
 
   public void setName(String name) {
@@ -252,18 +246,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.sstFiltered = sstFiltered;
   }
 
-  public void setLinked(boolean linked) {
-    isLinked = linked;
-  }
-
-  public void setLinkedBucketName(String linkedBucketName) {
-    this.linkedBucketName = linkedBucketName;
-  }
-
-  public void setLinkedVolumeName(String linkedVolumeName) {
-    this.linkedVolumeName = linkedVolumeName;
-  }
-
   public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
       newBuilder() {
     return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
@@ -290,10 +272,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
         .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
-        .setLastTransactionInfo(lastTransactionInfo)
-        .setLinked(isLinked)
-        .setLinkedVolumeName(linkedVolumeName)
-        .setLinkedBucketName(linkedBucketName);
+        .setLastTransactionInfo(lastTransactionInfo);
   }
 
   /**
@@ -320,9 +299,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long exclusiveReplicatedSize;
     private boolean deepCleanedDeletedDir;
     private ByteString lastTransactionInfo;
-    private boolean isLinked = false;
-    private String linkedVolumeName;
-    private String linkedBucketName;
 
     public Builder() {
       // default values
@@ -446,21 +422,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    public Builder setLinked(boolean linked) {
-      isLinked = linked;
-      return this;
-    }
-
-    public Builder setLinkedBucketName(String linkedBucketName) {
-      this.linkedBucketName = linkedBucketName;
-      return this;
-    }
-
-    public Builder setLinkedVolumeName(String linkedVolumeName) {
-      this.linkedVolumeName = linkedVolumeName;
-      return this;
-    }
-
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(this);
@@ -497,15 +458,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
     if (lastTransactionInfo != null) {
       sib.setLastTransactionInfo(lastTransactionInfo);
-    }
-    sib.setIsLinked(isLinked);
-
-    if (linkedVolumeName != null) {
-      sib.setLinkedVolumeName(linkedVolumeName);
-    }
-
-    if (linkedBucketName != null) {
-      sib.setLinkedBucketName(linkedBucketName);
     }
 
     sib.setSnapshotPath(snapshotPath)
@@ -579,16 +531,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasLastTransactionInfo()) {
       osib.setLastTransactionInfo(snapshotInfoProto.getLastTransactionInfo());
     }
-
-    if (snapshotInfoProto.hasLinkedVolumeName()) {
-      osib.setLinkedVolumeName(snapshotInfoProto.getLinkedVolumeName());
-    }
-
-    if (snapshotInfoProto.hasLinkedBucketName()) {
-      osib.setLinkedBucketName(snapshotInfoProto.getLinkedBucketName());
-    }
-
-    osib.setLinked(snapshotInfoProto.hasIsLinked() && snapshotInfoProto.getIsLinked());
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
         .setCheckpointDir(snapshotInfoProto.getCheckpointDir())
@@ -759,10 +701,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         exclusiveSize == that.exclusiveSize &&
         exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
         deepCleanedDeletedDir == that.deepCleanedDeletedDir &&
-        Objects.equals(lastTransactionInfo, that.lastTransactionInfo) &&
-        isLinked == that.isLinked &&
-        Objects.equals(linkedVolumeName, that.linkedVolumeName) &&
-        Objects.equals(linkedBucketName, that.linkedBucketName);
+        Objects.equals(lastTransactionInfo, that.lastTransactionInfo);
   }
 
   @Override
@@ -773,8 +712,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
         deepClean, sstFiltered,
         referencedSize, referencedReplicatedSize,
-        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir, lastTransactionInfo,
-        linkedBucketName, linkedVolumeName, isLinked);
+        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir, lastTransactionInfo);
   }
 
   /**
@@ -808,9 +746,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
         ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
         ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
-        ", isLinked: '" + isLinked + '\'' +
-        ", linkedVolumeName: '" + linkedVolumeName + '\'' +
-        ", linkedBucketName: '" + linkedBucketName + '\'' +
         '}';
   }
 }

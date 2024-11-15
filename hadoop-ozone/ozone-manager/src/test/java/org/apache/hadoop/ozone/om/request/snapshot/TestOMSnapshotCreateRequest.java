@@ -149,18 +149,11 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
         omException.getMessage());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testValidateAndUpdateCache(boolean isLinked) throws Exception {
+  @Test
+  public void testValidateAndUpdateCache() throws Exception {
     when(getOzoneManager().isAdmin(any())).thenReturn(true);
-    String linkedBucketName = getBucketName() + "1";
-    String linkedVolumeName = getVolumeName() + "1";
-    if (isLinked) {
-      when(getOzoneManager().resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
-          .thenAnswer(i -> new ResolvedBucket(Pair.of(linkedVolumeName, linkedBucketName),
-              Pair.of(getVolumeName(), getBucketName()), "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
-    }
-    OMRequest omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     String key = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
     String bucketKey = getOmMetadataManager().getBucketKey(getVolumeName(), getBucketName());
@@ -196,13 +189,6 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
             .getCreateSnapshotResponse()
             .getSnapshotInfo();
 
-    if (isLinked) {
-      assertEquals(isLinked, snapshotInfoProto.getIsLinked());
-      assertEquals(linkedVolumeName, snapshotInfoProto.getLinkedVolumeName());
-      assertEquals(linkedBucketName, snapshotInfoProto.getLinkedBucketName());
-    } else {
-      assertEquals(isLinked, snapshotInfoProto.hasIsLinked() && snapshotInfoProto.getIsLinked());
-    }
     assertEquals(bucketDataSize, snapshotInfoProto.getReferencedSize());
     assertEquals(bucketUsedBytes,
         snapshotInfoProto.getReferencedReplicatedSize());

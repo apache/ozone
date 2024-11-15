@@ -73,9 +73,6 @@ public class TestOmSnapshotInfo {
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
         .setDeepCleanedDeletedDir(false)
-        .setLinked(true)
-        .setLinkedVolumeName(VOLUME_NAME)
-        .setLinkedBucketName(BUCKET_NAME)
         .build();
   }
 
@@ -100,9 +97,6 @@ public class TestOmSnapshotInfo {
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
         .setDeepCleanedDeletedDir(false)
-        .setLinkedBucketName(BUCKET_NAME)
-        .setLinkedVolumeName(VOLUME_NAME)
-        .setIsLinked(true)
         .build();
   }
 

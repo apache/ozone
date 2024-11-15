@@ -886,9 +886,6 @@ message SnapshotInfo {
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
   optional bytes lastTransactionInfo = 20;
-  optional bool isLinked = 21;
-  optional string linkedVolumeName = 22;
-  optional string linkedBucketName = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -1923,9 +1920,6 @@ message CreateSnapshotRequest {
   optional string snapshotName = 3;
   optional hadoop.hdds.UUID snapshotId = 4;
   optional uint64 creationTime = 5;
-  optional bool isLinked = 6;
-  optional string linkedVolumeName = 7;
-  optional string linkedBucketName = 8;
 }
 
 message RenameSnapshotRequest {

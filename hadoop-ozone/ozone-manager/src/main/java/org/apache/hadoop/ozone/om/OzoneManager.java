@@ -2970,10 +2970,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.incNumSnapshotInfos();
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
     // permission check, since linked bucket permissions and source bucket permissions could be different.
-    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
-    Map<String, String> auditMap = buildAuditMap(resolvedBucket.realVolume());
-    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
+      auditMap = buildAuditMap(resolvedBucket.realVolume());
+      auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
       SnapshotInfo snapshotInfo =
           metadataManager.getSnapshotInfo(resolvedBucket.realVolume(), resolvedBucket.realBucket(), snapshotName);
 
@@ -2993,12 +2997,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     metrics.incNumSnapshotLists();
-    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
-    // permission check, since linked bucket permissions and source bucket permissions could be different.
-    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
-    Map<String, String> auditMap = buildAuditMap(resolvedBucket.realVolume());
-    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
+      auditMap = buildAuditMap(resolvedBucket.realVolume());
+      auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
       if (isAclEnabled) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
             ACLType.LIST, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
