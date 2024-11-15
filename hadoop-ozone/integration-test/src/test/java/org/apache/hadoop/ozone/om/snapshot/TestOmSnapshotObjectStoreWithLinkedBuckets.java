@@ -20,15 +20,15 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.junit.jupiter.api.Timeout;
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 /**
- * Test OmSnapshot for Legacy bucket type.
+ * Test OmSnapshot for Object Store bucket type.
  */
 @Timeout(300)
-public class TestOmSnapshotLegacy extends TestOmSnapshot {
+public class TestOmSnapshotObjectStoreWithLinkedBuckets extends TestOmSnapshot {
 
-  public TestOmSnapshotLegacy() throws Exception {
-    super(LEGACY, false, false, false);
+  public TestOmSnapshotObjectStoreWithLinkedBuckets() throws Exception {
+    super(OBJECT_STORE, false, false, false, true);
   }
 }

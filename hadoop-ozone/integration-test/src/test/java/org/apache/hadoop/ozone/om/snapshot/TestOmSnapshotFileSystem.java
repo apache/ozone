@@ -54,9 +54,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +99,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Abstract class for OmSnapshot file system tests.
  */
 @Timeout(120)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestOmSnapshotFileSystem {
   protected static final String VOLUME_NAME =
       "volume" + RandomStringUtils.randomNumeric(5);
@@ -107,26 +108,28 @@ public abstract class TestOmSnapshotFileSystem {
   protected static final String BUCKET_NAME_LEGACY =
       "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static OzoneConfiguration conf;
-  private static OzoneManagerProtocol writeClient;
-  private static OzoneManager ozoneManager;
-  private static String keyPrefix;
+  private MiniOzoneCluster cluster = null;
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private OzoneConfiguration conf;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager ozoneManager;
+  private String keyPrefix;
   private final String bucketName;
+  private final boolean createLinkedBuckets;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
-  public TestOmSnapshotFileSystem(String bucketName) {
+  public TestOmSnapshotFileSystem(String bucketName, boolean createLinkedBuckets) throws Exception {
     this.bucketName = bucketName;
+    this.createLinkedBuckets = createLinkedBuckets;
+    init();
   }
 
-  @BeforeAll
-  public static void init() throws Exception {
+  private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newBuilder(conf).build();
@@ -140,10 +143,10 @@ public abstract class TestOmSnapshotFileSystem {
     TestDataUtil.createVolume(client, VOLUME_NAME);
     TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(FILE_SYSTEM_OPTIMIZED).build(),
-        BUCKET_NAME_FSO);
+        BUCKET_NAME_FSO, createLinkedBuckets);
     TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
-        BUCKET_NAME_LEGACY);
+        BUCKET_NAME_LEGACY, createLinkedBuckets);
 
     // stop the deletion services so that keys can still be read
     KeyManagerImpl keyManager = (KeyManagerImpl) ozoneManager.getKeyManager();
@@ -163,7 +166,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   @AfterAll
-  public static void tearDown() throws Exception {
+  void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
@@ -376,7 +379,7 @@ public abstract class TestOmSnapshotFileSystem {
     assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
-  private static void setKeyPrefix(String s) {
+  private void setKeyPrefix(String s) {
     keyPrefix = s;
   }
 

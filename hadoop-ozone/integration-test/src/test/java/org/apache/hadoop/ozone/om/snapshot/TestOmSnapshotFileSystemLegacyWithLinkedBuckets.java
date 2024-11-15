@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Timeout;
  * OmSnapshot file system tests for Legacy.
  */
 @Timeout(120)
-public class TestOmSnapshotFileSystemLegacy extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemLegacy() {
-    super(BUCKET_NAME_LEGACY);
+public class TestOmSnapshotFileSystemLegacyWithLinkedBuckets extends TestOmSnapshotFileSystem {
+  TestOmSnapshotFileSystemLegacyWithLinkedBuckets() throws Exception {
+    super(BUCKET_NAME_LEGACY, true);
   }
 }
