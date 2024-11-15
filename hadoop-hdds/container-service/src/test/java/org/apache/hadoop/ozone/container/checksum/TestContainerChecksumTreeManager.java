@@ -393,6 +393,96 @@ class TestContainerChecksumTreeManager {
     assertTrue(checksumManager.getMetrics().getMerkleTreeDiffFailure() > 0);
   }
 
+  /**
+   * Test to check if the container diff consists of blocks that are missing in our merkle tree but
+   * they are deleted in the peer's merkle tree.
+   */
+  @Test
+  void testDeletedBlocksInPeerAndBoth() throws Exception {
+    ContainerMerkleTree peerMerkleTree = buildTestTree(config);
+    // Introduce missing blocks in our merkle tree
+    ContainerProtos.ContainerMerkleTree ourMerkleTree = buildTestTreeWithMismatches(peerMerkleTree, 3, 0, 0).getLeft();
+    List<Long> deletedBlockList = Arrays.asList(1L, 2L, 3L, 4L, 5L);
+    // Mark all the blocks as deleted in peer merkle tree
+    ContainerProtos.ContainerChecksumInfo.Builder peerChecksumInfoBuilder = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().setContainerMerkleTree(ourMerkleTree).setContainerID(CONTAINER_ID)
+        .addAllDeletedBlocks(deletedBlockList);
+
+    ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
+    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+
+    // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
+    // in peer merkle tree.
+    assertTrue(containerDiff.getMissingBlocks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+
+    // Delete blocks in our merkle tree as well.
+    checksumManager.markBlocksAsDeleted(container, deletedBlockList);
+    containerDiff = checksumManager.diff(container, peerChecksumInfo);
+
+    // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
+    // in both merkle tree.
+    assertTrue(containerDiff.getMissingBlocks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+  }
+
+  /**
+   * Test to check if the container diff consists of blocks that are corrupted in our merkle tree but also deleted in
+   * our merkle tree.
+   */
+  @Test
+  void testDeletedBlocksInOurContainerOnly() throws Exception {
+    // Setup deleted blocks only in the peer container checksum
+    ContainerMerkleTree peerMerkleTree = buildTestTree(config);
+    // Introduce block corruption in our merkle tree.
+    ContainerProtos.ContainerMerkleTree ourMerkleTree = buildTestTreeWithMismatches(peerMerkleTree, 0, 3, 3).getLeft();
+    List<Long> deletedBlockList = Arrays.asList(1L, 2L, 3L, 4L, 5L);
+    ContainerProtos.ContainerChecksumInfo.Builder peerChecksumInfoBuilder = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().setContainerMerkleTree(ourMerkleTree).setContainerID(CONTAINER_ID);
+
+    ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
+    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+    checksumManager.markBlocksAsDeleted(container, deletedBlockList);
+
+    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+
+    // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
+    // in our merkle tree.
+    assertTrue(containerDiff.getMissingBlocks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+  }
+
+  /**
+   * Test to check if the container diff consists of blocks that are corrupted in our merkle tree but also deleted in
+   * our peer tree.
+   */
+  @Test
+  void testCorruptionInOurMerkleTreeAndDeletedBlocksInPeer() throws Exception {
+    // Setup deleted blocks only in the peer container checksum
+    ContainerMerkleTree peerMerkleTree = buildTestTree(config);
+    // Introduce block corruption in our merkle tree.
+    ContainerProtos.ContainerMerkleTree ourMerkleTree = buildTestTreeWithMismatches(peerMerkleTree, 0, 3, 3).getLeft();
+    List<Long> deletedBlockList = Arrays.asList(1L, 2L, 3L, 4L, 5L);
+    ContainerProtos.ContainerChecksumInfo.Builder peerChecksumInfoBuilder = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().setContainerMerkleTree(ourMerkleTree).setContainerID(CONTAINER_ID)
+        .addAllDeletedBlocks(deletedBlockList);
+
+    ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
+    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+
+    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+
+    // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
+    // in peer merkle tree.
+    assertTrue(containerDiff.getMissingBlocks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+    assertTrue(containerDiff.getMissingChunks().isEmpty());
+  }
+
   @Test
   public void testChecksumTreeFilePath() {
     assertEquals(checksumFile.getAbsolutePath(),
