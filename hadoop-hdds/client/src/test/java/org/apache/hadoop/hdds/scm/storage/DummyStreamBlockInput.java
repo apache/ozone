@@ -106,8 +106,7 @@ class DummyStreamBlockInput extends StreamBlockInput {
       long remainingToRead = Math.min(chunkLen, len);
       if (isVerifyChecksum()) {
         if (len < chunkLen) {
-           final ChecksumData checksumData = ChecksumData.getFromProtoBuf(
-              chunkInfo.getChecksumData());
+          final ChecksumData checksumData = ChecksumData.getFromProtoBuf(chunkInfo.getChecksumData());
           final long endByteIndex = len - 1;
           final int bytesPerChecksum = checksumData.getBytesPerChecksum();
           remainingToRead = (endByteIndex / bytesPerChecksum + 1) * bytesPerChecksum;
