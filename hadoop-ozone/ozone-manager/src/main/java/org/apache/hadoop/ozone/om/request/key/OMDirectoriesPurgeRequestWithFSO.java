@@ -100,7 +100,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
-      int numDirDeleted = 0, numSubFilesDeleted = 0;
+      int numSubDirDeleted = 0, numSubFilesDeleted = 0;
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -114,7 +114,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
-          numDirDeleted++;
+          numSubDirDeleted++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -129,6 +129,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
+        deletingServiceMetrics.incrNumSubDirectoriesPurged(numSubDirDeleted);
+        deletingServiceMetrics.setNumSubDirectoriesPurgedInLatestRequest(numSubDirDeleted);
 
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getDeletedSubFilesList()) {
@@ -173,6 +175,14 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
+        deletingServiceMetrics.incrNumSubKeysPurged(numSubFilesDeleted);
+        deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(numSubFilesDeleted);
+        if (path.hasDeletedDir()) {
+          deletingServiceMetrics.incrNumDirPurged(1);
+          deletingServiceMetrics.setNumDirPurgedInLatestRequest(1);
+        } else {
+          deletingServiceMetrics.setNumDirPurgedInLatestRequest(0);
+        }
       }
 
       if (fromSnapshotInfo != null) {
@@ -197,6 +207,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap, deletingServiceMetrics);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
   }
 }
