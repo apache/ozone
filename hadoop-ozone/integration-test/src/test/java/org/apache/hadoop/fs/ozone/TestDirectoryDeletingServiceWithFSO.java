@@ -211,7 +211,18 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
-  public void testDeleteWithRequestSizeExceedingRatisProtoLimit() throws Exception {
+  public void testDeleteWithRequestSizeExceedingRatisRequestSizeLimit() throws Exception {
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable =
+        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 0);
     Path root = new Path("/rootDir1");
     Path appRoot = new Path(root, "appRoot1");
     // Creates 2 parent dirs from root.
@@ -221,13 +232,6 @@ public class TestDirectoryDeletingServiceWithFSO {
       fs.mkdirs(childDir);
     }
 
-    Table<String, OmKeyInfo> deletedDirTable =
-        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
-    Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getFSOBucketLayout());
-    Table<String, OmDirectoryInfo> dirTable =
-        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
@@ -417,7 +421,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     omDoubleBuffer.stopDaemon();
 
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);    long volumeId = metadataManager.getVolumeId(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    long volumeId = metadataManager.getVolumeId(volumeName);
 
     // manually delete dir and add to deleted table. namespace count occupied "1" as manual deletion do not reduce
     long bucketId = metadataManager.getBucketId(volumeName, bucketName);
@@ -769,6 +774,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
+    // delete the snapshot
+    client.getObjectStore().deleteSnapshot(volumeName, bucketName, "snap1");
+
     // Manual cleanup deletedDirTable for next tests
     cleanupTables();
   }
@@ -785,6 +793,10 @@ public class TestDirectoryDeletingServiceWithFSO {
       removeAllFromDB(it);
     }
     try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
+        .iterator()) {
+      removeAllFromDB(it);
+    }
+    try (TableIterator<?, ?> it = metadataManager.getSnapshotInfoTable()
         .iterator()) {
       removeAllFromDB(it);
     }
