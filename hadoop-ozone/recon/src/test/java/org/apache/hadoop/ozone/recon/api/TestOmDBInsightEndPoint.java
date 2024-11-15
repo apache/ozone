@@ -1021,7 +1021,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private void insertGlobalStatsRecords(GlobalStatsDao statsDao,
                                         Timestamp timestamp, String key,
                                         long value) {
-    GlobalStats newRecord = new GlobalStats(key, value, timestamp);
+    GlobalStats newRecord = new GlobalStats(key, value, timestamp.toLocalDateTime());
     statsDao.insert(newRecord);
   }
 

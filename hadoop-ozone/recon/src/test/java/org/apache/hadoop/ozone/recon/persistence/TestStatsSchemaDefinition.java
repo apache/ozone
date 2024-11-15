@@ -87,14 +87,14 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     long now = System.currentTimeMillis();
     GlobalStats newRecord = new GlobalStats();
-    newRecord.setLastUpdatedTimestamp(new Timestamp(now));
+    newRecord.setLastUpdatedTimestamp(new Timestamp(now).toLocalDateTime());
     newRecord.setKey("key1");
     newRecord.setValue(500L);
 
     // Create
     dao.insert(newRecord);
     GlobalStats newRecord2 = new GlobalStats();
-    newRecord2.setLastUpdatedTimestamp(new Timestamp(now + 1000L));
+    newRecord2.setLastUpdatedTimestamp(new Timestamp(now + 1000L).toLocalDateTime());
     newRecord2.setKey("key2");
     newRecord2.setValue(10L);
     dao.insert(newRecord2);
@@ -115,7 +115,7 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     // Update
     dbRecord.setValue(100L);
-    dbRecord.setLastUpdatedTimestamp(new Timestamp(now + 2000L));
+    dbRecord.setLastUpdatedTimestamp(new Timestamp(now + 2000L).toLocalDateTime());
     dao.update(dbRecord);
 
     // Read updated

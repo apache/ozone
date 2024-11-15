@@ -150,7 +150,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ClusterGrowthDailyDao dao = getDao(ClusterGrowthDailyDao.class);
     long now = System.currentTimeMillis();
     ClusterGrowthDaily newRecord = new ClusterGrowthDaily();
-    newRecord.setTimestamp(new Timestamp(now));
+    newRecord.setTimestamp(new Timestamp(now).toLocalDateTime());
     newRecord.setDatanodeId(10);
     newRecord.setDatanodeHost("host1");
     newRecord.setRackId("rack1");
@@ -166,7 +166,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ClusterGrowthDaily dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(new Timestamp(now).toLocalDateTime()).value2(10));
 
     assertEquals("host1", dbRecord.getDatanodeHost());
     assertEquals("rack1", dbRecord.getRackId());
@@ -184,7 +184,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(new Timestamp(now).toLocalDateTime()).value2(10));
 
     assertEquals(Long.valueOf(700), dbRecord.getUsedSize());
     assertEquals(Integer.valueOf(30), dbRecord.getBlockCount());
@@ -192,13 +192,13 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     // Delete
     dao.deleteById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
         CLUSTER_GROWTH_DAILY.DATANODE_ID)
-        .value1(new Timestamp(now)).value2(10));
+        .value1(new Timestamp(now).toLocalDateTime()).value2(10));
 
     // Verify
     dbRecord =
         dao.findById(getDslContext().newRecord(CLUSTER_GROWTH_DAILY.TIMESTAMP,
             CLUSTER_GROWTH_DAILY.DATANODE_ID)
-            .value1(new Timestamp(now)).value2(10));
+            .value1(new Timestamp(now).toLocalDateTime()).value2(10));
 
     assertNull(dbRecord);
   }

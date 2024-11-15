@@ -25,6 +25,7 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <classpath.skip>false</classpath.skip>
+    <javac.version>17</javac.version>
     <pnpm.version>8.15.7</pnpm.version>
   </properties>
   <build>

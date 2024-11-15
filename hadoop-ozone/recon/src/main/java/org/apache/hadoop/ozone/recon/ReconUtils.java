@@ -485,7 +485,7 @@ public class ReconUtils {
     Timestamp now =
         using(sqlConfiguration).fetchValue(select(currentTimestamp()));
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
-    GlobalStats newRecord = new GlobalStats(key, count, now);
+    GlobalStats newRecord = new GlobalStats(key, count, now.toLocalDateTime());
 
     // Insert a new record for key if it does not exist
     if (record == null) {
