@@ -2971,17 +2971,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
     // permission check, since linked bucket permissions and source bucket permissions could be different.
     ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
-    volumeName = resolvedBucket.realVolume();
-    bucketName = resolvedBucket.realBucket();
-    Map<String, String> auditMap = buildAuditMap(volumeName);
-    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    Map<String, String> auditMap = buildAuditMap(resolvedBucket.realVolume());
+    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
     try {
-      if (isAclEnabled) {
-        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.READ, volumeName, bucketName, null);
-      }
       SnapshotInfo snapshotInfo =
-          metadataManager.getSnapshotInfo(volumeName, bucketName, snapshotName);
+          metadataManager.getSnapshotInfo(resolvedBucket.realVolume(), resolvedBucket.realBucket(), snapshotName);
 
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           OMAction.SNAPSHOT_INFO, auditMap));
@@ -3002,17 +2996,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
     // permission check, since linked bucket permissions and source bucket permissions could be different.
     ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
-    volumeName = resolvedBucket.realVolume();
-    bucketName = resolvedBucket.realBucket();
-    Map<String, String> auditMap = buildAuditMap(volumeName);
-    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    Map<String, String> auditMap = buildAuditMap(resolvedBucket.realVolume());
+    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
     try {
       if (isAclEnabled) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.LIST, volumeName, bucketName, null);
+            ACLType.LIST, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
       }
       ListSnapshotResponse listSnapshotResponse =
-          metadataManager.listSnapshot(volumeName, bucketName,
+          metadataManager.listSnapshot(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
               snapshotPrefix, prevSnapshot, maxListResult);
 
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -4911,11 +4903,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
     // permission check, since linked bucket permissions and source bucket permissions could be different.
     ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
-    volume = resolvedBucket.realVolume();
-    bucket = resolvedBucket.realBucket();
-
-    return omSnapshotManager.getSnapshotDiffReport(volume, bucket, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, disableNativeDiff);
+    return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
   }
 
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
@@ -4924,10 +4913,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String toSnapshot)
       throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    volume = resolvedBucket.realBucket();
-    bucket = resolvedBucket.realBucket();
-
-    return omSnapshotManager.cancelSnapshotDiff(volume, bucket, fromSnapshot, toSnapshot);
+    return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+        fromSnapshot, toSnapshot);
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
@@ -4936,13 +4923,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                     boolean listAll)
       throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    volume = resolvedBucket.realBucket();
-    bucket = resolvedBucket.realBucket();
     if (isAclEnabled) {
       omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
     }
 
-    return omSnapshotManager.getSnapshotDiffList(volume, bucket, jobStatus, listAll);
+    return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+        jobStatus, listAll);
   }
 
   public String printCompactionLogDag(String fileNamePrefix,
