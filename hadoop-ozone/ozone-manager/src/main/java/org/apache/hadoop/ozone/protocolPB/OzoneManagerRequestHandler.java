@@ -33,7 +33,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;

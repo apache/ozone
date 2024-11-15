@@ -35,7 +35,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +42,9 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 
+/**
+ * Test class to test out OzoneManagerRequestHandler.
+ */
 public class TestOzoneManagerRequestHandler {
 
 
@@ -58,8 +60,8 @@ public class TestOzoneManagerRequestHandler {
     OmKeyInfo keyInfo = Mockito.mock(OmKeyInfo.class);
     OzoneManagerProtocolProtos.KeyInfo info =
         OzoneManagerProtocolProtos.KeyInfo.newBuilder().setBucketName("bucket").setKeyName("key").setVolumeName(
-            "volume").setDataSize(0).setType(HddsProtos.ReplicationType.RATIS).setCreationTime(0).setModificationTime(0)
-        .build();
+                "volume").setDataSize(0).setType(HddsProtos.ReplicationType.RATIS).setCreationTime(0)
+            .setModificationTime(0).build();
     Mockito.when(keyInfo.getProtobuf(Mockito.anyBoolean(), Mockito.anyInt())).thenReturn(info);
     Mockito.when(keyInfo.getProtobuf(Mockito.anyInt())).thenReturn(info);
     return keyInfo;
@@ -93,9 +95,12 @@ public class TestOzoneManagerRequestHandler {
     case ListStatus:
       Mockito.when(request.getListStatusRequest()).thenReturn(OzoneManagerProtocolProtos.ListStatusRequest.newBuilder()
           .setNumEntries(requestSize).setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder().setBucketName(
-              "bucket").setVolumeName("volume").setKeyName("keyName")
+                  "bucket").setVolumeName("volume").setKeyName("keyName")
               .setLatestVersionLocation(true).setHeadOp(true)).setRecursive(true).setStartKey("")
           .build());
+      break;
+    default:
+      break;
     }
   }
 
@@ -108,10 +113,10 @@ public class TestOzoneManagerRequestHandler {
     OzoneManager ozoneManager = requestHandler.getOzoneManager();
     Mockito.when(ozoneManager.listKeys(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
         Mockito.anyString(), Mockito.anyInt())).thenAnswer(i -> {
-      int maxSize = Math.max(Math.min(resultSize, i.getArgument(4)), 0);
-      return new ListKeysResult(keyInfos.isEmpty() ? keyInfos : keyInfos.subList(0, maxSize),
-          maxSize < resultSize);
-    });
+          int maxSize = Math.max(Math.min(resultSize, i.getArgument(4)), 0);
+          return new ListKeysResult(keyInfos.isEmpty() ? keyInfos : keyInfos.subList(0, maxSize),
+              maxSize < resultSize);
+        });
     OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
     for (int requestSize : Arrays.asList(0, resultSize - 1, resultSize, resultSize + 1, Integer.MAX_VALUE)) {
       mockOmRequest(request, OzoneManagerProtocolProtos.Type.ListKeys, requestSize);
@@ -131,10 +136,10 @@ public class TestOzoneManagerRequestHandler {
     OzoneManager ozoneManager = requestHandler.getOzoneManager();
     Mockito.when(ozoneManager.listKeysLight(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
         Mockito.anyString(), Mockito.anyInt())).thenAnswer(i -> {
-      int maxSize = Math.max(Math.min(resultSize, i.getArgument(4)), 0);
-      return new ListKeysLightResult(keyInfos.isEmpty() ? keyInfos : keyInfos.subList(0, maxSize),
-          maxSize < resultSize);
-    });
+          int maxSize = Math.max(Math.min(resultSize, i.getArgument(4)), 0);
+          return new ListKeysLightResult(keyInfos.isEmpty() ? keyInfos : keyInfos.subList(0, maxSize),
+              maxSize < resultSize);
+        });
     OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
     for (int requestSize : Arrays.asList(0, resultSize - 1, resultSize, resultSize + 1, Integer.MAX_VALUE)) {
       mockOmRequest(request, OzoneManagerProtocolProtos.Type.ListKeysLight, requestSize);
@@ -155,10 +160,10 @@ public class TestOzoneManagerRequestHandler {
     OzoneManager ozoneManager = requestHandler.getOzoneManager();
     Mockito.when(ozoneManager.listStatus(Mockito.any(OmKeyArgs.class), Mockito.anyBoolean(), Mockito.anyString(),
         Mockito.anyLong(), Mockito.anyBoolean())).thenAnswer(i -> {
-      long maxSize = i.getArgument(3);
-      maxSize = Math.max(Math.min(resultSize, maxSize), 0);
-      return statusList.isEmpty() ? statusList : statusList.subList(0, (int)maxSize);
-    });
+          long maxSize = i.getArgument(3);
+          maxSize = Math.max(Math.min(resultSize, maxSize), 0);
+          return statusList.isEmpty() ? statusList : statusList.subList(0, (int) maxSize);
+        });
     OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
     for (int requestSize : Arrays.asList(0, resultSize - 1, resultSize, resultSize + 1, Integer.MAX_VALUE)) {
       mockOmRequest(request, OzoneManagerProtocolProtos.Type.ListStatus, requestSize);
