@@ -234,6 +234,8 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+        exclude:
+          - check: findbugs # HDDS-10150: Spotbugs 3 does not support Java 17
       fail-fast: false
     steps:
       - name: Checkout project
