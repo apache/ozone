@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
@@ -100,8 +99,8 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
     String resolvedBucketName = getBucketName() + "1";
     String resolvedVolumeName = getVolumeName() + "1";
     when(getOzoneManager().resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
-        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName)
-            , "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     OMRequest omRequest = deleteSnapshotRequest(getVolumeName(),
         getBucketName(), deleteSnapshotName);
     OMSnapshotDeleteRequest omSnapshotDeleteRequest = doPreExecute(omRequest);

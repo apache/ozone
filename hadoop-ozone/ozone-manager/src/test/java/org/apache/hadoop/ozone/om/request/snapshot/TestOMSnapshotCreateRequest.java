@@ -103,15 +103,17 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     String resolvedBucketName = getBucketName() + "1";
     String resolvedVolumeName = getVolumeName() + "1";
     when(getOzoneManager().resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
-        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName)
-            , "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     OMRequest omRequest = createSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     assertEquals(resolvedVolumeName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getVolumeName());
     assertEquals(resolvedBucketName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getBucketName());
-    assertEquals(getBucketName(), omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedBucketName());
-    assertEquals(getVolumeName(), omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedVolumeName());
+    assertEquals(getBucketName(),
+        omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedBucketName());
+    assertEquals(getVolumeName(),
+        omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedVolumeName());
   }
 
   @ValueSource(strings = {

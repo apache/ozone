@@ -101,8 +101,8 @@ public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse 
     String resolvedBucketName = getBucketName() + "1";
     String resolvedVolumeName = getVolumeName() + "1";
     when(getOzoneManager().resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
-        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName)
-            , "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     String currentSnapshotName = "current";
     OzoneManagerProtocolProtos.OMRequest omRequest = renameSnapshotRequest(getVolumeName(),
         getBucketName(), currentSnapshotName, toSnapshotName);
