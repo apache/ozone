@@ -30,9 +30,8 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "fso-tree-repair",
-    description = "Identify and repair a disconnected FSO tree, and mark " +
-        "unreachable entries for deletion. OM should be " +
-        "stopped while this tool is run."
+    description = "Identify and repair a disconnected FSO tree, and mark unreachable entries for deletion. " +
+        "OM should be stopped while this tool is run."
 )
 @MetaInfServices(SubcommandWithParent.class)
 public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {

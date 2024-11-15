@@ -71,8 +71,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * FSORepairTool test cases.
  */
 public class TestFSORepairTool {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(TestFSORepairTool.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
   private static MiniOzoneHAClusterImpl cluster;
@@ -85,16 +84,14 @@ public class TestFSORepairTool {
   public static void init() throws Exception {
     // Set configs.
     conf = new OzoneConfiguration();
-    // deletion services will be triggered manually.
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
-            TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK, 20);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     // Since delete services use RocksDB iterators, make sure the double
     // buffer is flushed between runs.
-    conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 2);
+    conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 1);
 
     // Build cluster.
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
@@ -105,8 +102,7 @@ public class TestFSORepairTool {
     cluster.waitForClusterToBeReady();
 
     // Init ofs.
-    final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, cluster.getOzoneManager().getOMServiceId());
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, cluster.getOzoneManager().getOMServiceId());
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
     client = OzoneClientFactory.getRpcClient("omservice", conf);
@@ -161,16 +157,14 @@ public class TestFSORepairTool {
 
   private String[] getHASetConfStrings(int numOfArgs) {
     assert (numOfArgs >= 0);
-    String[] res = new String[1 + 1 + 1 + numOfArgs];
+    String[] res = new String[3 + numOfArgs];
     final int indexOmServiceIds = 0;
     final int indexOmNodes = 1;
     final int indexOmAddressStart = 2;
 
-    res[indexOmServiceIds] = getSetConfStringFromConf(
-            OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+    res[indexOmServiceIds] = getSetConfStringFromConf(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
 
-    String omNodesKey = ConfUtils.addKeySuffixes(
-            OMConfigKeys.OZONE_OM_NODES_KEY, "omservice");
+    String omNodesKey = ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_NODES_KEY, "omservice");
     String omNodesVal = conf.get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
 
@@ -197,8 +191,7 @@ public class TestFSORepairTool {
 
     int indexCopyStart = res.length - existingArgs.length;
     // Then copy the existing args to the returned String array
-    System.arraycopy(existingArgs, 0, res, indexCopyStart,
-            existingArgs.length);
+    System.arraycopy(existingArgs, 0, res, indexCopyStart, existingArgs.length);
     return res;
   }
 
@@ -215,8 +208,7 @@ public class TestFSORepairTool {
     FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
 
     // Test the connected tree in debug mode.
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), false, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), false, null, null);
     FSORepairTool.Report debugReport = tool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
@@ -225,8 +217,7 @@ public class TestFSORepairTool {
 
     // Running again in repair mode should give same results since the tree
     // is connected.
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     FSORepairTool.Report repairReport = tool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
@@ -240,8 +231,7 @@ public class TestFSORepairTool {
     FSORepairTool.Report report2 = buildConnectedTree("vol1", "bucket2", 10);
     FSORepairTool.Report expectedReport = new FSORepairTool.Report(report1, report2);
 
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     FSORepairTool.Report debugReport = tool.run();
     Assertions.assertEquals(expectedReport, debugReport);
   }
@@ -258,14 +248,12 @@ public class TestFSORepairTool {
     FSORepairTool.Report expectedReport2 = new FSORepairTool.Report(report2);
 
     // When volume filter is passed
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, "/vol1", null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, "/vol1", null);
     FSORepairTool.Report result1 = tool.run();
     Assertions.assertEquals(expectedReport1, result1);
 
     // When both volume and bucket filters are passed
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, "/vol2", "bucket2");
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, "/vol2", "bucket2");
     FSORepairTool.Report result2 = tool.run();
     Assertions.assertEquals(expectedReport2, result2);
 
@@ -275,8 +263,7 @@ public class TestFSORepairTool {
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
          PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
-      tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), true, "/vol1", "bucket2");
+      tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, "/vol1", "bucket2");
       tool.run();
       String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("Bucket 'bucket2' does not exist in volume '/vol1'."));
@@ -288,8 +275,7 @@ public class TestFSORepairTool {
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
          PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
-      tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), true, "/vol3", "bucket2");
+      tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, "/vol3", "bucket2");
       tool.run();
       String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("Volume '/vol3' does not exist."));
@@ -301,8 +287,7 @@ public class TestFSORepairTool {
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
          PrintStream ps = new PrintStream(outputStream, true, DEFAULT_ENCODING)) {
       System.setOut(ps);
-      tool = new FSORepairTool(getOmDB(),
-              getOmDBLocation(), true, null, "bucket2");
+      tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, "bucket2");
       tool.run();
       String output = outputStream.toString(DEFAULT_ENCODING);
       Assertions.assertTrue(output.contains("--bucket flag cannot be used without specifying --volume."));
@@ -320,11 +305,9 @@ public class TestFSORepairTool {
             cluster.getOzoneManager().getMetadataManager().getKeyTable(getFSOBucketLayout());
     FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket2");
-    FSORepairTool.Report expectedAggregateReport = new FSORepairTool.Report(
-        report1, report2);
+    FSORepairTool.Report expectedAggregateReport = new FSORepairTool.Report(report1, report2);
 
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
 
     Assertions.assertEquals(generatedReport, expectedAggregateReport);
@@ -368,8 +351,7 @@ public class TestFSORepairTool {
     ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/file2"));
     disconnectDirectory("dir1");
 
-    tool = new FSORepairTool(getOmDB(),
-       getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
 
     Assertions.assertEquals(1, generatedReport.getUnreachable().getDirs());
@@ -386,8 +368,7 @@ public class TestFSORepairTool {
   @Test
   public void testEmptyFileTrees() throws Exception {
     // Run when there are no file trees.
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     FSORepairTool.Report generatedReport = tool.run();
     Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
     assertDeleteTablesEmpty();
@@ -397,8 +378,7 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol2/bucket1"));
 
     // Run on an empty volume and bucket.
-    tool = new FSORepairTool(getOmDB(),
-        getOmDBLocation(), true, null, null);
+    tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
     generatedReport = tool.run();
     Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
     assertDeleteTablesEmpty();
@@ -431,13 +411,11 @@ public class TestFSORepairTool {
       legacyStream.close();
 
       // Add an FSO bucket with data.
-      FSORepairTool.Report connectReport =
-          buildConnectedTree("vol1", "fso-bucket");
+      FSORepairTool.Report connectReport = buildConnectedTree("vol1", "fso-bucket");
 
       // Even in repair mode there should be no action. legacy and obs buckets
       // will be skipped and FSO tree is connected.
-      tool = new FSORepairTool(getOmDB(),
-          getOmDBLocation(), true, null, null);
+      tool = new FSORepairTool(getOmDB(), getOmDBLocation(), true, null, null);
       FSORepairTool.Report generatedReport = tool.run();
 
       Assertions.assertEquals(connectReport, generatedReport);
@@ -446,23 +424,20 @@ public class TestFSORepairTool {
     } finally {
       // Need to manually delete obs bucket. It cannot be deleted with ofs as
       // part of the normal test cleanup.
-      store.getVolume("vol1").getBucket("obs-bucket")
-          .deleteKey("prefix/test-key");
+      store.getVolume("vol1").getBucket("obs-bucket").deleteKey("prefix/test-key");
       store.getVolume("vol1").deleteBucket("obs-bucket");
     }
   }
 
 
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket)
-      throws Exception {
+  private FSORepairTool.Report buildConnectedTree(String volume, String bucket) throws Exception {
     return buildConnectedTree(volume, bucket, 0);
   }
 
   /**
    * Creates a tree with 3 reachable directories and 4 reachable files.
    */
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket, int fileSize)
-      throws Exception {
+  private FSORepairTool.Report buildConnectedTree(String volume, String bucket, int fileSize) throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
@@ -503,8 +478,7 @@ public class TestFSORepairTool {
         .build();
   }
 
-  private void assertConnectedTreeReadable(String volume, String bucket)
-      throws IOException {
+  private void assertConnectedTreeReadable(String volume, String bucket) throws IOException {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
@@ -525,8 +499,7 @@ public class TestFSORepairTool {
     Assertions.assertTrue(fs.exists(file4));
   }
 
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket)
-      throws Exception {
+  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket) throws Exception {
     return buildDisconnectedTree(volume, bucket, 0);
   }
 
@@ -534,8 +507,7 @@ public class TestFSORepairTool {
    * Creates a tree with 1 reachable directory, 1 reachable file, 1
    * unreachable directory, and 3 unreachable files.
    */
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket,
-      int fileSize) throws Exception {
+  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket, int fileSize) throws Exception {
     buildConnectedTree(volume, bucket, fileSize);
 
     // Manually remove dir1. This should disconnect 3 of the files and 1 of
@@ -558,11 +530,8 @@ public class TestFSORepairTool {
 
   private void disconnectDirectory(String dirName) throws Exception {
     OzoneManager leader = cluster.getOMLeader();
-    Table<String, OmDirectoryInfo> dirTable =
-        leader.getMetadataManager().getDirectoryTable();
-    try (TableIterator<String, ?
-        extends Table.KeyValue<String, OmDirectoryInfo>> iterator =
-            dirTable.iterator()) {
+    Table<String, OmDirectoryInfo> dirTable = leader.getMetadataManager().getDirectoryTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator = dirTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
         String key = entry.getKey();
@@ -574,8 +543,7 @@ public class TestFSORepairTool {
     }
   }
 
-  private void assertDisconnectedTreePartiallyReadable(
-      String volume, String bucket) throws Exception {
+  private void assertDisconnectedTreePartiallyReadable(String volume, String bucket) throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
