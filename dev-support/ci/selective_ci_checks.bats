@@ -197,7 +197,7 @@ load bats-assert/load.bash
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=true
-  assert_output -p needs-integration-tests=false
+  assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
 }
 
