@@ -102,6 +102,14 @@ public class ContainerSet implements Iterable<Container<?>> {
     return addContainer(container, false);
   }
 
+  public void validateContainerIsMissing(long containerId, State state) throws StorageContainerException {
+    if (missingContainerSet.contains(containerId)) {
+      throw new StorageContainerException(String.format("Container with container Id %d with state : %s is missing in" +
+          " the DN.", containerId, state),
+          ContainerProtos.Result.CONTAINER_MISSING);
+    }
+  }
+
   /**
    * Add Container to container map.
    * @param container container to be added
@@ -114,11 +122,8 @@ public class ContainerSet implements Iterable<Container<?>> {
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
-    if (!overwriteMissingContainers && missingContainerSet.contains(containerId)) {
-      throw new StorageContainerException(String.format("Container with container Id %d is missing in the DN " +
-          "and creation of containers with state %s is not allowed. Only recreation of container in RECOVERING state " +
-          "is allowed.", containerId, containerState.toString()), ContainerProtos.Result.CONTAINER_MISSING);
-
+    if (!overwriteMissingContainers) {
+      validateContainerIsMissing(containerId, containerState);
     }
     if (containerMap.putIfAbsent(containerId, container) == null) {
       if (LOG.isDebugEnabled()) {

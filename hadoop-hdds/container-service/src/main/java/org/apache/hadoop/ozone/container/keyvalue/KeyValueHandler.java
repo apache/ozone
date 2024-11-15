@@ -357,12 +357,12 @@ public class KeyValueHandler extends Handler {
     long containerID = request.getContainerID();
     State containerState = request.getCreateContainer().getState();
 
-    if (containerSet.getMissingContainerSet().contains(containerID) && containerState != RECOVERING) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException(String.format("Container with " + "container Id %d is " +
-          "missing in the DN and creation of containers with state %s is not allowed. Only recreation of container " +
-              "in RECOVERING state is allowed.", containerID, containerState.toString()),
-              ContainerProtos.Result.CONTAINER_MISSING), request);
+    if (containerState != RECOVERING) {
+      try {
+        containerSet.validateContainerIsMissing(containerID, containerState);
+      } catch (StorageContainerException ex) {
+        return ContainerUtils.logAndReturnError(LOG, ex, request);
+      }
     }
 
     ContainerLayoutVersion layoutVersion =
