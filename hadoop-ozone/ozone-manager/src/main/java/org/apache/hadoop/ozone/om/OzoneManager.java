@@ -2968,14 +2968,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
                                       String snapshotName) throws IOException {
     metrics.incNumSnapshotInfos();
-    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
-    // permission check, since linked bucket permissions and source bucket permissions could be different.
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
       // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
       // permission check, since linked bucket permissions and source bucket permissions could be different.
-      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
       SnapshotInfo snapshotInfo =
@@ -3002,7 +3000,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
       // permission check, since linked bucket permissions and source bucket permissions could be different.
-      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName), false);
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
       if (isAclEnabled) {
