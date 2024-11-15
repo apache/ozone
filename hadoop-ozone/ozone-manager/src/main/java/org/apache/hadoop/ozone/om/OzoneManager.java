@@ -4914,10 +4914,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     volume = resolvedBucket.realVolume();
     bucket = resolvedBucket.realBucket();
 
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume, bucket, null);
-    }
-
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket, fromSnapshot, toSnapshot,
         token, pageSize, forceFullDiff, disableNativeDiff);
   }
@@ -4927,10 +4923,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume, bucket, null);
-    }
+    ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+    volume = resolvedBucket.realBucket();
+    bucket = resolvedBucket.realBucket();
 
     return omSnapshotManager.cancelSnapshotDiff(volume, bucket, fromSnapshot, toSnapshot);
   }
