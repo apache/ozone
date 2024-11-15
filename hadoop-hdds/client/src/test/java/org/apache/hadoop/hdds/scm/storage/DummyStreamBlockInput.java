@@ -106,10 +106,11 @@ class DummyStreamBlockInput extends StreamBlockInput {
       long remainingToRead = Math.min(chunkLen, len);
       if (isVerifyChecksum()) {
         if (len < chunkLen) {
-          ChecksumData checksumData = ChecksumData.getFromProtoBuf(
+           final ChecksumData checksumData = ChecksumData.getFromProtoBuf(
               chunkInfo.getChecksumData());
-          int bytesPerChecksum = checksumData.getBytesPerChecksum();
-          remainingToRead = (len / bytesPerChecksum + 1) * bytesPerChecksum;
+          final long endByteIndex = len - 1;
+          final int bytesPerChecksum = checksumData.getBytesPerChecksum();
+          remainingToRead = (endByteIndex / bytesPerChecksum + 1) * bytesPerChecksum;
         } else {
           remainingToRead = chunkLen;
         }
@@ -122,7 +123,6 @@ class DummyStreamBlockInput extends StreamBlockInput {
         } else {
           bufferLen = bufferCapacity;
         }
-        System.out.println(bufferLen);
         ByteString byteString = ByteString.copyFrom(chunkDataMap.get(chunks.get(chunkIndex).getChunkName()),
             (int) chunkOffset, (int) bufferLen);
 

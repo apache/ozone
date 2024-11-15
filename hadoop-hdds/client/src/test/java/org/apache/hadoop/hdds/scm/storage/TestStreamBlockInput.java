@@ -243,6 +243,12 @@ public class TestStreamBlockInput {
     numBytesRead = blockStream.read(b2, 0, 20);
     assertEquals(20, numBytesRead);
     matchWithInputData(b2, 70, 20);
+
+    byte[] b3 = new byte[20];
+    seekAndVerify(80);
+    numBytesRead = blockStream.read(b3, 0, 20);
+    assertEquals(20, numBytesRead);
+    matchWithInputData(b3, 80, 20);
   }
 
   @Test
