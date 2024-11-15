@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -226,12 +225,6 @@ public final class SnapshotUtils {
       String volumeName,
       String bucketName
   ) throws IOException {
-    final String bucketTableKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketTableKey);
-    if (bucketInfo.isLink()) {
-      volumeName = bucketInfo.getSourceVolume();
-      bucketName = bucketInfo.getSourceBucket();
-    }
     String keyPrefix = getOzonePathKey(volumeName, bucketName);
     String keyPrefixFso = getOzonePathKeyForFso(omMetadataManager, volumeName,
         bucketName);

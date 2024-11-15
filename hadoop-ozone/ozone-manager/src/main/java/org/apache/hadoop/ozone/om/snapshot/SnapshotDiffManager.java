@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -1568,12 +1567,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                                          final OMMetadataManager mManager)
       throws IOException {
     final String bucketTableKey = mManager.getBucketKey(volume, bucket);
-    OmBucketInfo bucketInfo = mManager.getBucketTable().get(bucketTableKey);
-    if (bucketInfo.isLink()) {
-      return mManager.getBucketTable().get(mManager.getBucketKey(bucketInfo.getSourceVolume(),
-          bucketInfo.getSourceBucket())).getBucketLayout();
-    }
-    return bucketInfo.getBucketLayout();
+    return mManager.getBucketTable().get(bucketTableKey).getBucketLayout();
   }
 
   private boolean areKeysEqual(WithObjectID oldKey, WithObjectID newKey) {
