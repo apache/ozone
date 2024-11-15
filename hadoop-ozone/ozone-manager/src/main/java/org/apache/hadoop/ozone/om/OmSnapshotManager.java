@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import java.util.UUID;
 
 import com.google.common.cache.RemovalListener;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -656,7 +657,12 @@ public final class OmSnapshotManager implements AutoCloseable {
       // don't allow snapshot indicator without snapshot name
       throw new OMException(INVALID_KEY_NAME);
     }
-
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
+        bucketName), false);
+    volumeName = resolvedBucket.realVolume();
+    bucketName = resolvedBucket.realBucket();
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
         bucketName, snapshotName);
 
