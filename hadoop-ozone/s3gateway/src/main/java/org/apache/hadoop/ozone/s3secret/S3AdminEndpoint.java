@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -13,19 +13,22 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ *
  */
 
-package org.apache.hadoop.ozone.client.rpc;
+package org.apache.hadoop.ozone.s3secret;
 
-import org.junit.jupiter.api.BeforeAll;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
 /**
- * Tests key output stream with zero-copy enabled.
+ * Annotation to only allow admin users to access the endpoint.
  */
-public class TestECKeyOutputStreamWithZeroCopy extends
-    AbstractTestECKeyOutputStream {
-  @BeforeAll
-  public static void init() throws Exception {
-    init(true);
-  }
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3AdminEndpoint {
 }

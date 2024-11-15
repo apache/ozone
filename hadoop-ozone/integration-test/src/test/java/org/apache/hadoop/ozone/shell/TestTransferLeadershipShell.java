@@ -26,9 +26,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ratis.protocol.RaftPeer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 /**
  * Test transferLeadership with SCM HA setup.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestTransferLeadershipShell {
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
@@ -58,7 +60,7 @@ public class TestTransferLeadershipShell {
    *
    * @throws IOException Exception
    */
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     omServiceId = "om-service-test1";
@@ -78,7 +80,7 @@ public class TestTransferLeadershipShell {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterEach
+  @AfterAll
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();

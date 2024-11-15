@@ -37,7 +37,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -75,7 +74,7 @@ public class PutKeyHandler extends KeyHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();

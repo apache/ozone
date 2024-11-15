@@ -253,7 +253,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     try {
       OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
     } catch (ServiceException e) {
-      LOG.error("PurgeKey request failed. Will retry at next run.");
+      LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
     }
 
@@ -306,14 +306,18 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       purgeDirRequest.addAllDeletedPath(requests);
 
       OzoneManagerProtocolProtos.OMRequest omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
-              .setPurgeDirectoriesRequest(purgeDirRequest).setClientId(clientId.toString()).build();
+          OzoneManagerProtocolProtos.OMRequest.newBuilder()
+              .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+              .setPurgeDirectoriesRequest(purgeDirRequest)
+              .setClientId(clientId.toString())
+              .build();
+
       // Submit Purge paths request to OM
       try {
         OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId,
             runCount.getAndIncrement());
       } catch (ServiceException e) {
-        LOG.error("PurgePaths request failed. Will retry at next run.");
+        LOG.error("PurgePaths request failed. Will retry at next run.", e);
       }
     }
     if (omRequestSent) {

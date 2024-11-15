@@ -112,7 +112,6 @@ public final class OmDBAccessIdInfo {
   /**
    * Builder for OmDBAccessIdInfo.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantId;
     private String userPrincipal;

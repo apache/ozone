@@ -17,7 +17,7 @@
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-old-config:
   &old-config
-  image: apache/ozone:${OZONE_VERSION}-rocky
+  image: ${OZONE_IMAGE}:${OZONE_VERSION}${OZONE_IMAGE_FLAVOR}
   dns_search: .
   env_file:
     - docker-config

@@ -463,9 +463,9 @@ public class DatanodeSimulator implements Callable<Void> {
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
     details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
-    details.setPort(DatanodeDetails.Port.Name.STANDALONE, 0);
-    details.setPort(DatanodeDetails.Port.Name.RATIS, 0);
-    details.setPort(DatanodeDetails.Port.Name.REST, 0);
+    details.setStandalonePort(0);
+    details.setRatisPort(0);
+    details.setRestPort(0);
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
