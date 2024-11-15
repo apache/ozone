@@ -26,9 +26,9 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
  * Test OmSnapshot for Object Store bucket type.
  */
 @Timeout(300)
-public class TestOmSnapshotObjectStoreWithoutLinkedBuckets extends TestOmSnapshot {
+public class TestOmSnapshotObjectStore extends TestOmSnapshot {
 
-  public TestOmSnapshotObjectStoreWithoutLinkedBuckets() throws Exception {
+  public TestOmSnapshotObjectStore() throws Exception {
     super(OBJECT_STORE, false, false, false, true);
   }
 }

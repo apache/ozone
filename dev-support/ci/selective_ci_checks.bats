@@ -190,14 +190,14 @@ load bats-assert/load.bash
 }
 
 @test "native test in other module" {
-  run dev-support/ci/selective_ci_checks.sh 3115158830483c527fb978e1edc15473d81191d2
+  run dev-support/ci/selective_ci_checks.sh 822c0dee1a
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=true
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
 }
 

@@ -18,17 +18,19 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Timeout;
 
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is disabled.
+ * Test OmSnapshot for FSO bucket type when native lib is enabled.
  */
+@Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
 @Timeout(300)
-public class TestOmSnapshotFsoWithoutNativeLibWithoutLinkedBuckets extends TestOmSnapshot {
-
-  public TestOmSnapshotFsoWithoutNativeLibWithoutLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, false);
+class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
+  TestOmSnapshotFsoWithNativeLib() throws Exception {
+    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false);
   }
 }
