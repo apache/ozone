@@ -216,7 +216,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             }
           }
 
-
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestBatches,
