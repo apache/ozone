@@ -652,7 +652,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 } else {
                   future.complete(
                       ContainerCommandResponseProto.newBuilder(responseProto)
-                          .setCmdType(Type.StreamRead).build());
+                          .setCmdType(Type.ReadBlock).build());
                 }
               }
 
@@ -669,7 +669,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onCompleted() {
                 if (readBlock.getReadChunkCount() > 0) {
                   future.complete(response.setReadBlock(readBlock)
-                      .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
+                      .setCmdType(Type.ReadBlock).setResult(Result.SUCCESS).build());
                 }
                 if (!future.isDone()) {
                   future.completeExceptionally(new IOException(

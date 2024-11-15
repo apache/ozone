@@ -109,7 +109,6 @@ enum Type {
   FinalizeBlock = 21;
   Echo = 22;
   ReadBlock = 23;
-  StreamRead = 24;
 }
 
 
