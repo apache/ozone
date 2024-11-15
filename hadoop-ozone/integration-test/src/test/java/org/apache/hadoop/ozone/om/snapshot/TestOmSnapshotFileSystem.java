@@ -151,7 +151,7 @@ public abstract class TestOmSnapshotFileSystem {
     if (createLinkedBuckets) {
       linkedBucketMaps.put(bucket.getName(), bucket.getSourceBucket());
     }
-    OzoneBucket ozoneBucket = TestDataUtil.createBucket(client, VOLUME_NAME,
+    bucket = TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
         BUCKET_NAME_LEGACY, createLinkedBuckets);
     if (createLinkedBuckets) {
