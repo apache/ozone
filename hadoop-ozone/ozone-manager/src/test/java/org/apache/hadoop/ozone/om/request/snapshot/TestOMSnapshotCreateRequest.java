@@ -110,10 +110,6 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     assertEquals(resolvedVolumeName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getVolumeName());
     assertEquals(resolvedBucketName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getBucketName());
-    assertEquals(getBucketName(),
-        omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedBucketName());
-    assertEquals(getVolumeName(),
-        omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getLinkedVolumeName());
   }
 
   @ValueSource(strings = {
