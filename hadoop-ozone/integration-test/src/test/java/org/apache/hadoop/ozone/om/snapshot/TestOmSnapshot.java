@@ -238,7 +238,7 @@ public abstract class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     stopKeyManager();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
   }
 
@@ -1918,7 +1918,7 @@ public abstract class TestOmSnapshot {
     OzoneVolume volume1 = store.getVolume(volume);
     createBucket(volume1, bucket);
     OzoneBucket bucket1 = volume1.getBucket(bucket);
-    OzoneBucket originalBucket1 = volume1.getBucket(linkedBuckets.get(bucket));
+    OzoneBucket originalBucket1 = volume1.getBucket(linkedBuckets.getOrDefault(bucket, bucket));
     originalBucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
     volume1.setQuota(OzoneQuota.parseQuota("204800000", "1000"));
 

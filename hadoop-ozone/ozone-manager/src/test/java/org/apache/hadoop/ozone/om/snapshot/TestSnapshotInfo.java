@@ -78,6 +78,9 @@ public class TestSnapshotInfo {
         .setGlobalPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath("test/path")
         .setCheckpointDir("checkpoint.testdir")
+        .setLinked(true)
+        .setLinkedVolumeName("vol1")
+        .setLinkedBucketName("bucket1")
         .build();
   }
 

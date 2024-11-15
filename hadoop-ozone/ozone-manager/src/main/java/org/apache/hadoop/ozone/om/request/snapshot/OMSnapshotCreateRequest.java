@@ -122,14 +122,17 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-
-    return omRequest.toBuilder().setCreateSnapshotRequest(
-        omRequest.getCreateSnapshotRequest().toBuilder()
-            .setSnapshotId(toProtobuf(UUID.randomUUID()))
-            .setVolumeName(volumeName)
-            .setBucketName(this.bucketName)
-            .setCreationTime(Time.now())
-            .build()).build();
+    CreateSnapshotRequest.Builder createSnapshotRequest = omRequest.getCreateSnapshotRequest().toBuilder()
+        .setSnapshotId(toProtobuf(UUID.randomUUID()))
+        .setVolumeName(volumeName)
+        .setBucketName(this.bucketName)
+        .setCreationTime(Time.now());
+    if (bucket.isLink()) {
+      createSnapshotRequest.setIsLinked(true);
+      createSnapshotRequest.setLinkedVolumeName(bucket.requestedVolume());
+      createSnapshotRequest.setLinkedBucketName(bucket.requestedBucket());
+    }
+    return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
   
   @Override
@@ -167,6 +170,17 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
+      }
+
+      CreateSnapshotRequest createSnapshotRequest = getOmRequest().getCreateSnapshotRequest();
+      if (createSnapshotRequest.hasIsLinked()) {
+        snapshotInfo.setLinked(true);
+      }
+      if (createSnapshotRequest.hasLinkedVolumeName()) {
+        snapshotInfo.setLinkedVolumeName(createSnapshotRequest.getLinkedVolumeName());
+      }
+      if (createSnapshotRequest.hasLinkedBucketName()) {
+        snapshotInfo.setLinkedBucketName(createSnapshotRequest.getLinkedBucketName());
       }
 
       // Note down RDB latest transaction sequence number, which is used
