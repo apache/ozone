@@ -100,7 +100,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
-      int numSubDirDeleted = 0, numSubFilesDeleted = 0;
+      int numSubDirDeleted = 0, numSubFilesDeleted = 0, numDirsDeleted = 0;
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -129,8 +129,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
-        deletingServiceMetrics.incrNumSubDirectoriesPurged(numSubDirDeleted);
-        deletingServiceMetrics.setNumSubDirectoriesPurgedInLatestRequest(numSubDirDeleted);
 
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getDeletedSubFilesList()) {
@@ -175,15 +173,16 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
-        deletingServiceMetrics.incrNumSubKeysPurged(numSubFilesDeleted);
-        deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(numSubFilesDeleted);
         if (path.hasDeletedDir()) {
-          deletingServiceMetrics.incrNumDirPurged(1);
-          deletingServiceMetrics.setNumDirPurgedInLatestRequest(1);
-        } else {
-          deletingServiceMetrics.setNumDirPurgedInLatestRequest(0);
+          numDirsDeleted++;
         }
       }
+      deletingServiceMetrics.incrNumSubDirectoriesPurged(numSubDirDeleted);
+      deletingServiceMetrics.setNumSubDirectoriesPurgedInLatestRequest(numSubDirDeleted);
+      deletingServiceMetrics.incrNumSubKeysPurged(numSubFilesDeleted);
+      deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(numSubFilesDeleted);
+      deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
+      deletingServiceMetrics.setNumDirPurgedInLatestRequest(numDirsDeleted);
 
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
