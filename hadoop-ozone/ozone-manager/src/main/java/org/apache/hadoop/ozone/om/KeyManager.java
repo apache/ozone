@@ -119,7 +119,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(int count, String startKey)
+      throws IOException;
 
   /**
    * Returns a list rename entries from the snapshotRenamedTable.

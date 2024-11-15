@@ -514,7 +514,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     keyDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
         100000);
-    when(keyManager.getPendingDeletionKeys(anyInt())).thenAnswer(i -> {
+    when(keyManager.getPendingDeletionKeys(anyInt(), "")).thenAnswer(i -> {
       // wait for SDS to reach the KDS wait block before processing any key.
       GenericTestUtils.waitFor(keyDeletionWaitStarted::get, 1000, 100000);
       keyDeletionStarted.set(true);
