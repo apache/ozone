@@ -976,7 +976,7 @@ public class OMDBInsightEndpoint {
     ListKeysResponse listKeysResponse = new ListKeysResponse();
     if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       listKeysResponse.setStatus(ResponseStatus.INITIALIZING);
-      return Response.ok(listKeysResponse).build();
+      return Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(listKeysResponse).build();
     }
     ParamInfo paramInfo = new ParamInfo(replicationType, creationDate, keySize, startPrefix, prevKey,
         limit, false, "");
@@ -997,9 +997,9 @@ public class OMDBInsightEndpoint {
   }
 
   private Response getListKeysResponse(ParamInfo paramInfo) {
+    ListKeysResponse listKeysResponse = new ListKeysResponse();
     try {
       paramInfo.setLimit(Math.max(0, paramInfo.getLimit())); // Ensure limit is non-negative
-      ListKeysResponse listKeysResponse = new ListKeysResponse();
       listKeysResponse.setPath(paramInfo.getStartPrefix());
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
@@ -1008,7 +1008,6 @@ public class OMDBInsightEndpoint {
       Table<String, KeyEntityInfoProtoWrapper> keyTable =
           omMetadataManager.getKeyTableLite(BucketLayout.LEGACY);
       retrieveKeysFromTable(keyTable, paramInfo, listKeysResponse.getKeys());
-
 
       // Search keys from FSO layout.
       searchKeysInFSO(paramInfo, listKeysResponse.getKeys());
@@ -1029,6 +1028,10 @@ public class OMDBInsightEndpoint {
 
       return Response.ok(listKeysResponse).build();
     } catch (RuntimeException e) {
+      if (e instanceof ServiceNotReadyException) {
+        listKeysResponse.setStatus(ResponseStatus.INITIALIZING);
+        return Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(listKeysResponse).build();
+      }
       LOG.error("Error generating listKeys response", e);
       return ReconResponseUtils.createInternalServerErrorResponse(
           "Unexpected runtime error while searching keys in OM DB: " + e.getMessage());
