@@ -97,6 +97,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequestTestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = mock(AuditLogger.class);
