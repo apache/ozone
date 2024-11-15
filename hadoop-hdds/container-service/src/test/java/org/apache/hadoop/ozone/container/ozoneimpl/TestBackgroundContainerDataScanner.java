@@ -19,11 +19,12 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +37,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -62,7 +64,8 @@ public class TestBackgroundContainerDataScanner extends
   @BeforeEach
   public void setup() {
     super.setup();
-    scanner = new BackgroundContainerDataScanner(conf, controller, vol);
+    scanner = new BackgroundContainerDataScanner(conf, controller, vol,
+        new ContainerChecksumTreeManager(new OzoneConfiguration()));
   }
 
   @Test
@@ -156,11 +159,13 @@ public class TestBackgroundContainerDataScanner extends
   @Override
   public void testUnhealthyContainerRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
-    when(unhealthy.scanData(any(DataTransferThrottler.class),
-        any(Canceler.class))).thenReturn(getUnhealthyScanResult());
+    when(unhealthy.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(unhealthy.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyDataScanResult());
+    // If a container is not already in an unhealthy state, the controller will return true from this method.
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(true);
+
     setContainers(unhealthy, healthy);
 
     // First iteration should find the unhealthy container.
@@ -177,7 +182,7 @@ public class TestBackgroundContainerDataScanner extends
     // Update the mock to reflect this.
     when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertTrue(unhealthy.shouldScanData());
-
+    // Since the container is already unhealthy, the real controller would return false from this method.
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(false);
     scanner.runIteration();

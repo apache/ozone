@@ -24,7 +24,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -143,7 +144,7 @@ public class TestOnDemandContainerDataScanner extends
             OnDemandContainerDataScanner.getCanceler()))
         .thenAnswer((Answer<ScanResult>) invocation -> {
           latch.await();
-          return getUnhealthyScanResult();
+          return getUnhealthyDataScanResult();
         });
     Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
@@ -172,6 +173,8 @@ public class TestOnDemandContainerDataScanner extends
     resultFutureList.add(
         OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+    // Deleted containers will not count towards the scan count metric.
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(deletedContainer));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
@@ -261,10 +264,10 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testUnhealthyContainerRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(unhealthy.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
     when(unhealthy.scanData(
         any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(getUnhealthyScanResult());
+        .thenReturn(getUnhealthyDataScanResult());
     when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
         any())).thenReturn(true);
 
