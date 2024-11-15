@@ -625,7 +625,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     String[] keyParts = keyName.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
-
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
+          bucketName), false);
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
       return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
           getActiveSnapshot(volumeName, bucketName, snapshotName);
     } else {
@@ -657,12 +662,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       // don't allow snapshot indicator without snapshot name
       throw new OMException(INVALID_KEY_NAME);
     }
-    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
-    // permission check, since linked bucket permissions and source bucket permissions could be different.
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
-        bucketName), false);
-    volumeName = resolvedBucket.realVolume();
-    bucketName = resolvedBucket.realBucket();
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
         bucketName, snapshotName);
 
