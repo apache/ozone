@@ -212,8 +212,9 @@ public final class TestDataUtil {
             bucketLayout);
         if (createLinkedBucket) {
           String targetBucketName = ozoneBucket.getName() + RandomStringUtils.randomNumeric(5);
-          createLinkedBucket(client, volumeName, bucketName, targetBucketName);
+          ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
         }
+        return ozoneBucket;
       } catch (OMException e) {
         if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS
             && e.getResult() != OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {

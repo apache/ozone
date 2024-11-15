@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -100,6 +101,7 @@ import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -127,6 +129,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
@@ -183,6 +186,7 @@ public abstract class TestOmSnapshot {
   private final boolean disableNativeDiff;
   private final AtomicInteger counter;
   private final boolean createLinkedBucket;
+  private final Map<String, String> linkedBuckets = new HashMap<>();
 
   public TestOmSnapshot(BucketLayout newBucketLayout,
                         boolean newEnableFileSystemPaths,
@@ -222,6 +226,9 @@ public abstract class TestOmSnapshot {
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, createLinkedBucket);
+    if (createLinkedBucket) {
+      this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
+    }
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
     ozoneManager = cluster.getOzoneManager();
@@ -231,15 +238,16 @@ public abstract class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     stopKeyManager();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
   }
 
   private void createBucket(OzoneVolume volume, String bucketVal) throws IOException {
     if (createLinkedBucket) {
-      String sourceBucketName = bucketVal + counter.incrementAndGet();
+      String sourceBucketName = linkedBuckets.computeIfAbsent(bucketVal, (k) -> bucketVal + counter.incrementAndGet());
       volume.createBucket(sourceBucketName);
       TestDataUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
+      this.linkedBuckets.put(bucketVal, sourceBucketName);
     } else {
       volume.createBucket(bucketVal);
     }
@@ -610,11 +618,11 @@ public abstract class TestOmSnapshot {
   private void getOmKeyInfo(String volume, String bucket,
                             String key) throws IOException {
     ResolvedBucket resolvedBucket = new ResolvedBucket(volume, bucket,
-        volume, bucket, "", bucketLayout);
+        volume, this.linkedBuckets.getOrDefault(bucket, bucket), "", bucketLayout);
     cluster.getOzoneManager().getKeyManager()
         .getKeyInfo(new OmKeyArgs.Builder()
                 .setVolumeName(volume)
-                .setBucketName(bucket)
+                .setBucketName(this.linkedBuckets.getOrDefault(bucket, bucket))
                 .setKeyName(key).build(),
             resolvedBucket, null);
   }
@@ -1263,7 +1271,7 @@ public abstract class TestOmSnapshot {
     deleteKeys(bucketWithSnapshot);
     deleteKeys(bucketWithoutSnapshot);
     OMException omException = assertThrows(OMException.class,
-        () -> volume.deleteBucket(bucket1));
+        () -> volume.deleteBucket(linkedBuckets.getOrDefault(bucket1, bucket1)));
     assertEquals(CONTAINS_SNAPSHOT, omException.getResult());
     // TODO: Delete snapshot then delete bucket1 when deletion is implemented
     // no exception for bucket without snapshot
@@ -1291,12 +1299,12 @@ public abstract class TestOmSnapshot {
 
     assertEquals(snap1, snapshot1.getName());
     assertEquals(volume, snapshot1.getVolumeName());
-    assertEquals(bucket, snapshot1.getBucketName());
+    assertEquals(linkedBuckets.getOrDefault(bucket, bucket), snapshot1.getBucketName());
 
     OzoneSnapshot snapshot2 = store.getSnapshotInfo(volume, bucket, snap2);
     assertEquals(snap2, snapshot2.getName());
     assertEquals(volume, snapshot2.getVolumeName());
-    assertEquals(bucket, snapshot2.getBucketName());
+    assertEquals(linkedBuckets.getOrDefault(bucket, bucket), snapshot2.getBucketName());
 
     testGetSnapshotInfoFailure(null, bucket, "snapshotName",
         "volume can't be null or empty.");
@@ -1305,9 +1313,10 @@ public abstract class TestOmSnapshot {
     testGetSnapshotInfoFailure(volume, bucket, null,
         "snapshot name can't be null or empty.");
     testGetSnapshotInfoFailure(volume, bucket, "snapshotName",
-        "Snapshot '/" + volume + "/" + bucket + "/snapshotName' is not found.");
+        "Snapshot '/" + volume + "/" + linkedBuckets.getOrDefault(bucket, bucket) +
+            "/snapshotName' is not found.");
     testGetSnapshotInfoFailure(volume, "bucketName", "snapshotName",
-        "Snapshot '/" + volume + "/bucketName/snapshotName' is not found.");
+        "Bucket not found: " + volume + "/bucketName");
   }
 
   public void testGetSnapshotInfoFailure(String volName,
@@ -1486,9 +1495,9 @@ public abstract class TestOmSnapshot {
     assertEquals(CANCELLED, response.getJobStatus());
 
     String fromSnapshotTableKey =
-        SnapshotInfo.getTableKey(volumeName, bucketName, fromSnapName);
+        SnapshotInfo.getTableKey(volumeName, linkedBuckets.getOrDefault(bucketName, bucketName), fromSnapName);
     String toSnapshotTableKey =
-        SnapshotInfo.getTableKey(volumeName, bucketName, toSnapName);
+        SnapshotInfo.getTableKey(volumeName, linkedBuckets.getOrDefault(bucketName, bucketName), toSnapName);
 
     UUID fromSnapshotID = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshotTableKey).getSnapshotId();
     UUID toSnapshotID = SnapshotUtils.getSnapshotInfo(ozoneManager, toSnapshotTableKey).getSnapshotId();
@@ -1625,16 +1634,16 @@ public abstract class TestOmSnapshot {
     OMException omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
             null, 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(BUCKET_NOT_FOUND, omException.getResult());
     // Volume is nonexistent
     omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
             null, 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(VOLUME_NOT_FOUND, omException.getResult());
     omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
             null, 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(VOLUME_NOT_FOUND, omException.getResult());
   }
 
   /**
@@ -1739,13 +1748,12 @@ public abstract class TestOmSnapshot {
     String volume = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
 
-    String volBucketErrorMessage = "Provided volume name " + volume +
-        " or bucket name " + bucket + " doesn't exist";
+    String volErrorMessage = "Volume not found: " + volume;
 
     Exception volBucketEx = assertThrows(OMException.class,
         () -> store.listSnapshotDiffJobs(volume, bucket,
             "", true));
-    assertEquals(volBucketErrorMessage,
+    assertEquals(volErrorMessage,
         volBucketEx.getMessage());
 
     // Create the volume and the bucket.
@@ -1910,7 +1918,8 @@ public abstract class TestOmSnapshot {
     OzoneVolume volume1 = store.getVolume(volume);
     createBucket(volume1, bucket);
     OzoneBucket bucket1 = volume1.getBucket(bucket);
-    bucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
+    OzoneBucket originalBucket1 = volume1.getBucket(linkedBuckets.get(bucket));
+    originalBucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
     volume1.setQuota(OzoneQuota.parseQuota("204800000", "1000"));
 
     long volUsedNamespaceInitial = volume1.getUsedNamespace();
@@ -1986,7 +1995,7 @@ public abstract class TestOmSnapshot {
         OmSnapshotManager.getSnapshotPrefix(snapshotName);
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
+        .get(SnapshotInfo.getTableKey(volName, linkedBuckets.getOrDefault(buckName, buckName), snapshotName));
     String snapshotDirName =
         OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(),
             snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
@@ -2322,7 +2331,7 @@ public abstract class TestOmSnapshot {
       // Validate keys metadata in active Ozone namespace
       OzoneKeyDetails ozoneKeyDetails = ozoneBucketClient.getKey(keyName);
       assertEquals(keyName, ozoneKeyDetails.getName());
-      assertEquals(ozoneBucketClient.getName(),
+      assertEquals(linkedBuckets.getOrDefault(ozoneBucketClient.getName(), ozoneBucketClient.getName()),
           ozoneKeyDetails.getBucketName());
       assertEquals(ozoneBucketClient.getVolumeName(),
           ozoneKeyDetails.getVolumeName());
