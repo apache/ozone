@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -51,6 +54,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -97,6 +101,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
 import static javax.ws.rs.core.HttpHeaders.ETAG;
@@ -174,6 +180,8 @@ public class ObjectEndpoint extends EndpointBase {
   private int chunkSize;
   private boolean datastreamEnabled;
   private long datastreamMinLength;
+
+  private static volatile LoadingCache<Pair<String, String>, OzoneKeyDetails> keyCache;
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
@@ -263,6 +271,7 @@ public class ObjectEndpoint extends EndpointBase {
         CopyObjectResponse copyObjectResponse = copyObject(volume,
             copyHeader, bucketName, keyPath, replicationConfig,
             storageTypeDefault, perf);
+        getKeyCache().invalidate(Pair.of(bucketName, keyPath));
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -329,6 +338,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
+      getKeyCache().invalidate(Pair.of(bucketName, keyPath));
       return Response.ok()
           .header(ETAG, wrapInQuotes(eTag))
           .status(HttpStatus.SC_OK)
@@ -399,7 +409,7 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
       @QueryParam("part-number-marker") String partNumberMarker)
-      throws IOException, OS3Exception {
+      throws IOException, OS3Exception, ExecutionException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -417,7 +427,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       OzoneKeyDetails keyDetails = (partNumber != 0) ?
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
-          getClientProtocol().getS3KeyDetails(bucketName, keyPath);
+          getOzoneKeyDetails(bucketName, keyPath);
 
       isFile(keyPath, keyDetails);
 
@@ -1422,4 +1432,41 @@ public class ObjectEndpoint extends EndpointBase {
       return fileLength < bufferSize ? (int) fileLength : bufferSize;
     }
   }
+
+  private LoadingCache<Pair<String, String>, OzoneKeyDetails> getKeyCache() {
+    if (keyCache != null) {
+      return keyCache;
+    }
+    synchronized (this) {
+      if (keyCache == null) {
+        CacheLoader<Pair<String, String>, OzoneKeyDetails> loader = new CacheLoader<Pair<String, String>,
+            OzoneKeyDetails>() {
+          @Override
+          public OzoneKeyDetails load(Pair<String, String> key) throws Exception {
+            return getClientProtocol().getS3KeyDetails(key.getLeft(), key.getRight());
+          }
+        };
+        keyCache = CacheBuilder.newBuilder()
+            .weakValues()
+            .expireAfterAccess(ozoneConfiguration.getTimeDuration(
+                OzoneConfigKeys.OZONE_S3G_KEY_INFO_CACHE_IDLE_LIFETIME,
+                OzoneConfigKeys.OZONE_S3G_KEY_INFO_CACHE_IDLE_LIFETIME_DEFAULT,
+                TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS
+            ).build(loader);
+      }
+      return keyCache;
+    }
+  }
+
+  private OzoneKeyDetails getOzoneKeyDetails(String bucket, String key) throws OMException, ExecutionException {
+    try {
+      return getKeyCache().get(Pair.of(bucket, key));
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw e;
+    }
+  }
+
 }
