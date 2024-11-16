@@ -17,6 +17,8 @@
 Documentation       Write Compatibility
 Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
+Resource            ../lib/fs.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 Suite Setup         Create Local Test File
 
@@ -33,3 +35,18 @@ Dir Can Be Created
 
 File Can Be Put
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
+
+FSO Bucket Can Be Created and Used
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+    Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/fso-bucket-${SUFFIX}
+    Execute    ozone fs -mkdir -p ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir
+    Execute    ozone fs -put ${TESTFILE} ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
+
+HSync Can Be Used To Create Keys
+    Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
+    Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
+    ${o3fspath} =   Format FS URL         o3fs     vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
+    ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${pfspath}

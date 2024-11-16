@@ -23,9 +23,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.LeakDetector;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -34,12 +36,16 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import org.apache.ratis.util.UncheckedAutoCloseable;
+
+import com.google.common.base.Preconditions;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Factory class to create OzoneClients.
@@ -53,6 +59,21 @@ public final class OzoneClientFactory {
    * Private constructor, class is not meant to be initialized.
    */
   private OzoneClientFactory() { }
+
+  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR =
+      new LeakDetector("OzoneClientObject");
+
+  public static UncheckedAutoCloseable track(AutoCloseable object) {
+    final Class<?> clazz = object.getClass();
+    final StackTraceElement[] stackTrace = HddsUtils.getStackTrace(LOG);
+    return OZONE_CLIENT_LEAK_DETECTOR.track(object,
+        () -> HddsUtils.reportLeak(clazz,
+            HddsUtils.formatStackTrace(stackTrace, 4), LOG));
+  }
+
+  public static Logger getLogger() {
+    return LOG;
+  }
 
 
   /**

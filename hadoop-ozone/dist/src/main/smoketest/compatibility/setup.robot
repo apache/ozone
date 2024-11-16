@@ -20,6 +20,8 @@ Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
+${FSO_VERSION}    1.3.0
+${HSYNC_VERSION}  2.0.0
 
 
 *** Keywords ***

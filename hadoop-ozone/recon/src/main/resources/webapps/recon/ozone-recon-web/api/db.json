@@ -1923,7 +1923,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 1,
         "reason": null,
-        "keys": 1,
+        "keys": 4,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -1997,7 +1997,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2071,7 +2071,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2108,7 +2108,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 5,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2145,7 +2145,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2182,7 +2182,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 6,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a2",
         "replicas": [
           {
@@ -2219,7 +2219,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a3",
         "replicas": [
           {
@@ -5169,438 +5169,317 @@
     ]
   },
   "nonFSO": {
-    "keysSummary": {
-      "totalUnreplicatedDataSize": 10485760,
-      "totalReplicatedDataSize": 31457280,
-      "totalOpenKeys": 10
-    },
+    "lastKey": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/19/113328137261088807",
+    "replicatedDataSize": 31457280,
+    "unreplicatedDataSize": 10485760,
     "nonFSO": [
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/01/110569623850191713",
-        "path": "nonfso 1",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/10/113328137245098014",
+        "path": "dir1/dir2/dir3/an9uf2eeox/10",
+        "inStateSince": 1729250141069,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161542,
+        "modificationTime": 1729250161542,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2439/110569623850191714",
-        "path": "nonfso 2",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/11/113328137245818911",
+        "path": "dir1/dir2/dir3/an9uf2eeox/11",
+        "inStateSince": 1729250141080,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191715",
-        "path": "nonfso 11",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/12/113328137247195168",
+        "path": "dir1/dir2/dir3/an9uf2eeox/12",
+        "inStateSince": 1729250141091,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191716",
-        "path": "nonfso 12",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/13/113328137248178209",
+        "path": "dir1/dir2/dir3/an9uf2eeox/13",
+        "inStateSince": 1729250141116,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191717",
-        "path": "nonfso 21",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/14/113328137249685538",
+        "path": "dir1/dir2/dir3/an9uf2eeox/14",
+        "inStateSince": 1729250141139,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191718",
-        "path": "nonfso 22",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/15/113328137250930723",
+        "path": "dir1/dir2/dir3/an9uf2eeox/15",
+        "inStateSince": 1729250141158,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/16/113328137252569124",
+        "path": "dir1/dir2/dir3/an9uf2eeox/16",
+        "inStateSince": 1729250141183,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/17/113328137259778085",
+        "path": "dir1/dir2/dir3/an9uf2eeox/17",
+        "inStateSince": 1729250141293,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/18/113328137261023270",
+        "path": "dir1/dir2/dir3/an9uf2eeox/18",
+        "inStateSince": 1729250141312,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/19/113328137261088807",
+        "path": "dir1/dir2/dir3/an9uf2eeox/19",
+        "inStateSince": 1729250141313,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       }
     ],
     "status": "OK"
   },
   "fso": {
-    "fso": [
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
-        "path": "1",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
+    "replicatedDataSize": 31457280,
+    "unreplicatedDataSize": 10485760,
+    "fso": [{
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/0/113328113600561153",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/0",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2402/110569623850191714",
-        "path": "2",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820562,
+        "modificationTime": 1729249820562,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/1/113328113600626694",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/1",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191715",
-        "path": "3",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820562,
+        "modificationTime": 1729249820562,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/2/113328113600626691",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/2",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191716",
-        "path": "4",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/3/113328113600692233",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/3",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191717",
-        "path": "5",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/4/113328113600626695",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/4",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191718",
-        "path": "6",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/5/113328113600561152",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/5",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191719",
-        "path": "7",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/6/113328113600626692",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/6",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191720",
-        "path": "8",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/7/113328113600626696",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/7",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191721",
-        "path": "9",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/8/113328113600626693",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/8",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 10",
-        "path": "10",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/9",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191722",
-        "path": "11",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 12",
-        "path": "12",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 13",
-        "path": "13",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 14",
-        "path": "14",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 15",
-        "path": "15",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 16 key",
-        "path": "16",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 17 key",
-        "path": "17",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 18 key",
-        "path": "18",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 19 key",
-        "path": "19",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191723",
-        "path": "21",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 22",
-        "path": "22",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 23",
-        "path": "23",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 24",
-        "path": "24",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 25",
-        "path": "25",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 26 key",
-        "path": "26",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 17 key",
-        "path": "27",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 18 key",
-        "path": "28",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 19 key",
-        "path": "29",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 20 key",
-        "path": "20",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      }
-    ],
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820565,
+        "modificationTime": 1729249820565,
+        "isKey": true
+    }],
     "status": "OK"
   },
   "keydeletePending": {

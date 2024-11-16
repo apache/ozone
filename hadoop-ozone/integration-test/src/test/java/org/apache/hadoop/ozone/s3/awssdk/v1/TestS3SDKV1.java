@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -15,17 +15,33 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.client.rpc;
+package org.apache.hadoop.ozone.s3.awssdk.v1;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+
+import java.io.IOException;
 
 /**
- * Tests key output stream with zero-copy enabled.
+ * Tests the AWS S3 SDK basic operations with OM Ratis disabled.
  */
-public class TestECKeyOutputStreamWithZeroCopy extends
-    AbstractTestECKeyOutputStream {
+@Timeout(300)
+public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
+
   @BeforeAll
   public static void init() throws Exception {
-    init(true);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    startCluster(conf);
+  }
+
+  @AfterAll
+  public static void shutdown() throws IOException {
+    shutdownCluster();
   }
 }

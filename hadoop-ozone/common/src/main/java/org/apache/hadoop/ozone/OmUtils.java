@@ -767,7 +767,7 @@ public final class OmUtils {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
       }
-      if (!keyName.equals(normalizedKeyName) && LOG.isDebugEnabled()) {
+      if (LOG.isDebugEnabled() && !keyName.equals(normalizedKeyName)) {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }

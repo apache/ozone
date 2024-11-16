@@ -330,6 +330,7 @@ function check_needs_compile() {
 
     if [[ ${match_count} != "0" ]]; then
         compile_needed=true
+        dependency_check_needed=true
     fi
 
     start_end::group_end
@@ -520,6 +521,7 @@ function calculate_test_types_to_run() {
         echo "Looks like ${COUNT_CORE_OTHER_CHANGED_FILES} core files changed, running all tests."
         echo
         compose_tests_needed=true
+        dependency_check_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
     else
@@ -527,12 +529,14 @@ function calculate_test_types_to_run() {
         echo
         if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
+            dependency_check_needed=true
         fi
         if [[ ${COUNT_INTEGRATION_CHANGED_FILES} != "0" ]]; then
             integration_tests_needed="true"
         fi
         if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             kubernetes_tests_needed="true"
+            dependency_check_needed=true
         fi
     fi
     start_end::group_end
@@ -590,6 +594,7 @@ get_count_robot_files
 get_count_misc_files
 
 check_needs_build
+check_needs_dependency
 check_needs_compile
 
 # calculate basic checks to run
@@ -597,7 +602,6 @@ BASIC_CHECKS="rat"
 check_needs_author
 check_needs_bats
 check_needs_checkstyle
-check_needs_dependency
 check_needs_docs
 check_needs_findbugs
 check_needs_native

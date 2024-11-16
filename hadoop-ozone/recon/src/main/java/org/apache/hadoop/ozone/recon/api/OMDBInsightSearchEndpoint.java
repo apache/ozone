@@ -20,12 +20,10 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -50,13 +48,16 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
+import static org.apache.hadoop.ozone.recon.ReconUtils.validateStartPrefix;
 import static org.apache.hadoop.ozone.recon.ReconUtils.constructObjectPathWithPrefix;
+import static org.apache.hadoop.ozone.recon.ReconUtils.extractKeysFromTable;
+import static org.apache.hadoop.ozone.recon.ReconUtils.gatherSubPaths;
 import static org.apache.hadoop.ozone.recon.ReconUtils.validateNames;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
@@ -64,6 +65,11 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 
 /**
  * REST endpoint for search implementation in OM DB Insight.
+ *
+ * This class provides endpoints for searching keys in the Ozone Manager database.
+ * It supports searching for both open and deleted keys across File System Optimized (FSO)
+ * and Object Store (non-FSO) bucket layouts. The results include matching keys and their
+ * data sizes.
  */
 @Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
@@ -88,14 +94,14 @@ public class OMDBInsightSearchEndpoint {
 
 
   /**
-   * Performs a search for open keys in the Ozone Manager (OM) database using a specified search prefix.
+   * Performs a search for open keys in the Ozone Manager OpenKey and OpenFile table using a specified search prefix.
    * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
    * compiling a list of keys that match the given prefix along with their data sizes.
-   * <p>
+   *
    * The search prefix must start from the bucket level ('/volumeName/bucketName/') or any specific directory
    * or key level (e.g., '/volA/bucketA/dir1' for everything under 'dir1' inside 'bucketA' of 'volA').
    * The search operation matches the prefix against the start of keys' names within the OM DB.
-   * <p>
+   *
    * Example Usage:
    * 1. A startPrefix of "/volA/bucketA/" retrieves every key under bucket 'bucketA' in volume 'volA'.
    * 2. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
@@ -110,25 +116,17 @@ public class OMDBInsightSearchEndpoint {
   @GET
   @Path("/open/search")
   public Response searchOpenKeys(
-      @DefaultValue(DEFAULT_START_PREFIX) @QueryParam("startPrefix")
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_START_PREFIX) @QueryParam("startPrefix")
       String startPrefix,
-      @DefaultValue(RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
       int limit,
-      @DefaultValue(RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY) @QueryParam("prevKey") String prevKey) throws IOException {
+      @DefaultValue(RECON_OM_INSIGHTS_DEFAULT_SEARCH_PREV_KEY) @QueryParam("prevKey")
+      String prevKey) throws IOException {
 
     try {
-      // Ensure startPrefix is not null or empty and starts with '/'
-      if (startPrefix == null || startPrefix.length() == 0) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
-      }
-      startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
-
-      // Split the path to ensure it's at least at the bucket level
-      String[] pathComponents = startPrefix.split("/");
-      if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
-        return createBadRequestResponse(
-            "Invalid startPrefix: Path must be at the bucket level or deeper.");
+      // Validate the request parameters
+      if (!validateStartPrefix(startPrefix)) {
+        return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
       }
 
       // Ensure the limit is non-negative
@@ -145,7 +143,7 @@ public class OMDBInsightSearchEndpoint {
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
       Map<String, OmKeyInfo> obsKeys =
-          retrieveKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+          extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -221,12 +219,13 @@ public class OMDBInsightSearchEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
+      gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
           reconNamespaceSummaryManager);
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
-        matchedKeys.putAll(retrieveKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
+        matchedKeys.putAll(
+            extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -235,7 +234,8 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // If the search level is at the volume, bucket or key level, directly search the openFileTable
-    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
+    matchedKeys.putAll(
+        extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
     return matchedKeys;
   }
 
@@ -327,48 +327,6 @@ public class OMDBInsightSearchEndpoint {
     return prevKeyPrefix;
   }
 
-
-  /**
-   * Common method to retrieve keys from a table based on a search prefix and a limit.
-   *
-   * @param table       The table to retrieve keys from.
-   * @param startPrefix The search prefix to match keys against.
-   * @param limit       The maximum number of keys to retrieve.
-   * @param prevKey     The key to start after for the next set of records.
-   * @return A map of keys and their corresponding OmKeyInfo objects.
-   * @throws IOException If there are problems accessing the table.
-   */
-  private Map<String, OmKeyInfo> retrieveKeysFromTable(
-      Table<String, OmKeyInfo> table, String startPrefix, int limit, String prevKey)
-      throws IOException {
-    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
-      // If a previous key is provided, seek to the previous key and skip it.
-      if (!prevKey.isEmpty()) {
-        keyIter.seek(prevKey);
-        if (keyIter.hasNext()) {
-          // Skip the previous key
-          keyIter.next();
-        }
-      } else {
-        // If no previous key is provided, start from the search prefix.
-        keyIter.seek(startPrefix);
-      }
-      while (keyIter.hasNext() && matchedKeys.size() < limit) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String dbKey = entry.getKey();
-        if (!dbKey.startsWith(startPrefix)) {
-          break; // Exit the loop if the key no longer matches the prefix
-        }
-        matchedKeys.put(dbKey, entry.getValue());
-      }
-    } catch (IOException exception) {
-      LOG.error("Error retrieving keys from table for path: {}", startPrefix, exception);
-      throw exception;
-    }
-    return matchedKeys;
-  }
-
   /**
    * Creates a KeyEntityInfo object from an OmKeyInfo object and the corresponding key.
    *
@@ -380,6 +338,7 @@ public class OMDBInsightSearchEndpoint {
                                                          OmKeyInfo keyInfo) {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setIsKey(keyInfo.isFile());
     keyEntityInfo.setPath(keyInfo.getKeyName()); // Assuming path is the same as key name
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());

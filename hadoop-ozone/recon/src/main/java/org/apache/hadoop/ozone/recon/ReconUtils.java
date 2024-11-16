@@ -32,11 +32,14 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.List;
-import java.util.TimeZone;
-import java.util.Date;
-import java.util.Set;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -54,6 +57,8 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
@@ -286,11 +291,64 @@ public class ReconUtils {
    */
   public static String constructFullPath(OmKeyInfo omKeyInfo,
                                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager)
-      throws IOException {
+                                         ReconOMMetadataManager omMetadataManager)  throws IOException {
+    return constructFullPath(omKeyInfo.getKeyName(), omKeyInfo.getParentObjectID(), omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), reconNamespaceSummaryManager, omMetadataManager);
+  }
 
-    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
-    long parentId = omKeyInfo.getParentObjectID();
+  /**
+   * Constructs the full path of a key from its key name and parent ID using a bottom-up approach, starting from the
+   * leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param keyName The name of the key
+   * @param initialParentId The parent ID of the key
+   * @param volumeName The name of the volume
+   * @param bucketName The name of the bucket
+   * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
+   *         the path cannot be constructed at this time.
+   * @throws IOException
+   */
+  public static String constructFullPath(String keyName, long initialParentId, String volumeName, String bucketName,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                         ReconOMMetadataManager omMetadataManager) throws IOException {
+    StringBuilder fullPath = constructFullPathPrefix(initialParentId, volumeName, bucketName,
+        reconNamespaceSummaryManager, omMetadataManager);
+    if (fullPath.length() == 0) {
+      return "";
+    }
+    fullPath.append(keyName);
+    return fullPath.toString();
+  }
+
+
+  /**
+   * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
+   * leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param initialParentId The parent ID of the key
+   * @param volumeName The name of the volume
+   * @param bucketName The name of the bucket
+   * @return A StringBuilder containing the constructed prefix path of the key, or an empty string builder if a rebuild
+   *         is in progress.
+   * @throws IOException
+   */
+  public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
+      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      ReconOMMetadataManager omMetadataManager) throws IOException {
+    StringBuilder fullPath = new StringBuilder();
+    long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
     while (parentId != 0) {
@@ -298,16 +356,21 @@ public class ReconUtils {
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
-        return "";
+        fullPath.setLength(0);
+        return fullPath;
       }
       if (nsSummary.getParentId() == -1) {
         if (rebuildTriggered.compareAndSet(false, true)) {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
         log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
-        return "";
+        fullPath.setLength(0);
+        return fullPath;
       }
-      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+      // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
+      if (!nsSummary.getDirName().isEmpty()) {
+        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+      }
 
       // Move to the parent ID of the current directory
       parentId = nsSummary.getParentId();
@@ -315,13 +378,19 @@ public class ReconUtils {
     }
 
     // Prepend the volume and bucket to the constructed path
-    String volumeName = omKeyInfo.getVolumeName();
-    String bucketName = omKeyInfo.getBucketName();
     fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
+    //        but its not clear how they get there. This normalize call is quite expensive as it
+    //        creates several objects (URI, PATH, back to string). There was a bug fixed above
+    //        where the last parent dirName was empty, which always caused a double // after the
+    //        bucket name, but with that fixed, it seems like this should not be needed. All tests
+    //        pass without it for key listing.
     if (isDirectoryPresent) {
-      return OmUtils.normalizeKey(fullPath.toString(), true);
+      String path = fullPath.toString();
+      fullPath.setLength(0);
+      fullPath.append(OmUtils.normalizeKey(path, true));
     }
-    return fullPath.toString();
+    return fullPath;
   }
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
@@ -594,6 +663,109 @@ public class ReconUtils {
       log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
     }
+  }
+
+  public static boolean validateStartPrefix(String startPrefix) {
+
+    // Ensure startPrefix starts with '/' for non-empty values
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path to ensure it's at least at the bucket level (volume/bucket).
+    String[] pathComponents = startPrefix.split("/");
+    if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+      return false; // Invalid if not at bucket level or deeper
+    }
+
+    return true;
+  }
+
+  /**
+   * Retrieves keys from the specified table based on pagination and prefix filtering.
+   * This method handles different scenarios based on the presence of {@code startPrefix}
+   * and {@code prevKey}, enabling efficient key retrieval from the table.
+   *
+   * The method handles the following cases:
+   *
+   * 1. {@code prevKey} provided, {@code startPrefix} empty:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent records up to the limit.
+   *
+   * 2. {@code prevKey} empty, {@code startPrefix} empty:
+   *    - Iterates from the beginning of the table, retrieving all records up to the limit.
+   *
+   * 3. {@code startPrefix} provided, {@code prevKey} empty:
+   *    - Seeks to the first key matching {@code startPrefix} and returns all matching keys up to the limit.
+   *
+   * 4. {@code startPrefix} provided, {@code prevKey} provided:
+   *    - Seeks to {@code prevKey}, skips it, and returns subsequent keys that match {@code startPrefix},
+   *      up to the limit.
+   *
+   * This method also handles the following {@code limit} scenarios:
+   * - If {@code limit == 0} or {@code limit < -1}, no records are returned.
+   * - If {@code limit == -1}, all records are returned.
+   * - For positive {@code limit}, it retrieves records up to the specified {@code limit}.
+   *
+   * @param table       The table to retrieve keys from.
+   * @param startPrefix The search prefix to match keys against.
+   * @param limit       The maximum number of keys to retrieve.
+   * @param prevKey     The key to start after for the next set of records.
+   * @return A map of keys and their corresponding {@code OmKeyInfo} or {@code RepeatedOmKeyInfo} objects.
+   * @throws IOException If there are problems accessing the table.
+   */
+  public static <T> Map<String, T> extractKeysFromTable(
+      Table<String, T> table, String startPrefix, int limit, String prevKey)
+      throws IOException {
+
+    Map<String, T> matchedKeys = new LinkedHashMap<>();
+
+    // Null check for the table to prevent NPE during omMetaManager initialization
+    if (table == null) {
+      log.error("Table object is null. omMetaManager might still be initializing.");
+      return Collections.emptyMap();
+    }
+
+    // If limit = 0, return an empty result set
+    if (limit == 0 || limit < -1) {
+      return matchedKeys;
+    }
+
+    // If limit = -1, set it to Integer.MAX_VALUE to return all records
+    int actualLimit = (limit == -1) ? Integer.MAX_VALUE : limit;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
+
+      // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
+      if (!prevKey.isEmpty()) {
+        keyIter.seek(prevKey);
+        if (keyIter.hasNext()) {
+          keyIter.next();  // Skip the previous key record
+        }
+      } else if (!startPrefix.isEmpty()) {
+        // Scenario 3: startPrefix is provided but prevKey is empty, so seek to startPrefix
+        keyIter.seek(startPrefix);
+      }
+
+      // Scenario 2: Both startPrefix and prevKey are empty (iterate from the start of the table)
+      // No seeking needed; just start iterating from the first record in the table
+      // This is implicit in the following loop, as the iterator will start from the beginning
+
+      // Iterate through the keys while adhering to the limit (if the limit is not zero)
+      while (keyIter.hasNext() && matchedKeys.size() < actualLimit) {
+        Table.KeyValue<String, T> entry = keyIter.next();
+        String dbKey = entry.getKey();
+
+        // Scenario 3 & 4: If startPrefix is provided, ensure the key matches startPrefix
+        if (!startPrefix.isEmpty() && !dbKey.startsWith(startPrefix)) {
+          break;  // If the key no longer matches the prefix, exit the loop
+        }
+
+        // Add the valid key-value pair to the results
+        matchedKeys.put(dbKey, entry.getValue());
+      }
+    } catch (IOException exception) {
+      log.error("Error retrieving keys from table for path: {}", startPrefix, exception);
+      throw exception;
+    }
+    return matchedKeys;
   }
 
   /**
