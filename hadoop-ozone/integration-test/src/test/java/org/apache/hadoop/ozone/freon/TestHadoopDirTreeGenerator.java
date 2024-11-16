@@ -20,7 +20,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -48,6 +47,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,9 +168,7 @@ public class TestHadoopDirTreeGenerator {
           throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(dirPath);
     List<FileStatus> fileStatusList = new ArrayList<>();
-    for(FileStatus fileStatus : fileStatuses) {
-      fileStatusList.add(fileStatus);
-    }
+    Collections.addAll(fileStatusList, fileStatuses);
     // check the num of peer directories except root and leaf as both
     // has less dirs.
     if (depth < expectedDepth - 1) {
