@@ -1260,7 +1260,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), request.getNumEntries(),
+            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
