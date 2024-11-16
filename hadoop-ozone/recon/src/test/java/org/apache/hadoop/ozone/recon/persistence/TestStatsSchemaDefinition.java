@@ -104,13 +104,13 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     assertEquals("key1", dbRecord.getKey());
     assertEquals(Long.valueOf(500), dbRecord.getValue());
-    assertEquals(new Timestamp(now),
+    assertEquals(new Timestamp(now).toLocalDateTime(),
         dbRecord.getLastUpdatedTimestamp());
 
     dbRecord = dao.findById("key2");
     assertEquals("key2", dbRecord.getKey());
     assertEquals(Long.valueOf(10), dbRecord.getValue());
-    assertEquals(new Timestamp(now + 1000L),
+    assertEquals(new Timestamp(now + 1000L).toLocalDateTime(),
         dbRecord.getLastUpdatedTimestamp());
 
     // Update
@@ -121,7 +121,7 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     // Read updated
     dbRecord = dao.findById("key2");
 
-    assertEquals(new Timestamp(now + 2000L),
+    assertEquals(new Timestamp(now + 2000L).toLocalDateTime(),
         dbRecord.getLastUpdatedTimestamp());
     assertEquals(Long.valueOf(100L), dbRecord.getValue());
 
