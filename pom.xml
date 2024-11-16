@@ -220,7 +220,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <gson.version>2.10.1</gson.version>
 
     <okhttp.version>2.7.5</okhttp.version>
-    <okio.version>3.6.0</okio.version>
+    <okio.version>3.9.1</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <junit5.version>5.11.3</junit5.version>
