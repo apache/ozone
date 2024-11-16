@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -176,8 +177,10 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumPutObjectTaggingFails();
-      LOG.error("Put object tagging failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
-          bucketName, keyName, exception);
+      if (OMClientRequestUtils.shouldLogClientRequestFailure(exception)) {
+        LOG.error("Put object tagging failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
+            bucketName, keyName, exception);
+      }
       break;
     default:
       LOG.error("Unrecognized Result for S3PutObjectTaggingRequest: {}",

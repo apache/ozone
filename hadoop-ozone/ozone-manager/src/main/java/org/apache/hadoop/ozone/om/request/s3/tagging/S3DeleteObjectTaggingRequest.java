@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -174,8 +175,10 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumDeleteObjectTaggingFails();
-      LOG.error("Delete object tagging failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
-          bucketName, keyName, exception);
+      if (OMClientRequestUtils.shouldLogClientRequestFailure(exception)) {
+        LOG.error("Delete object tagging failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
+            bucketName, keyName, exception);
+      }
       break;
     default:
       LOG.error("Unrecognized Result for S3DeleteObjectTaggingRequest: {}",
