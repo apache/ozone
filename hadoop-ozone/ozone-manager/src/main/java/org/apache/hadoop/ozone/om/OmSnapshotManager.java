@@ -628,7 +628,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
-          bucketName), false);
+          bucketName), false, false);
       volumeName = resolvedBucket.realVolume();
       bucketName = resolvedBucket.realBucket();
       return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
