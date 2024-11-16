@@ -238,6 +238,7 @@ share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java-util.jar
 share/ozone/lib/proto-google-common-protos.jar
+share/ozone/lib/r2dbc-spi.RELEASE.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
 share/ozone/lib/ranger-plugins-audit.jar
@@ -256,6 +257,7 @@ share/ozone/lib/ratis-shell.jar
 share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar
+share/ozone/lib/reactive-streams.jar
 share/ozone/lib/reflections.jar
 share/ozone/lib/rocksdb-checkpoint-differ.jar
 share/ozone/lib/reload4j.jar
