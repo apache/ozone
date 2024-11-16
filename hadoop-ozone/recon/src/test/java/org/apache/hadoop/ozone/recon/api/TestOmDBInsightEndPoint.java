@@ -65,7 +65,7 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -904,7 +904,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testKeyCountsForValidAndInvalidKeyPrefix() {
-    Timestamp now = new Timestamp(System.currentTimeMillis());
+    LocalDateTime now = LocalDateTime.now();
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
 
     // Insert valid key count with valid key prefix
@@ -966,7 +966,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testKeysSummaryAttribute() {
-    Timestamp now = new Timestamp(System.currentTimeMillis());
+    LocalDateTime now = LocalDateTime.now();
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
     insertGlobalStatsRecords(statsDao, now, "openFileTableReplicatedDataSize",
@@ -1019,9 +1019,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   private void insertGlobalStatsRecords(GlobalStatsDao statsDao,
-                                        Timestamp timestamp, String key,
+                                        LocalDateTime timestamp, String key,
                                         long value) {
-    GlobalStats newRecord = new GlobalStats(key, value, timestamp.toLocalDateTime());
+    GlobalStats newRecord = new GlobalStats(key, value, timestamp);
     statsDao.insert(newRecord);
   }
 

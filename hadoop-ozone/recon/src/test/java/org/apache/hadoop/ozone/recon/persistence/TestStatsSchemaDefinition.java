@@ -26,8 +26,9 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
-import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -85,16 +86,17 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     GlobalStatsDao dao = getDao(GlobalStatsDao.class);
 
-    long now = System.currentTimeMillis();
+    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone());
     GlobalStats newRecord = new GlobalStats();
-    newRecord.setLastUpdatedTimestamp(new Timestamp(now).toLocalDateTime());
+    newRecord.setLastUpdatedTimestamp(now);
     newRecord.setKey("key1");
     newRecord.setValue(500L);
 
     // Create
     dao.insert(newRecord);
     GlobalStats newRecord2 = new GlobalStats();
-    newRecord2.setLastUpdatedTimestamp(new Timestamp(now + 1000L).toLocalDateTime());
+    LocalDateTime dateTime1 = now.plusSeconds(1);
+    newRecord2.setLastUpdatedTimestamp(dateTime1);
     newRecord2.setKey("key2");
     newRecord2.setValue(10L);
     dao.insert(newRecord2);
@@ -104,25 +106,23 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     assertEquals("key1", dbRecord.getKey());
     assertEquals(Long.valueOf(500), dbRecord.getValue());
-    assertEquals(new Timestamp(now).toLocalDateTime(),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(now, dbRecord.getLastUpdatedTimestamp());
 
     dbRecord = dao.findById("key2");
     assertEquals("key2", dbRecord.getKey());
     assertEquals(Long.valueOf(10), dbRecord.getValue());
-    assertEquals(new Timestamp(now + 1000L).toLocalDateTime(),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(dateTime1, dbRecord.getLastUpdatedTimestamp());
 
     // Update
+    LocalDateTime dateTime2 = dateTime1.plusSeconds(1);
     dbRecord.setValue(100L);
-    dbRecord.setLastUpdatedTimestamp(new Timestamp(now + 2000L).toLocalDateTime());
+    dbRecord.setLastUpdatedTimestamp(dateTime2);
     dao.update(dbRecord);
 
     // Read updated
     dbRecord = dao.findById("key2");
 
-    assertEquals(new Timestamp(now + 2000L).toLocalDateTime(),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(dateTime2, dbRecord.getLastUpdatedTimestamp());
     assertEquals(Long.valueOf(100L), dbRecord.getValue());
 
     // Delete
