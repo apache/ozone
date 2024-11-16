@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
@@ -1178,7 +1179,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
-    return new OzoneFileStatusIterator<>(f, false);
+    return new OzoneFileStatusIterator<>(f,
+        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat : new LocatedFileStatus(stat, null),
+        false);
   }
 
   @Override
@@ -1193,7 +1196,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           "Instead use 'ozone sh key list " +
           "<Volume_URI>' command");
     }
-    return new OzoneFileStatusIterator<>(f, true);
+    return new OzoneFileStatusIterator<>(f, stat -> stat, true);
   }
 
   /**
@@ -1203,6 +1206,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   private final class OzoneFileStatusIterator<T extends FileStatus>
       implements RemoteIterator<T> {
+    private final Function<FileStatus, T> transformFunc;
     private List<FileStatus> thisListing;
     private int i;
     private Path p;
@@ -1217,9 +1221,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * @param p path to file/directory.
      * @throws IOException
      */
-    private OzoneFileStatusIterator(Path p, boolean lite) throws IOException {
+    private OzoneFileStatusIterator(Path p, Function<FileStatus, T> transformFunc, boolean lite) throws IOException {
       this.p = p;
       this.lite = lite;
+      this.transformFunc = transformFunc;
       // fetch the first batch of entries in the directory
       thisListing = listFileStatus(p, startPath, lite);
       if (thisListing != null && !thisListing.isEmpty()) {
@@ -1240,7 +1245,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       while (curStat == null && hasNextNoFilter()) {
         T next;
         FileStatus fileStat = thisListing.get(i++);
-        next = (T) (fileStat);
+        next = transformFunc.apply(fileStat);
         curStat = next;
       }
       return curStat != null;

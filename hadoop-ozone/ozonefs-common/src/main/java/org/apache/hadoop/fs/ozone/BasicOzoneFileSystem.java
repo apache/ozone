@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.conf.Configuration;
@@ -947,13 +948,15 @@ public class BasicOzoneFileSystem extends FileSystem {
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
-    return new OzoneFileStatusIterator<>(f, false);
+    return new OzoneFileStatusIterator<>(f,
+        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat : new LocatedFileStatus(stat, null),
+        false);
   }
 
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
       throws IOException {
-    return new OzoneFileStatusIterator<>(f, true);
+    return new OzoneFileStatusIterator<>(f, stat -> stat, true);
   }
 
   @Override
@@ -986,7 +989,6 @@ public class BasicOzoneFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     adapter.setTimes(key, mtime, atime);
   }
-
   /**
    * A private class implementation for iterating list of file status.
    *
@@ -1000,6 +1002,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     private T curStat = null;
     private String startPath = "";
     private boolean lite;
+    private Function<FileStatus, T> transformFunc;
 
     /**
      * Constructor to initialize OzoneFileStatusIterator.
@@ -1008,9 +1011,10 @@ public class BasicOzoneFileSystem extends FileSystem {
      * @param p path to file/directory.
      * @throws IOException
      */
-    private OzoneFileStatusIterator(Path p, boolean lite) throws IOException {
+    private OzoneFileStatusIterator(Path p, Function<FileStatus, T> transformFunc, boolean lite) throws IOException {
       this.p = p;
       this.lite = lite;
+      this.transformFunc = transformFunc;
       // fetch the first batch of entries in the directory
       thisListing = listFileStatus(p, startPath, lite);
       if (thisListing != null && !thisListing.isEmpty()) {
@@ -1031,7 +1035,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       while (curStat == null && hasNextNoFilter()) {
         T next;
         FileStatus fileStat = thisListing.get(i++);
-        next = (T) (fileStat);
+        next = this.transformFunc.apply(fileStat);
         curStat = next;
       }
       return curStat != null;
