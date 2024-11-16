@@ -20,15 +20,15 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.junit.jupiter.api.Timeout;
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is disabled.
+ * Test OmSnapshot for Object Store bucket type.
  */
 @Timeout(300)
-public class TestOmSnapshotFsoWithoutNativeLib extends TestOmSnapshot {
+public class TestOmSnapshotObjectStoreWithLinkedBuckets extends TestOmSnapshot {
 
-  public TestOmSnapshotFsoWithoutNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, false);
+  public TestOmSnapshotObjectStoreWithLinkedBuckets() throws Exception {
+    super(OBJECT_STORE, false, false, false, true);
   }
 }

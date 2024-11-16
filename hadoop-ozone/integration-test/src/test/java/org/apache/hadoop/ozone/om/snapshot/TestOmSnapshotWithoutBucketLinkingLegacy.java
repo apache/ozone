@@ -20,15 +20,15 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.junit.jupiter.api.Timeout;
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is disabled.
+ * Test OmSnapshot for Legacy bucket type.
  */
 @Timeout(300)
-public class TestOmSnapshotFsoWithoutNativeLib extends TestOmSnapshot {
+public class TestOmSnapshotWithoutBucketLinkingLegacy extends TestOmSnapshot {
 
-  public TestOmSnapshotFsoWithoutNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, false);
+  public TestOmSnapshotWithoutBucketLinkingLegacy() throws Exception {
+    super(LEGACY, false, false, false, false);
   }
 }

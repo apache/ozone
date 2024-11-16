@@ -18,17 +18,15 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.ozone.om.TestOmSnapshotFileSystem;
 import org.junit.jupiter.api.Timeout;
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
-
 /**
- * Test OmSnapshot for Legacy bucket type.
+ * OmSnapshot file system tests for FSO.
  */
-@Timeout(300)
-public class TestOmSnapshotLegacy extends TestOmSnapshot {
-
-  public TestOmSnapshotLegacy() throws Exception {
-    super(LEGACY, false, false, false);
+@Timeout(120)
+public class TestOmSnapshotFileSystemFsoWithLinkedBuckets extends TestOmSnapshotFileSystem {
+  TestOmSnapshotFileSystemFsoWithLinkedBuckets() throws Exception {
+    super(BUCKET_NAME_FSO, true);
   }
 }
