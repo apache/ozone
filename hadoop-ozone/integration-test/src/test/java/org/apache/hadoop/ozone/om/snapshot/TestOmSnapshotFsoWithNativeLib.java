@@ -28,6 +28,6 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 @Timeout(300)
 public class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
   public TestOmSnapshotFsoWithNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false);
+    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false);
   }
 }

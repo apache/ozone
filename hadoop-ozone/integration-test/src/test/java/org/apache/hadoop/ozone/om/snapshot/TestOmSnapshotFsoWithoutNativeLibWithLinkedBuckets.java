@@ -26,9 +26,9 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
  * Test OmSnapshot for FSO bucket type when native lib is disabled.
  */
 @Timeout(300)
-public class TestOmSnapshotFsoWithoutNativeLib extends TestOmSnapshot {
+public class TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets extends TestOmSnapshot {
 
-  public TestOmSnapshotFsoWithoutNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, false);
+  public TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets() throws Exception {
+    super(FILE_SYSTEM_OPTIMIZED, false, false, true, true);
   }
 }
