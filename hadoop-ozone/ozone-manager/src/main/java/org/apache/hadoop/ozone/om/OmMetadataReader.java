@@ -501,7 +501,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             ozoneManager.getOmRpcServerAddr().getHostName());
   }
 
- 
+
   /**
    * CheckAcls for the ozone object.
    *
