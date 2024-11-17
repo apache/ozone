@@ -108,7 +108,7 @@ public final class ContainerCache extends LRUMap {
    */
   @Override
   protected boolean removeLRU(LinkEntry entry) {
-    ReferenceCountedDB<DatanodeStore> db = (ReferenceCountedDB<DatanodeStore>) entry.getValue();
+    ReferenceCountedDB db = (ReferenceCountedDB) entry.getValue();
     lock.lock();
     try {
       metrics.incNumCacheEvictions();
@@ -128,21 +128,21 @@ public final class ContainerCache extends LRUMap {
    * @param conf - Hadoop Configuration.
    * @return ReferenceCountedDB.
    */
-  public ReferenceCountedDB<DatanodeStore> getDB(long containerID, String containerDBType,
+  public ReferenceCountedDB getDB(long containerID, String containerDBType,
                                   String containerDBPath,
                                   String schemaVersion,
                                   ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
-    ReferenceCountedDB<DatanodeStore> db;
+    ReferenceCountedDB db;
     Lock containerLock = rocksDBLock.get(containerDBPath);
     containerLock.lock();
     metrics.incNumDbGetOps();
     try {
       lock.lock();
       try {
-        db = (ReferenceCountedDB<DatanodeStore>) this.get(containerDBPath);
+        db = (ReferenceCountedDB) this.get(containerDBPath);
         if (db != null && !db.isClosed()) {
           metrics.incNumCacheHits();
           db.incrementReference();
@@ -170,8 +170,8 @@ public final class ContainerCache extends LRUMap {
 
       lock.lock();
       try {
-        ReferenceCountedDB<DatanodeStore> currentDB =
-            (ReferenceCountedDB<DatanodeStore>) this.get(containerDBPath);
+        ReferenceCountedDB currentDB =
+            (ReferenceCountedDB) this.get(containerDBPath);
         if (currentDB != null && !currentDB.isClosed()) {
           // increment the reference before returning the object
           currentDB.incrementReference();
@@ -201,7 +201,7 @@ public final class ContainerCache extends LRUMap {
   public void removeDB(String containerDBPath) {
     lock.lock();
     try {
-      ReferenceCountedDB<DatanodeStore> db = (ReferenceCountedDB<DatanodeStore>)this.get(containerDBPath);
+      ReferenceCountedDB db = (ReferenceCountedDB)this.get(containerDBPath);
       if (db != null) {
         boolean cleaned = cleanupDb(db);
         if (!db.isClosed()) {
@@ -230,7 +230,7 @@ public final class ContainerCache extends LRUMap {
    * @param containerDBPath - DB path of the container.
    * @param db - DB handler
    */
-  public void addDB(String containerDBPath, ReferenceCountedDB<DatanodeStore> db) {
+  public void addDB(String containerDBPath, ReferenceCountedDB db) {
     lock.lock();
     try {
       this.putIfAbsent(containerDBPath, db);

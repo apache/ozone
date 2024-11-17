@@ -425,7 +425,7 @@ public class TestKeyValueContainerMetadataInspector
       long blockCount, long byteCount,
       long dbDeleteCount, List<DeletedBlocksTransaction> deleteTransactions)
       throws Exception {
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, getConf())) {
+    try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
       // Don't care about in memory state. Just change the DB values.
       metadataTable.put(containerData.getBlockCountKey(), blockCount);
@@ -470,7 +470,7 @@ public class TestKeyValueContainerMetadataInspector
   void checkDbCounts(KeyValueContainerData containerData,
       long expectedBlockCount, long expectedBytesUsed,
       long expectedDeletedCount) throws Exception {
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, getConf())) {
+    try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       long bytesUsed = metadataTable.get(containerData.getBytesUsedKey());

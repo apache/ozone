@@ -26,11 +26,11 @@ import java.io.Closeable;
  * Class enclosing a reference counted handle to DBStore.
  */
 public class ReferenceCountedHandle<STORE extends AbstractStore> implements Closeable {
-  private final ReferenceCountedDB<STORE> dbHandle;
+  private final BaseReferenceCountedDB<STORE> dbHandle;
   private volatile boolean isClosed;
 
   //Provide a handle with an already incremented reference.
-  public ReferenceCountedHandle(ReferenceCountedDB<STORE> dbHandle) {
+  public ReferenceCountedHandle(BaseReferenceCountedDB<STORE> dbHandle) {
     this.dbHandle = dbHandle;
     this.isClosed = false;
   }

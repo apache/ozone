@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.base.Preconditions;
-
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.BaseDBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.AbstractStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,24 +30,16 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Class to implement reference counting over instances handed by Container
- * Cache.
- * Enable DEBUG log below will enable us quickly locate the leaked reference
- * from caller stack. When JDK9 StackWalker is available, we can switch to
- * StackWalker instead of new Exception().printStackTrace().
+ * Class to implement reference counting over instances of a db handle.
  */
-public class ReferenceCountedDB extends DBHandle {
+public class BaseReferenceCountedDB<STORE extends AbstractStore> extends BaseDBHandle<STORE> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ReferenceCountedDB.class);
+      LoggerFactory.getLogger(BaseReferenceCountedDB.class);
   private final AtomicInteger referenceCount;
 
-  public ReferenceCountedDB(DatanodeStore store, String containerDBPath) {
+  public BaseReferenceCountedDB(STORE store, String containerDBPath) {
     super(store, containerDBPath);
     this.referenceCount = new AtomicInteger(0);
-  }
-
-  public long getReferenceCount() {
-    return referenceCount.get();
   }
 
   public void incrementReference() {

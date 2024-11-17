@@ -234,13 +234,14 @@ public final class KeyValueContainerUtil {
     boolean bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
 
     if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
-      try (DBHandle<DatanodeStore> db = BlockUtils.getDB(kvContainerData, config)) {
-        populateContainerMetadata(kvContainerData, db.getStore(), bCheckChunksFilePath);
+      try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
+        populateContainerMetadata(kvContainerData,
+            db.getStore(), bCheckChunksFilePath);
       }
       return;
     }
 
-    DBHandle<DatanodeStore> cachedDB = null;
+    DBHandle cachedDB = null;
     DatanodeStore store = null;
     try {
       try {

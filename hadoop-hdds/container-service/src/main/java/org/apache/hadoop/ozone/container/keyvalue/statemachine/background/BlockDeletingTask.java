@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
@@ -147,7 +146,7 @@ public class BlockDeletingTask implements BackgroundTask {
     File dataDir = new File(containerData.getChunksPath());
     long startTime = Time.monotonicNow();
     // Scan container's db and get list of under deletion blocks
-    try (DBHandle<DatanodeStore> meta = BlockUtils.getDB(containerData, conf)) {
+    try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
       if (containerData.hasSchema(SCHEMA_V1)) {
         crr = deleteViaSchema1(meta, container, dataDir, startTime);
       } else if (containerData.hasSchema(SCHEMA_V2)) {
@@ -175,7 +174,7 @@ public class BlockDeletingTask implements BackgroundTask {
   }
 
   public ContainerBackgroundTaskResult deleteViaSchema1(
-      DBHandle<DatanodeStore> meta, Container container, File dataDir,
+      DBHandle meta, Container container, File dataDir,
       long startTime) throws IOException {
     ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
     if (!checkDataDir(dataDir)) {
@@ -277,7 +276,7 @@ public class BlockDeletingTask implements BackgroundTask {
   }
 
   public ContainerBackgroundTaskResult deleteViaSchema2(
-      DBHandle<DatanodeStore> meta, Container container, File dataDir,
+      DBHandle meta, Container container, File dataDir,
       long startTime) throws IOException {
     Deleter schema2Deleter = (table, batch, tid) -> {
       Table<Long, DeletedBlocksTransaction> delTxTable =
@@ -297,7 +296,7 @@ public class BlockDeletingTask implements BackgroundTask {
   }
 
   public ContainerBackgroundTaskResult deleteViaSchema3(
-      DBHandle<DatanodeStore> meta, Container container, File dataDir,
+      DBHandle meta, Container container, File dataDir,
       long startTime) throws IOException {
     Deleter schema3Deleter = (table, batch, tid) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
@@ -319,7 +318,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private ContainerBackgroundTaskResult deleteViaTransactionStore(
       TableIterator<?, ? extends Table.KeyValue<?, DeletedBlocksTransaction>>
-          iter, DBHandle<DatanodeStore> meta, Container container, File dataDir,
+          iter, DBHandle meta, Container container, File dataDir,
       long startTime, Deleter deleter) throws IOException {
     ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
     if (!checkDataDir(dataDir)) {

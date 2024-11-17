@@ -120,7 +120,7 @@ public final class BlockUtils {
    * @return DB handle.
    * @throws StorageContainerException
    */
-  public static DBHandle<DatanodeStore> getDB(KeyValueContainerData containerData,
+  public static DBHandle getDB(KeyValueContainerData containerData,
       ConfigurationSource conf) throws StorageContainerException {
     Preconditions.checkNotNull(containerData);
     Preconditions.checkNotNull(containerData.getDbFile());
@@ -191,7 +191,7 @@ public final class BlockUtils {
       ContainerCache cache = ContainerCache.getInstance(conf);
       Preconditions.checkNotNull(cache);
       cache.addDB(containerDBPath,
-          new ReferenceCountedDB<>(store, containerDBPath));
+          new ReferenceCountedDB(store, containerDBPath));
     }
   }
 
@@ -283,7 +283,7 @@ public final class BlockUtils {
   public static void dumpKVContainerDataToFiles(
       KeyValueContainerData containerData,
       ConfigurationSource conf) throws IOException {
-    try (DBHandle<DatanodeStore> db = getDB(containerData, conf)) {
+    try (DBHandle db = getDB(containerData, conf)) {
       Preconditions.checkState(db.getStore()
           instanceof DatanodeStoreSchemaThreeImpl);
 

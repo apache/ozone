@@ -15,28 +15,42 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.utils;
+package org.apache.hadoop.ozone.container.common.interfaces;
 
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.AbstractStore;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 /**
- * Just a wrapper for DatanodeStore.
- * This is for container schema v3 which has one rocksdb instance per disk.
+ * DB handle abstract class.
  */
-public class RawDB extends DBHandle {
+public abstract class BaseDBHandle<STORE extends AbstractStore> implements Closeable {
 
-  public RawDB(DatanodeStore store, String containerDBPath) {
-    super(store, containerDBPath);
+  private final STORE store;
+  private final String containerDBPath;
+
+  public BaseDBHandle(STORE store, String containerDBPath) {
+    this.store = store;
+    this.containerDBPath = containerDBPath;
+  }
+
+  public STORE getStore() {
+    return this.store;
+  }
+
+  public String getContainerDBPath() {
+    return this.containerDBPath;
+  }
+
+  public boolean cleanup() {
+    return true;
   }
 
   @Override
-  public void close() throws IOException {
-    // NOTE: intend to do nothing on close
-    // With schema v3, block operations on a single container should not
-    // close the whole db handle.
-    // Will close the low-level stores all together in a collection class.
+  public String toString() {
+    return "DBHandle{" +
+        "containerDBPath='" + containerDBPath + '\'' +
+        ", store=" + store +
+        '}';
   }
 }

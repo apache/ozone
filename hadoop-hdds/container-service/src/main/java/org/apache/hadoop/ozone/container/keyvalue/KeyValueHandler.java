@@ -1343,7 +1343,7 @@ public class KeyValueHandler extends Handler {
   private boolean logBlocksIfNonZero(Container container)
       throws IOException {
     boolean nonZero = false;
-    try (DBHandle<DatanodeStore> dbHandle
+    try (DBHandle dbHandle
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {

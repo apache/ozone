@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -257,7 +256,7 @@ public class TestOzoneContainer {
     long freeBytes = container.getContainerData().getMaxSize();
     long containerId = container.getContainerData().getContainerID();
     KeyValueContainerData cData = container.getContainerData();
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
       Table<String, Long> metadataTable =
           db.getStore().getMetadataTable();

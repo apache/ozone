@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -77,7 +76,7 @@ public class TestKeyValueBlockIterator {
   private OzoneConfiguration conf;
   @TempDir
   private File testRoot;
-  private DBHandle<DatanodeStore> db;
+  private DBHandle db;
   private ContainerLayoutVersion layout;
   private String schemaVersion;
   private String datanodeID = UUID.randomUUID().toString();
@@ -399,7 +398,7 @@ public class TestKeyValueBlockIterator {
             Map<String, Integer> prefixCounts) throws Exception {
     // Create required block data.
     Map<String, List<Long>> blockIDs = new HashMap<>();
-    try (DBHandle<DatanodeStore> metadataStore = BlockUtils.getDB(containerData, conf)) {
+    try (DBHandle metadataStore = BlockUtils.getDB(containerData, conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);

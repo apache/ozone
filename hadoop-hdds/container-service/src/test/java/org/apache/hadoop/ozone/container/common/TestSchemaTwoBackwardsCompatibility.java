@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -175,7 +174,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     // turn on schema v3 first, then do operations
     ContainerTestUtils.enableSchemaV3(conf);
 
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(container.getContainerData(), conf)) {
+    try (DBHandle db = BlockUtils.getDB(container.getContainerData(), conf)) {
       long containerID = container.getContainerData().getContainerID();
       int blockCount = 0;
       try (BlockIterator<BlockData> iter = db.getStore()
@@ -211,7 +210,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     // turn on schema v3 first, then do operations
     ContainerTestUtils.enableSchemaV3(conf);
 
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
       Table<String, Long> metadatatable = db.getStore().getMetadataTable();
       assertEquals((long)metadatatable.get(BLOCK_COUNT),
           BLOCKS_PER_CONTAINER);
@@ -263,7 +262,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     assertEquals(cData.getBytesUsed(), expectedBytesUsed);
 
     // check db metadata after deletion
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
       Table<String, Long> metadatatable = db.getStore().getMetadataTable();
       assertEquals((long)metadatatable.get(BLOCK_COUNT), expectedKeyCount);
       assertEquals((long)metadatatable.get(PENDING_DELETE_BLOCK_COUNT), 0);
@@ -296,7 +295,7 @@ public class TestSchemaTwoBackwardsCompatibility {
       List<Long> blocks = Arrays.asList(startBlockID, startBlockID + 1);
       DeletedBlocksTransaction txn =
           createTestDeleteTxn(txnID, blocks, containerID);
-      try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, conf)) {
+      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
         try (BatchOperation batch = db.getStore().getBatchHandler()
             .initBatchOperation()) {
           DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =

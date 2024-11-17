@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -231,7 +230,7 @@ public class TestValidateBCSIDOnRestart {
         .getContainer(omKeyLocationInfo.getContainerID())
         .getContainerData();
     keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(keyValueContainerData, conf)) {
+    try (DBHandle db = BlockUtils.getDB(keyValueContainerData, conf)) {
 
       // modify the bcsid for the container in the ROCKS DB thereby inducing
       // corruption

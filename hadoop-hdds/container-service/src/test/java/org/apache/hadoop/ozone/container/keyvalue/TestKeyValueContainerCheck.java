@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 
 import java.io.File;
@@ -116,8 +115,8 @@ public class TestKeyValueContainerCheck
     File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(containerData);
     containerData.setDbFile(dbFile);
-    try (DBHandle<DatanodeStore> ignored = BlockUtils.getDB(containerData, conf);
-         BlockIterator<BlockData> kvIter =
+    try (DBHandle ignored = BlockUtils.getDB(containerData, conf);
+        BlockIterator<BlockData> kvIter =
                 ignored.getStore().getBlockIterator(containerID)) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());

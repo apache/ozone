@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.BaseReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 
 import java.io.IOException;
@@ -40,7 +40,7 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
     implements MetadataStore {
 
   private Table<Long, ContainerProtos.ContainerDataProto.State> containerIdsTable;
-  private static final ConcurrentMap<String, ReferenceCountedDB<MasterVolumeMetadataStore>> INSTANCES =
+  private static final ConcurrentMap<String, BaseReferenceCountedDB<MasterVolumeMetadataStore>> INSTANCES =
       new ConcurrentHashMap<>();
 
   public static ReferenceCountedHandle<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
@@ -53,8 +53,8 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
         if (v == null || v.isClosed()) {
           try {
             MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
-            ReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDB =
-                new ReferenceCountedDB<>(masterVolumeMetadataStore,
+            BaseReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDB =
+                new BaseReferenceCountedDB<>(masterVolumeMetadataStore,
                     masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
             referenceCountedDB.incrementReference();
             return referenceCountedDB;

@@ -109,7 +109,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
@@ -2116,7 +2115,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         (KeyValueContainerData)(datanodeService.getDatanodeStateMachine()
             .getContainer().getContainerSet().getContainer(containerID)
             .getContainerData());
-    try (DBHandle<DatanodeStore> db = BlockUtils.getDB(containerData, cluster.getConf());
+    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
          BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator(containerID)) {
       while (keyValueBlockIterator.hasNext()) {
@@ -2249,7 +2248,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         long newBCSID = container.getBlockCommitSequenceId() - 1;
         KeyValueContainerData cData =
             (KeyValueContainerData) container.getContainerData();
-        try (DBHandle<DatanodeStore> db = BlockUtils.getDB(cData, cluster.getConf())) {
+        try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
           db.getStore().getMetadataTable().put(cData.getBcsIdKey(),
               newBCSID);
         }
