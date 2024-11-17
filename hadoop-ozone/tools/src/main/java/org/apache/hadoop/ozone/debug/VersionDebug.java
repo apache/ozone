@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -45,12 +46,18 @@ public class VersionDebug implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws IOException {
-    Map<String, Map<String, Object>> versions = ImmutableSortedMap.of(
-        "client", asMap(ClientVersion.CURRENT),
-        "datanode", asMap(DatanodeVersion.CURRENT),
-        "om", asMap(OzoneManagerVersion.CURRENT)
-    );
-    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(versions));
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(ImmutableSortedMap.of(
+        "ozone", ImmutableSortedMap.of(
+            "revision", OzoneVersionInfo.OZONE_VERSION_INFO.getRevision(),
+            "url", OzoneVersionInfo.OZONE_VERSION_INFO.getUrl(),
+            "version", OzoneVersionInfo.OZONE_VERSION_INFO.getVersion()
+        ),
+        "components", ImmutableSortedMap.of(
+            "client", asMap(ClientVersion.CURRENT),
+            "datanode", asMap(DatanodeVersion.CURRENT),
+            "om", asMap(OzoneManagerVersion.CURRENT)
+        )
+    )));
     return null;
   }
 
