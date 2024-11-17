@@ -833,7 +833,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper for OFS listStatus on a bucket to get all snapshots.
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
-      String volumeName, String bucketName, URI uri) throws IOException {
+      String volumeName, String bucketName, URI uri, String prevSnapshot, long numberOfEntries) throws IOException {
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
@@ -842,9 +842,9 @@ public class BasicRootedOzoneClientAdapterImpl
     String group = getGroupName(ugi);
     List<FileStatusAdapter> res = new ArrayList<>();
 
-    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, null);
+    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, prevSnapshot);
 
-    while (snapshotIter.hasNext()) {
+    while (snapshotIter.hasNext() && res.size() < numberOfEntries) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();
       if (SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE.name().equals(ozoneSnapshot.getSnapshotStatus())) {
         res.add(getFileStatusAdapterForBucketSnapshot(
@@ -911,7 +911,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
     if (ofsPath.isSnapshotPath()) {
       return listStatusBucketSnapshot(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), uri);
+          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries);
     }
 
     String keyName = ofsPath.getKeyName();

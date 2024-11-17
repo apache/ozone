@@ -1488,7 +1488,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
-        request.getPrevSnapshot(), request.getMaxListResult());
+        request.getPrevSnapshot(), (int)Math.min(request.getMaxListResult(), maxKeyListSize));
 
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
         .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());
