@@ -50,6 +50,7 @@ _kinit() {
 }
 
 _init() {
+  container=scm
   _kinit
   execute_command_in_container ${container} ozone freon ockg -n1 -t1 -p warmup
 }
@@ -81,8 +82,8 @@ test_cross_compatibility() {
 
   execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-  container=scm _kinit
-  execute_command_in_container scm ozone freon ockg -n1 -t1 -p warmup
+  _init
+
   new_client _write
   new_client _read ${current_version}
 
