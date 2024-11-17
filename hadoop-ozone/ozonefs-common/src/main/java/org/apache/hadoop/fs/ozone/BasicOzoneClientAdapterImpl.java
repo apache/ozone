@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -586,8 +585,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       omKeyLocationInfo.getPipeline().getNodes()
           .forEach(dn -> {
             hostList.add(dn.getHostName());
-            int port = dn.getPort(
-                DatanodeDetails.Port.Name.STANDALONE).getValue();
+            int port = dn.getStandalonePort().getValue();
             if (port == 0) {
               port = configuredDnPort;
             }

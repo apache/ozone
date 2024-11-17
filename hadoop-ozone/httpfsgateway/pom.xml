@@ -32,6 +32,7 @@
   <description>Apache Ozone HttpFS</description>
 
   <properties>
+    <classpath.skip>false</classpath.skip>
     <httpfs.source.repository>REPO NOT AVAIL</httpfs.source.repository>
     <httpfs.source.revision>REVISION NOT AVAIL</httpfs.source.revision>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssZ</maven.build.timestamp.format>

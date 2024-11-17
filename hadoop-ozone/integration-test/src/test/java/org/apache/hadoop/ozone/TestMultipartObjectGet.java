@@ -139,7 +139,7 @@ public class TestMultipartObjectGet {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(BUCKET, KEY, content.length(),
-        partNumber, uploadID, body);
+        partNumber, uploadID, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -168,7 +168,7 @@ public class TestMultipartObjectGet {
   private void getObjectMultipart(int partNumber, long bytes)
       throws IOException, OS3Exception {
     Response response =
-        REST.get(BUCKET, KEY, partNumber, null, 100, null);
+        REST.get(BUCKET, KEY, partNumber, null, 100, null, null);
     assertEquals(200, response.getStatus());
     assertEquals(bytes, response.getLength());
     assertEquals("3", response.getHeaderString(MP_PARTS_COUNT));

@@ -26,6 +26,7 @@
   <packaging>jar</packaging>
   <version>2.0.0-SNAPSHOT</version>
   <properties>
+    <classpath.skip>false</classpath.skip>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
   </properties>

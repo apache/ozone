@@ -109,7 +109,11 @@ public enum OMAction implements AuditAction {
   UPGRADE_CANCEL,
   UPGRADE_FINALIZE,
 
-  LIST_OPEN_FILES;
+  LIST_OPEN_FILES,
+
+  GET_OBJECT_TAGGING,
+  PUT_OBJECT_TAGGING,
+  DELETE_OBJECT_TAGGING;
 
   @Override
   public String getAction() {

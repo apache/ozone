@@ -28,8 +28,10 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20240729-jdk17-1</docker.ozone-runner.version>
-    <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20230318-1</docker.ozone-testkr5b.image>
+    <docker.ozone.image>apache/ozone</docker.ozone.image>
+    <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor> <!-- suffix appended to Ozone version to get Docker image version -->
+    <docker.ozone-runner.version>20241108-jdk17-1</docker.ozone-runner.version>
+    <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241112-1</docker.ozone-testkr5b.image>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
   </properties>
 
@@ -71,24 +73,7 @@
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
-            <id>copy-classpath-files</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>unpack-dependencies</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>
-                target/ozone-${ozone.version}/share/ozone/classpath
-              </outputDirectory>
-              <includes>*.classpath</includes>
-              <includeArtifactIds>
-                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
-                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native,ozone-s3-secret-store
-              </includeArtifactIds>
-            </configuration>
-          </execution>
-          <execution>
-            <id>copy-jars</id>
+            <id>copy-omitted-jars</id>
             <phase>prepare-package</phase>
             <goals>
               <goal>copy-dependencies</goal>
@@ -96,24 +81,6 @@
             <configuration>
               <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-          <execution>
-            <id>copy-omitted-jars</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib
-              </outputDirectory>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                  <version>${grpc.protobuf-compile.version}</version>
-                </artifactItem>
-              </artifactItems>
             </configuration>
           </execution>
         </executions>

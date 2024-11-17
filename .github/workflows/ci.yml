@@ -31,6 +31,9 @@ env:
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 17 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  HADOOP_IMAGE: ghcr.io/apache/hadoop
+  OZONE_IMAGE: ghcr.io/apache/ozone
+  OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 jobs:
   build-info:
@@ -153,6 +156,7 @@ jobs:
           retention-days: 1
       - name: Store source tarball for compilation
         uses: actions/upload-artifact@v4
+        if: needs.build-info.outputs.needs-compile == 'true'
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
@@ -407,6 +411,66 @@ jobs:
           name: ${{ github.job }}
           path: target/${{ github.job }}
         continue-on-error: true
+  repro:
+    needs:
+      - build-info
+      - build
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+      - name: Execute tests
+        run: |
+          hadoop-ozone/dev-support/checks/${{ github.job }}.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
+        continue-on-error: true
+      - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Install diffoscope
+        run: |
+          sudo apt update -q
+          sudo apt install -y diffoscope
+        if: ${{ failure() }}
+      - name: Check artifact differences
+        run: |
+          hadoop-ozone/dev-support/checks/_diffoscope.sh
+        if: ${{ failure() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ github.job }}
+          path: target/${{ github.job }}
+        continue-on-error: true
   acceptance:
     needs:
       - build-info
@@ -549,6 +613,9 @@ jobs:
           args="${{ inputs.ratis_args }}"
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
             args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+          fi
+          if [[ "${{ matrix.profile }}" != "filesystem" ]]; then
+            args="$args -DskipShade"
           fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}

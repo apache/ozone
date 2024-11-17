@@ -94,7 +94,6 @@ public class DatanodeDetails extends NodeImpl implements
   private String version;
   private long setupTime;
   private String revision;
-  private String buildDate;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
   private int initialVersion;
@@ -112,7 +111,6 @@ public class DatanodeDetails extends NodeImpl implements
     version = b.version;
     setupTime = b.setupTime;
     revision = b.revision;
-    buildDate = b.buildDate;
     persistedOpState = b.persistedOpState;
     persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
     initialVersion = b.initialVersion;
@@ -141,7 +139,6 @@ public class DatanodeDetails extends NodeImpl implements
     this.version = datanodeDetails.version;
     this.setupTime = datanodeDetails.setupTime;
     this.revision = datanodeDetails.revision;
-    this.buildDate = datanodeDetails.buildDate;
     this.persistedOpState = datanodeDetails.getPersistedOpState();
     this.persistedOpStateExpiryEpochSec =
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
@@ -237,6 +234,18 @@ public class DatanodeDetails extends NodeImpl implements
     setPort(new Port(name, port));
   }
 
+  public void setRatisPort(int port) {
+    setPort(Name.RATIS, port);
+  }
+
+  public void setRestPort(int port) {
+    setPort(Name.REST, port);
+  }
+
+  public void setStandalonePort(int port) {
+    setPort(Name.STANDALONE, port);
+  }
+
   /**
    * Returns all the Ports used by DataNode.
    *
@@ -327,19 +336,51 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Port
    */
   public synchronized Port getPort(Port.Name name) {
+    Port ratisPort = null;
     for (Port port : ports) {
       if (port.getName().equals(name)) {
         return port;
       }
+      if (port.getName().equals(Name.RATIS)) {
+        ratisPort = port;
+      }
     }
-    // if no separate admin/server/datastream port, return single Ratis one for
-    // compat
+    // if no separate admin/server/datastream port,
+    // return single Ratis one for compatibility
     if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
         name == Name.RATIS_DATASTREAM) {
-      return getPort(Name.RATIS);
+      return ratisPort;
     }
     return null;
   }
+
+  /**
+   * Helper method to get the Ratis port.
+   * 
+   * @return Port
+   */
+  public Port getRatisPort() {
+    return getPort(Name.RATIS);
+  }
+
+  /**
+   * Helper method to get the REST port.
+   *
+   * @return Port
+   */
+  public Port getRestPort() {
+    return getPort(Name.REST);
+  }
+
+  /**
+   * Helper method to get the Standalone port.
+   *
+   * @return Port
+   */
+  public Port getStandalonePort() {
+    return getPort(Name.STANDALONE);
+  }
+
 
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
@@ -433,9 +474,6 @@ public class DatanodeDetails extends NodeImpl implements
     if (extendedDetailsProto.hasRevision()) {
       builder.setRevision(extendedDetailsProto.getRevision());
     }
-    if (extendedDetailsProto.hasBuildDate()) {
-      builder.setBuildDate(extendedDetailsProto.getBuildDate());
-    }
     return builder.build();
   }
 
@@ -526,9 +564,6 @@ public class DatanodeDetails extends NodeImpl implements
 
     if (!Strings.isNullOrEmpty(getRevision())) {
       extendedBuilder.setRevision(getRevision());
-    }
-    if (!Strings.isNullOrEmpty(getBuildDate())) {
-      extendedBuilder.setBuildDate(getBuildDate());
     }
 
     return extendedBuilder.build();
@@ -622,7 +657,6 @@ public class DatanodeDetails extends NodeImpl implements
     private String version;
     private long setupTime;
     private String revision;
-    private String buildDate;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
@@ -654,7 +688,6 @@ public class DatanodeDetails extends NodeImpl implements
       this.version = details.getVersion();
       this.setupTime = details.getSetupTime();
       this.revision = details.getRevision();
-      this.buildDate = details.getBuildDate();
       this.persistedOpState = details.getPersistedOpState();
       this.persistedOpStateExpiryEpochSec =
           details.getPersistedOpStateExpiryEpochSec();
@@ -802,18 +835,6 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
-     * Sets the DataNode build date.
-     *
-     * @param date the build date of DataNode.
-     *
-     * @return DatanodeDetails.Builder
-     */
-    public Builder setBuildDate(String date) {
-      this.buildDate = date;
-      return this;
-    }
-
-    /**
      * Sets the DataNode setup time.
      *
      * @param time the setup time of DataNode.
@@ -884,6 +905,36 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static Port newPort(Port.Name name, Integer value) {
     return new Port(name, value);
+  }
+
+  /**
+   * Constructs a new Ratis Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRatisPort(Integer portNumber) {
+    return newPort(Name.RATIS, portNumber);
+  }
+
+  /**
+   * Constructs a new REST Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRestPort(Integer portNumber) {
+    return newPort(Name.REST, portNumber);
+  }
+
+  /**
+   * Constructs a new Standalone Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newStandalonePort(Integer portNumber) {
+    return newPort(Name.STANDALONE, portNumber);
   }
 
   /**
@@ -1052,24 +1103,6 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setRevision(String rev) {
     this.revision = rev;
-  }
-
-  /**
-   * Returns the DataNode build date.
-   *
-   * @return DataNode build date
-   */
-  public String getBuildDate() {
-    return buildDate;
-  }
-
-  /**
-   * Set DataNode build date.
-   *
-   * @param date DataNode build date
-   */
-  public void setBuildDate(String date) {
-    this.buildDate = date;
   }
 
   @Override

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -15,17 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.client.rpc;
-
-import org.junit.jupiter.api.BeforeAll;
-
 /**
- * Tests key output stream with zero-copy enabled.
+ * Package contains classes related to S3 tagging responses.
  */
-public class TestECKeyOutputStreamWithZeroCopy extends
-    AbstractTestECKeyOutputStream {
-  @BeforeAll
-  public static void init() throws Exception {
-    init(true);
-  }
-}
+package org.apache.hadoop.ozone.om.response.s3.tagging;

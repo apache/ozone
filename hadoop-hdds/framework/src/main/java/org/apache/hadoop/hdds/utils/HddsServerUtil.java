@@ -742,9 +742,7 @@ public final class HddsServerUtil {
         "  version = " + versionInfo.getVersion(),
         "  classpath = " + System.getProperty("java.class.path"),
         "  build = " + versionInfo.getUrl() + "/"
-            + versionInfo.getRevision()
-            + " ; compiled by '" + versionInfo.getUser()
-            + "' on " + versionInfo.getDate(),
+            + versionInfo.getRevision(),
         "  java = " + System.getProperty("java.version"),
         "  conf = " + conf);
   }
