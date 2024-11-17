@@ -1893,31 +1893,31 @@
   </property>
 
   <property>
-    <name>ozone.s3g.content.http.enabled</name>
+    <name>ozone.s3g.webadmin.http.enabled</name>
     <value>true</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>This option can be used to disable the web server which serves additional content in Ozone S3 Gateway.</description>
   </property>
 
   <property>
-    <name>ozone.s3g.content.https-address</name>
+    <name>ozone.s3g.webadmin.https-address</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>Ozone S3Gateway content server's HTTPS address and port.</description>
   </property>
 
   <property>
-    <name>ozone.s3g.content.https-bind-host</name>
+    <name>ozone.s3g.webadmin.https-bind-host</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The actual address the HTTPS server will bind to. If this optional address
-      is set, it overrides only the hostname portion of ozone.s3g.content.https-address.
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.https-address.
       This is useful for making the Ozone S3Gateway HTTPS server listen on all
       interfaces by setting it to 0.0.0.0.</description>
   </property>
 
   <property>
-    <name>ozone.s3g.content.http-address</name>
+    <name>ozone.s3g.webadmin.http-address</name>
     <value>0.0.0.0:19878</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The address and port where Ozone S3Gateway serves
@@ -1925,11 +1925,11 @@
   </property>
 
   <property>
-    <name>ozone.s3g.content.http-bind-host</name>
+    <name>ozone.s3g.webadmin.http-bind-host</name>
     <value>0.0.0.0</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The actual address the HTTP server will bind to. If this optional address
-      is set, it overrides only the hostname portion of ozone.s3g.content.http-address.
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.http-address.
       This is useful for making the Ozone S3Gateway HTTP server listen on all
       interfaces by setting it to 0.0.0.0.</description>
   </property>

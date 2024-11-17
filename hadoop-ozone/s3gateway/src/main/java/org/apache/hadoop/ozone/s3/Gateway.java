@@ -82,7 +82,7 @@ public class Gateway extends GenericCli {
     loginS3GUser(OzoneConfigurationHolder.configuration());
     setHttpBaseDir(OzoneConfigurationHolder.configuration());
     httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
-    contentServer = new S3GatewayWebContentServer(OzoneConfigurationHolder.configuration(), "s3g-web");
+    contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     start();
 

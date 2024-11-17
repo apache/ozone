@@ -36,13 +36,13 @@ import org.eclipse.jetty.servlet.ServletHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTPS_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTPS_BIND_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTP_BIND_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CONTENT_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_DEFAULT;
@@ -57,12 +57,12 @@ import static org.apache.hadoop.security.authentication.server.AuthenticationFil
 /**
  * HTTP server for serving static content and Ozone-specific endpoints (/conf, etc.).
  */
-class S3GatewayWebContentServer extends BaseHttpServer {
+class S3GatewayWebAdminServer extends BaseHttpServer {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3GatewayWebContentServer.class);
+      LoggerFactory.getLogger(S3GatewayWebAdminServer.class);
 
-  S3GatewayWebContentServer(MutableConfigurationSource conf, String name) throws IOException {
+  S3GatewayWebAdminServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
     addServlet("icon", "/favicon.ico", IconServlet.class);
     addSecretAuthentication(conf);
@@ -85,7 +85,7 @@ class S3GatewayWebContentServer extends BaseHttpServer {
             conf.get(OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
         if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-              principalInConf, conf.get(OZONE_S3G_CONTENT_HTTP_BIND_HOST_KEY)));
+              principalInConf, conf.get(OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY)));
         }
         String httpKeytab = conf.get(OZONE_S3G_KEYTAB_FILE);
         if (!Strings.isNullOrEmpty(httpKeytab)) {
@@ -112,22 +112,22 @@ class S3GatewayWebContentServer extends BaseHttpServer {
 
   @Override
   protected String getHttpAddressKey() {
-    return OZONE_S3G_CONTENT_HTTP_ADDRESS_KEY;
+    return OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
   }
 
   @Override
   protected String getHttpBindHostKey() {
-    return OZONE_S3G_CONTENT_HTTP_BIND_HOST_KEY;
+    return OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY;
   }
 
   @Override
   protected String getHttpsAddressKey() {
-    return OZONE_S3G_CONTENT_HTTPS_ADDRESS_KEY;
+    return OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
   }
 
   @Override
   protected String getHttpsBindHostKey() {
-    return OZONE_S3G_CONTENT_HTTPS_BIND_HOST_KEY;
+    return OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
   }
 
   @Override
@@ -137,12 +137,12 @@ class S3GatewayWebContentServer extends BaseHttpServer {
 
   @Override
   protected int getHttpBindPortDefault() {
-    return OZONE_S3G_CONTENT_HTTP_BIND_PORT_DEFAULT;
+    return OZONE_S3G_WEBADMIN_HTTP_BIND_PORT_DEFAULT;
   }
 
   @Override
   protected int getHttpsBindPortDefault() {
-    return OZONE_S3G_CONTENT_HTTPS_BIND_PORT_DEFAULT;
+    return OZONE_S3G_WEBADMIN_HTTPS_BIND_PORT_DEFAULT;
   }
 
   @Override
@@ -157,7 +157,7 @@ class S3GatewayWebContentServer extends BaseHttpServer {
 
   @Override
   protected String getEnabledKey() {
-    return OZONE_S3G_CONTENT_HTTP_ENABLED_KEY;
+    return OZONE_S3G_WEBADMIN_HTTP_ENABLED_KEY;
   }
 
   @Override
