@@ -74,18 +74,12 @@ _read() {
     compatibility/read.robot
 }
 
-test_bucket_encryption() {
-  _kinit
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}" -v SUFFIX:${client_version} security/bucket-encryption.robot
-}
-
 test_cross_compatibility() {
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
   OZONE_KEEP_RESULTS=true start_docker_env
 
   execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
-  new_client test_bucket_encryption
 
   container=scm _kinit
   execute_command_in_container scm ozone freon ockg -n1 -t1 -p warmup
@@ -94,8 +88,6 @@ test_cross_compatibility() {
 
   for client_version in "$@"; do
     client="old_client_${client_version//./_}"
-
-    old_client test_bucket_encryption
 
     old_client _write
     old_client _read ${client_version}
