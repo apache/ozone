@@ -4792,6 +4792,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     new QuotaRepairTask(this).repair(buckets);
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(final OmKeyArgs args)
+      throws IOException {
+    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
+      return rcReader.get().getObjectTagging(args);
+    }
+  }
+
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
