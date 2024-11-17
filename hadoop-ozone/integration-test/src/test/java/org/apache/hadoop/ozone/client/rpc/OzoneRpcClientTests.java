@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
@@ -90,7 +91,6 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -196,6 +196,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -625,7 +626,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateVolumeWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addMetadata("key1", "val1")
@@ -640,7 +641,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateBucketWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -4811,17 +4812,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testUploadWithStreamAndMemoryMappedBuffer() throws IOException {
-    // create a local dir
-    final String dir = GenericTestUtils.getTempPath(
-        getClass().getSimpleName());
-    GenericTestUtils.assertDirCreation(new File(dir));
+  public void testUploadWithStreamAndMemoryMappedBuffer(@TempDir Path dir) throws IOException {
 
     // create a local file
     final int chunkSize = 1024;
     final byte[] data = new byte[8 * chunkSize];
     ThreadLocalRandom.current().nextBytes(data);
-    final File file = new File(dir, "data");
+    final File file = new File(dir.toString(), "data");
     try (FileOutputStream out = new FileOutputStream(file)) {
       out.write(data);
     }

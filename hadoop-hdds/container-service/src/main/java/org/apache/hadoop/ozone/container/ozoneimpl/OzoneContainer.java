@@ -404,6 +404,18 @@ public class OzoneContainer {
     }
   }
 
+  /**
+   * We need to inject the containerController into the hddsVolume.
+   * because we need to obtain the container count
+   * for each disk based on the container controller.
+   */
+  private void initHddsVolumeContainer() {
+    for (StorageVolume v : volumeSet.getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) v;
+      hddsVolume.setController(controller);
+    }
+  }
+
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
       this.metadataScanner =
@@ -501,6 +513,8 @@ public class OzoneContainer {
     readChannel.start();
     blockDeletingService.start();
     recoveringContainerScrubbingService.start();
+
+    initHddsVolumeContainer();
 
     // mark OzoneContainer as INITIALIZED.
     initializingStatus.set(InitializingStatus.INITIALIZED);

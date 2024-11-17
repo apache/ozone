@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.server;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -64,7 +63,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.ozone.test.GenericTestUtils;
 import com.google.common.collect.Maps;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
@@ -84,8 +82,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Test Containers.
  */
 public class TestContainerServer {
-  static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
-      .getAbsolutePath() + File.separator;
+  @TempDir
+  private static Path testDir;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClient caClient;
   @TempDir
@@ -94,7 +92,7 @@ public class TestContainerServer {
   @BeforeAll
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
-    CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
+    CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
@@ -112,7 +110,7 @@ public class TestContainerServer {
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                    .getStandalonePort().getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(datanodeDetails, conf,
             new TestContainerDispatcher(), caClient), (dn, p) -> {
@@ -128,8 +126,8 @@ public class TestContainerServer {
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
-    final String dir = TEST_DIR + dn.getUuid();
+        dn.getRatisPort().getValue());
+    final String dir = testDir.resolve(dn.getUuid().toString()).toString();
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
@@ -193,9 +191,9 @@ public class TestContainerServer {
       throws IOException {
     ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
-        Paths.get(TEST_DIR, "dfs", "data", "hdds",
+        Paths.get(testDir.toString(), "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
-    conf.set(OZONE_METADATA_DIRS, TEST_DIR);
+    conf.set(OZONE_METADATA_DIRS, testDir.toString());
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
@@ -225,8 +223,7 @@ public class TestContainerServer {
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
-                pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                pipeline.getFirstNode().getStandalonePort().getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
             hddsDispatcher, caClient), (dn, p) -> {

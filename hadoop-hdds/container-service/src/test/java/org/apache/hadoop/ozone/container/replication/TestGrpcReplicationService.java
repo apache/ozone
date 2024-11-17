@@ -103,11 +103,9 @@ class TestGrpcReplicationService {
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
             .setPersistedOpStateExpiry(0);
     DatanodeDetails.Port containerPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE,
-            OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
+        DatanodeDetails.newStandalonePort(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     DatanodeDetails.Port ratisPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS,
-            OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+        DatanodeDetails.newRatisPort(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
     DatanodeDetails.Port replicationPort =
         DatanodeDetails.newPort(DatanodeDetails.Port.Name.REPLICATION,
             replicationConfig.getPort());

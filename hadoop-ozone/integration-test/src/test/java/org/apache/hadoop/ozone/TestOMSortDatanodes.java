@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,11 +35,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.util.List;
@@ -62,13 +61,14 @@ import static org.mockito.Mockito.mock;
 @Timeout(300)
 public class TestOMSortDatanodes {
 
+  @TempDir
+  private static File dir;
   private static OzoneConfiguration config;
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
   private static KeyManagerImpl keyManager;
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneManager om;
-  private static File dir;
   private static final int NODE_COUNT = 10;
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
       "edge0", "/rack0",
@@ -80,7 +80,6 @@ public class TestOMSortDatanodes {
   @BeforeAll
   public static void setup() throws Exception {
     config = new OzoneConfiguration();
-    dir = GenericTestUtils.getRandomizedTestDir();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class.getName());
@@ -128,7 +127,6 @@ public class TestOMSortDatanodes {
     if (om != null) {
       om.stop();
     }
-    FileUtils.deleteDirectory(dir);
   }
 
   @Test

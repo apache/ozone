@@ -76,8 +76,7 @@ public class TestOzoneContainer {
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
       conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
-          pipeline.getFirstNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
+          pipeline.getFirstNode().getStandalonePort().getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
@@ -109,8 +108,7 @@ public class TestOzoneContainer {
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
       conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
-          pipeline.getFirstNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
+          pipeline.getFirstNode().getStandalonePort().getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
