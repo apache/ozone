@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -74,7 +73,7 @@ public class ChunkKeyHandler extends KeyHandler implements
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-          throws IOException, OzoneClientException {
+          throws IOException {
     try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(parent.getOzoneConf());
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();

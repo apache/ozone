@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -198,9 +197,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       }
 
       //register the real port to the datanode details.
-      datanodeDetails.setPort(DatanodeDetails
-          .newPort(Name.STANDALONE,
-              realPort));
+      datanodeDetails.setPort(DatanodeDetails.newStandalonePort(realPort));
 
       isStarted = true;
     }

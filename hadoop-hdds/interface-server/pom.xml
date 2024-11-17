@@ -31,6 +31,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no testable code in this module -->
+    <spotbugs.skip>true</spotbugs.skip> <!-- only generated code in this module -->
   </properties>
 
   <dependencies>
@@ -141,13 +142,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
-        <configuration>
-          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
-        </configuration>
       </plugin>
     </plugins>
   </build>

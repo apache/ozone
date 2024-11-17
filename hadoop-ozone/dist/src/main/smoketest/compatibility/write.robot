@@ -24,8 +24,6 @@ Suite Setup         Create Local Test File
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
-${VOL}       comp-hsync-volume
-${BUCK}      comp-hsync-bucket
 
 
 *** Test Cases ***
@@ -48,9 +46,7 @@ FSO Bucket Can Be Created and Used
 HSync Can Be Used To Create Keys
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
-    Execute             ozone sh volume create /${VOL}
-    Execute             ozone sh bucket create /${VOL}/${BUCK}
-    ${o3fspath} =   Format FS URL         o3fs     ${VOL}    ${BUCK}
-    Freon DFSG      sync=HSYNC    path=${o3fspath}
-    ${pfspath} =    Format FS URL         ofs      ${VOL}    ${BUCK}
-    Freon DFSG      sync=HSYNC    path=${pfspath}
+    ${o3fspath} =   Format FS URL         o3fs     vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
+    ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
+    Freon DFSG      sync=HSYNC    n=1    path=${pfspath}

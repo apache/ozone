@@ -134,7 +134,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   /**
    * Builder class for CertInfo.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private X509Certificate x509Certificate;
     private long timestamp;

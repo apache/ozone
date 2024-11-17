@@ -36,6 +36,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -53,8 +54,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test for HadoopDirTreeGenerator.
  */
 public class TestHadoopDirTreeGenerator {
-
-  private String path;
+  @TempDir
+  private java.nio.file.Path path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
@@ -64,12 +65,8 @@ public class TestHadoopDirTreeGenerator {
 
   @BeforeEach
   public void setup() {
-    path = GenericTestUtils
-            .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
-    File baseDir = new File(path);
-    baseDir.mkdirs();
   }
 
   /**
@@ -79,7 +76,6 @@ public class TestHadoopDirTreeGenerator {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
-      FileUtils.deleteDirectory(new File(path));
     }
   }
 
@@ -108,8 +104,8 @@ public class TestHadoopDirTreeGenerator {
   public void testNestedDirTreeGeneration() throws Exception {
     try {
       startCluster();
-      FileOutputStream out = FileUtils.openOutputStream(new File(path,
-              "conf"));
+      FileOutputStream out = FileUtils.openOutputStream(new File(path.toString(),
+          "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
@@ -140,7 +136,7 @@ public class TestHadoopDirTreeGenerator {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     String rootPath = "o3fs://" + bucketName + "." + volumeName;
-    String confPath = new File(path, "conf").getAbsolutePath();
+    String confPath = new File(path.toString(), "conf").getAbsolutePath();
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
             fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
