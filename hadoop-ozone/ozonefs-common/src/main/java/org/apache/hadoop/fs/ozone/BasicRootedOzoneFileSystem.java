@@ -957,7 +957,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // listStatus returns entries numEntries in size if available.
       // Any lesser number of entries indicate that the required entries have
       // exhausted.
-    } while (!tmpStatusList.isEmpty());
+    } while (entriesAdded > 0);
 
     return statuses;
   }
