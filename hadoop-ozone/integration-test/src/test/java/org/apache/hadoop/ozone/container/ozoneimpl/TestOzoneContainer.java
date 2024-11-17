@@ -304,7 +304,6 @@ public class TestOzoneContainer {
       writeChunkRequest = writeChunkForContainer(client, testContainerID,
           1024);
 
-
       // Read Chunk
       request = ContainerTestHelper.getReadChunkRequest(
           pipeline, writeChunkRequest.getWriteChunk());

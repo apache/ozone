@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -269,7 +268,7 @@ public class TestVolumeSetDiskChecks {
         new DummyChecker(conf, new Timer(), 0);
 
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    ContainerSet conSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 20);
+    ContainerSet conSet = new ContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
     String path = dir.getPath();

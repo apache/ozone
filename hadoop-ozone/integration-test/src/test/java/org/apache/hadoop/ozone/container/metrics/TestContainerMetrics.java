@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -135,7 +134,7 @@ public class TestContainerMetrics {
   }
 
   private HddsDispatcher createDispatcher(DatanodeDetails dd, VolumeSet volumeSet) {
-    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    ContainerSet containerSet = new ContainerSet(1000);
     StateContext context = ContainerTestUtils.getMockContext(
         dd, CONF);
     ContainerMetrics metrics = ContainerMetrics.create(CONF);
@@ -244,7 +243,7 @@ public class TestContainerMetrics {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         volumeSet);
     return XceiverServerRatis.newXceiverServerRatis(null, dn, CONF, dispatcher,
-        new ContainerController(new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         null, null);
   }
 }

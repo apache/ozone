@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -130,7 +129,7 @@ public class TestReplicationSupervisor {
   @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    set = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    set = new ContainerSet(1000);
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     context = new StateContext(
         new OzoneConfiguration(),

@@ -218,6 +218,7 @@ public class TestStorageVolumeChecker {
       ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
     initTest(checkResult, layout);
     LOG.info("Executing {}", testInfo.getTestMethod());
+
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckMinGap(Duration.ofMillis(0));

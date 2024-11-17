@@ -225,6 +225,7 @@ public class TestDatanodeUpgradeToScmHA {
       throws Exception {
     setScmHAEnabled(enableSCMHA);
     /// SETUP ///
+
     startScmServer();
     String originalScmID = scmServerImpl.getScmId();
     File volume = UpgradeTestHelper.addHddsVolume(conf, tempFolder);
@@ -318,6 +319,7 @@ public class TestDatanodeUpgradeToScmHA {
   public void testFormattingNewVolumes(boolean enableSCMHA) throws Exception {
     setScmHAEnabled(enableSCMHA);
     /// SETUP ///
+
     startScmServer();
     String originalScmID = scmServerImpl.getScmId();
     File preFinVolume1 = UpgradeTestHelper.addHddsVolume(conf, tempFolder);

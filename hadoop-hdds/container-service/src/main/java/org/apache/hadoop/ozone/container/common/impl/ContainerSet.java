@@ -27,12 +27,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +70,11 @@ public class ContainerSet implements Iterable<Container<?>> {
   private Clock clock;
   private long recoveringTimeout;
   private final Table<Long, State> containerIdsTable;
+
+  @VisibleForTesting
+  public ContainerSet(long recoveringTimeout) {
+    this(DBTestUtils.getInMemoryTableForTest(), recoveringTimeout);
+  }
 
   public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, false);

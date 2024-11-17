@@ -61,7 +61,6 @@ public class TestOzoneClientFactory {
         }
       });
     });
-    e.printStackTrace();
     assertInstanceOf(AccessControlException.class, e);
   }
 

@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -147,7 +146,7 @@ public class TestStaleRecoveringContainerScrubbingService {
   public void testScrubbingStaleRecoveringContainers(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initVersionInfo(versionInfo);
-    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 10);
+    ContainerSet containerSet = new ContainerSet(10);
     containerSet.setClock(testClock);
     StaleRecoveringContainerScrubbingService srcss =
         new StaleRecoveringContainerScrubbingService(

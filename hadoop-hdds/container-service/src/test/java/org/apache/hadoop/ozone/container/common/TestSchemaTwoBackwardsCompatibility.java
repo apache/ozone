@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -136,7 +135,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager, volumeSet);
 
-    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    containerSet = new ContainerSet(1000);
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     ozoneContainer = mock(OzoneContainer.class);

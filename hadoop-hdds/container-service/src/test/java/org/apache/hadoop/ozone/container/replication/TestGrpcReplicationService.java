@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -95,7 +94,7 @@ class TestGrpcReplicationService {
 
     SecurityConfig secConf = new SecurityConfig(conf);
 
-    ContainerSet containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    ContainerSet containerSet = new ContainerSet(1000);
 
     DatanodeDetails.Builder dn =
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())

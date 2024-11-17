@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -337,7 +336,7 @@ public final class ContainerTestUtils {
   }
 
   private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000), Collections.emptyMap());
+      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;

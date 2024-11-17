@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -106,7 +105,7 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
     volumeSet = mock(MutableVolumeSet.class);
-    containerSet = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    containerSet = new ContainerSet(1000);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -270,7 +269,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    ContainerSet containerSet1 = new ContainerSet(1000);
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
@@ -320,7 +319,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(DBTestUtils.getInMemoryTableForTest(), 1000);
+    ContainerSet containerSet1 = new ContainerSet(1000);
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDirDbDelete")).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
