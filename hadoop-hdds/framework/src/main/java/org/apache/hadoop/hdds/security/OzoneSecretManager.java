@@ -172,14 +172,13 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    */
   private OzoneSecretKey updateCurrentKey(KeyPair keyPair,
       X509Certificate certificate) {
-    logger.info("Updating current master key for generating tokens. Cert id {}",
-        certificate.getSerialNumber().toString());
-
     int newCurrentId = incrementCurrentKeyId();
     OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId,
         certificate.getNotAfter().getTime(), keyPair,
         certificate.getSerialNumber().toString());
     currentKey.set(newKey);
+    logger.info("Updated current master key for generating tokens. Cert id {}, Master key id {}",
+        certificate.getSerialNumber().toString(), newKey.getKeyId());
     return newKey;
   }
 
