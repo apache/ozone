@@ -103,10 +103,23 @@ public class ContainerSet implements Iterable<Container<?>> {
     this.recoveringTimeout = recoveringTimeout;
   }
 
+  /**
+   * Add Container to container map. This would fail if the container is already present or has been marked as missing.
+   * @param container container to be added
+   * @return If container is added to containerMap returns true, otherwise
+   * false
+   */
   public boolean addContainer(Container<?> container) throws StorageContainerException {
     return addContainer(container, false);
   }
 
+  /**
+   * Add Container to container map. This would overwrite the container even if it is missing. But would fail if the
+   * container is already present.
+   * @param container container to be added
+   * @return If container is added to containerMap returns true, otherwise
+   * false
+   */
   public boolean addContainerByOverwriteMissingContainer(Container<?> container) throws StorageContainerException {
     return addContainer(container, true);
   }
@@ -125,7 +138,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is added to containerMap returns true, otherwise
    * false
    */
-  public boolean addContainer(Container<?> container, boolean overwriteMissingContainers) throws
+  private boolean addContainer(Container<?> container, boolean overwriteMissingContainers) throws
       StorageContainerException {
     Preconditions.checkNotNull(container, "container cannot be null");
 
