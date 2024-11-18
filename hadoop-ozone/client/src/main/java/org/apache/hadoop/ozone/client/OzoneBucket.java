@@ -1001,7 +1001,7 @@ public class OzoneBucket extends WithMetadata {
    */
   public List<OzoneFileStatusLight> listStatusLight(String keyName, boolean recursive,
       String startKey, long numEntries) throws IOException {
-    return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries);
+    return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries, false);
   }
 
   /**

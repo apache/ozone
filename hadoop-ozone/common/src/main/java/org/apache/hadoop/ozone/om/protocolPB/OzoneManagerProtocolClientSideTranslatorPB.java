@@ -2380,12 +2380,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
-      boolean recursive, String startKey, long numEntries) throws IOException {
-    return listStatusLight(args, recursive, startKey, numEntries, false);
-  }
-
-  @Override
-  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
