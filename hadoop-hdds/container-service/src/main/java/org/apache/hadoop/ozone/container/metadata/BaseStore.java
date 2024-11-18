@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -26,9 +25,9 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * Abstract Interface for interacting with datanode databases.
+ * Interface for interacting with datanode databases.
  */
-public interface AbstractStore extends Closeable {
+public interface BaseStore extends Closeable {
 
   /**
    * Start datanode manager.
@@ -48,7 +47,6 @@ public interface AbstractStore extends Closeable {
    *
    * @return datanode store.
    */
-  @VisibleForTesting
   DBStore getStore();
 
   /**

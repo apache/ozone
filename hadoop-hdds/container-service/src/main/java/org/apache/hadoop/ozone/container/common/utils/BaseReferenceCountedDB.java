@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BaseDBHandle;
-import org.apache.hadoop.ozone.container.metadata.AbstractStore;
+import org.apache.hadoop.ozone.container.metadata.BaseStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Class to implement reference counting over instances of a db handle.
  */
-public class BaseReferenceCountedDB<STORE extends AbstractStore> extends BaseDBHandle<STORE> {
+public class BaseReferenceCountedDB<STORE extends BaseStore> extends BaseDBHandle<STORE> {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseReferenceCountedDB.class);
   private final AtomicInteger referenceCount;

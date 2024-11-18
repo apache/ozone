@@ -90,68 +90,72 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   @Override
   public Void call() throws Exception {
-
     try {
-      OzoneConfiguration conf = createOzoneConfiguration();
-
-      final Collection<String> datanodeStorageDirs =
-          HddsServerUtil.getDatanodeStorageDirs(conf);
-
-      for (String dir : datanodeStorageDirs) {
-        checkDestinationDirectory(dir);
-      }
-
-      final ContainerOperationClient containerOperationClient =
-          new ContainerOperationClient(conf);
-
-      final List<ContainerInfo> containerInfos =
-          containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
-
-      //logic same as the download+import on the destination datanode
-      initializeReplicationSupervisor(conf, containerInfos.size() * 2);
-
-      replicationTasks = new ArrayList<>();
-
-      for (ContainerInfo container : containerInfos) {
-
-        final ContainerWithPipeline containerWithPipeline =
-            containerOperationClient
-                .getContainerWithPipeline(container.getContainerID());
-
-        if (container.getState() == LifeCycleState.CLOSED) {
-
-          final List<DatanodeDetails> datanodesWithContainer =
-              containerWithPipeline.getPipeline().getNodes();
-
-          final List<String> datanodeUUIDs =
-              datanodesWithContainer
-                  .stream().map(DatanodeDetails::getUuidString)
-                  .collect(Collectors.toList());
-
-          //if datanode is specified, replicate only container if it has a
-          //replica.
-          if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
-            replicationTasks.add(new ReplicationTask(
-                ReplicateContainerCommand.fromSources(container.getContainerID(),
-                    datanodesWithContainer), replicator));
-          }
-        }
-
-      }
-
-      //important: override the max number of tasks.
-      setTestNo(replicationTasks.size());
-
-      init();
-
-      timer = getMetrics().timer("replicate-container");
-      runTests(this::replicateContainer);
+      return replicate();
     } finally {
       if (masterVolumeMetadataStoreReferenceCountedDB != null) {
         masterVolumeMetadataStoreReferenceCountedDB.close();
       }
+    }
+  }
+
+
+  public Void replicate() throws Exception {
+
+    OzoneConfiguration conf = createOzoneConfiguration();
+
+    final Collection<String> datanodeStorageDirs =
+        HddsServerUtil.getDatanodeStorageDirs(conf);
+
+    for (String dir : datanodeStorageDirs) {
+      checkDestinationDirectory(dir);
+    }
+
+    final ContainerOperationClient containerOperationClient =
+        new ContainerOperationClient(conf);
+
+    final List<ContainerInfo> containerInfos =
+        containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
+
+    //logic same as the download+import on the destination datanode
+    initializeReplicationSupervisor(conf, containerInfos.size() * 2);
+
+    replicationTasks = new ArrayList<>();
+
+    for (ContainerInfo container : containerInfos) {
+
+      final ContainerWithPipeline containerWithPipeline =
+          containerOperationClient
+              .getContainerWithPipeline(container.getContainerID());
+
+      if (container.getState() == LifeCycleState.CLOSED) {
+
+        final List<DatanodeDetails> datanodesWithContainer =
+            containerWithPipeline.getPipeline().getNodes();
+
+        final List<String> datanodeUUIDs =
+            datanodesWithContainer
+                .stream().map(DatanodeDetails::getUuidString)
+                .collect(Collectors.toList());
+
+        //if datanode is specified, replicate only container if it has a
+        //replica.
+        if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
+          replicationTasks.add(new ReplicationTask(
+              ReplicateContainerCommand.fromSources(container.getContainerID(),
+                  datanodesWithContainer), replicator));
+        }
+      }
 
     }
+
+    //important: override the max number of tasks.
+    setTestNo(replicationTasks.size());
+
+    init();
+
+    timer = getMetrics().timer("replicate-container");
+    runTests(this::replicateContainer);
     return null;
   }
 

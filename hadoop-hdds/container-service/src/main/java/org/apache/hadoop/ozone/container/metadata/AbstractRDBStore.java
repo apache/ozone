@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  * Abstract Interface defining the way to interact with any rocksDB in the datanode.
  * @param <DEF> Generic parameter defining the schema for the DB.
  */
-public abstract class AbstractRDBStore<DEF extends DBDefinition> implements AbstractStore {
+public abstract class AbstractRDBStore<DEF extends DBDefinition> implements BaseStore {
   private final DEF dbDef;
   private final ManagedColumnFamilyOptions cfOptions;
   private static DatanodeDBProfile dbProfile;

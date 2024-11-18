@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.VoidCallable;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -45,6 +44,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +85,7 @@ public class MutableVolumeSet implements VolumeSet {
   private String clusterID;
 
   private final StorageVolumeChecker volumeChecker;
-  private VoidCallable<IOException> failedVolumeListener;
+  private CheckedRunnable<IOException> failedVolumeListener;
   private StateContext context;
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
@@ -133,7 +133,7 @@ public class MutableVolumeSet implements VolumeSet {
     initializeVolumeSet();
   }
 
-  public void setFailedVolumeListener(VoidCallable<IOException> runnable) {
+  public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
     failedVolumeListener = runnable;
   }
 
@@ -256,7 +256,7 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     if (failedVolumeListener != null) {
-      failedVolumeListener.call();
+      failedVolumeListener.run();
     }
     // TODO:
     // 1. Consider stopping IO on open containers and tearing down

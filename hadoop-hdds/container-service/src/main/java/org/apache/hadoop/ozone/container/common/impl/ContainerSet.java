@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.DBTestUtils;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -73,7 +73,7 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   @VisibleForTesting
   public ContainerSet(long recoveringTimeout) {
-    this(DBTestUtils.getInMemoryTableForTest(), recoveringTimeout);
+    this(new InMemoryTestTable<>(), recoveringTimeout);
   }
 
   public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout) {
