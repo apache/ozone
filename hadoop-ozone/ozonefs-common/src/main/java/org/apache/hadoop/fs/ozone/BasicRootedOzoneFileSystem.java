@@ -1303,6 +1303,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    *
    * @param f
    * @param startPath
+   * @param lite if true return lightweight keys
    * @return list of file status.
    * @throws IOException
    */
