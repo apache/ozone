@@ -99,7 +99,6 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     }
   }
 
-
   public Void replicate() throws Exception {
 
     OzoneConfiguration conf = createOzoneConfiguration();
