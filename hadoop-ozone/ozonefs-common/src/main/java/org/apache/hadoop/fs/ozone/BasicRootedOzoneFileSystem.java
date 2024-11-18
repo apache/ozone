@@ -1219,6 +1219,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * Get the first batch of entry for iteration.
      *
      * @param p path to file/directory.
+     * @param transformFunc function to convert FileStatus into an expected type.
+     * @param lite if true it should look into fetching a lightweight keys from server.
      * @throws IOException
      */
     private OzoneFileStatusIterator(Path p, Function<FileStatus, T> transformFunc, boolean lite) throws IOException {
