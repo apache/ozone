@@ -231,12 +231,12 @@ public final class BlockDeletingServiceMetrics {
     this.failureCountInLastIteration.incr(-1L * this.failureCountInLastIteration.value());
   }
 
-  public void incrSuccessCountInLastIteration(long successCountInLastIteration) {
-    this.successCountInLastIteration.incr(successCountInLastIteration);
+  public void incrSuccessCountInLastIteration(long delta) {
+    this.successCountInLastIteration.incr(delta);
   }
 
-  public void incrSuccessBytesInLastIteration(long successBytesInLastIteration) {
-    this.successBytesInLastIteration.incr(successBytesInLastIteration);
+  public void incrSuccessBytesInLastIteration(long delta) {
+    this.successBytesInLastIteration.incr(delta);
   }
 
   public void incrFailureCountInLastIteration() {
