@@ -18,14 +18,14 @@ package org.apache.hadoop.ozone.container.common.utils;
  * limitations under the License.
  *
  */
-import org.apache.hadoop.ozone.container.metadata.BaseStore;
+import org.apache.hadoop.ozone.container.metadata.DBStoreManager;
 
 import java.io.Closeable;
 
 /**
  * Class enclosing a reference counted handle to DBStore.
  */
-public class ReferenceCountedHandle<STORE extends BaseStore> implements Closeable {
+public class ReferenceCountedHandle<STORE extends DBStoreManager> implements Closeable {
   private final BaseReferenceCountedDB<STORE> dbHandle;
   private volatile boolean isClosed;
 

@@ -27,7 +27,7 @@ import java.io.IOException;
 /**
  * Interface for interacting with datanode databases.
  */
-public interface BaseStore extends Closeable {
+public interface DBStoreManager extends Closeable {
 
   /**
    * Start datanode manager.

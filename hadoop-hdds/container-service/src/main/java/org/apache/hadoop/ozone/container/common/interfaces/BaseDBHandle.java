@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import org.apache.hadoop.ozone.container.metadata.BaseStore;
+import org.apache.hadoop.ozone.container.metadata.DBStoreManager;
 
 import java.io.Closeable;
 
 /**
  * DB handle abstract class.
  */
-public abstract class BaseDBHandle<STORE extends BaseStore> implements Closeable {
+public abstract class BaseDBHandle<STORE extends DBStoreManager> implements Closeable {
 
   private final STORE store;
   private final String containerDBPath;

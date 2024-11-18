@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 /**
  * Interface for interacting with database in the master volume of a datanode.
  */
-public interface MetadataStore extends BaseStore {
+public interface MetadataStore extends DBStoreManager {
   /**
    * A Table that keeps the containerIds in a datanode.
    *

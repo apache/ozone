@@ -34,7 +34,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DatanodeStore extends BaseStore {
+public interface DatanodeStore extends DBStoreManager {
   String NO_SUCH_BLOCK_ERR_MSG =
           "Unable to find the block.";
 
