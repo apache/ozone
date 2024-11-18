@@ -35,7 +35,11 @@ import java.util.concurrent.Callable;
 /** Show internal component version information as JSON. */
 @CommandLine.Command(
     name = "version",
-    description = "Show internal version of Ozone components.")
+    description = "Show internal version of Ozone components, as defined in the artifacts where this command is " +
+        "executed.  It does not communicate with any Ozone services.  Run the same command on different nodes to " +
+        "get a cross-component view of versions.  The goal of this command is to help quickly get a glance of the " +
+        "latest features supported by Ozone on the current node."
+)
 @MetaInfServices(SubcommandWithParent.class)
 public class VersionDebug implements Callable<Void>, SubcommandWithParent {
 
