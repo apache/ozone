@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
@@ -100,6 +101,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.SecretKeyTestClient;
 import org.apache.hadoop.security.KerberosAuthException;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
@@ -152,7 +154,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_MISMATCH;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
@@ -1182,10 +1183,10 @@ final class TestSecureOzoneCluster {
   }
 
   /**
-   * Tests delegation token renewal after a certificate renew.
+   * Tests delegation token renewal after a secret key rotation.
    */
   @Test
-  void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
+  void testDelegationTokenRenewCrossSecretKeyRotation() throws Exception {
     initSCM();
     try {
       scm = HddsTestUtils.getScmSimple(conf);
@@ -1206,11 +1207,12 @@ final class TestSecureOzoneCluster {
 
       CertificateClientTestImpl certClient =
           new CertificateClientTestImpl(newConf, true);
-      X509Certificate omCert = certClient.getCertificate();
-      String omCertId1 = omCert.getSerialNumber().toString();
       // Start OM
       om.setCertClient(certClient);
       om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
+      SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
+      ManagedSecretKey secretKey1 = secretKeyClient.getCurrentSecretKey();
+      om.setSecretKeyClient(secretKeyClient);
       om.start();
       GenericTestUtils.waitFor(() -> om.isLeaderReady(), 100, 10000);
 
@@ -1231,30 +1233,26 @@ final class TestSecureOzoneCluster {
       assertEquals(SecurityUtil.buildTokenService(
           om.getNodeDetails().getRpcAddress()).toString(),
           token1.getService().toString());
-      assertEquals(omCertId1, token1.decodeIdentifier().getOmCertSerialId());
+      assertEquals(secretKey1.getId().toString(), token1.decodeIdentifier().getSecretKeyId());
 
       // Renew delegation token
       long expiryTime = omClient.renewDelegationToken(token1);
       assertThat(expiryTime).isGreaterThan(0);
 
-      // Wait for OM certificate to renew
-      LambdaTestUtils.await(certLifetime, 100, () ->
-          !StringUtils.equals(token1.decodeIdentifier().getOmCertSerialId(),
-              omClient.getDelegationToken(new Text("om"))
-                  .decodeIdentifier().getOmCertSerialId()));
-      String omCertId2 =
-          certClient.getCertificate().getSerialNumber().toString();
-      assertNotEquals(omCertId1, omCertId2);
+      // Rotate secret key
+      secretKeyClient.rotate();
+      ManagedSecretKey secretKey2 = secretKeyClient.getCurrentSecretKey();
+      assertNotEquals(secretKey1.getId(), secretKey2.getId());
       // Get a new delegation token
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
           new Text("om"));
-      assertEquals(omCertId2, token2.decodeIdentifier().getOmCertSerialId());
+      assertEquals(secretKey2.getId().toString(), token2.decodeIdentifier().getSecretKeyId());
 
-      // Because old certificate is still valid, so renew old token will succeed
+      // Because old secret key is still valid, so renew old token will succeed
       expiryTime = omClient.renewDelegationToken(token1);
       assertThat(expiryTime)
           .isGreaterThan(0)
-          .isLessThan(omCert.getNotAfter().getTime());
+          .isLessThan(secretKey2.getExpiryTime().toEpochMilli());
     } finally {
       if (scm != null) {
         scm.stop();

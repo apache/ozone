@@ -985,8 +985,23 @@ public class OzoneBucket extends WithMetadata {
    */
   public List<OzoneFileStatus> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries) throws IOException {
-    return proxy
-        .listStatus(volumeName, name, keyName, recursive, startKey, numEntries);
+    return proxy.listStatus(volumeName, name, keyName, recursive, startKey, numEntries);
+  }
+
+  /**
+   * List the lightweight status for a file or a directory and its contents.
+   *
+   * @param keyName    Absolute path of the entry to be listed
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @return list of file status
+   */
+  public List<OzoneFileStatusLight> listStatusLight(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries, false);
   }
 
   /**
@@ -1044,6 +1059,37 @@ public class OzoneBucket extends WithMetadata {
   public void setTimes(String keyName, long mtime, long atime)
       throws IOException {
     proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
+  /**
+   * Gets the tags for an existing key.
+   * @param keyName Key name.
+   * @return Tags for the specified key.
+   * @throws IOException
+   */
+  public Map<String, String> getObjectTagging(String keyName)
+      throws IOException {
+    return proxy.getObjectTagging(volumeName, name, keyName);
+  }
+
+  /**
+   * Sets the tags to an existing key.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  public void putObjectTagging(String keyName, Map<String, String> tags)
+      throws IOException {
+    proxy.putObjectTagging(volumeName, name, keyName, tags);
+  }
+
+  /**
+   * Removes all the tags from an existing key.
+   * @param keyName Key name
+   * @throws IOException
+   */
+  public void deleteObjectTagging(String keyName) throws IOException {
+    proxy.deleteObjectTagging(volumeName, name, keyName);
   }
 
   public void setSourcePathExist(boolean b) {

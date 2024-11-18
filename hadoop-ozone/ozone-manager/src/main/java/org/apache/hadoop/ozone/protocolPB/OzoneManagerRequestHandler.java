@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,6 +43,9 @@ import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -393,6 +397,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepairRsp =
             startQuotaRepair(request.getStartQuotaRepairRequest());
         responseBuilder.setStartQuotaRepairResponse(startQuotaRepairRsp);
+        break;
+      case GetObjectTagging:
+        OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
+            getObjectTagging(request.getGetObjectTaggingRequest());
+        responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1515,6 +1524,24 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return SetSafeModeResponse.newBuilder()
         .setResponse(response)
         .build();
+  }
+
+  private GetObjectTaggingResponse getObjectTagging(GetObjectTaggingRequest request)
+      throws IOException {
+    KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .build();
+
+    GetObjectTaggingResponse.Builder resp =
+        GetObjectTaggingResponse.newBuilder();
+
+    Map<String, String> result = impl.getObjectTagging(omKeyArgs);
+
+    resp.addAllTags(KeyValueUtil.toProtobuf(result));
+    return resp.build();
   }
 
   private SafeModeAction toSafeModeAction(
