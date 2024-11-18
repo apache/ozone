@@ -2113,6 +2113,41 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testOzoneManagerListLocatedStatusAndListStatus() throws IOException {
+    String data = RandomStringUtils.randomAlphanumeric(20);
+    String directory = RandomStringUtils.randomAlphanumeric(5);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    RemoteIterator<LocatedFileStatus> listLocatedStatus = fs.listLocatedStatus(path);
+    int count = 0;
+    while (listLocatedStatus.hasNext()) {
+      LocatedFileStatus locatedFileStatus = listLocatedStatus.next();
+      assertTrue(locatedFileStatus.getBlockLocations().length >= 1);
+
+      for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
+        assertTrue(blockLocation.getNames().length >= 1);
+        assertTrue(blockLocation.getHosts().length >= 1);
+      }
+      count++;
+    }
+    assertEquals(1, count);
+    count = 0;
+    RemoteIterator<FileStatus> listStatus = fs.listStatusIterator(path);
+    while (listStatus.hasNext()) {
+      FileStatus fileStatus = listStatus.next();
+      assertFalse(fileStatus instanceof LocatedFileStatus);
+      count++;
+    }
+    assertEquals(1, count);
+    FileStatus[] fileStatuses = fs.listStatus(path.getParent());
+    assertEquals(1, fileStatuses.length);
+    assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  @Test
   void testOzoneManagerFileSystemInterface() throws IOException {
     String dirPath = RandomStringUtils.randomAlphanumeric(5);
 

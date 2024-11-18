@@ -220,7 +220,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
   @Test
   public void testBucketACLOperations() {
-    // TODO: Uncomment assertions when bucket S3 ACL logic has been fixed
+    // TODO HDDS-11738: Uncomment assertions when bucket S3 ACL logic has been fixed
     final String bucketName = getBucketName();
 
     AccessControlList aclList = new AccessControlList();
@@ -235,15 +235,12 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     s3Client.createBucket(createBucketRequest);
 
-//    AccessControlList retrievedAclList = s3.getBucketAcl(bucketName);
-//    assertEquals(aclList, retrievedAclList);
+    //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
 
-//    aclList.grantPermission(grantee, Permission.Write);
-//    s3.setBucketAcl(bucketName, aclList);
+    aclList.grantPermission(grantee, Permission.Write);
+    s3Client.setBucketAcl(bucketName, aclList);
 
-//    retrievedAclList = s3.getBucketAcl(bucketName);
-//    assertEquals(aclList, retrievedAclList);
-
+    //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
   }
 
   @Test
