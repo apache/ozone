@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 
 import static org.jooq.impl.DSL.name;
@@ -71,30 +72,27 @@ public class ReconSchemaVersionTableManager {
    *
    * @param newVersion The new version to set.
    */
-  public void updateSchemaVersion(int newVersion) throws SQLException {
-    try {
-      boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
-          .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));
+  public void updateSchemaVersion(int newVersion, Connection conn)
+      throws SQLException {
+    DSLContext dslContext = DSL.using(conn);
+    boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
+        .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));
 
-      if (recordExists) {
-        // Update the existing schema version record
-        dslContext.update(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-            .set(DSL.field(name("version_number")), newVersion)
-            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
-            .execute();
-        LOG.info("Updated schema version to '{}'.", newVersion);
-      } else {
-        // Insert a new schema version record
-        dslContext.insertInto(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
-            .columns(DSL.field(name("version_number")),
-                DSL.field(name("applied_on")))
-            .values(newVersion, DSL.currentTimestamp())
-            .execute();
-        LOG.info("Inserted new schema version '{}'.", newVersion);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to update schema version to '{}'.", newVersion, e);
-      throw new SQLException("Unable to update schema version in the table.", e);
+    if (recordExists) {
+      // Update the existing schema version record
+      dslContext.update(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+          .set(DSL.field(name("version_number")), newVersion)
+          .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
+          .execute();
+      LOG.info("Updated schema version to '{}'.", newVersion);
+    } else {
+      // Insert a new schema version record
+      dslContext.insertInto(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME))
+          .columns(DSL.field(name("version_number")),
+              DSL.field(name("applied_on")))
+          .values(newVersion, DSL.currentTimestamp())
+          .execute();
+      LOG.info("Inserted new schema version '{}'.", newVersion);
     }
   }
 

@@ -112,8 +112,8 @@ public class TestReconLayoutVersionManager {
         ReconStorageContainerManagerFacade.class));
 
     // Verify that schema versions are updated for our custom features
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1, null);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2, null);
   }
 
   /**
@@ -141,7 +141,7 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
     layoutVersionManager.finalizeLayoutFeatures(mock(
         ReconStorageContainerManagerFacade.class));
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), null);
   }
 
   /**
@@ -177,7 +177,7 @@ public class TestReconLayoutVersionManager {
     }
 
     // Verify that schema version update was never called due to the exception
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), null);
   }
 
   /**
@@ -235,7 +235,7 @@ public class TestReconLayoutVersionManager {
     layoutVersionManager.finalizeLayoutFeatures(mock(
         ReconStorageContainerManagerFacade.class));
 
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), null);
   }
 
   /**
@@ -269,8 +269,8 @@ public class TestReconLayoutVersionManager {
     layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
     // Verify that the schema versions for the first two features were updated.
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1, null);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2, null);
 
     // Step 2: Introduce a new feature (Feature 3).
     ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
@@ -288,7 +288,7 @@ public class TestReconLayoutVersionManager {
     layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
     // Verify that the schema version for feature 3 was updated.
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3, null);
 
     // Verify that action1 and action2 were not executed again.
     verify(action1, times(1)).execute(scmFacadeMock);
