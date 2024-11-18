@@ -25,9 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -83,15 +81,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         .getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
 
-    // Verify key name
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (checkKeyNameEnabled) {
-      OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
-    }
-
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
+    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
+        .setKeyName(renameKeyRequest.getToKeyName()).build();
+    validateKey(ozoneManager, validateArgs);
 
     String srcKey = extractSrcKey(renameKeyArgs);
     String dstKey = extractDstKey(renameKeyRequest);

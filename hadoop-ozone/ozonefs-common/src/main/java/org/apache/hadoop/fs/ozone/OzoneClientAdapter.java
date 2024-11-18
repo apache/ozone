@@ -69,9 +69,10 @@ public interface OzoneClientAdapter {
 
   Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException;
+      Path workingDir, String username, boolean lite) throws IOException;
 
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;

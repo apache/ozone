@@ -735,6 +735,16 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
+    Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args, bucket.bucketLayout()));
+
+    return value.getTags();
+  }
+
+  @Override
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
   }

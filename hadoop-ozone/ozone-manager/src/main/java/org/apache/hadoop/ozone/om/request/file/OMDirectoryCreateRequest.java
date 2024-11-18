@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -117,8 +116,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
 
-    OmUtils.verifyKeyNameWithSnapshotReservedWord(
-        createDirectoryRequest.getKeyArgs().getKeyName());
+    KeyArgs keyArgs = createDirectoryRequest.getKeyArgs();
+    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
+        .setSnapshotReservedWord(keyArgs.getKeyName()).build();
+    validateKey(ozoneManager, validateArgs);
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Instant.now().toEpochMilli());

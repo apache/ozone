@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -55,7 +54,7 @@ public class DeleteKeyHandler extends KeyHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();

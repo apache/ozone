@@ -94,10 +94,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Sets;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -123,6 +121,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -155,7 +154,8 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(300)
 public class TestKeyManagerImpl {
-
+  @TempDir
+  private static File dir;
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
   private static NodeManager nodeManager;
@@ -164,7 +164,6 @@ public class TestKeyManagerImpl {
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
-  private static File dir;
   private static long scmBlockSize;
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
@@ -179,7 +178,6 @@ public class TestKeyManagerImpl {
   public static void setUp() throws Exception {
     ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
-    dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
@@ -243,7 +241,6 @@ public class TestKeyManagerImpl {
     scm.stop();
     scm.join();
     om.stop();
-    FileUtils.deleteDirectory(dir);
   }
 
   @BeforeEach

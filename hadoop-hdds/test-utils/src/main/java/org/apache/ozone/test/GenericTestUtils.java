@@ -93,7 +93,10 @@ public abstract class GenericTestUtils {
    * Get the (created) base directory for tests.
    *
    * @return the absolute directory
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getTestDir() {
     String prop =
         System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
@@ -110,7 +113,10 @@ public abstract class GenericTestUtils {
    * Get an uncreated directory for tests.
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getTestDir(String subdir) {
     return new File(getTestDir(), subdir).getAbsoluteFile();
   }
@@ -120,7 +126,10 @@ public abstract class GenericTestUtils {
    * name. This is likely to provide a unique path for tests run in parallel
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getRandomizedTestDir() {
     return new File(getRandomizedTempPath());
   }
@@ -132,7 +141,10 @@ public abstract class GenericTestUtils {
    *
    * @param subpath sub path, with no leading "/" character
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static String getTempPath(String subpath) {
     String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
         : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
@@ -153,8 +165,11 @@ public abstract class GenericTestUtils {
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
    *
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @SuppressWarnings("java:S2245") // no need for secure random
+  @Deprecated
   public static String getRandomizedTempPath() {
     return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
         + "-" + randomAlphanumeric(10));
