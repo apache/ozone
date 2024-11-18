@@ -191,7 +191,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     this.maxKeyListSize = om.getConfiguration().getLong(OZONE_OM_SERVER_LIST_MAX_SIZE,
       OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT);
     if (this.maxKeyListSize <= 0) {
-      this.maxKeyListSize = Integer.MAX_VALUE;
+      this.maxKeyListSize = OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
     }
   }
 
