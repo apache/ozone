@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -487,11 +488,24 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
-    return toProtoBuilder(clientVersion).build();
+    return toProtoBuilder(clientVersion, Collections.emptySet()).build();
   }
 
+  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> filterPorts) {
+    return toProtoBuilder(clientVersion, filterPorts).build();
+  }
+
+  /**
+   * Converts the current DatanodeDetails instance into a proto {@link HddsProtos.DatanodeDetailsProto.Builder} object.
+   *
+   * @param clientVersion - The client version.
+   * @param filterPorts   - A set of {@link Port.Name} specifying ports to include.
+   *                        If empty, all available ports will be included.
+   * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
+   */
+
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion) {
+      int clientVersion, Set<Port.Name> filterPorts) {
 
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
@@ -530,14 +544,24 @@ public class DatanodeDetails extends NodeImpl implements
     final boolean handlesUnknownPorts =
         ClientVersion.fromProtoValue(clientVersion)
         .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
+    final int requestedPortCount = filterPorts.size();
+    final boolean maySkip = requestedPortCount > 0;
     for (Port port : ports) {
-      if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
+      if (maySkip && !filterPorts.contains(port.getName())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Skip adding {} port {} to proto message",
+                  port.getName(), port.getValue());
+        }
+      } else if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
         builder.addPorts(port.toProto());
       } else {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Skip adding {} port {} to proto message for client v{}",
-              port.getName(), port.getValue(), clientVersion);
+                  port.getName(), port.getValue(), clientVersion);
         }
+      }
+      if (maySkip && builder.getPortsCount() == requestedPortCount) {
+        break;
       }
     }
 
@@ -960,6 +984,9 @@ public class DatanodeDetails extends NodeImpl implements
           Name.values());
       public static final Set<Name> V0_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, REST));
+
+      public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
+          EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
 
     private final Name name;
@@ -1109,7 +1136,7 @@ public class DatanodeDetails extends NodeImpl implements
   public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
     return HddsProtos.NetworkNode.newBuilder()
-        .setDatanodeDetails(toProtoBuilder(clientVersion).build())
+        .setDatanodeDetails(toProtoBuilder(clientVersion, Collections.emptySet()).build())
         .build();
   }
 }
