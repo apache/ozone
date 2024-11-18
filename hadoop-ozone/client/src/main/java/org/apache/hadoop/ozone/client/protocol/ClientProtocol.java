@@ -1327,4 +1327,38 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void recoverKey(OmKeyArgs args, long clientID) throws IOException;
+
+  /**
+   * Gets the tags for an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return tags for the specified key.
+   * @throws IOException
+   */
+  Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Sets the tags to an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  void putObjectTagging(String volumeName, String bucketName, String keyName,
+                        Map<String, String> tags) throws IOException;
+
+
+  /**
+   * Removes all the tags from the specified key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @throws IOException
+   */
+  void deleteObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
 }

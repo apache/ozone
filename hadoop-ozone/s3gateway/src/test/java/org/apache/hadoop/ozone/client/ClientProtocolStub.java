@@ -778,4 +778,20 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
+    return getBucket(volumeName, bucketName).getObjectTagging(keyName);
+  }
+
+  @Override
+  public void putObjectTagging(String volumeName, String bucketName, String keyName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putObjectTagging(keyName, tags);
+  }
+
+  @Override
+  public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
+    getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
+  }
+
 }

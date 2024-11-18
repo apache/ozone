@@ -2743,6 +2743,61 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.recoverKey(args, clientID);
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_OBJECT_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 object tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    return ozoneManagerClient.getObjectTagging(keyArgs);
+  }
+
+  @Override
+  public void putObjectTagging(String volumeName, String bucketName,
+                               String keyName, Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_OBJECT_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 object tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .addAllTags(tags)
+        .build();
+    ozoneManagerClient.putObjectTagging(keyArgs);
+  }
+
+  @Override
+  public void deleteObjectTagging(String volumeName, String bucketName,
+                                  String keyName) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_OBJECT_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 object tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
   private static ExecutorService createThreadPoolExecutor(
        int corePoolSize, int maximumPoolSize, String threadNameFormat) {
     return new ThreadPoolExecutor(corePoolSize, maximumPoolSize,

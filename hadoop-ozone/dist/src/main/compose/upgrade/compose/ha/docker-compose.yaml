@@ -83,7 +83,7 @@ services:
       - docker-config
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     networks:
       net:
         ipv4_address: 10.9.0.3

@@ -1160,6 +1160,31 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   /**
+   * Gets the tags for the specified key.
+   * @param args Key args
+   * @return Tags associated with the key.
+   */
+  Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
+
+  /**
+   * Sets the tags to an existing key.
+   * @param args Key args
+   */
+  default void putObjectTagging(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Removes all the tags from the specified key.
+   * @param args Key args
+   */
+  default void deleteObjectTagging(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
    * Get status of last triggered quota repair in OM.
    * @return String
    * @throws IOException
