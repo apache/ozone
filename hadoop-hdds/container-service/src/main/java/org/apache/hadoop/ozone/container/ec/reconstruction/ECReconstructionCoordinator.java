@@ -343,7 +343,7 @@ public class ECReconstructionCoordinator implements Closeable {
         List<ECBlockOutputStream> allStreams = new ArrayList<>(Arrays.asList(targetBlockStreams));
         allStreams.addAll(Arrays.asList(emptyBlockStreams));
         for (ECBlockOutputStream targetStream : allStreams) {
-          ecValidator.validateBuffer(targetStream);
+          ecValidator.validateChecksum(targetStream, blockDataGroup);
           targetStream.executePutBlock(true, true, blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream, targetStream.getCurrentPutBlkResponseFuture());
         }

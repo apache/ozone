@@ -44,16 +44,27 @@ public class ECValidator {
     this.blockLength = blockLength;
   }
 
-  private boolean validateChecksumInStripe(ContainerProtos.ChecksumData checksumData, ByteString stripeChecksum)
-    throws OzoneChecksumException{
+  private void validateChecksumInStripe(ContainerProtos.ChecksumData checksumData,
+                                           ByteString stripeChecksum, int chunkIndex)
+    throws OzoneChecksumException {
 
+    // If we have say 100 bytes per checksum, in the stripe the first 100 bytes should
+    // correspond to the fist chunk checksum, next 100 should be the second chunk checksum
+    // and so on. So the checksum should range from (numOfBytes * index of chunk) to ((numOfBytes * index of chunk) + numOfBytes)
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
-    ByteString checksum = stripeChecksum.substring();
+
+    int checksumIdxStart = (bytesPerChecksum * chunkIndex);
+    ByteString expectedChecksum = stripeChecksum.substring(checksumIdxStart,
+      (checksumIdxStart + bytesPerChecksum));
+    if (!checksumData.getChecksums(0).equals(expectedChecksum)) {
+      throw new OzoneChecksumException(String.format("Mismatch in checksum for recreated data: %s and existing stripe checksum: %s",
+        checksumData.getChecksums(0), expectedChecksum));
+    }
   }
 
   private BlockData getChecksumBlockData(BlockData[] blockDataGroup) {
     BlockData checksumBlockData = null;
-    // Reverse traversal as all parity bits will have checmsumBytes
+    // Reverse traversal as all parity bits will have checksumBytes
     for (int i = blockDataGroup.length - 1; i >= 0; i--) {
       BlockData blockData = blockDataGroup[i];
       if (null == blockData) {
@@ -91,10 +102,11 @@ public class ECValidator {
       List<ContainerProtos.ChunkInfo> checksumBlockChunks = checksumBlockData.getChunks();
 
       for (int i = 0; i < recreatedChunks.size(); i++) {
-        validateChecksumInStripe(recreatedChunks.get(i).getChecksumData(), checksumBlockChunks.get(i).getStripeChecksum());
+        validateChecksumInStripe(
+          recreatedChunks.get(i).getChecksumData(),
+          checksumBlockChunks.get(i).getStripeChecksum(), i
+        );
       }
-
-
     } else {
       LOG.debug("Checksum validation was disabled, skipping check");
     }
