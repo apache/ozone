@@ -387,7 +387,11 @@ public class KeyValueHandler extends Handler {
     try {
       if (containerSet.getContainer(containerID) == null) {
         newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
-        created = containerSet.addContainer(newContainer, RECOVERING == newContainer.getContainerState());
+        if (RECOVERING == newContainer.getContainerState()) {
+          created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
+        } else {
+          created = containerSet.addContainer(newContainer);
+        }
       } else {
         // The create container request for an already existing container can
         // arrive in case the ContainerStateMachine reapplies the transaction

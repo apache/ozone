@@ -107,6 +107,10 @@ public class ContainerSet implements Iterable<Container<?>> {
     return addContainer(container, false);
   }
 
+  public boolean addContainerByOverwriteMissingContainer(Container<?> container) throws StorageContainerException {
+    return addContainer(container, true);
+  }
+
   public void validateContainerIsMissing(long containerId, State state) throws StorageContainerException {
     if (missingContainerSet.contains(containerId)) {
       throw new StorageContainerException(String.format("Container with container Id %d with state : %s is missing in" +
@@ -168,8 +172,37 @@ public class ContainerSet implements Iterable<Container<?>> {
     return containerMap.get(containerId);
   }
 
+  /**
+   * Removes container from both memory and database. This should be used when the containerData on disk has been
+   * removed completely from the node.
+   * @param containerId
+   * @return True if container is removed from containerMap.
+   * @throws StorageContainerException
+   */
   public boolean removeContainer(long containerId) throws StorageContainerException {
     return removeContainer(containerId, false, true);
+  }
+
+  /**
+   * Removes containerId from memory. This needs to be used when the container is still present on disk, and the
+   * inmemory state of the container needs to be updated.
+   * @param containerId
+   * @return True if container is removed from containerMap.
+   * @throws StorageContainerException
+   */
+  public boolean removeContainerOnlyFromMemory(long containerId) throws StorageContainerException {
+    return removeContainer(containerId, false, false);
+  }
+
+  /**
+   * Marks a container to be missing, thus it removes the container from inmemory containerMap and marks the
+   * container as missing.
+   * @param containerId
+   * @return True if container is removed from containerMap.
+   * @throws StorageContainerException
+   */
+  public boolean removeMissingContainer(long containerId) throws StorageContainerException {
+    return removeContainer(containerId, true, false);
   }
 
   /**
@@ -178,7 +211,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is removed from containerMap returns true, otherwise
    * false
    */
-  public boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB)
+  private boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB)
       throws StorageContainerException {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
@@ -257,7 +290,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     for (Container<?> c : containerMap.values()) {
       ContainerData data = c.getContainerData();
       if (data.getVolume().isFailed()) {
-        removeContainer(data.getContainerID(), true, false);
+        removeMissingContainer(data.getContainerID());
         LOG.debug("Removing Container {} as the Volume {} " +
             "has failed", data.getContainerID(), data.getVolume());
         failedVolume.set(true);
