@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -33,8 +32,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
-
-import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
@@ -106,9 +103,7 @@ public class BackgroundContainerDataScanner extends
           metrics.incNumUnHealthyContainers();
         }
       }
-      ContainerMerkleTree dataTree = result.getDataTree();
-      checksumManager.writeContainerDataTree(containerData, captureLatencyNs(
-          checksumManager.getMetrics().getCreateMerkleTreeLatencyNS(), dataTree::toProto));
+      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
       metrics.incNumContainersScanned();
     }
 

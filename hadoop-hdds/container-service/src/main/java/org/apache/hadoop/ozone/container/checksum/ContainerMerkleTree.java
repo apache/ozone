@@ -91,7 +91,7 @@ public class ContainerMerkleTree {
   /**
    * Represents a merkle tree for a single block within a container.
    */
-  public static class BlockMerkleTree {
+  private static class BlockMerkleTree {
     // Map of each offset within the block to its chunk info.
     // Chunk order in the checksum is determined by their offset.
     private final SortedMap<Long, ChunkMerkleTree> offset2Chunk;
@@ -150,7 +150,7 @@ public class ContainerMerkleTree {
    * Each chunk has multiple checksums within it at each "bytesPerChecksum" interval.
    * This class computes one checksum for the whole chunk by aggregating these.
    */
-  public static class ChunkMerkleTree {
+  private static class ChunkMerkleTree {
     private ContainerProtos.ChunkInfo chunk;
     private boolean isHealthy = true;
 

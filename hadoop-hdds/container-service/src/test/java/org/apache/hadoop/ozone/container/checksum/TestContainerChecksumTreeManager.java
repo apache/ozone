@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTreeWithMismatches;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,8 +68,8 @@ class TestContainerChecksumTreeManager {
   private ConfigurationSource config;
 
   /**
-   * The number of mismatched to be introduced in the container diff. The order is of follow,
-   * Number of missing blocks, Number of missing chunks, Number of corrupt chunks.
+   * The number of mismatched to be introduced in the container diff. The arguments are
+   * number of missing blocks, number of missing chunks, number of corrupt chunks.
    */
   public static Stream<Arguments> getContainerDiffMismatches() {
     return Stream.of(
@@ -104,8 +105,9 @@ class TestContainerChecksumTreeManager {
   public void testWriteEmptyTreeToFile() throws Exception {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
-    checksumManager.writeContainerDataTree(container, new ContainerMerkleTree().toProto());
+    checksumManager.writeContainerDataTree(container, new ContainerMerkleTree());
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
+    assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
 
@@ -136,10 +138,11 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
 
+    assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     // TestContainerMerkleTree verifies that going from ContainerMerkleTree to its proto is consistent.
@@ -198,12 +201,13 @@ class TestContainerChecksumTreeManager {
     checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
 
+    assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
     assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
@@ -215,7 +219,7 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getCreateMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
@@ -224,6 +228,7 @@ class TestContainerChecksumTreeManager {
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumFile(container);
 
+    assertTrue(metrics.getCreateMerkleTreeLatencyNS().lastStat().total() > 0);
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
     assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
@@ -234,9 +239,9 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);
   }
@@ -253,14 +258,14 @@ class TestContainerChecksumTreeManager {
     assertFalse(tmpFile.exists());
     assertFalse(finalFile.exists());
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertFalse(tmpFile.exists());
     assertTrue(finalFile.exists());
 
     // Make the write to the tmp file fail by removing permissions on its parent.
     assertTrue(tmpFile.getParentFile().setWritable(false));
     try {
-      checksumManager.writeContainerDataTree(container, tree.toProto());
+      checksumManager.writeContainerDataTree(container, tree);
       fail("Write to the tmp file should have failed.");
     } catch (IOException ex) {
       LOG.info("Write to the tmp file failed as expected with the following exception: ", ex);
@@ -277,7 +282,7 @@ class TestContainerChecksumTreeManager {
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
     assertFalse(finalFile.exists());
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTrue(finalFile.exists());
 
     // Corrupt the file so it is not a valid protobuf.
@@ -289,7 +294,7 @@ class TestContainerChecksumTreeManager {
 
     // The manager's read/modify/write cycle should account for the corruption and overwrite the entry.
     // No exception should be thrown.
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTreesSortedAndMatch(tree.toProto(), readChecksumFile(container).getContainerMerkleTree());
   }
 
@@ -303,7 +308,7 @@ class TestContainerChecksumTreeManager {
     File finalFile = ContainerChecksumTreeManager.getContainerChecksumFile(container);
     assertFalse(finalFile.exists());
     ContainerMerkleTree tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     assertTrue(finalFile.exists());
 
     // Truncate the file to zero length.
@@ -319,7 +324,7 @@ class TestContainerChecksumTreeManager {
 
     // The manager's read/modify/write cycle should account for the empty file and overwrite it with a valid entry.
     // No exception should be thrown.
-    checksumManager.writeContainerDataTree(container, tree.toProto());
+    checksumManager.writeContainerDataTree(container, tree);
     ContainerProtos.ContainerChecksumInfo info = readChecksumFile(container);
     assertTreesSortedAndMatch(tree.toProto(), info.getContainerMerkleTree());
     assertEquals(CONTAINER_ID, info.getContainerID());
@@ -329,15 +334,15 @@ class TestContainerChecksumTreeManager {
   public void testContainerWithNoDiff() throws Exception {
     ContainerMerkleTree ourMerkleTree = buildTestTree(config);
     ContainerMerkleTree peerMerkleTree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, ourMerkleTree.toProto());
+    checksumManager.writeContainerDataTree(container, ourMerkleTree);
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
             .setContainerID(container.getContainerID())
             .setContainerMerkleTree(peerMerkleTree.toProto()).build();
-    ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
+    ContainerDiffReport diff = checksumManager.diff(container, peerChecksumInfo);
     assertTrue(checksumManager.getMetrics().getMerkleTreeDiffLatencyNS().lastStat().total() > 0);
     assertFalse(diff.needsRepair());
-    assertTrue(checksumManager.getMetrics().getNoRepairContainerDiffs() > 0);
-    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
+    assertEquals(checksumManager.getMetrics().getNoRepairContainerDiffs(), 1);
+    assertEquals(checksumManager.getMetrics().getMerkleTreeDiffSuccess(), 1);
   }
 
   /**
@@ -349,24 +354,24 @@ class TestContainerChecksumTreeManager {
   public void testContainerDiffWithMismatches(int numMissingBlock, int numMissingChunk,
                                               int numCorruptChunk) throws Exception {
     ContainerMerkleTree peerMerkleTree = buildTestTree(config);
-    Pair<ContainerProtos.ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
+    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> buildResult =
         buildTestTreeWithMismatches(peerMerkleTree, numMissingBlock, numMissingChunk, numCorruptChunk);
-    ContainerChecksumTreeManager.ContainerDiff expectedDiff = buildResult.getRight();
+    ContainerDiffReport expectedDiff = buildResult.getRight();
     ContainerProtos.ContainerMerkleTree ourMerkleTree = buildResult.getLeft();
-    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+    writeContainerDataTreeProto(container, ourMerkleTree);
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
         .setContainerID(container.getContainerID())
         .setContainerMerkleTree(peerMerkleTree.toProto()).build();
-    ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
+    ContainerDiffReport diff = checksumManager.diff(container, peerChecksumInfo);
     assertTrue(metrics.getMerkleTreeDiffLatencyNS().lastStat().total() > 0);
     assertContainerDiffMatch(expectedDiff, diff);
-    assertTrue(checksumManager.getMetrics().getRepairContainerDiffs() > 0);
-    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
+    assertEquals(checksumManager.getMetrics().getRepairContainerDiffs(), 1);
+    assertEquals(checksumManager.getMetrics().getMerkleTreeDiffSuccess(), 1);
   }
 
   /**
    * Test if a peer which has missing blocks and chunks affects our container diff. If the peer tree has mismatches
-   * with respect to our merkle tree then we need to should not include that mismatch in the container diff.
+   * with respect to our merkle tree then we should not include that mismatch in the container diff.
    * The ContainerDiff generated by the peer when it reconciles with our merkle tree will capture that mismatch.
    */
   @ParameterizedTest(name = "Missing blocks: {0}, Missing chunks: {1}, Corrupt chunks: {2}")
@@ -374,23 +379,23 @@ class TestContainerChecksumTreeManager {
   public void testPeerWithMismatchesHasNoDiff(int numMissingBlock, int numMissingChunk,
                                               int numCorruptChunk) throws Exception {
     ContainerMerkleTree ourMerkleTree = buildTestTree(config);
-    Pair<ContainerProtos.ContainerMerkleTree, ContainerChecksumTreeManager.ContainerDiff> buildResult =
+    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> buildResult =
         buildTestTreeWithMismatches(ourMerkleTree, numMissingBlock, numMissingChunk, numCorruptChunk);
     ContainerProtos.ContainerMerkleTree peerMerkleTree =  buildResult.getLeft();
-    checksumManager.writeContainerDataTree(container, ourMerkleTree.toProto());
+    checksumManager.writeContainerDataTree(container, ourMerkleTree);
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
         .setContainerID(container.getContainerID())
         .setContainerMerkleTree(peerMerkleTree).build();
-    ContainerChecksumTreeManager.ContainerDiff diff = checksumManager.diff(container, peerChecksumInfo);
+    ContainerDiffReport diff = checksumManager.diff(container, peerChecksumInfo);
     assertFalse(diff.needsRepair());
-    assertTrue(checksumManager.getMetrics().getNoRepairContainerDiffs() > 0);
-    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffSuccess() > 0);
+    assertEquals(checksumManager.getMetrics().getNoRepairContainerDiffs(), 1);
+    assertEquals(checksumManager.getMetrics().getMerkleTreeDiffSuccess(), 1);
   }
 
   @Test
   public void testFailureContainerMerkleTreeMetric() {
     assertThrows(Exception.class, () -> checksumManager.diff(container, null));
-    assertTrue(checksumManager.getMetrics().getMerkleTreeDiffFailure() > 0);
+    assertEquals(checksumManager.getMetrics().getMerkleTreeDiffFailure(), 1);
   }
 
   /**
@@ -409,8 +414,8 @@ class TestContainerChecksumTreeManager {
         .addAllDeletedBlocks(deletedBlockList);
 
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
-    checksumManager.writeContainerDataTree(container, ourMerkleTree);
-    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+    writeContainerDataTreeProto(container, ourMerkleTree);
+    ContainerDiffReport containerDiff = checksumManager.diff(container, peerChecksumInfo);
 
     // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
     // in peer merkle tree.
@@ -444,10 +449,10 @@ class TestContainerChecksumTreeManager {
         .newBuilder().setContainerMerkleTree(ourMerkleTree).setContainerID(CONTAINER_ID);
 
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
-    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+    writeContainerDataTreeProto(container, ourMerkleTree);
     checksumManager.markBlocksAsDeleted(container, deletedBlockList);
 
-    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+    ContainerDiffReport containerDiff = checksumManager.diff(container, peerChecksumInfo);
 
     // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
     // in our merkle tree.
@@ -472,9 +477,9 @@ class TestContainerChecksumTreeManager {
         .addAllDeletedBlocks(deletedBlockList);
 
     ContainerProtos.ContainerChecksumInfo peerChecksumInfo = peerChecksumInfoBuilder.build();
-    checksumManager.writeContainerDataTree(container, ourMerkleTree);
+    writeContainerDataTreeProto(container, ourMerkleTree);
 
-    ContainerChecksumTreeManager.ContainerDiff containerDiff = checksumManager.diff(container, peerChecksumInfo);
+    ContainerDiffReport containerDiff = checksumManager.diff(container, peerChecksumInfo);
 
     // The diff should not have any missing block/missing chunk/corrupt chunks as the blocks are deleted
     // in peer merkle tree.

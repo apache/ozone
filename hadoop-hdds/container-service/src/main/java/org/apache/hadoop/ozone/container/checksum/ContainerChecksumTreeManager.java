@@ -30,11 +30,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Collection;
 import java.util.Set;
@@ -85,7 +82,7 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(ContainerData data, ContainerProtos.ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
@@ -103,7 +100,7 @@ public class ContainerChecksumTreeManager {
 
       checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(tree);
+          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
       write(data, checksumInfoBuilder.build());
       LOG.debug("Data merkle tree for container {} updated", containerID);
     } finally {
@@ -149,9 +146,10 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo peerChecksumInfo)
-      throws Exception {
-    ContainerDiff report = new ContainerDiff();
+  public ContainerDiffReport diff(KeyValueContainerData thisContainer,
+                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws Exception {
+
+    ContainerDiffReport report = new ContainerDiffReport();
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
         Preconditions.assertNotNull(thisContainer, "Container data is null");
@@ -187,7 +185,7 @@ public class ContainerChecksumTreeManager {
 
   private void compareContainerMerkleTree(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
                                           ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
-                                          ContainerDiff report) {
+                                          ContainerDiffReport report) {
     ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
     ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
     Set<Long> thisDeletedBlockSet = new HashSet<>(thisChecksumInfo.getDeletedBlocksList());
@@ -213,6 +211,7 @@ public class ContainerChecksumTreeManager {
         //    block and the peer's BG service hasn't run yet. We can ignore comparing them.
         // 3) If the block is only deleted in peer merkle tree, we can't reconcile for this block. It might be
         //    deleted by peer's BG service. We can ignore comparing them.
+        // TODO: Handle missed block deletions from the deleted block ids.
         if (!thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
             !peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
             thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
@@ -249,7 +248,7 @@ public class ContainerChecksumTreeManager {
 
   private void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
                                       ContainerProtos.BlockMerkleTree peerBlockMerkleTree,
-                                      ContainerDiff report) {
+                                      ContainerDiffReport report) {
 
     List<ContainerProtos.ChunkMerkleTree> thisChunkMerkleTreeList = thisBlockMerkleTree.getChunkMerkleTreeList();
     List<ContainerProtos.ChunkMerkleTree> peerChunkMerkleTreeList = peerBlockMerkleTree.getChunkMerkleTreeList();
@@ -383,53 +382,4 @@ public class ContainerChecksumTreeManager {
     return checksumFile.exists();
   }
 
-  /**
-   * This class represents the difference between our replica of a container and a peer's replica of a container.
-   * It summarizes the operations we need to do to reconcile our replica with the peer replica it was compared to.
-   *
-   */
-  public static class ContainerDiff {
-    private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
-    private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
-    private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
-
-    public ContainerDiff() {
-      this.missingBlocks = new ArrayList<>();
-      this.missingChunks = new HashMap<>();
-      this.corruptChunks = new HashMap<>();
-    }
-
-    public void addMissingBlock(ContainerProtos.BlockMerkleTree missingBlockMerkleTree) {
-      this.missingBlocks.add(missingBlockMerkleTree);
-    }
-
-    public void addMissingChunk(long blockId, ContainerProtos.ChunkMerkleTree missingChunkMerkleTree) {
-      this.missingChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(missingChunkMerkleTree);
-    }
-
-    public void addCorruptChunk(long blockId, ContainerProtos.ChunkMerkleTree corruptChunk) {
-      this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
-    }
-
-    public List<ContainerProtos.BlockMerkleTree> getMissingBlocks() {
-      return missingBlocks;
-    }
-
-    public Map<Long, List<ContainerProtos.ChunkMerkleTree>> getMissingChunks() {
-      return missingChunks;
-    }
-
-    public Map<Long, List<ContainerProtos.ChunkMerkleTree>> getCorruptChunks() {
-      return corruptChunks;
-    }
-
-    /**
-     * If needRepair is true, It means current replica needs blocks/chunks from the peer to repair
-     * its container replica. The peer replica still may have corruption, which it will fix when
-     * it reconciles with other peers.
-     */
-    public boolean needsRepair() {
-      return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
-    }
-  }
 }
