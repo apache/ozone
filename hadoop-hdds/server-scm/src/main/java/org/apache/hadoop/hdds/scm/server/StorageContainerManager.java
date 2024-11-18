@@ -1595,8 +1595,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    // At this point leader is not known
-    scmHAMetricsUpdate(null);
+    AtomicBoolean leaderIsDefined = new AtomicBoolean(false);
+    if (SCMHAUtils.isSCMHAEnabled(configuration)) {
+      getScmHAManager().getRatisServer().getRatisRoles().stream()
+          .filter(peerState -> peerState.contains("LEADER"))
+          .findFirst()
+          .ifPresent(peerState -> {
+            leaderIsDefined.set(true);
+            String[] peerInfo = peerState.split(":");
+            scmHAMetricsUpdate(peerInfo[3]);
+          });
+    }
+
+    if (!leaderIsDefined.get()) {
+      // At this point leader is not known
+      scmHAMetricsUpdate(null);
+    }
 
     if (scmCertificateClient != null) {
       // In case root CA certificate is rotated during this SCM is offline
@@ -2298,7 +2312,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // unregister, in case metrics already exist
     // so that the metric tags will get updated.
     SCMHAMetrics.unRegister();
-
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
