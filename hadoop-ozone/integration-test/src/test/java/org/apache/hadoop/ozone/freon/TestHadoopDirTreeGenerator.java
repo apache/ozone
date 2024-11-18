@@ -113,16 +113,16 @@ public class TestHadoopDirTreeGenerator {
       out.getFD().sync();
       out.close();
 
-//      verifyDirTree("vol1", "bucket1", 1,
-//              1, 1, "0");
-//      verifyDirTree("vol2", "bucket1", 1,
-//              5, 1, "5B");
-//      verifyDirTree("vol3", "bucket1", 2,
-//              5, 3, "1B");
-//      verifyDirTree("vol4", "bucket1", 3,
-//              2, 4, "2B");
-//      verifyDirTree("vol5", "bucket1", 5,
-//              4, 1, "0");
+      verifyDirTree("vol1", "bucket1", 1,
+              1, 1, "0");
+      verifyDirTree("vol2", "bucket1", 1,
+              5, 1, "5B");
+      verifyDirTree("vol3", "bucket1", 2,
+              5, 3, "1B");
+      verifyDirTree("vol4", "bucket1", 3,
+              2, 4, "2B");
+      verifyDirTree("vol5", "bucket1", 5,
+              4, 1, "0");
       // default page size is Constants.LISTING_PAGE_SIZE = 1024
       verifyDirTree("vol6", "bucket1", 2,
               1, 1100, "0");
