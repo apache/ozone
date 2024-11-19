@@ -2107,7 +2107,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <properties>
         <test>void</test>
         <skip.npx>true</skip.npx>
-        <skip.installnpx>true</skip.installnpx>
+        <skip.installnodenpm>true</skip.installnodenpm>
         <skipDocs>true</skipDocs>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
