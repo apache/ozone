@@ -25,8 +25,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -50,21 +50,31 @@ public final class OzoneAclUtil {
   /**
    * Helper function to get access acl list for current user.
    *
-   * @param userName
-   * @param userGroups
+   * @param ugi current login user
    * @return list of OzoneAcls
    * */
-  public static List<OzoneAcl> getAclList(String userName,
-      String[] userGroups, ACLType userRights, ACLType groupRights) {
-
+  public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType[] userRights, ACLType[] groupRights) {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
-
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, userName, ACCESS, userRights));
-    if (userGroups != null) {
-      // Group ACLs of the User.
-      Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
-          new OzoneAcl(GROUP, group, ACCESS, groupRights)));
+    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userRights));
+    try {
+      String groupName = ugi.getPrimaryGroupName();
+      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupRights));
+    } catch (IOException e) {
+      // do nothing, since user has the permission, user can add ACL for selected groups later.
+    }
+    return listOfAcls;
+  }
+
+  public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType userRights, ACLType groupRights) {
+    List<OzoneAcl> listOfAcls = new ArrayList<>();
+    // User ACL.
+    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userRights));
+    try {
+      String groupName = ugi.getPrimaryGroupName();
+      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupRights));
+    } catch (IOException e) {
+      // do nothing, since user has the permission, user can add ACL for selected groups later.
     }
     return listOfAcls;
   }

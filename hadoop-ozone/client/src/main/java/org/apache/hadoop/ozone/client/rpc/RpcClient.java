@@ -161,7 +161,6 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -210,8 +209,8 @@ public class RpcClient implements ClientProtocol {
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
   private UserGroupInformation s3gUgi;
-  private final ACLType userRights;
-  private final ACLType groupRights;
+  private final ACLType[] userRights;
+  private final ACLType[] groupRights;
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -450,15 +449,8 @@ public class RpcClient implements ClientProtocol {
         ugi.getShortUserName() : volArgs.getOwner();
     long quotaInNamespace = volArgs.getQuotaInNamespace();
     long quotaInBytes = volArgs.getQuotaInBytes();
-    List<OzoneAcl> listOfAcls = new ArrayList<>();
-    //User ACL
-    listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
-        owner, ACCESS, userRights));
-    //Group ACLs of the User
-    List<String> userGroups = Arrays.asList(UserGroupInformation
-        .createRemoteUser(owner).getGroupNames());
-    userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, groupRights)));
+    List<OzoneAcl> listOfAcls =
+        OzoneAclUtil.getAclList(UserGroupInformation.createRemoteUser(owner), userRights, groupRights);
     //ACLs from VolumeArgs
     List<OzoneAcl> volumeAcls = volArgs.getAcls();
     if (volumeAcls != null) {
@@ -759,8 +751,7 @@ public class RpcClient implements ClientProtocol {
    * */
   private List<OzoneAcl> getAclList() {
     UserGroupInformation realUserInfo = getRealUserInfo();
-    return OzoneAclUtil.getAclList(realUserInfo.getUserName(),
-        realUserInfo.getGroupNames(), userRights, groupRights);
+    return OzoneAclUtil.getAclList(realUserInfo, userRights, groupRights);
   }
 
   /**
