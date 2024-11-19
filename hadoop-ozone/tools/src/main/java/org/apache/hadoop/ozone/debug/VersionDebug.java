@@ -67,8 +67,10 @@ public class VersionDebug implements Callable<Void>, SubcommandWithParent {
 
   private static <T extends Enum<T> & ComponentVersion> Map<String, Object> asMap(T version) {
     return ImmutableSortedMap.of(
-        "name", version.name(),
-        "protoValue", version.toProtoValue()
+        "componentVersion", ImmutableSortedMap.of(
+            "name", version.name(),
+            "protoValue", version.toProtoValue()
+        )
     );
   }
 
