@@ -117,6 +117,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -184,7 +185,7 @@ abstract class AbstractOzoneFileSystemTest {
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
-
+    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
@@ -2093,8 +2094,8 @@ abstract class AbstractOzoneFileSystemTest {
     final long initialListStatusCount = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 1);
-    assertEquals(initialListStatusCount + 1, omMetrics.getNumListStatus());
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
+    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
     dirPath = RandomStringUtils.randomAlphanumeric(5);
@@ -2105,8 +2106,8 @@ abstract class AbstractOzoneFileSystemTest {
 
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
-    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 4);
+    assertEquals(initialListStatusCount + 4, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertThat(Arrays.asList(statusList)).contains(fs.getFileStatus(p));
     }

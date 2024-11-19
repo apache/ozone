@@ -938,25 +938,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
     List<FileStatusAdapter> tmpStatusList;
     String startPath = "";
-
+    int entriesAdded;
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startPath,
               numEntries, uri, workingDir, getUsername(), lite);
-
+      entriesAdded = 0;
       if (!tmpStatusList.isEmpty()) {
         if (startPath.isEmpty() || !statuses.getLast().getPath().toString()
             .equals(tmpStatusList.get(0).getPath().toString())) {
           statuses.addAll(tmpStatusList);
+          entriesAdded += tmpStatusList.size();
         } else {
           statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
+          entriesAdded += tmpStatusList.size() - 1;
         }
         startPath = pathToKey(statuses.getLast().getPath());
       }
       // listStatus returns entries numEntries in size if available.
       // Any lesser number of entries indicate that the required entries have
       // exhausted.
-    } while (tmpStatusList.size() == numEntries);
+    } while (entriesAdded > 0);
 
     return statuses;
   }
@@ -1265,8 +1267,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
       if (i >= thisListing.size()) {
-        if (startPath != null && (thisListing.size() == listingPageSize ||
-            thisListing.size() == listingPageSize - 1)) {
+        if (startPath != null && (!thisListing.isEmpty())) {
           // current listing is exhausted & fetch a new listing
           thisListing = listFileStatus(p, startPath, lite);
           if (thisListing != null && !thisListing.isEmpty()) {
