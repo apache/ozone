@@ -269,7 +269,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   }
 
-  private void validatePeers(RaftServer server, RaftGroupId id) throws IOException {
+  private void validatePeers() throws IOException {
     if (this.peersValidated.get()) {
       return;
     }
@@ -980,7 +980,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         = () -> {
           try {
             try {
-              this.validatePeers(this.ratisServer.getServer(), getGroupId());
+              this.validatePeers();
             } catch (StorageContainerException e) {
               return ContainerUtils.logAndReturnError(LOG, e, request);
             }
