@@ -72,4 +72,12 @@ public class ContainerDiffReport {
   public boolean needsRepair() {
     return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
   }
+
+  @Override
+  public String toString() {
+    return "ContainerDiffReport:" +
+        " MissingBlocks= " + missingBlocks.size() +
+        ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum() +
+        ", CorruptChunks= " + corruptChunks.values().stream().mapToInt(List::size).sum();
+  }
 }

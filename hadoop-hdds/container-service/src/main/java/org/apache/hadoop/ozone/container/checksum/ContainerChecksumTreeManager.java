@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -90,7 +91,7 @@ public class ContainerChecksumTreeManager {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
       try {
         // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = read(data)
+        checksumInfoBuilder = readBuilder(data)
             .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
       } catch (IOException ex) {
         LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
@@ -121,7 +122,7 @@ public class ContainerChecksumTreeManager {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
       try {
         // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = read(data)
+        checksumInfoBuilder = readBuilder(data)
             .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
       } catch (IOException ex) {
         LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
@@ -147,39 +148,39 @@ public class ContainerChecksumTreeManager {
   }
 
   public ContainerDiffReport diff(KeyValueContainerData thisContainer,
-                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws Exception {
+                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws SCMException {
 
     ContainerDiffReport report = new ContainerDiffReport();
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
         Preconditions.assertNotNull(thisContainer, "Container data is null");
         Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null");
-        Optional<ContainerProtos.ContainerChecksumInfo.Builder> thisContainerChecksumInfoBuilder =
-            read(thisContainer);
-        if (!thisContainerChecksumInfoBuilder.isPresent()) {
-          throw new IOException("The container #" + thisContainer.getContainerID() +
-              " doesn't have container checksum");
+        Optional<ContainerProtos.ContainerChecksumInfo> thisContainerChecksumInfo = read(thisContainer);
+        if (!thisContainerChecksumInfo.isPresent()) {
+          throw new SCMException("The container #" + thisContainer.getContainerID() +
+              " doesn't have container checksum", SCMException.ResultCodes.IO_EXCEPTION);
         }
 
         if (thisContainer.getContainerID() != peerChecksumInfo.getContainerID()) {
-          throw new IOException("Container Id does not match for container " + thisContainer.getContainerID());
+          throw new SCMException("Container Id does not match for container " + thisContainer.getContainerID(),
+              SCMException.ResultCodes.CONTAINER_CHECKSUM_ERROR);
         }
 
-        ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfoBuilder.get().build();
+        ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfo.get();
         compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       metrics.incrementMerkleTreeDiffFailures();
-      throw new Exception("Container Diff failed for container #" + thisContainer.getContainerID(), ex);
+      throw new SCMException("Container Diff failed for container #" + thisContainer.getContainerID(), ex,
+          SCMException.ResultCodes.CONTAINER_CHECKSUM_ERROR);
     }
 
     // Update Container Diff metrics based on the diff report.
     if (report.needsRepair()) {
       metrics.incrementRepairContainerDiffs();
-    } else {
-      metrics.incrementNoRepairContainerDiffs();
+      return report;
     }
-    metrics.incrementMerkleTreeDiffSuccesses();
+    metrics.incrementNoRepairContainerDiffs();
     return report;
   }
 
@@ -313,7 +314,7 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  private Optional<ContainerProtos.ContainerChecksumInfo.Builder> read(ContainerData data) throws IOException {
+  private Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
@@ -323,13 +324,18 @@ public class ContainerChecksumTreeManager {
       }
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
         return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(),
-            () -> Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream).toBuilder()));
+            () -> Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream)));
       }
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
       throw new IOException("Error occurred when reading container merkle tree for containerID "
               + data.getContainerID() + " at path " + checksumFile, ex);
     }
+  }
+
+  private Optional<ContainerProtos.ContainerChecksumInfo.Builder> readBuilder(ContainerData data) throws IOException {
+    Optional<ContainerProtos.ContainerChecksumInfo> checksumInfo = read(data);
+    return checksumInfo.map(ContainerProtos.ContainerChecksumInfo::toBuilder);
   }
 
   /**

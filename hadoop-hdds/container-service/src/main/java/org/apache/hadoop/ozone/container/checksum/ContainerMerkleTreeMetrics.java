@@ -54,9 +54,6 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of Merkle tree diff failure")
   private MutableCounterLong numMerkleTreeDiffFailure;
 
-  @Metric(about = "Number of Merkle tree diff success")
-  private MutableCounterLong numMerkleTreeDiffSuccess;
-
   @Metric(about = "Number of container diff that doesn't require repair")
   private MutableCounterLong numNoRepairContainerDiff;
 
@@ -87,13 +84,10 @@ public class ContainerMerkleTreeMetrics {
     this.numMerkleTreeDiffFailure.incr();
   }
 
-  public void incrementMerkleTreeDiffSuccesses() {
-    this.numMerkleTreeDiffSuccess.incr();
-  }
-
   public void incrementNoRepairContainerDiffs() {
     this.numNoRepairContainerDiff.incr();
   }
+
   public void incrementRepairContainerDiffs() {
     this.numRepairContainerDiff.incr();
   }
@@ -120,10 +114,6 @@ public class ContainerMerkleTreeMetrics {
 
   public long getRepairContainerDiffs() {
     return this.numRepairContainerDiff.value();
-  }
-
-  public long getMerkleTreeDiffSuccess() {
-    return this.numMerkleTreeDiffSuccess.value();
   }
 
   public long getMerkleTreeDiffFailure() {
