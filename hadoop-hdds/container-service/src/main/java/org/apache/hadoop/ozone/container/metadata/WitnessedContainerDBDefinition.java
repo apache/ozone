@@ -19,12 +19,11 @@ package org.apache.hadoop.ozone.container.metadata;
  *
  */
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.Proto2EnumCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
@@ -36,11 +35,11 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
   private static final String CONTAINER_IDS_TABLE_NAME = "containerIds";
 
-  public static final DBColumnFamilyDefinition<Long, State>
+  public static final DBColumnFamilyDefinition<Long, String>
       CONTAINER_IDS_TABLE = new DBColumnFamilyDefinition<>(
       CONTAINER_IDS_TABLE_NAME,
       LongCodec.get(),
-      Proto2EnumCodec.get(State.OPEN));
+      StringCodec.get());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -66,7 +65,7 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
     return ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
   }
 
-  public DBColumnFamilyDefinition<Long, State> getContainerIdsTable() {
+  public DBColumnFamilyDefinition<Long, String> getContainerIdsTable() {
     return CONTAINER_IDS_TABLE;
   }
 }

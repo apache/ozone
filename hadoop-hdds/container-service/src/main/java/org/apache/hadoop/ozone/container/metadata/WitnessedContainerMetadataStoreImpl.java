@@ -20,13 +20,10 @@ package org.apache.hadoop.ozone.container.metadata;
  */
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.ozone.container.common.utils.BaseReferenceCountedDB;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -39,33 +36,24 @@ import java.util.concurrent.ConcurrentMap;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<Long, ContainerProtos.ContainerDataProto.State> containerIdsTable;
-  private static final ConcurrentMap<String, BaseReferenceCountedDB<WitnessedContainerMetadataStore>> INSTANCES =
+  private Table<Long, String> containerIdsTable;
+  private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
 
-  public static ReferenceCountedHandle<WitnessedContainerMetadataStore> get(ConfigurationSource conf)
+  public static WitnessedContainerMetadataStore get(ConfigurationSource conf)
       throws IOException {
     String dbDirPath = DBStoreBuilder.getDBDirPath(WitnessedContainerDBDefinition.get(), conf).getAbsolutePath();
     try {
-      return new ReferenceCountedHandle<>(INSTANCES.compute(dbDirPath, (k, v) -> {
-        if (v != null) {
-          v.incrementReference();
-        }
+      return INSTANCES.compute(dbDirPath, (k, v) -> {
         if (v == null || v.isClosed()) {
           try {
-            WitnessedContainerMetadataStore
-                witnessedContainerMetadataStore = new WitnessedContainerMetadataStoreImpl(conf, false);
-            BaseReferenceCountedDB<WitnessedContainerMetadataStore> referenceCountedDB =
-                new BaseReferenceCountedDB<>(witnessedContainerMetadataStore,
-                    witnessedContainerMetadataStore.getStore().getDbLocation().getAbsolutePath());
-            referenceCountedDB.incrementReference();
-            return referenceCountedDB;
+            return new WitnessedContainerMetadataStoreImpl(conf, false);
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
         }
         return v;
-      }));
+      });
     } catch (UncheckedIOException e) {
       throw e.getCause();
     }
@@ -84,7 +72,7 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
   }
 
   @Override
-  public Table<Long, ContainerProtos.ContainerDataProto.State> getContainerIdsTable() {
+  public Table<Long, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 }

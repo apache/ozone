@@ -24,7 +24,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -56,7 +55,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -137,7 +135,7 @@ public class OzoneContainer {
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
-  private ReferenceCountedHandle<WitnessedContainerMetadataStore> witnessedContainerMetadataStore;
+  private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -192,8 +190,7 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = new ContainerSet(witnessedContainerMetadataStore.getStore().getContainerIdsTable(),
-        recoveringContainerTimeout);
+    containerSet = new ContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(), recoveringContainerTimeout);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -342,7 +339,7 @@ public class OzoneContainer {
       for (int i = 0; i < volumeThreads.size(); i++) {
         volumeThreads.get(i).join();
       }
-      try (TableIterator<Long, ? extends Table.KeyValue<Long, ContainerProtos.ContainerDataProto.State>> itr =
+      try (TableIterator<Long, ? extends Table.KeyValue<Long, String>> itr =
                containerSet.getContainerIdsTable().iterator()) {
         Map<Long, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
@@ -547,7 +544,7 @@ public class OzoneContainer {
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
     if (this.witnessedContainerMetadataStore != null) {
-      this.witnessedContainerMetadataStore.close();
+      IOUtils.close(LOG, this.witnessedContainerMetadataStore);
       this.witnessedContainerMetadataStore = null;
     }
   }

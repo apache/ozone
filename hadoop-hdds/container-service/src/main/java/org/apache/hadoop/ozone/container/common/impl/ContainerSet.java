@@ -69,18 +69,18 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListMap<>();
   private Clock clock;
   private long recoveringTimeout;
-  private final Table<Long, State> containerIdsTable;
+  private final Table<Long, String> containerIdsTable;
 
   @VisibleForTesting
   public ContainerSet(long recoveringTimeout) {
     this(new InMemoryTestTable<>(), recoveringTimeout);
   }
 
-  public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout) {
+  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, false);
   }
 
-  public ContainerSet(Table<Long, State> continerIdsTable, long recoveringTimeout, boolean readOnly) {
+  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout, boolean readOnly) {
     this.clock = Clock.system(ZoneOffset.UTC);
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
@@ -154,7 +154,7 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.put(containerId, containerState);
+          containerIdsTable.put(containerId, containerState.toString());
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -469,7 +469,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return missingContainerSet;
   }
 
-  public Table<Long, State> getContainerIdsTable() {
+  public Table<Long, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 

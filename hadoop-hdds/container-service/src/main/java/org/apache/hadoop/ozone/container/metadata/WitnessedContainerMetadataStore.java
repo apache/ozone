@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.metadata;
  *
  */
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -31,5 +30,5 @@ public interface WitnessedContainerMetadataStore extends DBStoreManager {
    *
    * @return Table
    */
-  Table<Long, ContainerProtos.ContainerDataProto.State> getContainerIdsTable();
+  Table<Long, String> getContainerIdsTable();
 }

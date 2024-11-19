@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
@@ -85,7 +84,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
-  private ReferenceCountedHandle<WitnessedContainerMetadataStore> witnessedContainerMetadataStore;
+  private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
   private List<ReplicationTask> replicationTasks;
 
@@ -187,10 +186,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-    ReferenceCountedHandle<WitnessedContainerMetadataStore> referenceCountedDS =
+    WitnessedContainerMetadataStore referenceCountedDS =
         WitnessedContainerMetadataStoreImpl.get(conf);
     this.witnessedContainerMetadataStore = referenceCountedDS;
-    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore().getContainerIdsTable(), 1000);
+    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
