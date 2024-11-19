@@ -2113,6 +2113,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <maven.shade.skip>true</maven.shade.skip>
       </properties>
     </profile>
+
+    <profile>
+      <id>skip-frontend</id>
+      <activation>
+        <property>
+          <name>skipRecon</name>
+        </property>
+      </activation>
+      <properties>
+        <skip.npx>true</skip.npx>
+        <skip.installnodenpm>true</skip.installnodenpm>
+      </properties>
+    </profile>
+
     <profile>
       <!-- @Native tests are excluded by default.  This profile removes the exclusion if native build is enabled. -->
       <id>rocks-native-tests</id>
