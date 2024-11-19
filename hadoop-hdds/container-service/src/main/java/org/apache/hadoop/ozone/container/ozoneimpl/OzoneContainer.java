@@ -63,7 +63,8 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
-import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -136,7 +137,7 @@ public class OzoneContainer {
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
-  private ReferenceCountedHandle<MasterVolumeMetadataStore> masterVolumeMetadataStore;
+  private ReferenceCountedHandle<WitnessedContainerMetadataStore> witnessedContainerMetadataStore;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -190,8 +191,8 @@ public class OzoneContainer {
     long recoveringContainerTimeout = config.getTimeDuration(
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    this.masterVolumeMetadataStore = MasterVolumeMetadataStore.get(conf);
-    containerSet = new ContainerSet(masterVolumeMetadataStore.getStore().getContainerIdsTable(),
+    this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
+    containerSet = new ContainerSet(witnessedContainerMetadataStore.getStore().getContainerIdsTable(),
         recoveringContainerTimeout);
     metadataScanner = null;
 
@@ -545,9 +546,9 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
-    if (this.masterVolumeMetadataStore != null) {
-      this.masterVolumeMetadataStore.close();
-      this.masterVolumeMetadataStore = null;
+    if (this.witnessedContainerMetadataStore != null) {
+      this.witnessedContainerMetadataStore.close();
+      this.witnessedContainerMetadataStore = null;
     }
   }
 

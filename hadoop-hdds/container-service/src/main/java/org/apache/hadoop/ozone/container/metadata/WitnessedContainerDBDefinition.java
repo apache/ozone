@@ -32,7 +32,7 @@ import java.util.Map;
 /**
  * Class for defining the schema for master volume in a datanode.
  */
-public final class MasterVolumeDBDefinition extends DBDefinition.WithMap {
+public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
   private static final String CONTAINER_IDS_TABLE_NAME = "containerIds";
 
@@ -46,19 +46,19 @@ public final class MasterVolumeDBDefinition extends DBDefinition.WithMap {
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
       CONTAINER_IDS_TABLE);
 
-  private static final MasterVolumeDBDefinition INSTANCE = new MasterVolumeDBDefinition();
+  private static final WitnessedContainerDBDefinition INSTANCE = new WitnessedContainerDBDefinition();
 
-  public static MasterVolumeDBDefinition get() {
+  public static WitnessedContainerDBDefinition get() {
     return INSTANCE;
   }
 
-  private MasterVolumeDBDefinition() {
+  private WitnessedContainerDBDefinition() {
     super(COLUMN_FAMILIES);
   }
 
   @Override
   public String getName() {
-    return OzoneConsts.CONTAINER_META_DB_NAME;
+    return OzoneConsts.WITNESSED_CONTAINER_DB_NAME;
   }
 
   @Override

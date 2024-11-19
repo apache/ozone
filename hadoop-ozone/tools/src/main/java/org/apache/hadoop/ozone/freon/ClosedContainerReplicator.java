@@ -35,7 +35,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.metadata.MasterVolumeMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -84,7 +85,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
-  private ReferenceCountedHandle<MasterVolumeMetadataStore> masterVolumeMetadataStoreReferenceCountedDB;
+  private ReferenceCountedHandle<WitnessedContainerMetadataStore> witnessedContainerMetadataStore;
 
   private List<ReplicationTask> replicationTasks;
 
@@ -93,8 +94,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     try {
       return replicate();
     } finally {
-      if (masterVolumeMetadataStoreReferenceCountedDB != null) {
-        masterVolumeMetadataStoreReferenceCountedDB.close();
+      if (witnessedContainerMetadataStore != null) {
+        witnessedContainerMetadataStore.close();
       }
     }
   }
@@ -186,8 +187,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-    ReferenceCountedHandle<MasterVolumeMetadataStore> referenceCountedDS = MasterVolumeMetadataStore.get(conf);
-    this.masterVolumeMetadataStoreReferenceCountedDB = referenceCountedDS;
+    ReferenceCountedHandle<WitnessedContainerMetadataStore> referenceCountedDS =
+        WitnessedContainerMetadataStoreImpl.get(conf);
+    this.witnessedContainerMetadataStore = referenceCountedDS;
     ContainerSet containerSet = new ContainerSet(referenceCountedDS.getStore().getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);

@@ -36,15 +36,16 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Class for interacting with database in the master volume of a datanode.
  */
-public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolumeDBDefinition>
-    implements MetadataStore {
+public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
+    implements WitnessedContainerMetadataStore {
 
   private Table<Long, ContainerProtos.ContainerDataProto.State> containerIdsTable;
-  private static final ConcurrentMap<String, BaseReferenceCountedDB<MasterVolumeMetadataStore>> INSTANCES =
+  private static final ConcurrentMap<String, BaseReferenceCountedDB<WitnessedContainerMetadataStore>> INSTANCES =
       new ConcurrentHashMap<>();
 
-  public static ReferenceCountedHandle<MasterVolumeMetadataStore> get(ConfigurationSource conf) throws IOException {
-    String dbDirPath = DBStoreBuilder.getDBDirPath(MasterVolumeDBDefinition.get(), conf).getAbsolutePath();
+  public static ReferenceCountedHandle<WitnessedContainerMetadataStore> get(ConfigurationSource conf)
+      throws IOException {
+    String dbDirPath = DBStoreBuilder.getDBDirPath(WitnessedContainerDBDefinition.get(), conf).getAbsolutePath();
     try {
       return new ReferenceCountedHandle<>(INSTANCES.compute(dbDirPath, (k, v) -> {
         if (v != null) {
@@ -52,10 +53,11 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
         }
         if (v == null || v.isClosed()) {
           try {
-            MasterVolumeMetadataStore masterVolumeMetadataStore = new MasterVolumeMetadataStore(conf, false);
-            BaseReferenceCountedDB<MasterVolumeMetadataStore> referenceCountedDB =
-                new BaseReferenceCountedDB<>(masterVolumeMetadataStore,
-                    masterVolumeMetadataStore.getStore().getDbLocation().getAbsolutePath());
+            WitnessedContainerMetadataStore
+                witnessedContainerMetadataStore = new WitnessedContainerMetadataStoreImpl(conf, false);
+            BaseReferenceCountedDB<WitnessedContainerMetadataStore> referenceCountedDB =
+                new BaseReferenceCountedDB<>(witnessedContainerMetadataStore,
+                    witnessedContainerMetadataStore.getStore().getDbLocation().getAbsolutePath());
             referenceCountedDB.incrementReference();
             return referenceCountedDB;
           } catch (IOException e) {
@@ -69,8 +71,8 @@ public final class MasterVolumeMetadataStore extends AbstractRDBStore<MasterVolu
     }
   }
 
-  private MasterVolumeMetadataStore(ConfigurationSource config, boolean openReadOnly) throws IOException {
-    super(MasterVolumeDBDefinition.get(), config, openReadOnly);
+  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly) throws IOException {
+    super(WitnessedContainerDBDefinition.get(), config, openReadOnly);
   }
 
   @Override
