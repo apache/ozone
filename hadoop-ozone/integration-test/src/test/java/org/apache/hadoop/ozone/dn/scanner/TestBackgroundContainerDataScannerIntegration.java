@@ -91,7 +91,8 @@ class TestBackgroundContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
 
-    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK || corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
+    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
+        corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
       corruption.assertLogged(containerID, logCapturer);
     } else {
