@@ -17,9 +17,6 @@
  */
 import { lazy } from 'react';
 
-import { Heatmap } from '@/views/heatMap/heatmap';
-import NotFound from '@/v2/pages/notFound/notFound';
-
 const Overview = lazy(() => import('@/v2/pages/overview/overview'));
 const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
 const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
@@ -29,6 +26,7 @@ const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
 const Containers = lazy(() => import('@/v2/pages/containers/containers'));
 const Insights = lazy(() => import('@/v2/pages/insights/insights'));
 const OMDBInsights = lazy(() => import('@/v2/pages/insights/omInsights'));
+const Heatmap = lazy(() => import('@/v2/pages/heatmap/heatmap'));
 
 
 export const routesV2 = [
@@ -68,7 +66,6 @@ export const routesV2 = [
     path: '/Om',
     component: OMDBInsights
   },
-  // TODO: Replace with V2 heatmap once rea
   {
     path: '/Heatmap',
     component: Heatmap
