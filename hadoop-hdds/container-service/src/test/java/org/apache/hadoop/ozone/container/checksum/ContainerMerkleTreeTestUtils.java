@@ -351,8 +351,6 @@ public final class ContainerMerkleTreeTestUtils {
     try (FileOutputStream outputStream = new FileOutputStream(checksumFile)) {
       checksumInfo.writeTo(outputStream);
     } catch (IOException ex) {
-      // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
-      // Nothing reads directly from the tmp file.
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }

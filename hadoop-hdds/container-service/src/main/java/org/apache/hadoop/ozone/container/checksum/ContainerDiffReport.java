@@ -73,11 +73,14 @@ public class ContainerDiffReport {
     return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
   }
 
+  // TODO: HDDS-11763 - Add metrics for missing blocks, missing chunks, corrupt chunks.
   @Override
   public String toString() {
     return "ContainerDiffReport:" +
-        " MissingBlocks= " + missingBlocks.size() +
-        ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum() +
-        ", CorruptChunks= " + corruptChunks.values().stream().mapToInt(List::size).sum();
+        " MissingBlocks= " + missingBlocks.size() + " blocks" +
+        ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum()
+        + " chunks from " + missingChunks.size() + " blocks" +
+        ", CorruptChunks= " + corruptChunks.values().stream().mapToInt(List::size).sum()
+        + " chunks from " + corruptChunks.size() + " blocks";
   }
 }

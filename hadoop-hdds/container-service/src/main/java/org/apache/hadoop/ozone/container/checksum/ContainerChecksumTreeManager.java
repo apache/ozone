@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -148,7 +148,8 @@ public class ContainerChecksumTreeManager {
   }
 
   public ContainerDiffReport diff(KeyValueContainerData thisContainer,
-                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws SCMException {
+                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws
+      StorageContainerException {
 
     ContainerDiffReport report = new ContainerDiffReport();
     try {
@@ -157,13 +158,13 @@ public class ContainerChecksumTreeManager {
         Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null");
         Optional<ContainerProtos.ContainerChecksumInfo> thisContainerChecksumInfo = read(thisContainer);
         if (!thisContainerChecksumInfo.isPresent()) {
-          throw new SCMException("The container #" + thisContainer.getContainerID() +
-              " doesn't have container checksum", SCMException.ResultCodes.IO_EXCEPTION);
+          throw new StorageContainerException("The container #" + thisContainer.getContainerID() +
+              " doesn't have container checksum", ContainerProtos.Result.IO_EXCEPTION);
         }
 
         if (thisContainer.getContainerID() != peerChecksumInfo.getContainerID()) {
-          throw new SCMException("Container Id does not match for container " + thisContainer.getContainerID(),
-              SCMException.ResultCodes.CONTAINER_CHECKSUM_ERROR);
+          throw new StorageContainerException("Container Id does not match for container "
+              + thisContainer.getContainerID(), ContainerProtos.Result.CONTAINER_ID_MISMATCH);
         }
 
         ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfo.get();
@@ -171,8 +172,8 @@ public class ContainerChecksumTreeManager {
       });
     } catch (IOException ex) {
       metrics.incrementMerkleTreeDiffFailures();
-      throw new SCMException("Container Diff failed for container #" + thisContainer.getContainerID(), ex,
-          SCMException.ResultCodes.CONTAINER_CHECKSUM_ERROR);
+      throw new StorageContainerException("Container Diff failed for container #" + thisContainer.getContainerID(), ex,
+          ContainerProtos.Result.IO_EXCEPTION);
     }
 
     // Update Container Diff metrics based on the diff report.
@@ -212,7 +213,7 @@ public class ContainerChecksumTreeManager {
         //    block and the peer's BG service hasn't run yet. We can ignore comparing them.
         // 3) If the block is only deleted in peer merkle tree, we can't reconcile for this block. It might be
         //    deleted by peer's BG service. We can ignore comparing them.
-        // TODO: Handle missed block deletions from the deleted block ids.
+        // TODO: HDDS-11765 - Handle missed block deletions from the deleted block ids.
         if (!thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
             !peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
             thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
