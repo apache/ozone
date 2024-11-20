@@ -48,7 +48,6 @@ jobs:
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
       sha: ${{ steps.get-sha.outputs.sha }}
@@ -339,7 +338,6 @@ jobs:
       - build
     runs-on: ubuntu-20.04
     timeout-minutes: 5
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -370,7 +368,6 @@ jobs:
       - build
     runs-on: ubuntu-20.04
     timeout-minutes: 15
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -415,6 +412,9 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
+      - dependency
+      - license
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     steps:
