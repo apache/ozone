@@ -225,12 +225,6 @@ public final class BlockDeletingServiceMetrics {
     this.containerChosenCountInLastIteration.set(containerChosenCountInLastIteration);
   }
 
-  public void resetLastIterationCounts() {
-    this.successCountInLastIteration.incr(-1L * this.successCountInLastIteration.value());
-    this.successBytesInLastIteration.incr(-1L * this.successBytesInLastIteration.value());
-    this.failureCountInLastIteration.incr(-1L * this.failureCountInLastIteration.value());
-  }
-
   public void incrSuccessCountInLastIteration(long delta) {
     this.successCountInLastIteration.incr(delta);
   }
@@ -239,8 +233,8 @@ public final class BlockDeletingServiceMetrics {
     this.successBytesInLastIteration.incr(delta);
   }
 
-  public void incrFailureCountInLastIteration() {
-    this.failureCountInLastIteration.incr();
+  public void incrFailureCountInLastIteration(long delta) {
+    this.failureCountInLastIteration.incr(delta);
   }
 
   @Override

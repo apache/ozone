@@ -128,7 +128,7 @@ public class BlockDeletingService extends BackgroundService {
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
-    metrics.resetLastIterationCounts();
+    BlockDeletingTask.resetLastIterationCounts();
     try {
       // We at most list a number of containers a time,
       // in case there are too many containers and start too many workers.
@@ -159,6 +159,9 @@ public class BlockDeletingService extends BackgroundService {
       metrics.setContainerChosenCountInLastIteration(containers.size());
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
+      metrics.incrSuccessCountInLastIteration(BlockDeletingTask.getSuccessBlockDeleteInLastIteration());
+      metrics.incrSuccessBytesInLastIteration(BlockDeletingTask.getSuccessBytesDeletedInLastIteration());
+      metrics.incrFailureCountInLastIteration(BlockDeletingTask.getFailBlockDeleteInLastIteration());
       if (containers.size() > 0) {
         LOG.debug("Queued {} blocks from {} containers for deletion",
             totalBlocks, containers.size());
