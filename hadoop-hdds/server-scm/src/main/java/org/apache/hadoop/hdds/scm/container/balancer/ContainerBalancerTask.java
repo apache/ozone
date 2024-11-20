@@ -51,7 +51,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,8 +58,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -120,7 +117,6 @@ public class ContainerBalancerTask implements Runnable {
   private int nextIterationIndex;
   private boolean delayStart;
   private final ConcurrentLinkedQueue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
-  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -310,91 +306,74 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private void saveIterationStatistic(Integer iterationNumber, IterationResult iR) {
-    lock.writeLock().lock();
-    try {
-      ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-              iterationNumber,
-              iR.name(),
-              getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
-              metrics.getDataSizeMovedGBInLatestIteration(),
-              metrics.getNumContainerMovesScheduledInLatestIteration(),
-              metrics.getNumContainerMovesCompletedInLatestIteration(),
-              metrics.getNumContainerMovesFailedInLatestIteration(),
-              metrics.getNumContainerMovesTimeoutInLatestIteration(),
-              new ConcurrentHashMap<>(findTargetStrategy.getSizeEnteringNodes())
-                      .entrySet()
-                      .stream()
-                      .filter(Objects::nonNull)
-                      .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                      .collect(
-                              Collectors.toMap(
-                                      entry -> entry.getKey().getUuid(),
-                                      entry -> entry.getValue() / OzoneConsts.GB
-                              )
-                      ),
-              new ConcurrentHashMap<>(findSourceStrategy.getSizeLeavingNodes())
-                      .entrySet()
-                      .stream()
-                      .filter(Objects::nonNull)
-                      .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                      .collect(
-                              Collectors.toMap(
-                                      entry -> entry.getKey().getUuid(),
-                                      entry -> entry.getValue() / OzoneConsts.GB
-                              )
-                      )
-      );
-      iterationsStatistic.offer(iterationStatistic);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+        iterationNumber,
+        iR.name(),
+        getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
+        metrics.getDataSizeMovedGBInLatestIteration(),
+        metrics.getNumContainerMovesScheduledInLatestIteration(),
+        metrics.getNumContainerMovesCompletedInLatestIteration(),
+        metrics.getNumContainerMovesFailedInLatestIteration(),
+        metrics.getNumContainerMovesTimeoutInLatestIteration(),
+        findTargetStrategy.getSizeEnteringNodes()
+            .entrySet()
+            .stream()
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                ConcurrentHashMap::new,
+                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
+                ConcurrentHashMap::putAll
+            ),
+        findSourceStrategy.getSizeLeavingNodes()
+            .entrySet()
+            .stream()
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                ConcurrentHashMap::new,
+                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
+                ConcurrentHashMap::putAll
+            )
+    );
+    iterationsStatistic.offer(iterationStatistic);
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    lock.readLock().lock();
-    try {
-      int lastIterationNumber = iterationsStatistic.stream()
-          .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
-          .max()
-          .orElse(0);
+    int lastIterationNumber = iterationsStatistic.stream()
+        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+        .max()
+        .orElse(0);
 
-      ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-          lastIterationNumber + 1,
-          null,
-          getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
-          sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
-          metrics.getNumContainerMovesScheduledInLatestIteration(),
-          metrics.getNumContainerMovesCompletedInLatestIteration(),
-          metrics.getNumContainerMovesFailedInLatestIteration(),
-          metrics.getNumContainerMovesTimeoutInLatestIteration(),
-          new ConcurrentHashMap<>(findTargetStrategy.getSizeEnteringNodes())
-              .entrySet()
-              .stream()
-              .filter(Objects::nonNull)
-              .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-              .collect(Collectors.toMap(
-                      entry -> entry.getKey().getUuid(),
-                      entry -> entry.getValue() / OzoneConsts.GB
-                  )
-              ),
-          new ConcurrentHashMap<>(findSourceStrategy.getSizeLeavingNodes())
-              .entrySet()
-              .stream()
-              .filter(Objects::nonNull)
-              .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-              .collect(
-                  Collectors.toMap(
-                      entry -> entry.getKey().getUuid(),
-                      entry -> entry.getValue() / OzoneConsts.GB
-                  )
-              )
-      );
-      List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
-      resultList.add(currentIterationStatistic);
-      return resultList;
-    } finally {
-      lock.readLock().unlock();
-    }
+    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+        lastIterationNumber + 1,
+        null,
+        getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
+        sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
+        metrics.getNumContainerMovesScheduledInLatestIteration(),
+        metrics.getNumContainerMovesCompletedInLatestIteration(),
+        metrics.getNumContainerMovesFailedInLatestIteration(),
+        metrics.getNumContainerMovesTimeoutInLatestIteration(),
+        findTargetStrategy.getSizeEnteringNodes()
+            .entrySet()
+            .stream()
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                ConcurrentHashMap::new,
+                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
+                ConcurrentHashMap::putAll
+            ),
+        findSourceStrategy.getSizeLeavingNodes()
+            .entrySet()
+            .stream()
+            .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+            .collect(
+                ConcurrentHashMap::new,
+                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
+                ConcurrentHashMap::putAll
+            )
+    );
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    resultList.add(currentIterationStatistic);
+    return resultList;
   }
 
   /**

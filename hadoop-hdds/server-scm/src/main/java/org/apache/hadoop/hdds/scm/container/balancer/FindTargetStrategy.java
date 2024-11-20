@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This interface can be used to implement strategies to find a target for a
@@ -70,5 +70,5 @@ public interface FindTargetStrategy {
    */
   void resetPotentialTargets(@Nonnull Collection<DatanodeDetails> targets);
 
-  Map<DatanodeDetails, Long> getSizeEnteringNodes();
+  ConcurrentHashMap<DatanodeDetails, Long> getSizeEnteringNodes();
 }

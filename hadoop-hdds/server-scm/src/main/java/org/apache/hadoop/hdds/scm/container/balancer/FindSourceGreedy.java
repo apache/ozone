@@ -26,11 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The selection criteria for selecting source datanodes , the containers of
@@ -39,14 +38,14 @@ import java.util.UUID;
 public class FindSourceGreedy implements FindSourceStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
-  private Map<DatanodeDetails, Long> sizeLeavingNode;
+  private ConcurrentHashMap<DatanodeDetails, Long> sizeLeavingNode;
   private PriorityQueue<DatanodeUsageInfo> potentialSources;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double lowerLimit;
 
   FindSourceGreedy(NodeManager nodeManager) {
-    sizeLeavingNode = new HashMap<>();
+    sizeLeavingNode = new ConcurrentHashMap<>();
     potentialSources = new PriorityQueue<>((a, b) -> {
       double currentUsageOfA = a.calculateUtilization(
           -sizeLeavingNode.get(a.getDatanodeDetails()));
@@ -203,7 +202,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   }
 
   @Override
-  public Map<DatanodeDetails, Long> getSizeLeavingNodes() {
+  public ConcurrentHashMap<DatanodeDetails, Long> getSizeLeavingNodes() {
     return sizeLeavingNode;
   }
 }
