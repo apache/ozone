@@ -80,6 +80,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.ServiceNotReadyException;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -356,16 +357,14 @@ public class ReconUtils {
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
-        fullPath.setLength(0);
-        return fullPath;
+        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
       if (nsSummary.getParentId() == -1) {
         if (rebuildTriggered.compareAndSet(false, true)) {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
         log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
-        fullPath.setLength(0);
-        return fullPath;
+        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
