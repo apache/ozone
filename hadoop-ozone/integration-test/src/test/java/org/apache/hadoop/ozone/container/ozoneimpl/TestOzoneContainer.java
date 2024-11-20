@@ -250,6 +250,11 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
+      // Create Container
+      request  = ContainerTestHelper.getCreateContainerRequest(testContainerID, pipeline);
+      response = client.sendCommand(request);
+      assertEquals(ContainerProtos.Result.CONTAINER_MISSING, response.getResult());
+
       // Delete Block and Delete Chunk are handled by BlockDeletingService
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
       // are deprecated
@@ -261,8 +266,7 @@ public class TestOzoneContainer {
           testContainerID, containerUpdate);
       updateResponse1 = client.sendCommand(updateRequest1);
       assertNotNull(updateResponse1);
-      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
-          response.getResult());
+      assertEquals(ContainerProtos.Result.CONTAINER_MISSING, updateResponse1.getResult());
 
       //Update an non-existing container
       long nonExistingContinerID =
@@ -285,6 +289,23 @@ public class TestOzoneContainer {
           return false;
         }
       }, 1000, 30000);
+      // Create Recovering Container
+      request  = ContainerTestHelper.getCreateContainerRequest(testContainerID, pipeline,
+          ContainerProtos.ContainerDataProto.State.RECOVERING);
+      response = client.sendCommand(request);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      //write chunk on recovering container
+      response = client.sendCommand(writeChunkRequest);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      //write chunk on recovering container
+      response = client.sendCommand(putBlockRequest);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      //Get block on the recovering container should succeed now.
+      request = ContainerTestHelper.getBlockRequest(pipeline, putBlockRequest.getPutBlock());
+      response = client.sendCommand(request);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
     } finally {
       if (client != null) {
