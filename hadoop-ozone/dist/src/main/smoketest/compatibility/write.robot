@@ -24,12 +24,12 @@ Suite Setup         Create Local Test File
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
-${KEY_NAME}  key1
+${ENCRYPTION_KEY}    key1
 
 
 *** Test Cases ***
 Create Encrypted Bucket
-    Execute    ozone sh bucket create -k ${KEY_NAME} /vol1/encrypted-${SUFFIX}
+    Execute    ozone sh bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${SUFFIX}
 
 Create Key in Encrypted Bucket
     Execute    ozone sh key put /vol1/encrypted-${SUFFIX}/key ${TESTFILE}
