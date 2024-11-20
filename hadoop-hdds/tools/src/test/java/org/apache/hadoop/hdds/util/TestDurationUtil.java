@@ -36,40 +36,39 @@ class TestDurationUtil {
     return Stream.of(
         arguments(
             "0s",
-            DurationUtil.getPrettyDuration(Duration.ZERO)
+            Duration.ZERO
         ),
         arguments(
             "2562047788015215h 30m 7s",
-            DurationUtil.getPrettyDuration(Duration.ofSeconds(Long.MAX_VALUE))
+            Duration.ofSeconds(Long.MAX_VALUE)
         ),
         arguments(
             "1s",
-            DurationUtil.getPrettyDuration(Duration.ofSeconds(1))
+            Duration.ofSeconds(1)
         ),
         arguments(
             "30s",
-            DurationUtil.getPrettyDuration(Duration.ofSeconds(30))
+            Duration.ofSeconds(30)
         ),
         arguments(
             "1m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofMinutes(1))
+            Duration.ofMinutes(1)
         ),
         arguments(
             "2m 30s",
-            DurationUtil.getPrettyDuration(Duration.ofMinutes(2).plusSeconds(30))
+            Duration.ofMinutes(2).plusSeconds(30)
         ),
         arguments(
             "1h 30m 45s",
-            DurationUtil.getPrettyDuration(
-                Duration.ofHours(1).plusMinutes(30).plusSeconds(45))
+            Duration.ofHours(1).plusMinutes(30).plusSeconds(45)
         ),
         arguments(
             "24h 0m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofDays(1))
+            Duration.ofDays(1)
         ),
         arguments(
             "48h 0m 0s",
-            DurationUtil.getPrettyDuration(Duration.ofDays(2))
+            Duration.ofDays(2)
         )
     );
   }
@@ -80,8 +79,8 @@ class TestDurationUtil {
 
   @ParameterizedTest
   @MethodSource("paramsForPositiveCases")
-  void testDuration(String expected, String actual) {
-    assertEquals(expected, actual);
+  void testDuration(String expected, Duration actual) {
+    assertEquals(expected, DurationUtil.getPrettyDuration(actual));
   }
 
   @ParameterizedTest

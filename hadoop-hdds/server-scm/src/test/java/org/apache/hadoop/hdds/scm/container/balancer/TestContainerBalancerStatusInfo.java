@@ -63,7 +63,7 @@ class TestContainerBalancerStatusInfo {
     verifyCompletedIteration(iterationHistory2, 2);
 
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationStatistics.get(2);
-    verifyEmptyIteration(currentIteration);
+    verifyStartedEmptyIteration(currentIteration);
   }
 
   @Test
@@ -199,7 +199,7 @@ class TestContainerBalancerStatusInfo {
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(1, iterationsStatic.size());
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(0);
-    assertEmptyIteration(currentIteration);
+    verifyUnstartedIteration(currentIteration);
   }
 
   @Test
@@ -223,8 +223,9 @@ class TestContainerBalancerStatusInfo {
     assertCurrentIterationStatisticWhileBalancingInProgress(currentIteration);
   }
 
-  private static void assertEmptyIteration(ContainerBalancerTaskIterationStatusInfo iterationsStatic) {
 
+  private static void verifyUnstartedIteration(ContainerBalancerTaskIterationStatusInfo iterationsStatic) {
+    assertEquals(0, iterationsStatic.getIterationNumber());
     assertEquals(-1, iterationsStatic.getIterationDuration());
     assertNull(iterationsStatic.getIterationResult());
     assertEquals(0, iterationsStatic.getContainerMovesScheduled());
@@ -233,8 +234,8 @@ class TestContainerBalancerStatusInfo {
     assertEquals(0, iterationsStatic.getContainerMovesTimeout());
     assertEquals(0, iterationsStatic.getSizeScheduledForMove());
     assertEquals(0, iterationsStatic.getDataSizeMoved());
-    assertEquals(0, iterationsStatic.getSizeEnteringNodes().size());
-    assertEquals(0, iterationsStatic.getSizeLeavingNodes().size());
+    assertTrue(iterationsStatic.getSizeEnteringNodes().isEmpty());
+    assertTrue(iterationsStatic.getSizeLeavingNodes().isEmpty());
   }
 
   private static void assertCurrentIterationStatisticWhileBalancingInProgress(
@@ -293,7 +294,7 @@ class TestContainerBalancerStatusInfo {
     assertEquals(enteringDataSum, leavingDataSum);
   }
 
-  private void verifyEmptyIteration(
+  private void verifyStartedEmptyIteration(
       ContainerBalancerTaskIterationStatusInfo iteration
   ) {
     assertEquals(0, iteration.getIterationNumber());
