@@ -175,7 +175,7 @@ public final class NodeSchemaLoader {
       ParserConfigurationException, SAXException, IOException {
     LOG.info("Loading network topology layer schema file");
     // Read and parse the schema file.
-    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory dbf = DocumentBuilderFactoryWrapper.getInstance();
     dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     dbf.setIgnoringComments(true);
     DocumentBuilder builder = dbf.newDocumentBuilder();

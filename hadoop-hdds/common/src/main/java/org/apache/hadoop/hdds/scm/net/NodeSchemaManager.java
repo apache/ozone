@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** The class manages all network topology schemas. */
 
@@ -45,6 +46,8 @@ public final class NodeSchemaManager {
 
   private static volatile NodeSchemaManager instance = null;
 
+  private static final ConcurrentHashMap<String, NodeSchemaManager> cache = new ConcurrentHashMap<>();
+
   private NodeSchemaManager() {
   }
 
@@ -53,6 +56,18 @@ public final class NodeSchemaManager {
       instance = new NodeSchemaManager();
     }
     return instance;
+  }
+
+  public static NodeSchemaManager getInitiatedInstance(String schemaFile) {
+    NodeSchemaManager cachedInstance = cache.get(schemaFile);
+    if (cachedInstance == null) {
+      instance = new NodeSchemaManager();
+      instance.init(schemaFile);
+      cache.put(schemaFile, instance);
+      return instance;
+    } else {
+      return cachedInstance;
+    }
   }
 
   public void init(ConfigurationSource conf) {
