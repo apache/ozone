@@ -101,6 +101,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
@@ -242,6 +243,15 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
+    // Validate the request has been made to the correct datanode with the node id matching.
+    if (kvContainer != null) {
+      try {
+        handler.validateRequestDatanodeId(kvContainer.getContainerData().getReplicaIndex(),
+            request.getDatanodeUuid());
+      } catch (StorageContainerException e) {
+        return ContainerUtils.logAndReturnError(LOG, e, request);
+      }
+    }
 
     switch (cmdType) {
     case CreateContainer:
@@ -351,6 +361,13 @@ public class KeyValueHandler extends Handler {
           new StorageContainerException(
               "Container creation failed because " + "key value container" +
                   " already exists", null, CONTAINER_ALREADY_EXISTS), request);
+    }
+
+    try {
+      this.validateRequestDatanodeId(request.getCreateContainer().hasReplicaIndex() ?
+          request.getCreateContainer().getReplicaIndex() : null, request.getDatanodeUuid());
+    } catch (StorageContainerException e) {
+      return ContainerUtils.logAndReturnError(LOG, e, request);
     }
 
     long containerID = request.getContainerID();
@@ -1531,5 +1548,23 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  /**
+   * Verify if request's replicaIndex matches with containerData. This validates only for EC containers i.e.
+   * containerReplicaIdx should be > 0.
+   *
+   * @param containerReplicaIdx  replicaIndex for the container command.
+   * @param requestDatanodeUUID requested block info
+   * @throws StorageContainerException if replicaIndex mismatches.
+   */
+  private boolean validateRequestDatanodeId(Integer containerReplicaIdx, String requestDatanodeUUID)
+      throws StorageContainerException {
+    if (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(this.getDatanodeId())) {
+      throw new StorageContainerException(
+          String.format("Request is trying to write to node with uuid : %s but the current nodeId is: %s .",
+              requestDatanodeUUID, this.getDatanodeId()), INVALID_ARGUMENT);
+    }
+    return true;
   }
 }
