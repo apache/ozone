@@ -64,7 +64,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is used to test OzoneContainer.
@@ -164,7 +163,7 @@ public class TestOzoneContainer {
     verifyCommittedSpace(ozoneContainer);
     Set<Long> missingContainers = new HashSet<>();
     for (int i = 0; i < numTestContainers; i++) {
-      if (i %2 == 0) {
+      if (i % 2 == 0) {
         missingContainers.add(containerDatas.get(i).getContainerID());
         FileUtils.deleteDirectory(new File(containerDatas.get(i).getContainerPath()));
       }
@@ -173,8 +172,8 @@ public class TestOzoneContainer {
     ozoneContainer = ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
     ozoneContainer.buildContainerSet();
     containerset = ozoneContainer.getContainerSet();
-    assertEquals(numTestContainers/2, containerset.containerCount());
-    assertEquals(numTestContainers/2 + numTestContainers % 2, containerset.getMissingContainerSet().size());
+    assertEquals(numTestContainers / 2, containerset.containerCount());
+    assertEquals(numTestContainers / 2 + numTestContainers % 2, containerset.getMissingContainerSet().size());
     assertEquals(missingContainers, containerset.getMissingContainerSet());
     ozoneContainer.stop();
   }
