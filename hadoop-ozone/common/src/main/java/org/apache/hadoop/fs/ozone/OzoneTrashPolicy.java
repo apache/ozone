@@ -43,10 +43,10 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 /**
  * TrashPolicy for Ozone Specific Trash Operations.
  */
-public class TrashPolicyOzone extends TrashPolicyDefault {
+public class OzoneTrashPolicy extends TrashPolicyDefault {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TrashPolicyOzone.class);
+      LoggerFactory.getLogger(OzoneTrashPolicy.class);
 
   protected static final Path CURRENT = new Path("Current");
 

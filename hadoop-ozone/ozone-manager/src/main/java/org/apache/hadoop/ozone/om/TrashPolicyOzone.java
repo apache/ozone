@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.util.Time;
@@ -48,7 +49,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKP
  *  of TrashPolicy ozone-specific trash optimizations are/will be made such as
  *  having a multithreaded TrashEmptier.
  */
-public class TrashPolicyOzone extends org.apache.hadoop.fs.ozone.TrashPolicyOzone {
+public class TrashPolicyOzone extends OzoneTrashPolicy {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashPolicyOzone.class);
