@@ -235,8 +235,12 @@ public class TestOzoneContainer {
       putBlockRequest = ContainerTestHelper.getPutBlockRequest(
           pipeline, writeChunkRequest.getWriteChunk());
 
-
       response = client.sendCommand(putBlockRequest);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.CONTAINER_MISSING, response.getResult());
+
+      // Write chunk
+      response = client.sendCommand(writeChunkRequest);
       assertNotNull(response);
       assertEquals(ContainerProtos.Result.CONTAINER_MISSING, response.getResult());
 
