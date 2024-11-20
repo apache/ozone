@@ -398,7 +398,7 @@ run_rebot() {
 
   shift 2
 
-  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
+  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
   if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
