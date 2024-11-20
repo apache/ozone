@@ -19,11 +19,30 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 
+import java.io.Closeable;
+
 /**
- * DB handle abstract class for datanode store.
+ * DB handle abstract class.
  */
-public abstract class DBHandle extends BaseDBHandle<DatanodeStore> {
+public abstract class DBHandle implements Closeable {
+
+  private final DatanodeStore store;
+  private final String containerDBPath;
+
   public DBHandle(DatanodeStore store, String containerDBPath) {
-    super(store, containerDBPath);
+    this.store = store;
+    this.containerDBPath = containerDBPath;
+  }
+
+  public DatanodeStore getStore() {
+    return this.store;
+  }
+
+  public String getContainerDBPath() {
+    return this.containerDBPath;
+  }
+
+  public boolean cleanup() {
+    return true;
   }
 }
