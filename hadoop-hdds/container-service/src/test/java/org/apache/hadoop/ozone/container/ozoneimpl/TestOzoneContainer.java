@@ -176,6 +176,7 @@ public class TestOzoneContainer {
     assertEquals(numTestContainers/2, containerset.containerCount());
     assertEquals(numTestContainers/2 + numTestContainers % 2, containerset.getMissingContainerSet().size());
     assertEquals(missingContainers, containerset.getMissingContainerSet());
+    ozoneContainer.stop();
   }
 
   @ContainerTestVersionInfo.ContainerTest
