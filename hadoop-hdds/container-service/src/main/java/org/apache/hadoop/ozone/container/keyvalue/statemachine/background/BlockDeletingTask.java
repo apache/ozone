@@ -260,8 +260,8 @@ public class BlockDeletingTask implements BackgroundTask {
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
-        successBlockDeleteInLastIteration += deletedBlocksCount;
-        successBytesDeletedInLastIteration += releasedBytes;
+        incrSuccessBlockDeleteInLastIteration(deletedBlocksCount);
+        incrSuccessBytesDeletedInLastIteration(releasedBytes);
       }
 
       if (!succeedBlocks.isEmpty()) {
@@ -276,7 +276,7 @@ public class BlockDeletingTask implements BackgroundTask {
       LOG.warn("Deletion operation was not successful for container: " +
           container.getContainerData().getContainerID(), exception);
       metrics.incrFailureCount();
-      failBlockDeleteInLastIteration += 1;
+      incrFailBlockDeleteInLastIteration(1);
       throw exception;
     }
   }
@@ -414,8 +414,8 @@ public class BlockDeletingTask implements BackgroundTask {
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
-        successBlockDeleteInLastIteration += deletedBlocksCount;
-        successBytesDeletedInLastIteration += releasedBytes;
+        incrSuccessBlockDeleteInLastIteration(deletedBlocksCount);
+        incrSuccessBytesDeletedInLastIteration(releasedBytes);
       }
 
       LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
@@ -427,7 +427,7 @@ public class BlockDeletingTask implements BackgroundTask {
       LOG.warn("Deletion operation was not successful for container: " +
           container.getContainerData().getContainerID(), exception);
       metrics.incrFailureCount();
-      failBlockDeleteInLastIteration += 1;
+      incrFailBlockDeleteInLastIteration(1);
       throw exception;
     }
   }
@@ -542,6 +542,18 @@ public class BlockDeletingTask implements BackgroundTask {
 
   public static long getFailBlockDeleteInLastIteration() {
     return failBlockDeleteInLastIteration;
+  }
+
+  public static void incrSuccessBlockDeleteInLastIteration(long delta) {
+    BlockDeletingTask.successBlockDeleteInLastIteration += delta;
+  }
+
+  public static void incrSuccessBytesDeletedInLastIteration(long delta) {
+    BlockDeletingTask.successBytesDeletedInLastIteration += delta;
+  }
+
+  public static void incrFailBlockDeleteInLastIteration(long delta) {
+    BlockDeletingTask.failBlockDeleteInLastIteration += delta;
   }
 
   private interface Deleter {
