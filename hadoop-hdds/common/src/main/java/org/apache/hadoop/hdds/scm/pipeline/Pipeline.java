@@ -330,8 +330,11 @@ public final class Pipeline {
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
+    //This is a workaround for the case a datanode restarted with reinitializing it's dnId but it still reports the
+    // same set of pipelines it was part of. The pipeline report should be accepted for this anomalous condition.
+    //  We rely on StaleNodeHandler in closing this pipeline eventually.
     if (dn == null || (nodeStatus.get(dn) == null
-        && nodeStatus.keySet().stream().noneMatch(node -> node.validateNodeValue(dn)))) {
+        && nodeStatus.keySet().stream().noneMatch(node -> node.compareNodeValues(dn)))) {
       throw new IOException(
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
