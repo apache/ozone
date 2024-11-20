@@ -544,7 +544,12 @@ public class OzoneContainer {
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
     if (this.witnessedContainerMetadataStore != null) {
-      IOUtils.close(LOG, this.witnessedContainerMetadataStore);
+      try {
+        this.witnessedContainerMetadataStore.stop();
+      } catch (Exception e) {
+        LOG.error(String.format("Error while stopping witnessedContainerMetadataStore. Status of store: %s",
+            witnessedContainerMetadataStore.isClosed()), e);
+      }
       this.witnessedContainerMetadataStore = null;
     }
   }
