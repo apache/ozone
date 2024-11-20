@@ -94,9 +94,8 @@ public class TestHsyncGenerator {
       OzoneVolume volume = store.getVolume(volumeName);
       volume.createBucket(bucketName);
 
-      String rootPath = String.format("%s://%s/%s/%s/",
-          OZONE_OFS_URI_SCHEME, cluster.getConf().get(OZONE_OM_ADDRESS_KEY),
-          volumeName, bucketName);
+      String rootPath = String.format("%s://%s/%s/%s/", OZONE_OFS_URI_SCHEME,
+          cluster.getConf().get(OZONE_OM_ADDRESS_KEY), volumeName, bucketName);
 
       int exitCode = cmd.execute(
           "--path", rootPath,
