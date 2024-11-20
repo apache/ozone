@@ -583,8 +583,8 @@ public class DatanodeDetails extends NodeImpl implements
 
   /**
    * Checks hostname, ipAddress & port of the 2 nodes are the same.
-   * @param datanodeDetails
-   * @return
+   * @param datanodeDetails dnDetails object to compare with.
+   * @return true if the values match otherwise false.
    */
   public boolean compareNodeValues(DatanodeDetails datanodeDetails) {
     if (this == datanodeDetails || super.equals(datanodeDetails)) {
