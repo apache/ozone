@@ -547,8 +547,8 @@ public class OzoneContainer {
       try {
         this.witnessedContainerMetadataStore.stop();
       } catch (Exception e) {
-        LOG.error(String.format("Error while stopping witnessedContainerMetadataStore. Status of store: %s",
-            witnessedContainerMetadataStore.isClosed()), e);
+        LOG.error("Error while stopping witnessedContainerMetadataStore. Status of store: {}",
+            witnessedContainerMetadataStore.isClosed(), e);
       }
       this.witnessedContainerMetadataStore = null;
     }
