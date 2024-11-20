@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.OFSPath;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,7 +188,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           }
           baseTrashPath = new Path(baseTrashPath.toString()
               .replace(existsFilePath.toString(),
-                  existsFilePath.toString() + Time.now()));
+                  existsFilePath.toString() + Instant.now().toEpochMilli()));
           trashPath = new Path(baseTrashPath, trashPath.getName());
           // retry, ignore current failure
           --i;
@@ -204,7 +204,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           String orig = trashPath.toString();
 
           while (fs.exists(trashPath)) {
-            trashPath = new Path(orig + Time.now());
+            trashPath = new Path(orig + Instant.now().toEpochMilli());
           }
 
           // move to current trash
@@ -305,7 +305,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       }
       long now, end;
       while (true) {
-        now = Time.now();
+        now = Instant.now().toEpochMilli();
         end = ceiling(now, emptierInterval);
         try {
           // sleep for interval
@@ -321,7 +321,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
         try {
           om.getMetrics().incNumTrashActiveCycles();
-          now = Time.now();
+          now = Instant.now().toEpochMilli();
           if (now >= end) {
             Collection<FileStatus> trashRoots;
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
@@ -364,7 +364,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         try {
           om.getMetrics().incNumTrashRootsProcessed();
           trash.deleteCheckpoint(trashRootPath, deleteImmediately);
-          trash.createCheckpoint(trashRootPath, new Date(Time.now()));
+          trash.createCheckpoint(trashRootPath, new Date(Instant.now().toEpochMilli()));
         } catch (Exception e) {
           om.getMetrics().incNumTrashFails();
           LOG.error("Unable to checkpoint:" + trashRootPath, e);
@@ -424,7 +424,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       return;
     }
 
-    long now = Time.now();
+    long now = Instant.now().toEpochMilli();
     for (int i = 0; i < dirs.length; i++) {
       Path path = dirs[i].getPath();
       String dir = path.toUri().getPath();

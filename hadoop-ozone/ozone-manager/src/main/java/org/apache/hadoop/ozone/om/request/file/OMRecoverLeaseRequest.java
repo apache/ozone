@@ -52,7 +52,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 
 
@@ -61,6 +60,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -233,13 +233,13 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     } else {
       final long leaseSoftLimit = ozoneManager.getConfiguration()
           .getTimeDuration(OZONE_OM_LEASE_SOFT_LIMIT, OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
-      if (!force && Time.now() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
+      if (!force && Instant.now().toEpochMilli() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
         throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
             KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
       }
       openKeyInfo.getMetadata().put(OzoneConsts.LEASE_RECOVERY, "true");
       openKeyInfo.setUpdateID(transactionLogIndex, ozoneManager.isRatisEnabled());
-      openKeyInfo.setModificationTime(Time.now());
+      openKeyInfo.setModificationTime(Instant.now().toEpochMilli());
       // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenFileKey, openKeyInfo, transactionLogIndex);

@@ -54,12 +54,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
@@ -126,7 +126,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         .setSnapshotId(toProtobuf(UUID.randomUUID()))
         .setVolumeName(volumeName)
         .setBucketName(this.bucketName)
-        .setCreationTime(Time.now());
+        .setCreationTime(Instant.now().toEpochMilli());
     return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
   

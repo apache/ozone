@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -34,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -98,7 +98,7 @@ public class TestOMSnapshotCreateResponse {
         bucketName,
         snapshotName,
         snapshotId,
-        Time.now());
+        Instant.now().toEpochMilli());
     snapshotInfo.setLastTransactionInfo(
         TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
     // confirm table is empty

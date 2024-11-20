@@ -22,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.time.Instant;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -32,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -65,7 +66,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
 
@@ -125,7 +126,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     addPart(1, part1, omMultipartKeyInfo);
 
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
 
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
@@ -204,7 +205,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     addPart(1, part1, omMultipartKeyInfo);
 
-    long clientId = Time.now();
+    long clientId = Instant.now().toEpochMilli();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
 

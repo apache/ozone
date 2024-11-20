@@ -29,13 +29,13 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
@@ -72,7 +72,7 @@ public class TestSnapshotInfo {
         .setVolumeName("vol1")
         .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotStatus.SNAPSHOT_ACTIVE)
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setDeletionTime(-1L)
         .setPathPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)

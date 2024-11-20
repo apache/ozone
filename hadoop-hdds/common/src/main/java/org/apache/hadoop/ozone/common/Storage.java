@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Properties;
 import java.util.function.IntSupplier;
 
@@ -84,7 +84,7 @@ public abstract class Storage {
     if (state == StorageState.INITIALIZED) {
       this.storageInfo = new StorageInfo(type, getVersionFile());
     } else {
-      this.storageInfo = new StorageInfo(nodeType, id, Time.now(),
+      this.storageInfo = new StorageInfo(nodeType, id, Instant.now().toEpochMilli(),
           defaultLayoutVersion);
       setNodeProperties();
     }

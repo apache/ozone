@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
@@ -55,7 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RenameKeyResponse;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -91,7 +91,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     // Set modification time & srcKeyName.
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
-        .setModificationTime(Time.now()).setKeyName(srcKey);
+        .setModificationTime(Instant.now().toEpochMilli()).setKeyName(srcKey);
 
     KeyArgs resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
         ozoneManager, srcKey, dstKey);

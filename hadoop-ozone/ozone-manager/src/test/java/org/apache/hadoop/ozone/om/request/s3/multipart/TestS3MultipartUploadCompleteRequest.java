@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
-import org.apache.hadoop.util.Time;
 
 
 /**
@@ -136,7 +136,7 @@ public class TestS3MultipartUploadCompleteRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = omClientResponse.getOMResponse()
         .getInitiateMultiPartUploadResponse().getMultipartUploadID();
 
@@ -234,7 +234,7 @@ public class TestS3MultipartUploadCompleteRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
 
-    long clientID = Time.now();
+    long clientID = Instant.now().toEpochMilli();
     String multipartUploadID = omClientResponse.getOMResponse()
         .getInitiateMultiPartUploadResponse().getMultipartUploadID();
 

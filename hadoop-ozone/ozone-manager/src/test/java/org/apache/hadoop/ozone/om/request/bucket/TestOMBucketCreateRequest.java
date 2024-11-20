@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -37,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
@@ -190,7 +190,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     // create a volume with less quota
     OmVolumeArgs omVolumeArgs =
-        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+        OmVolumeArgs.newBuilder().setCreationTime(Instant.now().toEpochMilli())
             .setQuotaInBytes(100)
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
@@ -397,7 +397,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   public static void addCreateVolumeToTable(String volumeName,
       OMMetadataManager omMetadataManager) throws Exception {
     OmVolumeArgs omVolumeArgs =
-        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+        OmVolumeArgs.newBuilder().setCreationTime(Instant.now().toEpochMilli())
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
     OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);

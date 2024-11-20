@@ -26,9 +26,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -115,7 +115,7 @@ public class TestOmMultipartKeyInfo {
   private static OmMultipartKeyInfo.Builder createSubject() {
     return new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
-        .setCreationTime(Time.now());
+        .setCreationTime(Instant.now().toEpochMilli());
   }
 
   private static PartKeyInfo.Builder createPart(KeyInfo.Builder partKeyInfo) {
@@ -131,8 +131,8 @@ public class TestOmMultipartKeyInfo {
         .setBucketName(UUID.randomUUID().toString())
         .setKeyName(UUID.randomUUID().toString())
         .setDataSize(100L)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setType(HddsProtos.ReplicationType.STAND_ALONE);
   }
 }

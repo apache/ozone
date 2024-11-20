@@ -41,10 +41,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -298,7 +298,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       }
 
       OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils
-          .createOmMultipartKeyInfo(uploadId, Time.now(),
+          .createOmMultipartKeyInfo(uploadId, Instant.now().toEpochMilli(),
               ReplicationType.RATIS, ReplicationFactor.THREE, objectID);
 
       for (int j = 1; j <= numParts; j++) {

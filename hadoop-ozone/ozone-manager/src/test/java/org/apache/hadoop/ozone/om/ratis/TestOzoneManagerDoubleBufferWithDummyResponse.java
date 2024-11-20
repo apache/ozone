@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,7 +43,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -144,7 +144,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         OmBucketInfo.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(UUID.randomUUID().toString())
-            .setCreationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
             .build();
     return new OMDummyCreateBucketResponse(omBucketInfo,
         OMResponse.newBuilder()

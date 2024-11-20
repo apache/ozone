@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,7 +31,6 @@ import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -249,7 +249,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    */
   @VisibleForTesting
   public void processAll(long timeout) {
-    long currentTime = Time.now();
+    long currentTime = Instant.now().toEpochMilli();
     while (true) {
 
       if (!isRunning) {
@@ -277,7 +277,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
         Thread.currentThread().interrupt();
       }
 
-      if (Time.now() > currentTime + timeout) {
+      if (Instant.now().toEpochMilli() > currentTime + timeout) {
         throw new AssertionError(
             "Messages are not processed in the given timeframe. Queued: "
                 + queuedCount.get() + " Processed: " + processed);

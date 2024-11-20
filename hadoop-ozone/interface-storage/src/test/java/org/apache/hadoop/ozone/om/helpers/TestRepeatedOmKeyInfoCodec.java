@@ -30,6 +30,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -69,16 +70,16 @@ public class TestRepeatedOmKeyInfoCodec
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
         OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
     return new OmKeyInfo.Builder()
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setReplicationConfig(
                 RatisReplicationConfig
                     .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEYNAME)
-        .setObjectID(Time.now())
-        .setUpdateID(Time.now())
+        .setObjectID(Instant.now().toEpochMilli())
+        .setUpdateID(Instant.now().toEpochMilli())
         .setDataSize(100)
         .setOmKeyLocationInfos(
             Collections.singletonList(omKeyLocationInfoGroup))

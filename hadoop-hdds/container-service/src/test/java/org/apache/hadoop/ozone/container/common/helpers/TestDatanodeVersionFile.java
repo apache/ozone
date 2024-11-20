@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -62,7 +62,7 @@ public class TestDatanodeVersionFile {
     storageID = UUID.randomUUID().toString();
     clusterID = UUID.randomUUID().toString();
     datanodeUUID = UUID.randomUUID().toString();
-    cTime = Time.now();
+    cTime = Instant.now().toEpochMilli();
     lv = HDDSVolumeLayoutVersion.getLatestVersion().getVersion();
 
     dnVersionFile = new DatanodeVersionFile(

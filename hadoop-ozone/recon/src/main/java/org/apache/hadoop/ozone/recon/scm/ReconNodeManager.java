@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +58,6 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.recon.ReconContext;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -228,16 +228,16 @@ public class ReconNodeManager extends SCMNodeManager {
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto queueReport) {
     List<SCMCommand> cmds = new ArrayList<>();
-    long currentTime = Time.now();
+    long currentTime = Instant.now().toEpochMilli();
     if (needUpdate(datanodeDetails, currentTime)) {
       cmds.add(new ReregisterCommand());
       LOG.info("Sending ReregisterCommand() for " +
           datanodeDetails.getHostName());
-      datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
+      datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Instant.now().toEpochMilli());
       return cmds;
     }
     // Update heartbeat map with current time
-    datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
+    datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Instant.now().toEpochMilli());
     cmds.addAll(super.processHeartbeat(datanodeDetails, queueReport));
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))

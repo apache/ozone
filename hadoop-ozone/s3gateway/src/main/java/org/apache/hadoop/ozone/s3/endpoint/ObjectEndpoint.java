@@ -1252,8 +1252,7 @@ public class ObjectEndpoint extends EndpointBase {
           // for now
           CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
           copyObjectResponse.setETag(wrapInQuotes(sourceKeyDetails.getMetadata().get(ETAG)));
-          copyObjectResponse.setLastModified(Instant.ofEpochMilli(
-              Time.now()));
+          copyObjectResponse.setLastModified(Instant.now());
           return copyObjectResponse;
         }
       }

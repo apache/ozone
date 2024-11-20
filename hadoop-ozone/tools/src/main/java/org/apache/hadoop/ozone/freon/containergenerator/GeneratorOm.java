@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon.containergenerator;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -45,7 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.hadoop.util.Time;
 
 import com.codahale.metrics.Timer;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -149,7 +149,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     OmVolumeArgs omVolumeArgs = new OmVolumeArgs.Builder().setVolume(volumeName)
         .setAdminName(admin)
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setOwnerName(owner)
         .setObjectID(1L)
         .setUpdateID(1L)

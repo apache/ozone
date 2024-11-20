@@ -28,6 +28,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -45,7 +46,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -147,7 +147,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     when(ozoneManager.getOmServerProtocol()).thenReturn(serverMock);
     // add volume with -2 value
     OmVolumeArgs omVolumeArgs =
-        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+        OmVolumeArgs.newBuilder().setCreationTime(Instant.now().toEpochMilli())
             .setVolume(volumeName).setAdminName(volumeName)
             .setOwnerName(volumeName).setQuotaInBytes(-2)
             .setQuotaInNamespace(-2).build();

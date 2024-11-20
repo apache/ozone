@@ -49,12 +49,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -199,7 +199,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         fromKeyValue.setKeyName(toKeyName);
 
         //Set modification time
-        fromKeyValue.setModificationTime(Time.now());
+        fromKeyValue.setModificationTime(Instant.now().toEpochMilli());
 
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated

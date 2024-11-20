@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -153,7 +153,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               keyArgs.getSortDatanodes(),
               userInfo);
 
-      newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
+      newKeyArgs = keyArgs.toBuilder().setModificationTime(Instant.now().toEpochMilli())
               .setType(type).setFactor(factor)
               .setDataSize(requestedSize);
 
@@ -162,7 +162,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               getOmRequest().getVersion()))
           .collect(Collectors.toList()));
     } else {
-      newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
+      newKeyArgs = keyArgs.toBuilder().setModificationTime(Instant.now().toEpochMilli());
     }
 
     newKeyArgs.setKeyName(keyPath);

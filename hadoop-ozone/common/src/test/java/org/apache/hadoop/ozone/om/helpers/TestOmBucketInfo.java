@@ -27,8 +27,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.Test;
-import org.apache.hadoop.util.Time;
 
+import java.time.Instant;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -75,7 +75,7 @@ public class TestOmBucketInfo {
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setBucketName("bucket")
         .setVolumeName("vol1")
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.ARCHIVE)
         .setAcls(Collections.singletonList(new OzoneAcl(
@@ -124,7 +124,7 @@ public class TestOmBucketInfo {
   public void getProtobufMessageEC() {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
-            .setCreationTime(Time.now()).setIsVersionEnabled(false)
+            .setCreationTime(Instant.now().toEpochMilli()).setIsVersionEnabled(false)
             .setStorageType(StorageType.ARCHIVE).setAcls(Collections
                 .singletonList(new OzoneAcl(
                     IAccessAuthorizer.ACLIdentityType.USER,
@@ -142,7 +142,7 @@ public class TestOmBucketInfo {
     omBucketInfo = OmBucketInfo.newBuilder()
         .setBucketName("bucket")
         .setVolumeName("vol1")
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.ARCHIVE)
         .setAcls(Collections.singletonList(new OzoneAcl(

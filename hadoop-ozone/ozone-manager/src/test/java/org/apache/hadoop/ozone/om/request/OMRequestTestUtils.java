@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -109,7 +110,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.logging.log4j.util.Strings;
@@ -422,8 +422,8 @@ public final class OMRequestTestUtils {
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setDataSize(100L) // Just set dummy size for testing
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
+            .setCreationTime(Instant.now().toEpochMilli())
+            .setModificationTime(Instant.now().toEpochMilli())
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
@@ -514,7 +514,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
-        bucketName, snapshotName, UUID.randomUUID(), Time.now());
+        bucketName, snapshotName, UUID.randomUUID(), Instant.now().toEpochMilli());
     addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
     return snapshotInfo;
   }
@@ -526,7 +526,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-        snapshotName, UUID.randomUUID(), Time.now());
+        snapshotName, UUID.randomUUID(), Instant.now().toEpochMilli());
     addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
     return snapshotInfo;
   }
@@ -561,8 +561,8 @@ public final class OMRequestTestUtils {
         .setReplicationConfig(replicationConfig)
         .setObjectID(0L)
         .setUpdateID(0L)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .addOmKeyLocationInfoGroup(omKeyLocationInfoGroup)
         .setDataSize(1000L);
   }
@@ -581,8 +581,8 @@ public final class OMRequestTestUtils {
       long parentObjID) {
     return new OmDirectoryInfo.Builder()
         .setName(keyName)
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setModificationTime(Instant.now().toEpochMilli())
         .setObjectID(objectID)
         .setParentObjectID(parentObjID)
         .setUpdateID(50)
@@ -628,7 +628,7 @@ public final class OMRequestTestUtils {
   public static void addVolumeToDB(String volumeName,
       OMMetadataManager omMetadataManager, long quotaInBytes) throws Exception {
     OmVolumeArgs omVolumeArgs =
-        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+        OmVolumeArgs.newBuilder().setCreationTime(Instant.now().toEpochMilli())
             .setVolume(volumeName).setAdminName(volumeName)
             .setOwnerName(volumeName).setQuotaInBytes(quotaInBytes)
             .setQuotaInNamespace(10000L).build();
@@ -651,7 +651,7 @@ public final class OMRequestTestUtils {
   public static void addVolumeToDB(String volumeName, String ownerName,
       OMMetadataManager omMetadataManager) throws Exception {
     OmVolumeArgs omVolumeArgs =
-        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+        OmVolumeArgs.newBuilder().setCreationTime(Instant.now().toEpochMilli())
             .setVolume(volumeName).setAdminName(ownerName)
             .setObjectID(System.currentTimeMillis())
             .setOwnerName(ownerName).setQuotaInBytes(Long.MAX_VALUE)
@@ -695,7 +695,7 @@ public final class OMRequestTestUtils {
 
     OmBucketInfo omBucketInfo = builder
         .setObjectID(System.currentTimeMillis())
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .build();
 
     String volumeName = omBucketInfo.getVolumeName();
@@ -722,7 +722,7 @@ public final class OMRequestTestUtils {
 
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketName(bucketName).setCreationTime(Instant.now().toEpochMilli())
             .setQuotaInBytes(quotaInBytes).build();
 
     // Add to cache.
@@ -809,7 +809,7 @@ public final class OMRequestTestUtils {
       String newOwner) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setOwnerName(newOwner).setModificationTime(Time.now()).build();
+            .setOwnerName(newOwner).setModificationTime(Instant.now().toEpochMilli()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
@@ -830,7 +830,7 @@ public final class OMRequestTestUtils {
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
             .setQuotaInBytes(quotaInBytes)
             .setQuotaInNamespace(quotaInNamespace)
-            .setModificationTime(Time.now()).build();
+            .setModificationTime(Instant.now().toEpochMilli()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
@@ -848,7 +848,7 @@ public final class OMRequestTestUtils {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
             .setQuotaInNamespace(quotaInNamespace)
-            .setModificationTime(Time.now()).build();
+            .setModificationTime(Instant.now().toEpochMilli()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
@@ -1436,7 +1436,7 @@ public final class OMRequestTestUtils {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setSnapshotName(snapshotName)
-            .setDeletionTime(Time.now())
+            .setDeletionTime(Instant.now().toEpochMilli())
             .build();
 
     OzoneManagerProtocolProtos.UserInfo userInfo =

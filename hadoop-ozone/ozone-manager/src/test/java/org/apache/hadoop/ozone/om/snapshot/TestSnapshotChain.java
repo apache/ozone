@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -37,6 +36,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -300,7 +300,7 @@ public class TestSnapshotChain {
 
     UUID snapshotID3 = UUID.randomUUID();
     SnapshotInfo snapshotInfo3 = createSnapshotInfo(snapshotID3, prevSnapshotID,
-        prevSnapshotID, Time.now());
+        prevSnapshotID, Instant.now().toEpochMilli());
     // Add and delete snapshot to make sure snapshot chain is correct.
     chainManager.addSnapshot(snapshotInfo3);
     chainManager.deleteSnapshot(snapshotInfoList.get(0));

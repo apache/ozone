@@ -23,9 +23,9 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
@@ -43,7 +43,7 @@ public class TestOmSnapshotInfo {
   private static final String BUCKET_NAME = "bucket1";
   private static final SnapshotStatus SNAPSHOT_STATUS =
       SnapshotStatus.SNAPSHOT_ACTIVE;
-  private static final long CREATION_TIME = Time.now();
+  private static final long CREATION_TIME = Instant.now().toEpochMilli();
   private static final long DELETION_TIME = -1;
   private static final UUID PATH_PREVIOUS_SNAPSHOT_ID = UUID.randomUUID();
   private static final UUID GLOBAL_PREVIOUS_SNAPSHOT_ID =

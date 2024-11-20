@@ -21,13 +21,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 
 import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -288,7 +288,7 @@ public final class OzoneFSUtils {
   }
 
   public static String generateUniqueTempSnapshotName() {
-    return "temp" + UUID.randomUUID() + SnapshotInfo.generateName(Time.now());
+    return "temp" + UUID.randomUUID() + SnapshotInfo.generateName(Instant.now().toEpochMilli());
   }
 
   public static Path trimPathToDepth(Path path, int maxDepth) {

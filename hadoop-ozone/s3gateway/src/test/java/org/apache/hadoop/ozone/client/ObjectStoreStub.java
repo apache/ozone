@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -30,7 +31,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
@@ -72,7 +72,7 @@ public class ObjectStoreStub extends ObjectStore {
         .setOwner(volumeArgs.getOwner())
         .setQuotaInBytes(volumeArgs.getQuotaInBytes())
         .setQuotaInNamespace(volumeArgs.getQuotaInNamespace())
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setAcls(volumeArgs.getAcls())
         .build();
     volumes.put(volumeName, volume);

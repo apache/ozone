@@ -22,9 +22,9 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -47,7 +47,7 @@ public class TestOmMultipartKeyInfoCodec
     final Codec<OmMultipartKeyInfo> codec = getCodec();
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
-        .setCreationTime(Time.now())
+        .setCreationTime(Instant.now().toEpochMilli())
         .setReplicationConfig(
                 RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.THREE))

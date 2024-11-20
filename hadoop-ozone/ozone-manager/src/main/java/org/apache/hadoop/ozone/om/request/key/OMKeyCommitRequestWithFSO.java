@@ -19,12 +19,12 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -204,7 +204,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
         openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
-        openKeyToDelete.setModificationTime(Time.now());
+        openKeyToDelete.setModificationTime(Instant.now().toEpochMilli());
         openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
             dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +45,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
-import org.apache.hadoop.util.Time;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -349,7 +349,7 @@ public final class OmKeyInfo extends WithParentObjectId
         keyLocationVersions.get(keyLocationVersions.size() - 1);
     currentLatestVersion.appendNewBlocks(newLocationList);
     if (updateTime) {
-      setModificationTime(Time.now());
+      setModificationTime(Instant.now().toEpochMilli());
     }
   }
 
@@ -391,7 +391,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     if (updateTime) {
-      setModificationTime(Time.now());
+      setModificationTime(Instant.now().toEpochMilli());
     }
     return latestVersionNum;
   }

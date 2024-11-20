@@ -48,12 +48,12 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -170,7 +170,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .build();
 
     // Generate volume modification time
-    long initialTime = Time.now();
+    long initialTime = Instant.now().toEpochMilli();
     final VolumeInfo updatedVolumeInfo = volumeInfo.toBuilder()
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
