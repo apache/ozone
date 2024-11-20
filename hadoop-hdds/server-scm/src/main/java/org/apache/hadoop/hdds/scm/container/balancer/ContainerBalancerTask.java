@@ -397,7 +397,7 @@ public class ContainerBalancerTask implements Runnable {
         emptyMap()
     );
     IterationInfo iterationInfo = new IterationInfo(
-                      0,
+        0,
         null,
         iterationDuration
     );
