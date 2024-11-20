@@ -35,15 +35,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -61,6 +60,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerMapper {
+  @TempDir
+  private static Path dbPath;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
@@ -71,14 +72,12 @@ public class TestContainerMapper {
   private static String bucketName = UUID.randomUUID().toString();
   private static OzoneConfiguration conf;
   private static List<String> keyList = new ArrayList<>();
-  private static String dbPath;
 
 
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    dbPath = GenericTestUtils.getRandomizedTempPath();
-    conf.set(OZONE_OM_DB_DIRS, dbPath);
+    conf.set(OZONE_OM_DB_DIRS, dbPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE, "100MB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
@@ -137,6 +136,5 @@ public class TestContainerMapper {
   public static void shutdown() throws IOException {
     IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
-    FileUtils.deleteFully(new File(dbPath));
   }
 }

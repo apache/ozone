@@ -398,7 +398,7 @@ run_rebot() {
 
   shift 2
 
-  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
+  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
   if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
@@ -517,9 +517,13 @@ fix_data_dir_permissions() {
 ## @param `ozone` image version
 prepare_for_binary_image() {
   local v=$1
+  local default_image="${docker.ozone.image}" # set at build-time from Maven property
+  local default_flavor="${docker.ozone.image.flavor}" # set at build-time from Maven property
+  local image="${OZONE_IMAGE:-${default_image}}" # may be specified by user running the test
+  local flavor="${OZONE_IMAGE_FLAVOR:-${default_flavor}}" # may be specified by user running the test
 
   export OZONE_DIR=/opt/ozone
-  export OZONE_IMAGE="apache/ozone:${v}"
+  export OZONE_TEST_IMAGE="${image}:${v}${flavor}"
 }
 
 ## @description Define variables required for using `ozone-runner` docker image
@@ -539,7 +543,7 @@ get_runner_image_spec() {
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="$(get_runner_image_spec "$@")"
+  export OZONE_TEST_IMAGE="$(get_runner_image_spec "$@")"
 }
 
 ## @description Executing the Ozone Debug CLI related robot tests

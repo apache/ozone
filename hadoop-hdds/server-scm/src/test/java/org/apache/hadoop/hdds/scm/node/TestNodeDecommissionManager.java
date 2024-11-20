@@ -237,21 +237,15 @@ public class TestNodeDecommissionManager {
     // same IP so we have 3 registered from the same host and 2 distinct ports.
     DatanodeDetails sourceDN = dns.get(9);
     int ratisPort = sourceDN
-        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+        .getRatisPort().getValue();
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(UUID.randomUUID())
         .setHostName(sourceDN.getHostName())
         .setIpAddress(sourceDN.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE,
-            sourceDN.getPort(DatanodeDetails.Port.Name.STANDALONE)
-                .getValue() + 1))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS,
-            ratisPort + 1))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST,
-            sourceDN.getPort(DatanodeDetails.Port.Name.REST).getValue() + 1))
+        .addPort(DatanodeDetails.newStandalonePort(sourceDN.getStandalonePort()
+            .getValue() + 1))
+        .addPort(DatanodeDetails.newRatisPort(ratisPort + 1))
+        .addPort(DatanodeDetails.newRestPort(sourceDN.getRestPort().getValue() + 1))
         .setNetworkLocation(sourceDN.getNetworkLocation());
     DatanodeDetails extraDN = builder.build();
     dns.add(extraDN);
@@ -1081,12 +1075,9 @@ public class TestNodeDecommissionManager {
     builder.setUuid(UUID.randomUUID())
         .setHostName(multiDn.getHostName())
         .setIpAddress(multiDn.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE, 3456))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS, 4567))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST, 5678))
+        .addPort(DatanodeDetails.newStandalonePort(3456))
+        .addPort(DatanodeDetails.newRatisPort(4567))
+        .addPort(DatanodeDetails.newRestPort(5678))
         .setNetworkLocation(multiDn.getNetworkLocation());
 
     DatanodeDetails dn = builder.build();
@@ -1100,16 +1091,9 @@ public class TestNodeDecommissionManager {
     builder.setUuid(UUID.randomUUID())
         .setHostName(duplicatePorts.getHostName())
         .setIpAddress(duplicatePorts.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.STANDALONE)
-                .getValue()))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.RATIS).getValue()))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.REST).getValue()))
+        .addPort(DatanodeDetails.newStandalonePort(duplicatePorts.getStandalonePort().getValue()))
+        .addPort(DatanodeDetails.newRatisPort(duplicatePorts.getRatisPort().getValue()))
+        .addPort(DatanodeDetails.newRestPort(duplicatePorts.getRestPort().getValue()))
         .setNetworkLocation(multiDn.getNetworkLocation());
     dn = builder.build();
     dns.add(dn);

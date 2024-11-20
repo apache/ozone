@@ -22,5 +22,5 @@ Test Timeout        5 minutes
 *** Test Cases ***
 
 Check om admin command
-    ${result} =        Execute and checkrc              ozone admin om roles -id=omServiceIdDefault  0
+    ${result} =        Execute and ignore error         ozone admin om roles -id=omServiceIdDefault
                        Should Contain                   ${result}  This command works only on OzoneManager HA cluster.
