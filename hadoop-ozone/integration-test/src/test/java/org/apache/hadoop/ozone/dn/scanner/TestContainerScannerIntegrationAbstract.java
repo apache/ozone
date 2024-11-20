@@ -19,8 +19,6 @@
  */
 package org.apache.hadoop.ozone.dn.scanner;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -41,42 +39,26 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests the data scanner functionality.
@@ -227,175 +209,5 @@ public abstract class TestContainerScannerIntegrationAbstract {
   private OzoneOutputStream createKey(String keyName) throws Exception {
     return TestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
-  }
-
-  /**
-   * Represents a type of container corruption that can be injected into the
-   * test.
-   */
-  protected enum ContainerCorruptions {
-    MISSING_CHUNKS_DIR(container -> {
-      File chunksDir = new File(container.getContainerData().getContainerPath(),
-          "chunks");
-      try {
-        FileUtils.deleteDirectory(chunksDir);
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-      assertFalse(chunksDir.exists());
-    }, FailureType.MISSING_CHUNKS_DIR),
-
-    MISSING_METADATA_DIR(container -> {
-      File metadataDir =
-          new File(container.getContainerData().getContainerPath(),
-              "metadata");
-      try {
-        FileUtils.deleteDirectory(metadataDir);
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-      assertFalse(metadataDir.exists());
-    }, FailureType.MISSING_METADATA_DIR),
-
-    MISSING_CONTAINER_FILE(container -> {
-      File containerFile = container.getContainerFile();
-      assertTrue(containerFile.delete());
-      assertFalse(containerFile.exists());
-    }, FailureType.MISSING_CONTAINER_FILE),
-
-    MISSING_CONTAINER_DIR(container -> {
-      File containerDir =
-          new File(container.getContainerData().getContainerPath());
-      try {
-        FileUtils.deleteDirectory(containerDir);
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-      assertFalse(containerDir.exists());
-    }, FailureType.MISSING_CONTAINER_DIR),
-
-    MISSING_BLOCK(container -> {
-      File chunksDir = new File(
-          container.getContainerData().getContainerPath(), "chunks");
-      for (File blockFile:
-          chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
-        try {
-          Files.delete(blockFile.toPath());
-        } catch (IOException ex) {
-          // Fail the test.
-          throw new UncheckedIOException(ex);
-        }
-      }
-    }, FailureType.MISSING_CHUNK_FILE),
-
-    CORRUPT_CONTAINER_FILE(container -> {
-      File containerFile = container.getContainerFile();
-      corruptFile(containerFile);
-    }, FailureType.CORRUPT_CONTAINER_FILE),
-
-    TRUNCATED_CONTAINER_FILE(container -> {
-      File containerFile = container.getContainerFile();
-      truncateFile(containerFile);
-    }, FailureType.CORRUPT_CONTAINER_FILE),
-
-    CORRUPT_BLOCK(container -> {
-      File chunksDir = new File(container.getContainerData().getContainerPath(),
-          "chunks");
-      Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
-              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-          .findFirst();
-      assertTrue(blockFile.isPresent());
-      corruptFile(blockFile.get());
-    }, FailureType.CORRUPT_CHUNK),
-
-    TRUNCATED_BLOCK(container -> {
-      File chunksDir = new File(container.getContainerData().getContainerPath(),
-          "chunks");
-      Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
-              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-          .findFirst();
-      assertTrue(blockFile.isPresent());
-      truncateFile(blockFile.get());
-    }, FailureType.INCONSISTENT_CHUNK_LENGTH);
-
-    private final Consumer<Container<?>> corruption;
-    private final FailureType expectedResult;
-
-    ContainerCorruptions(Consumer<Container<?>> corruption, FailureType expectedResult) {
-      this.corruption = corruption;
-      this.expectedResult = expectedResult;
-
-    }
-
-    public void applyTo(Container<?> container) {
-      corruption.accept(container);
-    }
-
-    /**
-     * Check that the correct corruption type was written to the container log for the provided container.
-     */
-    public void assertLogged(long containerID, int numErrors, LogCapturer logCapturer) {
-      // Enable multiline regex mode with "(?m)". This allows ^ to check for the start of a line in a multiline string.
-      // The log will have captured lines from all previous tests as well since we re-use the same cluster.
-      Pattern logLine = Pattern.compile("(?m)^ID=" + containerID + ".*" + " Scan result has " + numErrors +
-          " error.*" + expectedResult.toString());
-      assertThat(logCapturer.getOutput()).containsPattern(logLine);
-    }
-
-    /**
-     * Get all container corruption types as parameters for junit 4
-     * parameterized tests, except the ones specified.
-     */
-    public static Set<ContainerCorruptions> getAllParamsExcept(
-        ContainerCorruptions... exclude) {
-      Set<ContainerCorruptions> includeSet =
-          EnumSet.allOf(ContainerCorruptions.class);
-      Arrays.asList(exclude).forEach(includeSet::remove);
-      return includeSet;
-    }
-
-    /**
-     * Overwrite the file with random bytes.
-     */
-    private static void corruptFile(File file) {
-      try {
-        final int length = (int) file.length();
-
-        Path path = file.toPath();
-        final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
-
-        // Corrupt the last byte of the last chunk. This should map to a single error from the scanner.
-        final byte[] corruptedBytes = Arrays.copyOf(original, length);
-        corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
-
-        Files.write(path, corruptedBytes,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-        assertThat(IOUtils.readFully(Files.newInputStream(path), length))
-            .isEqualTo(corruptedBytes)
-            .isNotEqualTo(original);
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-    }
-
-    /**
-     * Truncate the file to 0 bytes in length.
-     */
-    private static void truncateFile(File file) {
-      try {
-        Files.write(file.toPath(), new byte[0],
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-        assertEquals(0, file.length());
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-    }
   }
 }

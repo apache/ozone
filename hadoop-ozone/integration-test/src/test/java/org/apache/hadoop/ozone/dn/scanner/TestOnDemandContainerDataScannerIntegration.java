@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -57,14 +58,14 @@ class TestOnDemandContainerDataScannerIntegration
    - Block checksums are verified on the client side. If there is a checksum
    error during read, the datanode will not learn about it.
    */
-  static Collection<ContainerCorruptions> supportedCorruptionTypes() {
-    return ContainerCorruptions.getAllParamsExcept(
-        ContainerCorruptions.MISSING_METADATA_DIR,
-        ContainerCorruptions.MISSING_CONTAINER_FILE,
-        ContainerCorruptions.CORRUPT_CONTAINER_FILE,
-        ContainerCorruptions.TRUNCATED_CONTAINER_FILE,
-        ContainerCorruptions.CORRUPT_BLOCK,
-        ContainerCorruptions.TRUNCATED_BLOCK);
+  static Collection<TestContainerCorruptions> supportedCorruptionTypes() {
+    return TestContainerCorruptions.getAllParamsExcept(
+        TestContainerCorruptions.MISSING_METADATA_DIR,
+        TestContainerCorruptions.MISSING_CONTAINER_FILE,
+        TestContainerCorruptions.CORRUPT_CONTAINER_FILE,
+        TestContainerCorruptions.TRUNCATED_CONTAINER_FILE,
+        TestContainerCorruptions.CORRUPT_BLOCK,
+        TestContainerCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeAll
@@ -90,7 +91,7 @@ class TestOnDemandContainerDataScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypes")
-  void testCorruptionDetected(ContainerCorruptions corruption)
+  void testCorruptionDetected(TestContainerCorruptions corruption)
       throws Exception {
     String keyName = "testKey";
     long containerID = writeDataThenCloseContainer(keyName);

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -69,7 +70,7 @@ class TestBackgroundContainerDataScannerIntegration
   @ParameterizedTest
   // Background container data scanner should be able to detect all errors.
   @EnumSource
-  void testCorruptionDetected(ContainerCorruptions corruption)
+  void testCorruptionDetected(TestContainerCorruptions corruption)
       throws Exception {
     pauseScanner();
 
@@ -90,9 +91,10 @@ class TestBackgroundContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
 
-    // If the block is truncated, every chunk in the block will register an error.
-    if (corruption == ContainerCorruptions.TRUNCATED_BLOCK) {
-      corruption.assertLogged(containerID, 2, logCapturer);
+    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
+        corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
+      // These errors will affect multiple chunks and result in multiple log messages.
+      corruption.assertLogged(containerID, logCapturer);
     } else {
       // Other corruption types will only lead to a single error.
       corruption.assertLogged(containerID, 1, logCapturer);

@@ -78,12 +78,14 @@ public class MetadataScanResult implements ScanResult {
    */
   @Override
   public String toString() {
-    if (errors.isEmpty()) {
-      return "Scan result has 0 errors";
+    if (deleted) {
+      return "Container was deleted";
+    } else if (errors.isEmpty()) {
+      return "Container has 0 errors";
     } else if (errors.size() == 1) {
-      return "Scan result has 1 error: " + errors.get(0);
+      return "Container has 1 error: " + errors.get(0);
     } else {
-      return "Scan result has " + errors.size() + " errors. The first error is: " + errors.get(0);
+      return "Container has " + errors.size() + " errors. The first error is: " + errors.get(0);
     }
   }
 }
