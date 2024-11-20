@@ -46,7 +46,7 @@ public final class NodeSchemaManager {
 
   private static volatile NodeSchemaManager instance = null;
 
-  private static final ConcurrentHashMap<String, NodeSchemaManager> cache = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, NodeSchemaManager> CACHE = new ConcurrentHashMap<>();
 
   private NodeSchemaManager() {
   }
@@ -59,11 +59,11 @@ public final class NodeSchemaManager {
   }
 
   public static NodeSchemaManager getInitiatedInstance(String schemaFile) {
-    NodeSchemaManager cachedInstance = cache.get(schemaFile);
+    NodeSchemaManager cachedInstance = CACHE.get(schemaFile);
     if (cachedInstance == null) {
       instance = new NodeSchemaManager();
       instance.init(schemaFile);
-      cache.put(schemaFile, instance);
+      CACHE.computeIfAbsent(schemaFile, k -> instance);
       return instance;
     } else {
       return cachedInstance;
