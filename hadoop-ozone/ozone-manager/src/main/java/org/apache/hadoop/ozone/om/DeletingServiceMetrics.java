@@ -51,7 +51,7 @@ public final class DeletingServiceMetrics {
   /**
    * Unregister the metrics instance.
    */
-  public static void unRegister() {
+  public static void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
