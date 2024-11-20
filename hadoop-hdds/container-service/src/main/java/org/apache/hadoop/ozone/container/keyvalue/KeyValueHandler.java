@@ -358,7 +358,7 @@ public class KeyValueHandler extends Handler {
 
     if (containerState != RECOVERING) {
       try {
-        containerSet.validateContainerIsMissing(containerID, containerState);
+        containerSet.ensureContainerNotMissing(containerID, containerState);
       } catch (StorageContainerException ex) {
         return ContainerUtils.logAndReturnError(LOG, ex, request);
       }

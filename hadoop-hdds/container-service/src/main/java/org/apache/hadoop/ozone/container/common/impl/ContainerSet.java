@@ -124,7 +124,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return addContainer(container, true);
   }
 
-  public void validateContainerIsMissing(long containerId, State state) throws StorageContainerException {
+  public void ensureContainerNotMissing(long containerId, State state) throws StorageContainerException {
     if (missingContainerSet.contains(containerId)) {
       throw new StorageContainerException(String.format("Container with container Id %d with state : %s is missing in" +
           " the DN.", containerId, state),
@@ -135,17 +135,18 @@ public class ContainerSet implements Iterable<Container<?>> {
   /**
    * Add Container to container map.
    * @param container container to be added
+   * @param overwrite if true should overwrite the container if the container was missing.
    * @return If container is added to containerMap returns true, otherwise
    * false
    */
-  private boolean addContainer(Container<?> container, boolean overwriteMissingContainers) throws
+  private boolean addContainer(Container<?> container, boolean overwrite) throws
       StorageContainerException {
     Preconditions.checkNotNull(container, "container cannot be null");
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
-    if (!overwriteMissingContainers) {
-      validateContainerIsMissing(containerId, containerState);
+    if (!overwrite) {
+      ensureContainerNotMissing(containerId, containerState);
     }
     if (containerMap.putIfAbsent(containerId, container) == null) {
       if (LOG.isDebugEnabled()) {
