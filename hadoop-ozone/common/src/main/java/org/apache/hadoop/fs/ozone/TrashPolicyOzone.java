@@ -18,22 +18,26 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.TrashPolicyDefault;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 
 
 /**
@@ -44,23 +48,29 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashPolicyOzone.class);
 
-  private static final Path CURRENT = new Path("Current");
+  protected static final Path CURRENT = new Path("Current");
+
+  protected static final int MSECS_PER_MINUTE = 60 * 1000;
 
   private static final FsPermission PERMISSION =
       new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
-  private Configuration configuration;
-
   private OzoneConfiguration ozoneConfiguration;
 
-  public TrashPolicyOzone() {
+  public OzoneConfiguration getOzoneConfiguration() {
+    return ozoneConfiguration;
   }
 
   @Override
   public void initialize(Configuration conf, FileSystem fs) {
     this.fs = fs;
-    this.configuration = conf;
-    ozoneConfiguration = OzoneConfiguration.of(this.configuration);
-
+    ozoneConfiguration = OzoneConfiguration.of(conf);
+    float hadoopTrashInterval = conf.getFloat(
+        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    // check whether user has configured ozone specific trash-interval
+    // if not fall back to hadoop configuration
+    this.deletionInterval = (long)(conf.getFloat(
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
+        * MSECS_PER_MINUTE);
   }
 
   @Override
