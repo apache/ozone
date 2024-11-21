@@ -1896,6 +1896,9 @@ public class LegacyReplicationManager {
   }
 
   protected void notifyStatusChanged() {
+    //now, as the current scm is leader and it`s state is up-to-date,
+    //we need to take some action about replicated inflight move options.
+    onLeaderReadyAndOutOfSafeMode();
   }
 
   private InflightMap getInflightMap(InflightType type) {
@@ -2097,6 +2100,62 @@ public class LegacyReplicationManager {
             SCMHAInvocationHandler.class.getClassLoader(),
             new Class<?>[]{MoveScheduler.class},
             invocationHandler);
+      }
+    }
+  }
+
+  /**
+  * when scm become LeaderReady and out of safe mode, some actions
+  * should be taken. for now , it is only used for handle replicated
+  * infligtht move.
+  */
+  private void onLeaderReadyAndOutOfSafeMode() {
+    List<HddsProtos.ContainerID> needToRemove = new LinkedList<>();
+    moveScheduler.getInflightMove().forEach((k, v) -> {
+      Set<ContainerReplica> replicas;
+      ContainerInfo cif;
+      try {
+        replicas = containerManager.getContainerReplicas(k);
+        cif = containerManager.getContainer(k);
+      } catch (ContainerNotFoundException e) {
+        needToRemove.add(k.getProtobuf());
+        LOG.error("can not find container {} " +
+            "while processing replicated move", k);
+        return;
+      }
+      boolean isSrcExist = replicas.stream()
+          .anyMatch(r -> r.getDatanodeDetails().equals(v.getSrc()));
+      boolean isTgtExist = replicas.stream()
+          .anyMatch(r -> r.getDatanodeDetails().equals(v.getTgt()));
+
+      if (isSrcExist) {
+        if (isTgtExist) {
+          //the former scm leader may or may not send the deletion command
+          //before reelection.here, we just try to send the command again.
+          try {
+            deleteSrcDnForMove(cif, replicas);
+          } catch (Exception ex) {
+            LOG.error("Exception while cleaning up excess replicas.", ex);
+          }
+        } else {
+          // resenting replication command is ok , no matter whether there is an
+          // on-going replication
+          sendReplicateCommand(cif, v.getTgt(),
+              Collections.singletonList(v.getSrc()));
+        }
+      } else {
+        // if container does not exist in src datanode, no matter it exists
+        // in target datanode, we can not take more actions to this option,
+        // so just remove it through ratis
+        needToRemove.add(k.getProtobuf());
+      }
+    });
+
+    for (HddsProtos.ContainerID containerID : needToRemove) {
+      try {
+        moveScheduler.completeMove(containerID);
+      } catch (Exception ex) {
+        LOG.error("Exception while moving container.", ex);
       }
     }
   }

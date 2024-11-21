@@ -2691,6 +2691,11 @@ public class TestLegacyReplicationManager {
       assertFalse(datanodeCommandHandler.received(
           SCMCommandProto.Type.deleteContainerCommand,
           dn1.getDatanodeDetails()));
+      //replica does not exist in target datanode, so a
+      // replicateContainerCommand will be sent again at
+      // notifyStatusChanged#onLeaderReadyAndOutOfSafeMode
+      assertEquals(2, datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
 
 
       //replicate container to dn3, now, over-replicated
@@ -2725,6 +2730,17 @@ public class TestLegacyReplicationManager {
       containerStateManager.removeContainerReplica(id, dn1);
       replicationManager.processAll();
       eventQueue.processAll(1000);
+
+      //since the move is complete,so after scm crash and restart
+      //inflightMove should not contain the container again
+      resetReplicationManager();
+      replicationManager.getMoveScheduler()
+              .reinitialize(SCMDBDefinition.MOVE.getTable(dbStore));
+      assertThat(replicationManager.getMoveScheduler()
+              .getInflightMove()).doesNotContainKey(id);
+
+      //completeableFuture is not stored in DB, so after scm crash and
+      //restart ,completeableFuture is missing
     }
 
     /**
