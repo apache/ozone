@@ -206,7 +206,7 @@ public class TestOzoneDebugShell {
     }
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
-    String keyPrefix = volumeName + "/" + bucketName + "/dir1";
+    String keyPrefix = volumeName + "/" + bucketName + "/dir1/";
     assertTrue(stdout.toString().contains(keyPrefix + "file1") && stdout.toString().contains(keyPrefix + "file2"));
     assertFalse(stdout.toString().contains(keyPrefix + "file3"));
   }
