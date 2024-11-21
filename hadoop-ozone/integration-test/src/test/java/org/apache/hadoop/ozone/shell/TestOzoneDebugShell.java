@@ -33,10 +33,13 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.debug.DBScanner;
+import org.apache.hadoop.ozone.debug.KeyPathRetriever;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -74,6 +77,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Ozone Debug shell.
@@ -173,6 +178,37 @@ public class TestOzoneDebugShell {
     assertEquals(0, exitCode);
     String cmdOut = stdout.toString();
     assertThat(cmdOut).contains(keyName);
+  }
+
+  @Test
+  public void testKeyPathRetriever() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    StringWriter stdout = new StringWriter();
+    PrintWriter pstdout = new PrintWriter(stdout);
+    String[] args;
+    CommandLine cmd;
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      OzoneBucket bucket = client.getObjectStore().getVolume(volumeName).getBucket(bucketName);
+      bucket.createDirectory("dir1");
+      TestDataUtil.createKey(bucket, "dir1/file1", "test");
+      TestDataUtil.createKey(bucket, "dir1/file2", "test");
+      TestDataUtil.createKey(bucket, "dir1/file3", "test");
+      OzoneKeyDetails key1 = bucket.getKey("dir1/file1");
+      OzoneKeyDetails key3 = bucket.getKey("dir1/file2");
+      StringBuilder sb = new StringBuilder();
+      key1.getOzoneKeyLocations().forEach(e -> sb.append(e.getContainerID()));
+      key3.getOzoneKeyLocations().forEach(e -> sb.append(",").append(e.getContainerID()));
+      String dbFile = OMStorage.getOmDbDir(conf).getPath() + "/om.db";
+      cmd = new CommandLine(new OzoneDebug()).addSubcommand(new CommandLine(new KeyPathRetriever())).setOut(pstdout);
+      args = new String[] {"retrieve-key-fullpath", "--db", dbFile, "--containers", sb.toString()};
+    }
+    int exitCode = cmd.execute(args);
+    assertEquals(0, exitCode);
+    String keyPrefix = volumeName + "/" + bucketName + "/dir1";
+    assertTrue(stdout.toString().contains(keyPrefix + "file1") && stdout.toString().contains(keyPrefix + "file2"));
+    assertFalse(stdout.toString().contains(keyPrefix + "file3"));
   }
 
   private static String getSnapshotDBPath(String checkPointDir) {
