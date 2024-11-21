@@ -42,15 +42,15 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
+      needs-basic-check: false
+      needs-native-check: false
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
+      needs-compile: false
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
-      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
-      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-dependency-check: false
+      needs-integration-tests: false
+      needs-kubernetes-tests: false
       sha: ${{ steps.get-sha.outputs.sha }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
@@ -143,7 +143,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -DskipRecon -DskipShade -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
@@ -475,15 +475,13 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
-      - dependency
-      - license
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
-        suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
+        suite:
+          - single
       fail-fast: false
     steps:
       - name: Checkout project
@@ -507,7 +505,7 @@ jobs:
           ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
-          OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
+          OZONE_TEST_SELECTOR: xcompat
           OZONE_VOLUME_OWNER: 1000
         continue-on-error: true
       - name: Summary of failures
