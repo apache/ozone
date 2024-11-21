@@ -138,9 +138,6 @@ public class DeletedBlockLogImpl
           }
         } else {
           iter.seek(startTxId);
-          if (iter.hasNext()) {
-            iter.next();
-          }
           while (iter.hasNext() && failedTXs.size() < count) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
             if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
