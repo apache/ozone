@@ -29,7 +29,7 @@ import java.util.concurrent.Callable;
  * Parser for scm.db file.
  */
 @CommandLine.Command(
-    name = "fso-tree-repair",
+    name = "fso-tree",
     description = "Identify and repair a disconnected FSO tree, and mark unreachable entries for deletion. " +
         "OM should be stopped while this tool is run."
 )
@@ -44,21 +44,21 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
       description = "Path to OM RocksDB")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--repair"},
+  @CommandLine.Option(names = {"-r", "--repair"},
         defaultValue = "false",
         description = "Run in repair mode to move unreachable files and directories to deleted tables.")
   private boolean repair;
 
-  @CommandLine.Option(names = {"--volume"},
+  @CommandLine.Option(names = {"-v", "--volume"},
       description = "Filter by volume name. Add '/' before the volume name.")
   private String volume;
 
-  @CommandLine.Option(names = {"--bucket"},
+  @CommandLine.Option(names = {"-b", "--bucket"},
       description = "Filter by bucket name")
   private String bucket;
 
   @CommandLine.Option(names = {"--verbose"},
-      description = "More verbose output. ")
+      description = "Verbose output. Show all intermediate steps and deleted keys info.")
   private boolean verbose;
 
   @Override
@@ -70,14 +70,14 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
     }
     try {
       FSORepairTool
-          repairTool = new FSORepairTool(dbPath, repair, volume, bucket);
+          repairTool = new FSORepairTool(dbPath, repair, volume, bucket, verbose);
       repairTool.run();
     } catch (Exception ex) {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
     }
 
     if (verbose) {
-      System.out.println("FSO repair finished. See client logs for results.");
+      System.out.println("FSO repair finished.");
     }
 
     return null;

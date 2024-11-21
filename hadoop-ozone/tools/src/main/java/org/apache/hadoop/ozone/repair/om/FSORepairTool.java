@@ -62,15 +62,18 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Base Tool to identify disconnected FSO trees in all buckets.
- * The tool will log information about unreachable files or directories.
- * If deletes are still in progress (the deleted directory table is not empty), the tool may
- * report that the tree is disconnected, even though pending deletes would fix the issue.
- *
+ * Base Tool to identify and repair disconnected FSO trees across all buckets.
+ * This tool logs information about reachable, unreachable and unreferenced files and directories in debug mode
+ * and moves these unreferenced files and directories to the deleted tables in repair mode.
+
+ * If deletes are still in progress (the deleted directory table is not empty), the tool
+ * reports that the tree is unreachable, even though pending deletes would fix the issue.
+ * If not, the tool reports them as unreferenced and deletes them in repair mode.
+
  * Before using the tool, make sure all OMs are stopped, and that all Ratis logs have been flushed to the OM DB.
  * This can be done using `ozone admin prepare` before running the tool, and `ozone admin
  * cancelprepare` when done.
- *
+
  * The tool will run a DFS from each bucket, and save all reachable directories as keys in a new temporary RocksDB
  * instance called "reachable.db" in the same directory as om.db.
  * It will then scan the entire file and directory tables for each bucket to see if each object's parent is in the
@@ -101,25 +104,30 @@ public class FSORepairTool {
   private RocksDatabase reachableDB;
   private final ReportStatistics reachableStats;
   private final ReportStatistics unreachableStats;
+  private final ReportStatistics unreferencedStats;
   private final boolean repair;
+  private final boolean verbose;
 
-  public FSORepairTool(String dbPath, boolean repair, String volume, String bucket) throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, repair, volume, bucket);
+  public FSORepairTool(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
+      throws IOException {
+    this(getStoreFromPath(dbPath), dbPath, repair, volume, bucket, verbose);
   }
 
   /**
    * Allows passing RocksDB instance from a MiniOzoneCluster directly to this class for testing.
    */
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean repair, String volume, String bucket)
+  public FSORepairTool(DBStore dbStore, String dbPath, boolean repair, String volume, String bucket, boolean verbose)
       throws IOException {
     this.reachableStats = new ReportStatistics(0, 0, 0);
     this.unreachableStats = new ReportStatistics(0, 0, 0);
+    this.unreferencedStats = new ReportStatistics(0, 0, 0);
 
     this.store = dbStore;
     this.omDBPath = dbPath;
     this.repair = repair;
     this.volumeFilter = volume;
     this.bucketFilter = bucket;
+    this.verbose = verbose;
     volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
         String.class,
         OmVolumeArgs.class);
@@ -150,10 +158,10 @@ public class FSORepairTool {
           "not exist or is not a RocksDB directory.", dbPath));
     }
     // Load RocksDB and tables needed.
-    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile());
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
   }
 
-  public FSORepairTool.Report run() throws IOException {
+  public FSORepairTool.Report run() throws Exception {
 
     if (bucketFilter != null && volumeFilter == null) {
       System.out.println("--bucket flag cannot be used without specifying --volume.");
@@ -265,7 +273,7 @@ public class FSORepairTool {
     dropReachableTableIfExists();
     createReachableTable();
     markReachableObjectsInBucket(volume, bucketInfo);
-    handleUnreachableObjects(volume, bucketInfo);
+    handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
     dropReachableTableIfExists();
   }
 
@@ -273,6 +281,7 @@ public class FSORepairTool {
     Report report = new Report.Builder()
         .setReachable(reachableStats)
         .setUnreachable(unreachableStats)
+        .setUnreferenced(unreferencedStats)
         .build();
 
     System.out.println("\n" + report);
@@ -308,8 +317,16 @@ public class FSORepairTool {
     }
   }
 
-  private void handleUnreachableObjects(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
-    // Check for unreachable directories in the bucket.
+  private boolean isDirectoryInDeletedDirTable(String dirKey) throws IOException {
+    return deletedDirectoryTable.isExist(dirKey);
+  }
+
+  private boolean isFileKeyInDeletedTable(String fileKey) throws IOException {
+    return deletedTable.isExist(fileKey);
+  }
+
+  private void handleUnreachableAndUnreferencedObjects(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
+    // Check for unreachable and unreferenced directories in the bucket.
     String bucketPrefix = OM_KEY_PREFIX +
         volume.getObjectID() +
         OM_KEY_PREFIX +
@@ -328,21 +345,27 @@ public class FSORepairTool {
         }
 
         if (!isReachable(dirKey)) {
-          System.out.println("Found unreachable directory: " + dirKey);
-          unreachableStats.addDir();
+          if (!isDirectoryInDeletedDirTable(dirKey)) {
+            System.out.println("Found unreferenced directory: " + dirKey);
+            unreferencedStats.addDir();
 
-          if (!repair) {
-            System.out.println("Marking unreachable directory " + dirKey + " for deletion.");
+            if (!repair) {
+              if (verbose) {
+                System.out.println("Marking unreferenced directory " + dirKey + " for deletion.");
+                }
+            } else {
+              System.out.println("Deleting unreferenced directory " + dirKey);
+              OmDirectoryInfo dirInfo = dirEntry.getValue();
+              markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
+            }
           } else {
-            System.out.println("Deleting unreachable directory " + dirKey);
-            OmDirectoryInfo dirInfo = dirEntry.getValue();
-            markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
+            unreachableStats.addDir();
           }
         }
       }
     }
 
-    // Check for unreachable files
+    // Check for unreachable and unreferenced files
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              fileIterator = fileTable.iterator()) {
       fileIterator.seek(bucketPrefix);
@@ -356,14 +379,20 @@ public class FSORepairTool {
 
         OmKeyInfo fileInfo = fileEntry.getValue();
         if (!isReachable(fileKey)) {
-          System.out.println("Found unreachable file: " + fileKey);
-          unreachableStats.addFile(fileInfo.getDataSize());
+          if (!isFileKeyInDeletedTable(fileKey)) {
+            System.out.println("Found unreferenced file: " + fileKey);
+            unreferencedStats.addFile(fileInfo.getDataSize());
 
-          if (!repair) {
-            System.out.println("Marking unreachable file " + fileKey + " for deletion." + fileKey);
+            if (!repair) {
+              if (verbose) {
+                System.out.println("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
+              }
+            } else {
+              System.out.println("Deleting unreferenced file " + fileKey);
+              markFileForDeletion(fileKey, fileInfo);
+            }
           } else {
-            System.out.println("Deleting unreachable file " + fileKey);
-            markFileForDeletion(fileKey, fileInfo);
+            unreachableStats.addFile(fileInfo.getDataSize());
           }
         } else {
           // NOTE: We are deserializing the proto of every reachable file
@@ -388,8 +417,9 @@ public class FSORepairTool {
       // directory delete. It is also not possible here if the file's parent
       // is gone. The name of the key does not matter so just use IDs.
       deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
-
-      System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
+      if (verbose) {
+        System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
+      }
       store.commitBatchOperation(batch);
     }
   }
@@ -561,6 +591,7 @@ public class FSORepairTool {
   public static class Report {
     private final ReportStatistics reachable;
     private final ReportStatistics unreachable;
+    private final ReportStatistics unreferenced;
 
     /**
      * Builds one report that is the aggregate of multiple others.
@@ -568,16 +599,19 @@ public class FSORepairTool {
     public Report(FSORepairTool.Report... reports) {
       reachable = new ReportStatistics();
       unreachable = new ReportStatistics();
+      unreferenced = new ReportStatistics();
 
       for (FSORepairTool.Report report : reports) {
         reachable.add(report.reachable);
         unreachable.add(report.unreachable);
+        unreferenced.add(report.unreferenced);
       }
     }
 
     private Report(FSORepairTool.Report.Builder builder) {
       this.reachable = builder.reachable;
       this.unreachable = builder.unreachable;
+      this.unreferenced = builder.unreferenced;
     }
 
     public ReportStatistics getReachable() {
@@ -588,8 +622,12 @@ public class FSORepairTool {
       return unreachable;
     }
 
+    public ReportStatistics getUnreferenced() {
+      return unreferenced;
+    }
+
     public String toString() {
-      return "Reachable: " + reachable + "\nUnreachable: " + unreachable;
+      return "Reachable: " + reachable + "\nUnreachable: " + unreachable + "\nUnreferenced: " + unreferenced;
     }
 
     @Override
@@ -605,12 +643,13 @@ public class FSORepairTool {
       // Useful for testing.
       System.out.println("Comparing reports\nExpect:\n" + this + "\nActual:\n" + report);
 
-      return reachable.equals(report.reachable) && unreachable.equals(report.unreachable);
+      return reachable.equals(report.reachable) && unreachable.equals(report.unreachable) &&
+             unreferenced.equals(report.unreferenced);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(reachable, unreachable);
+      return Objects.hash(reachable, unreachable, unreferenced);
     }
 
     /**
@@ -619,6 +658,7 @@ public class FSORepairTool {
     public static final class Builder {
       private ReportStatistics reachable = new ReportStatistics();
       private ReportStatistics unreachable = new ReportStatistics();
+      private ReportStatistics unreferenced = new ReportStatistics();
 
       public Builder() {
       }
@@ -630,6 +670,11 @@ public class FSORepairTool {
 
       public Builder setUnreachable(ReportStatistics unreachable) {
         this.unreachable = unreachable;
+        return this;
+      }
+
+      public Builder setUnreferenced(ReportStatistics unreferenced) {
+        this.unreferenced = unreferenced;
         return this;
       }
 
