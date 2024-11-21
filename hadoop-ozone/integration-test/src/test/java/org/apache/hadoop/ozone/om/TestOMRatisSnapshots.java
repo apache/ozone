@@ -409,9 +409,9 @@ public class TestOMRatisSnapshots {
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
-    SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap80");
+    SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap100");
     followerOM.getConfiguration().setInt(
         OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
         KeyManagerImpl.DISABLE_VALUE);
@@ -424,9 +424,9 @@ public class TestOMRatisSnapshots {
     }, 1000, 30_000);
 
     // Get two incremental tarballs, adding new keys/snapshot for each.
-    IncrementData firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
+    IncrementData firstIncrement = getNextIncrementalTarball(200, 2, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
-    IncrementData secondIncrement = getNextIncrementalTarball(240, 3, leaderOM,
+    IncrementData secondIncrement = getNextIncrementalTarball(300, 3, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
 
     // Resume the follower thread, it would download the incremental snapshot.
@@ -501,10 +501,10 @@ public class TestOMRatisSnapshots {
     assertNotNull(filesInCandidate);
     assertEquals(0, filesInCandidate.length);
 
-    checkSnapshot(leaderOM, followerOM, "snap80", firstKeys, snapshotInfo2);
-    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.getKeys(),
+    checkSnapshot(leaderOM, followerOM, "snap100", firstKeys, snapshotInfo2);
+    checkSnapshot(leaderOM, followerOM, "snap200", firstIncrement.getKeys(),
         firstIncrement.getSnapshotInfo());
-    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
+    checkSnapshot(leaderOM, followerOM, "snap300", secondIncrement.getKeys(),
         secondIncrement.getSnapshotInfo());
     assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
@@ -618,7 +618,7 @@ public class TestOMRatisSnapshots {
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);

@@ -38,6 +38,8 @@
     <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
+    <module>recon</module>
+    <module>recon-codegen</module>
     <module>s3gateway</module>
     <module>dist</module>
     <module>csi</module>
@@ -394,18 +396,6 @@
       <modules>
         <module>ozonefs-shaded</module>
         <module>ozonefs-hadoop2</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>build-with-recon</id>
-      <activation>
-        <property>
-          <name>!skipRecon</name>
-        </property>
-      </activation>
-      <modules>
-        <module>recon</module>
-        <module>recon-codegen</module>
       </modules>
     </profile>
     <profile>
