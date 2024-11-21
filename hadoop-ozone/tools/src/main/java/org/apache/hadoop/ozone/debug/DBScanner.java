@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
@@ -172,6 +173,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       defaultValue = "10")
   private int threadCount;
 
+  @CommandLine.Option(names = {"--max-records-per-file"},
+      description = "The number of records to print per file.",
+      defaultValue = "0")
+  private long recordsPerFile;
+
+  private int fileSuffix = 0;
+  private long globalCount = 0;
+
   private static final String KEY_SEPARATOR_SCHEMA_V3 =
       new OzoneConfiguration().getObject(DatanodeConfiguration.class)
           .getContainerSchemaV3KeySeparator();
@@ -180,7 +189,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws Exception {
-
+    fileSuffix = 0;
+    globalCount = 0;
     List<ColumnFamilyDescriptor> cfDescList =
         RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
     final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
@@ -240,11 +250,28 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return displayTable(iterator, dbColumnFamilyDef, out(), schemaV3);
     }
 
-    // Write to file output
-    try (PrintWriter out = new PrintWriter(new BufferedWriter(
-        new PrintWriter(fileName, UTF_8.name())))) {
-      return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
+    // If there are no parent directories, create them
+    File dirFile = new File(fileName);
+    if (!dirFile.exists()) {
+      boolean flg = dirFile.mkdirs();
+      if (!flg) {
+        throw new IOException("An exception occurred while creating " +
+                "the directory. Directorys: " + dirFile.getAbsolutePath());
+      }
     }
+
+    // Write to file output
+    while (iterator.get().isValid() && withinLimit(globalCount)) {
+      String fileNameTarget = recordsPerFile > 0 ? fileName + File.separator + fileSuffix++ :
+          fileName;
+      try (PrintWriter out = new PrintWriter(new BufferedWriter(
+          new PrintWriter(fileNameTarget, UTF_8.name())))) {
+        if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private boolean displayTable(ManagedRocksIterator iterator,
@@ -314,7 +341,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       }
     }
 
-    while (withinLimit(count) && iterator.get().isValid() && !exception && !reachedEnd) {
+    while (withinLimit(globalCount) && iterator.get().isValid() && !exception && !reachedEnd) {
       // if invalid endKey is given, it is ignored
       if (null != endKey && Arrays.equals(iterator.get().key(), getValueObject(dbColumnFamilyDef, endKey))) {
         reachedEnd = true;
@@ -326,6 +353,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         // the record passes the filter
         batch.add(new ByteArrayKeyValue(
             iterator.get().key(), iterator.get().value()));
+        globalCount++;
         count++;
         if (batch.size() >= batchSize) {
           while (logWriter.getInflightLogCount() > threadCount * 10L
@@ -343,6 +371,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         }
       }
       iterator.get().next();
+      if ((recordsPerFile > 0) && (count >= recordsPerFile)) {
+        break;
+      }
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,

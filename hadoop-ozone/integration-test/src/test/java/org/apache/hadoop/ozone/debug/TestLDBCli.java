@@ -342,6 +342,43 @@ public class TestLDBCli {
   }
 
   @Test
+  void testScanWithRecordsPerFile() throws IOException {
+    // Prepare dummy table
+    prepareTable(KEY_TABLE, false);
+
+    String scanDir1 = tempDir.getAbsolutePath() + "/scandir1";
+    // Prepare scan args
+    List<String> completeScanArgs1 = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE, "--out", scanDir1,
+        "--max-records-per-file", "2"));
+
+    File tmpDir1 = new File(scanDir1);
+    tmpDir1.deleteOnExit();
+
+    int exitCode1 = cmd.execute(completeScanArgs1.toArray(new String[0]));
+    assertEquals(0, exitCode1);
+    assertTrue(tmpDir1.isDirectory());
+    assertEquals(3, tmpDir1.listFiles().length);
+
+    String scanDir2 = tempDir.getAbsolutePath() + "/scandir2";
+    // Used with parameter '-l'
+    List<String> completeScanArgs2 = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE, "--out", scanDir2,
+        "--max-records-per-file", "3", "-l", "2"));
+    File tmpDir2 = new File(scanDir2);
+    tmpDir2.deleteOnExit();
+
+    int exitCode2 = cmd.execute(completeScanArgs2.toArray(new String[0]));
+    assertEquals(0, exitCode2);
+    assertTrue(tmpDir2.isDirectory());
+    assertEquals(1, tmpDir2.listFiles().length);
+  }
+
+  @Test
   void testSchemaCommand() throws IOException {
     // Prepare dummy table
     prepareTable(KEY_TABLE, false);
