@@ -303,6 +303,7 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated hadoop.hdds.KeyValue             metadata                       = 143;
 }
 
 message OMResponse {

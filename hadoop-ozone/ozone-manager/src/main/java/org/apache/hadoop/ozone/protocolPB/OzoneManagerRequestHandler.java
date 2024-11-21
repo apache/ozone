@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -146,6 +147,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
@@ -195,6 +197,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
   }
 
+  private Map<String, String> getMetadata(OMRequest omRequest) {
+    return omRequest.getMetadataList().stream().collect(Collectors.toMap(HddsProtos.KeyValue::getKey,
+        HddsProtos.KeyValue::getValue));
+  }
+
   //TODO simplify it to make it shorter
   @SuppressWarnings("methodlength")
   @Override
@@ -239,12 +246,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListKeys:
         ListKeysResponse listKeysResponse = listKeys(
-            request.getListKeysRequest(), request.getVersion());
+            request.getListKeysRequest(), getMetadata(request), request.getVersion());
         responseBuilder.setListKeysResponse(listKeysResponse);
         break;
       case ListKeysLight:
         ListKeysLightResponse listKeysLightResponse = listKeysLight(
-            request.getListKeysRequest());
+            request.getListKeysRequest(), getMetadata(request));
         responseBuilder.setListKeysLightResponse(listKeysLightResponse);
         break;
       case ListMultiPartUploadParts:
@@ -289,12 +296,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListStatus:
         ListStatusResponse listStatusResponse =
-            listStatus(request.getListStatusRequest(), request.getVersion());
+            listStatus(request.getListStatusRequest(), getMetadata(request), request.getVersion());
         responseBuilder.setListStatusResponse(listStatusResponse);
         break;
       case ListStatusLight:
         ListStatusLightResponse listStatusLightResponse =
-            listStatusLight(request.getListStatusRequest(),
+            listStatusLight(request.getListStatusRequest(), getMetadata(request),
                 request.getVersion());
         responseBuilder.setListStatusLightResponse(listStatusLightResponse);
         break;
@@ -342,7 +349,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListSnapshot:
         OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
-            getSnapshots(request.getListSnapshotRequest());
+            getSnapshots(request.getListSnapshotRequest(), getMetadata(request));
         responseBuilder.setListSnapshotResponse(listSnapshotResponse);
         break;
       case SnapshotDiff:
@@ -744,17 +751,24 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private ListKeysResponse listKeys(ListKeysRequest request, int clientVersion)
+  private long getMaxEntries(long requestCount, Map<String, String> requestMetdata) {
+    boolean allowMaxListing =
+        Optional.of(requestMetdata.getOrDefault(ALLOW_SERVER_SIDE_MAX_LISTING, "false"))
+            .map(Boolean::parseBoolean).get();
+    return allowMaxListing ? Math.min(this.maxKeyListSize, requestCount) : requestCount;
+  }
+
+  private ListKeysResponse listKeys(ListKeysRequest request, Map<String, String> requestMetdata,
+                                    int clientVersion)
       throws IOException {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
-
     ListKeysResult listKeysResult = impl.listKeys(
         request.getVolumeName(),
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        (int)getMaxEntries(request.getCount(), requestMetdata));
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
@@ -762,7 +776,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+  private ListKeysLightResponse listKeysLight(ListKeysRequest request, Map<String, String> requestMetadata)
       throws IOException {
     ListKeysLightResponse.Builder resp =
         ListKeysLightResponse.newBuilder();
@@ -772,7 +786,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        (int)getMaxEntries(request.getCount(), requestMetadata));
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
@@ -1230,7 +1244,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListStatusResponse listStatus(
-      ListStatusRequest request, int clientVersion) throws IOException {
+      ListStatusRequest request, Map<String, String> requestMetdata, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1243,7 +1257,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), getMaxEntries(request.getNumEntries(), requestMetdata),
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1255,7 +1269,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListStatusLightResponse listStatusLight(
-      ListStatusRequest request, int clientVersion) throws IOException {
+      ListStatusRequest request, Map<String, String> requestMetdata, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1269,7 +1283,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), getMaxEntries(request.getNumEntries(), requestMetdata),
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1493,11 +1507,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
-      OzoneManagerProtocolProtos.ListSnapshotRequest request)
+      OzoneManagerProtocolProtos.ListSnapshotRequest request, Map<String, String> requestMetdata)
       throws IOException {
     ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
-        request.getPrevSnapshot(), (int)Math.min(request.getMaxListResult(), maxKeyListSize));
+        request.getPrevSnapshot(), (int)getMaxEntries(request.getMaxListResult(), requestMetdata));
 
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
         .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());

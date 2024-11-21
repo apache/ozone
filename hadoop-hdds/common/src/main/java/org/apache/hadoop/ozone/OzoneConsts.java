@@ -540,4 +540,9 @@ public final class OzoneConsts {
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
+
+  /**
+   * OM Request's Listing header to allow server to cap listing size.
+   */
+  public static final String ALLOW_SERVER_SIDE_MAX_LISTING = "allowServerSideMaxListing";
 }

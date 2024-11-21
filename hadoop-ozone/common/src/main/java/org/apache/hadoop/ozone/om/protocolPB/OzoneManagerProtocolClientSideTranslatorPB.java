@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -41,6 +42,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -1047,6 +1049,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.ListKeys)
         .setListKeysRequest(req)
+        .addMetadata(HddsProtos.KeyValue.newBuilder().setKey(OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING)
+            .setValue(Boolean.TRUE.toString()))
         .build();
 
     ListKeysResponse resp =
@@ -1087,6 +1091,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.ListKeysLight)
         .setListKeysRequest(req)
+        .addMetadata(HddsProtos.KeyValue.newBuilder().setKey(OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING)
+            .setValue(Boolean.TRUE.toString()))
         .build();
 
     ListKeysLightResponse resp =
@@ -1376,6 +1382,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshot)
         .setListSnapshotRequest(requestBuilder)
+        .addMetadata(HddsProtos.KeyValue.newBuilder().setKey(OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING)
+            .setValue(Boolean.TRUE.toString()))
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
@@ -2366,6 +2374,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
+        .addMetadata(HddsProtos.KeyValue.newBuilder().setKey(OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING)
+            .setValue(Boolean.TRUE.toString()))
         .build();
     ListStatusResponse listStatusResponse =
         handleError(submitRequest(omRequest)).getListStatusResponse();
@@ -2395,6 +2405,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
+        .addMetadata(HddsProtos.KeyValue.newBuilder().setKey(OzoneConsts.ALLOW_SERVER_SIDE_MAX_LISTING)
+            .setValue(Boolean.TRUE.toString()))
         .build();
     ListStatusLightResponse listStatusLightResponse =
         handleError(submitRequest(omRequest)).getListStatusLightResponse();
