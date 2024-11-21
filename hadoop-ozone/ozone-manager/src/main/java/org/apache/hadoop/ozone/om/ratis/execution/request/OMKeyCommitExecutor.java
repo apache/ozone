@@ -76,13 +76,23 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 /**
  * Handles CommitKey request.
  */
-public class OMKeyCommitRequest extends OMKeyRequestBase {
-  private static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitRequest.class);
+public class OMKeyCommitExecutor extends OMKeyExecutor {
+  private static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitExecutor.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest, OmBucketInfo bucketInfo) {
+  public OMKeyCommitExecutor(OMRequest omRequest, OmBucketInfo bucketInfo) {
     super(omRequest, bucketInfo);
   }
 
+  /**
+   * preProcess will perform below actions.
+   * 1. update request with user info and layout version
+   * 2. validate request and key argument for operation
+   * 3. update request with normalized key, timestamp, resolved bucket and volume, ...
+   *
+   * @param ozoneManager
+   * @return OMRequest modified request updating more details
+   * @throws IOException
+   */
   @Override
   public OMRequest preProcess(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preProcess(ozoneManager);
@@ -122,6 +132,13 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
     return request.toBuilder().setCommitKeyRequest(commitKeyRequest.toBuilder().setKeyArgs(newKeyArgs)).build();
   }
 
+  /**
+   * authorize request with acl validation if enabled.
+   * it validates volume, bucket, resolved bucket for read, and key for write permission
+   *
+   * @param ozoneManager ozone manager
+   * @throws IOException
+   */
   @Override
   public void authorize(OzoneManager ozoneManager) throws IOException {
     KeyArgs keyArgs = getOmRequest().getCommitKeyRequest().getKeyArgs();
@@ -130,17 +147,49 @@ public class OMKeyCommitRequest extends OMKeyRequestBase {
         getOmRequest());
   }
 
+  /**
+   * lock the key.
+   * 
+   * @param lockOpr locking instance
+   * @return OmLockOpr.OmLockInfo lock details obtained
+   * @throws IOException
+   */
   @Override
   public OmLockOpr.OmLockInfo lock(OmLockOpr lockOpr) throws IOException {
     KeyArgs keyArgs = getOmRequest().getCommitKeyRequest().getKeyArgs();
     return lockOpr.obsLock(keyArgs.getBucketName(), keyArgs.getKeyName());
   }
 
+  /**
+   * unlock the key.
+   * 
+   * @param lockOpr locking instance
+   * @param lockInfo lock details obtained
+   */
   @Override
   public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
     lockOpr.obsUnlock(lockInfo);
   }
 
+  /**
+   * perform key commit operation.
+   * 1. validate hsync and its recovery
+   * 2. revalidate bucket details after lock
+   * 3. retrieve old key and validate hsync information
+   * 4. retrieve open key for commit
+   * 5. perform overwrite if old key exist and reuse objectId to open key
+   * 6. update used quota based on increase for overwrite / hsync
+   * 7. update recovery / client flag for hsync
+   * 8. identify unsed blocks and add for deletion, also update quota as used blocks
+   * 9. record change for add to final key table, remove/update open key table
+   * 10. prepare response
+   * 11. metric and audit logs generation
+   *
+   * @param ozoneManager ozone manager
+   * @param exeCtx execution context
+   * @return OMClientResponse response object
+   * @throws IOException
+   */
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {

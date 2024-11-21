@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.execution.factory.OmRequestFactory;
 import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -95,7 +95,7 @@ public class PostExecutor {
     }
 
     ExecutionContext executionContext = new ExecutionContext();
-    OMRequestBase omClientRequest = OmRequestFactory.createClientRequest(omRequest, ozoneManager);
+    OMRequestExecutor omClientRequest = OmRequestFactory.createRequestExecutor(omRequest, ozoneManager);
     try {
       saveLeaderIndex(omRequest, batchOperation);
       executionContext.setIndex(leaderIndex.get());

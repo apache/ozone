@@ -30,9 +30,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 /**
  * Interface for key write requests.
  */
-public abstract class OMKeyRequestBase extends OMRequestBase {
+public abstract class OMKeyExecutor extends OMRequestExecutor {
   private OmBucketInfo bucketInfo;
-  public OMKeyRequestBase(OMRequest omRequest, OmBucketInfo bucketInfo) {
+  public OMKeyExecutor(OMRequest omRequest, OmBucketInfo bucketInfo) {
     super(omRequest);
     this.bucketInfo = bucketInfo;
   }

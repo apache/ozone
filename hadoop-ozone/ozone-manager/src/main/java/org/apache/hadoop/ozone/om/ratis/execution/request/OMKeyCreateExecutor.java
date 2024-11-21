@@ -68,15 +68,25 @@ import static org.apache.hadoop.ozone.om.request.OMClientRequest.validateAndNorm
 /**
  * Handles CreateKey request.
  */
-public class OMKeyCreateRequest extends OMKeyRequestBase {
-  private static final Logger LOG = LoggerFactory.getLogger(OMKeyCreateRequest.class);
+public class OMKeyCreateExecutor extends OMKeyExecutor {
+  private static final Logger LOG = LoggerFactory.getLogger(OMKeyCreateExecutor.class);
   private String oriBucketName;
   private String oriVolumeName;
 
-  public OMKeyCreateRequest(OMRequest omRequest, OmBucketInfo bucketInfo) {
+  public OMKeyCreateExecutor(OMRequest omRequest, OmBucketInfo bucketInfo) {
     super(omRequest, bucketInfo);
   }
 
+  /**
+   * preProcess will perform below actions.
+   * 1. update request with user info and layout version
+   * 2. validate request and key argument for operation
+   * 3. update request with normalized key, timestamp, resolved bucket and volume, ...
+   * 
+   * @param ozoneManager
+   * @return OMRequest modified request updating more details
+   * @throws IOException
+   */
   @Override
   public OMRequest preProcess(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preProcess(ozoneManager);
@@ -108,6 +118,13 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
     return request.toBuilder().setCreateKeyRequest(createKeyRequest).build();
   }
 
+  /**
+   * authorize request with acl validation if enabled.
+   * it validates volume, bucket, resolved bucket for read, and key for create permission
+   * 
+   * @param ozoneManager ozone manager
+   * @throws IOException
+   */
   @Override
   public void authorize(OzoneManager ozoneManager) throws IOException {
     KeyArgs keyArgs = getOmRequest().getCreateKeyRequest().getKeyArgs();
@@ -115,6 +132,23 @@ public class OMKeyCreateRequest extends OMKeyRequestBase {
         IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY, getOmRequest());
   }
 
+  /**
+   * perform key create operation.
+   * 1. retrieve encryption info wrt bucket or MPU type
+   * 2. prepare OmKeyInfo using
+   *   - generate object Id using index
+   *   - replication config as input parameter
+   *   - retrieve acl from prefixManager, bucketInfo
+   *   - update encription info
+   * 3. record changes for db update
+   * 4. prepare response
+   * 5. metric and audit logs generation
+   * 
+   * @param ozoneManager ozone manager
+   * @param exeCtx execution context
+   * @return OMClientResponse response object
+   * @throws IOException
+   */
   @Override
   public OMClientResponse process(OzoneManager ozoneManager, ExecutionContext exeCtx) throws IOException {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();

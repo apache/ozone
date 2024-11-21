@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.ratis.execution.factory;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMPersistDbRequest;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMPersistDbExecutor;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -44,7 +44,7 @@ public final class OmRequestFactory {
    * @throws IOException
    */
   @SuppressWarnings("checkstyle:methodlength")
-  public static OMRequestBase createClientRequest(
+  public static OMRequestExecutor createRequestExecutor(
       OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):
     // Either the code will take FSO or non FSO path, both classes has a
@@ -60,7 +60,7 @@ public final class OmRequestFactory {
 
     switch (cmdType) {
     case PersistDb:
-      return new OMPersistDbRequest(omRequest);
+      return new OMPersistDbExecutor(omRequest);
     case CreateKey:
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
       volumeName = keyArgs.getVolumeName();

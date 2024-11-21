@@ -37,12 +37,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 /**
  * define methods for request to handle.
  */
-public class OMRequestBase implements RequestAuditor {
+public class OMRequestExecutor implements RequestAuditor {
   private final OMAuditLogger.Builder auditBuilder = OMAuditLogger.newBuilder();
   private DbChangesRecorder recorder = new DbChangesRecorder();
   private OMRequest omRequest;
 
-  public OMRequestBase(OMRequest omRequest) {
+  public OMRequestExecutor(OMRequest omRequest) {
     this.omRequest = omRequest;
   }
   /**

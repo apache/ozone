@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.ratis.execution;
 
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public final class RequestContext {
   private OMRequest request;
-  private OMRequestBase requestBase;
+  private OMRequestExecutor requestExecutor;
   private OMResponse response;
   private CompletableFuture<OMResponse> future;
   private String uuidClientId;
@@ -61,11 +61,11 @@ public final class RequestContext {
     this.future = future;
   }
 
-  public void setRequestBase(OMRequestBase requestBase) {
-    this.requestBase = requestBase;
+  public void setRequestExecutor(OMRequestExecutor requestBase) {
+    this.requestExecutor = requestBase;
   }
-  public OMRequestBase getRequestBase() {
-    return requestBase;
+  public OMRequestExecutor getRequestExecutor() {
+    return requestExecutor;
   }
 
   public void setUuidClientId(String clientId) {

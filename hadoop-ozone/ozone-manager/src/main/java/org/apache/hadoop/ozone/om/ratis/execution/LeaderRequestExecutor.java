@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -129,7 +129,7 @@ public class LeaderRequestExecutor {
       LOG.warn("Failed to write, Exception occurred ", e);
       ctx.setResponse(createErrorResponse(request, new IOException(e)));
     } finally {
-      if (!ctx.getRequestBase().changeRecorder().getTableRecordsMap().isEmpty()) {
+      if (!ctx.getRequestExecutor().changeRecorder().getTableRecordsMap().isEmpty()) {
         // submit to next stage for db changes
         try {
           nxtStage.accept(ctx);
@@ -143,7 +143,7 @@ public class LeaderRequestExecutor {
   }
 
   private void handleRequest(RequestContext ctx, ExecutionContext exeCtx) throws IOException {
-    OMRequestBase omClientRequest = ctx.getRequestBase();
+    OMRequestExecutor omClientRequest = ctx.getRequestExecutor();
     try {
       OMClientResponse omClientResponse = omClientRequest.process(ozoneManager, exeCtx);
       ctx.setResponse(omClientResponse.getOMResponse());
@@ -191,7 +191,7 @@ public class LeaderRequestExecutor {
         = OzoneManagerProtocolProtos.ExecutionControlRequest.newBuilder();
     long size = 0;
     for (RequestContext ctx : ctxs) {
-      DbChangesRecorder recorder = ctx.getRequestBase().changeRecorder();
+      DbChangesRecorder recorder = ctx.getRequestExecutor().changeRecorder();
       int tmpSize = recorder.getSerializedSize();
       if ((tmpSize + size) > ratisByteLimit) {
         // send current batched request
@@ -294,10 +294,10 @@ public class LeaderRequestExecutor {
   private void handleBatchUpdateComplete(Collection<RequestContext> ctxs, Throwable th, String leaderOMNodeId) {
     for (RequestContext ctx : ctxs) {
       // reset quota resource and release memory for change update
-      ctx.getRequestBase().changeRecorder().clear();
+      ctx.getRequestExecutor().changeRecorder().clear();
 
       if (th != null) {
-        OMAuditLogger.log(ctx.getRequestBase().getAuditBuilder(), ctx.getRequestBase(), ozoneManager,
+        OMAuditLogger.log(ctx.getRequestExecutor().getAuditBuilder(), ctx.getRequestExecutor(), ozoneManager,
             ctx.getExecutionContext(), th);
         if (th instanceof IOException) {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), (IOException)th));
@@ -305,7 +305,7 @@ public class LeaderRequestExecutor {
           ctx.getFuture().complete(createErrorResponse(ctx.getRequest(), new IOException(th)));
         }
       } else {
-        OMAuditLogger.log(ctx.getRequestBase().getAuditBuilder(), ctx.getExecutionContext());
+        OMAuditLogger.log(ctx.getRequestExecutor().getAuditBuilder(), ctx.getExecutionContext());
         OMResponse newRsp = ctx.getResponse();
         if (leaderOMNodeId != null) {
           newRsp = OMResponse.newBuilder(newRsp).setLeaderOMNodeId(leaderOMNodeId).build();

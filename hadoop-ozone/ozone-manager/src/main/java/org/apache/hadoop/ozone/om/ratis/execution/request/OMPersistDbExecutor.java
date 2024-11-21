@@ -45,10 +45,10 @@ import static org.apache.hadoop.ozone.om.ratis.execution.request.OmKeyUtils.crea
 /**
  * Handle OMQuotaRepairRequest Request.
  */
-public class OMPersistDbRequest extends OMRequestBase {
-  private static final Logger LOG = LoggerFactory.getLogger(OMPersistDbRequest.class);
+public class OMPersistDbExecutor extends OMRequestExecutor {
+  private static final Logger LOG = LoggerFactory.getLogger(OMPersistDbExecutor.class);
 
-  public OMPersistDbRequest(OMRequest omRequest) {
+  public OMPersistDbExecutor(OMRequest omRequest) {
     super(omRequest);
   }
 

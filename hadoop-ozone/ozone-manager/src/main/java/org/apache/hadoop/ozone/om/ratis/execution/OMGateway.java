@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.ratis.execution.factory.OmRequestFactory;
-import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestBase;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -61,7 +61,8 @@ public class OMGateway {
     if (om.isRatisEnabled()) {
       om.getOmRatisServer().getOmStateMachine().getPostExecutor().registerIndexNotifier(this::indexNotifier);
     } else {
-      uniqueIndex.set(PostExecutor.initLeaderIndex(om));
+      long index = PostExecutor.initLeaderIndex(om);
+      uniqueIndex.set(index);
     }
   }
 
@@ -93,15 +94,20 @@ public class OMGateway {
         (r, th) -> handleAfterExecution(requestContext, th));
     OmLockOpr.OmLockInfo lockInfo = null;
     try {
-      OMRequestBase requestBase = OmRequestFactory.createClientRequest(omRequest, om);
-      OMRequest request = requestBase.preProcess(om);
+      OMRequestExecutor requestExecutor = OmRequestFactory.createRequestExecutor(omRequest, om);
+      OMRequest request = requestExecutor.preProcess(om);
+      // re-update modified request from pre-process
       requestContext.setRequest(request);
       requestContext.setUuidClientId(clientId);
       requestContext.setCallId(callId);
-      requestContext.setRequestBase(requestBase);
-      requestContext.getRequestBase().authorize(om);
-      lockInfo = requestContext.getRequestBase().lock(omLockOpr);
-      validate(requestContext.getRequest());
+      requestContext.setRequestExecutor(requestExecutor);
+
+      OzoneManagerRequestHandler.requestParamValidation(omRequest);
+
+      requestContext.getRequestExecutor().authorize(om);
+      lockInfo = requestContext.getRequestExecutor().lock(omLockOpr);
+
+      validatePrepareState(requestContext.getRequest());
       ensurePreviousRequestCompletionForPrepare(requestContext.getRequest());
 
       // submit request
@@ -127,7 +133,7 @@ public class OMGateway {
       throw new ServiceException(e.getMessage(), e);
     } finally {
       if (null != lockInfo) {
-        requestContext.getRequestBase().unlock(omLockOpr, lockInfo);
+        requestContext.getRequestExecutor().unlock(omLockOpr, lockInfo);
         Server.Call call = Server.getCurCall().get();
         if (null != call) {
           call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKWAIT,
@@ -153,9 +159,7 @@ public class OMGateway {
     }
   }
 
-  private synchronized void validate(OMRequest omRequest) throws IOException {
-    OzoneManagerRequestHandler.requestParamValidation(omRequest);
-    // validate prepare state
+  private synchronized void validatePrepareState(OMRequest omRequest) throws IOException {
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
     OzoneManagerPrepareState prepareState = om.getPrepareState();
     if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
