@@ -352,7 +352,7 @@ public class FSORepairTool {
             if (!repair) {
               if (verbose) {
                 System.out.println("Marking unreferenced directory " + dirKey + " for deletion.");
-                }
+              }
             } else {
               System.out.println("Deleting unreferenced directory " + dirKey);
               OmDirectoryInfo dirInfo = dirEntry.getValue();
