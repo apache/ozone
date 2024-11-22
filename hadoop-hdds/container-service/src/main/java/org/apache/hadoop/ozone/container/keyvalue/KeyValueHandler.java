@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.fs.FileUtil;
@@ -54,24 +55,27 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
-import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -137,8 +141,12 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -1427,19 +1435,130 @@ public class KeyValueHandler extends Handler {
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
                                  Set<DatanodeDetails> peers) throws IOException {
-    // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
-    ContainerData data = container.getContainerData();
-    long id = data.getContainerID();
-    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES)
-        .putLong(id)
-        .asReadOnlyBuffer();
-    byteBuffer.rewind();
-    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
-    checksumImpl.update(byteBuffer);
-    long dataChecksum = checksumImpl.getValue();
-    LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
-    data.setDataChecksum(dataChecksum);
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+
+    for (DatanodeDetails peer : peers) {
+      ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
+          containerData.getContainerID(), peer);
+      if (peerChecksumInfo == null) {
+        LOG.warn("Checksum not yet generated for peer: {}", peer);
+        return;
+      }
+
+      long scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
+          StorageUnit.BYTES);
+      ContainerDiffReport diffReport = checksumManager.diff(containerData, peerChecksumInfo);
+      TokenHelper tokenHelper = dnClient.getTokenHelper();
+      XceiverClientSpi xceiverClient = dnClient.getXceiverClientManager()
+          .acquireClient(createSingleNodePipeline(peer));
+
+      try {
+        // Handle missing blocks
+        for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
+          handleMissingBlock(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, missingBlock);
+        }
+
+        // Handle missing chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
+          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, entry);
+        }
+
+        // Handle corrupt chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
+          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, entry);
+        }
+      } finally {
+        dnClient.getXceiverClientManager().releaseClient(xceiverClient, false);
+      }
+    }
+
+    updateContainerChecksum(containerData);
+    long dataChecksum = updateContainerChecksum(containerData);
+    LOG.info("Checksum data for container {} is updated to {}", containerData.getContainerID(), dataChecksum);
+    containerData.setDataChecksum(dataChecksum);
     sendICR(container);
+  }
+
+  private long updateContainerChecksum(KeyValueContainerData containerData) throws IOException {
+    ContainerMerkleTree merkleTree = new ContainerMerkleTree();
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
+         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+             getBlockIterator(containerData.getContainerID())) {
+      while (blockIterator.hasNext()) {
+        BlockData blockData = blockIterator.nextBlock();
+        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+        merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+      }
+    }
+    checksumManager.writeContainerDataTree(containerData, merkleTree);
+    return merkleTree.toProto().getDataChecksum();
+  }
+
+  private void handleMissingBlock(KeyValueContainer container, ContainerData containerData, TokenHelper tokenHelper,
+                                  long scmBlockSize, XceiverClientSpi xceiverClient,
+                                  ContainerProtos.BlockMerkleTree missingBlock) throws IOException {
+    BlockID blockID = new BlockID(containerData.getContainerID(), missingBlock.getBlockID());
+    Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, scmBlockSize);
+    // TODo: Cache the blockResponse to reuse it again.
+    ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
+        blockToken, new HashMap<>());
+    // TODO: Add BcsId in BlockMerkleTree to avoid this call
+    ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
+        ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
+    List<ContainerProtos.ChunkInfo> chunksList = blockResponse.getBlockData().getChunksList();
+
+    for (ContainerProtos.ChunkInfo chunkInfoProto : chunksList) {
+      ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
+      ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
+      writeChunkForClosedContainer(ChunkInfo.getFromProtoBuf(chunkInfoProto), blockID, chunkBuffer, container);
+    }
+
+    putBlockForClosedContainer(chunksList, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
+        blockLengthResponse.getBlockLength());
+  }
+
+  private ByteString readChunkData(XceiverClientSpi xceiverClient, ContainerProtos.ChunkInfo chunkInfoProto,
+                                   BlockID blockID, Token<OzoneBlockTokenIdentifier> blockToken) throws IOException {
+    ContainerProtos.ReadChunkResponseProto response =
+        ContainerProtocolCalls.readChunk(xceiverClient, chunkInfoProto, blockID.getDatanodeBlockIDProtobuf(),
+            null, blockToken);
+
+    if (response.hasData()) {
+      return response.getData();
+    } else if (response.hasDataBuffers()) {
+      return BufferUtils.concatByteStrings(response.getDataBuffers().getBuffersList());
+    } else {
+      throw new IOException("Error reading chunk data: No data returned.");
+    }
+  }
+
+  private void reconcileChunk(KeyValueContainer container, ContainerData containerData, TokenHelper tokenHelper,
+                              long scmBlockSize, XceiverClientSpi xceiverClient,
+                              Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> mapEntry) throws IOException {
+    long blockId = mapEntry.getKey();
+    List<ContainerProtos.ChunkMerkleTree> chunkList = mapEntry.getValue();
+    Set<Long> offsets = chunkList.stream().map(ContainerProtos.ChunkMerkleTree::getOffset)
+        .collect(Collectors.toSet());
+    BlockID blockID = new BlockID(containerData.getContainerID(), blockId);
+    Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, scmBlockSize);
+    ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
+        blockToken, new HashMap<>());
+    // TODO: Add BcsId in BlockMerkleTree to avoid this call
+    ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
+        ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
+    List<ContainerProtos.ChunkInfo> chunksList = blockResponse.getBlockData().getChunksList();
+
+    for (ContainerProtos.ChunkInfo chunkInfoProto : chunksList) {
+      if (offsets.contains(chunkInfoProto.getOffset())) {
+        ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
+        ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
+        writeChunkForClosedContainer(ChunkInfo.getFromProtoBuf(chunkInfoProto), blockID, chunkBuffer, container);
+      }
+    }
+
+    putBlockForClosedContainer(chunksList, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
+        blockLengthResponse.getBlockLength());
   }
 
   /**
