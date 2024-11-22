@@ -31,8 +31,9 @@ env:
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 17 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  HADOOP_IMAGE: ghcr.io/apache/hadoop
+  OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
-  OZONE_RUNNER_VERSION: 20241108-jdk17-1
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 jobs:
   build-info:
@@ -221,7 +222,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dskip.npx -Dskip.installnpx -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
         env:
           OZONE_WITH_COVERAGE: false
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
@@ -612,6 +613,9 @@ jobs:
           args="${{ inputs.ratis_args }}"
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
             args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+          fi
+          if [[ "${{ matrix.profile }}" != "filesystem" ]]; then
+            args="$args -DskipShade"
           fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}

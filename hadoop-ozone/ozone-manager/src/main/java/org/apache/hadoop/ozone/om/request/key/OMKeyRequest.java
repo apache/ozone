@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -174,6 +175,80 @@ public abstract class OMKeyRequest extends OMClientRequest {
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, clientId);
     return resolvedArgs;
+  }
+
+  /**
+   * Define the parameters carried when verifying the Key.
+   */
+  public static class ValidateKeyArgs {
+    private String snapshotReservedWord;
+    private String keyName;
+    private boolean validateSnapshotReserved;
+    private boolean validateKeyName;
+
+    ValidateKeyArgs(String snapshotReservedWord, String keyName,
+        boolean validateSnapshotReserved, boolean validateKeyName) {
+      this.snapshotReservedWord = snapshotReservedWord;
+      this.keyName = keyName;
+      this.validateSnapshotReserved = validateSnapshotReserved;
+      this.validateKeyName = validateKeyName;
+    }
+
+    public String getSnapshotReservedWord() {
+      return snapshotReservedWord;
+    }
+
+    public String getKeyName() {
+      return keyName;
+    }
+
+    public boolean isValidateSnapshotReserved() {
+      return validateSnapshotReserved;
+    }
+
+    public boolean isValidateKeyName() {
+      return validateKeyName;
+    }
+
+    /**
+     * Tools for building {@link ValidateKeyArgs}.
+     */
+    public static class Builder {
+      private String snapshotReservedWord;
+      private String keyName;
+      private boolean validateSnapshotReserved;
+      private boolean validateKeyName;
+
+      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
+        this.snapshotReservedWord = snapshotReservedWord;
+        this.validateSnapshotReserved = true;
+        return this;
+      }
+
+      public Builder setKeyName(String keyName) {
+        this.keyName = keyName;
+        this.validateKeyName = true;
+        return this;
+      }
+
+      public ValidateKeyArgs build() {
+        return new ValidateKeyArgs(snapshotReservedWord, keyName,
+            validateSnapshotReserved, validateKeyName);
+      }
+    }
+  }
+
+  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
+      throws OMException {
+    if (validateKeyArgs.isValidateSnapshotReserved()) {
+      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
+    }
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
+      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
+    }
   }
 
   /**

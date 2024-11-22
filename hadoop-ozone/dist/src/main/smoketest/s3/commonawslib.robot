@@ -24,7 +24,7 @@ ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
 ${BUCKET_LAYOUT}               OBJECT_STORE
-${KEY_NAME}                    key1
+${ENCRYPTION_KEY}              key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
 ${OZONE_S3_ADDRESS_STYLE}      path
@@ -156,7 +156,7 @@ Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/encrypted
     Return From Keyword If    ${exists}
-    Execute            ozone sh bucket create -k ${KEY_NAME} --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/encrypted
+    Execute            ozone sh bucket create -k ${ENCRYPTION_KEY} --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/encrypted
 
 Create link
     [arguments]       ${bucket}

@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -50,17 +52,26 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
@@ -69,8 +80,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests key output stream.
@@ -91,6 +104,46 @@ public class TestECKeyOutputStream {
   private static int inputSize = dataBlocks * chunkSize;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
+  private static void initConf(OzoneConfiguration configuration) {
+    OzoneClientConfig clientConfig = configuration.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
+    clientConfig.setStreamBufferFlushDelay(false);
+    configuration.setFromObject(clientConfig);
+
+    // If SCM detects dead node too quickly, then container would be moved to
+    // closed state and all in progress writes will get exception. To avoid
+    // that, we are just keeping higher timeout and none of the tests depending
+    // on deadnode detection timeout currently.
+    configuration.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
+    configuration.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 60, TimeUnit.SECONDS);
+    configuration.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
+        TimeUnit.SECONDS);
+    configuration.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
+        "(512|1024|2048|4096|1)k)$)");
+    configuration.setTimeDuration(
+        "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
+        TimeUnit.SECONDS);
+    configuration.setQuietMode(false);
+    configuration.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
+        StorageUnit.MB);
+    configuration.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,
+        TimeUnit.MILLISECONDS);
+    configuration.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
+        TimeUnit.SECONDS);
+    configuration.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    // "Enable" hsync to verify that hsync would be blocked by ECKeyOutputStream
+    configuration.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    configuration.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    configuration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
+        .setBlockSize(blockSize)
+        .setChunkSize(chunkSize)
+        .setStreamBufferFlushSize(flushSize)
+        .setStreamBufferMaxSize(maxFlushSize)
+        .applyTo(configuration);
+  }
+
   /**
    * Create a MiniDFSCluster for testing.
    */
@@ -100,43 +153,7 @@ public class TestECKeyOutputStream {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
-
-    // If SCM detects dead node too quickly, then container would be moved to
-    // closed state and all in progress writes will get exception. To avoid
-    // that, we are just keeping higher timeout and none of the tests depending
-    // on deadnode detection timeout currently.
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 60, TimeUnit.SECONDS);
-    conf.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
-        TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
-        TimeUnit.SECONDS);
-    conf.setQuietMode(false);
-    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
-        StorageUnit.MB);
-    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,
-        TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
-        TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-    // "Enable" hsync to verify that hsync would be blocked by ECKeyOutputStream
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-
-    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
-        .applyTo(conf);
-
+    initConf(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .build();
@@ -169,6 +186,90 @@ public class TestECKeyOutputStream {
                 ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
             objectStore, volumeName, bucketName)) {
       assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
+    }
+  }
+
+  @Test
+  public void testECKeyCreatetWithDatanodeIdChange()
+      throws Exception {
+    AtomicReference<Boolean> failed = new AtomicReference<>(false);
+    AtomicReference<MiniOzoneCluster> miniOzoneCluster = new AtomicReference<>();
+    OzoneClient client1 = null;
+    try (MockedStatic<Handler> mockedHandler = Mockito.mockStatic(Handler.class, Mockito.CALLS_REAL_METHODS)) {
+      Map<String, Handler> handlers = new HashMap<>();
+      mockedHandler.when(() -> Handler.getHandlerForContainerType(any(), any(), any(), any(), any(), any(), any()))
+          .thenAnswer(i -> {
+            Handler handler = Mockito.spy((Handler) i.callRealMethod());
+            handlers.put(handler.getDatanodeId(), handler);
+            return handler;
+          });
+      OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+      initConf(ozoneConfiguration);
+      miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
+      miniOzoneCluster.get().waitForClusterToBeReady();
+      client1 = miniOzoneCluster.get().newClient();
+      ObjectStore store = client1.getObjectStore();
+      store.createVolume(volumeName);
+      store.getVolume(volumeName).createBucket(bucketName);
+      OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
+          ECReplicationConfig.EcCodec.RS, 1024), inputSize, store, volumeName, bucketName);
+      byte[] b = new byte[6 * 1024];
+      ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
+      while (locationInfoList.isEmpty()) {
+        locationInfoList = groupOutputStream.getLocationInfoList();
+        Random random = new Random();
+        random.nextBytes(b);
+        assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
+        key.write(b);
+        key.flush();
+      }
+
+      assertEquals(1, locationInfoList.size());
+
+      OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      long containerId = omKeyLocationInfo.getContainerID();
+      Pipeline pipeline = omKeyLocationInfo.getPipeline();
+      DatanodeDetails dnWithReplicaIndex1 =
+          pipeline.getReplicaIndexes().entrySet().stream().filter(e -> e.getValue() == 1).map(Map.Entry::getKey)
+              .findFirst().get();
+      Mockito.when(handlers.get(dnWithReplicaIndex1.getUuidString()).getDatanodeId())
+          .thenAnswer(i -> {
+            if (!failed.get()) {
+              // Change dnId for one write chunk request.
+              failed.set(true);
+              return dnWithReplicaIndex1.getUuidString() + "_failed";
+            } else {
+              return dnWithReplicaIndex1.getUuidString();
+            }
+          });
+      locationInfoList = groupOutputStream.getLocationInfoList();
+      while (locationInfoList.size() == 1) {
+        locationInfoList = groupOutputStream.getLocationInfoList();
+        Random random = new Random();
+        random.nextBytes(b);
+        assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
+        key.write(b);
+        key.flush();
+      }
+      assertEquals(2, locationInfoList.size());
+      assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId)).getState().equals(
+                  HddsProtos.LifeCycleState.CLOSED);
+        } catch (ContainerNotFoundException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 30000);
+      key.close();
+      Assertions.assertTrue(failed.get());
+    } finally {
+      IOUtils.closeQuietly(client1);
+      if (miniOzoneCluster.get() != null) {
+        miniOzoneCluster.get().shutdown();
+      }
     }
   }
 

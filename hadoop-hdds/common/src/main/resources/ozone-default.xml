@@ -4556,4 +4556,12 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.om.server.list.max.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Configuration property to configure the max server side response size for list calls on om.
+    </description>
+  </property>
 </configuration>

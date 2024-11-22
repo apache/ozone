@@ -24,7 +24,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
   kms:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: kms
     dns_search: .
     ports:
