@@ -119,7 +119,7 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     try {
       runTests(this::sendHsync);
     } finally {
-        outputStream.close();
+      outputStream.close();
       fileSystem.close();
     }
 
@@ -159,10 +159,10 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     timer.time(() -> {
       while (true) {
         int transaction = writtenTransactions.take();
-        int lastSyncedTransaction = this.lastSyncedTransaction.get();
-        if (transaction > lastSyncedTransaction) {
+        int lastSynced = lastSyncedTransaction.get();
+        if (transaction > lastSynced) {
           outputStream.hsync();
-          this.lastSyncedTransaction.compareAndSet(lastSyncedTransaction, transaction);
+          lastSyncedTransaction.compareAndSet(lastSynced, transaction);
           return null;
         }
       }
