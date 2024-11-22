@@ -51,6 +51,15 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of Merkle tree read failure")
   private MutableCounterLong numMerkleTreeReadFailure;
 
+  @Metric(about = "Number of Merkle tree diff failure")
+  private MutableCounterLong numMerkleTreeDiffFailure;
+
+  @Metric(about = "Number of container diff that doesn't require repair")
+  private MutableCounterLong numNoRepairContainerDiff;
+
+  @Metric(about = "Number of container diff that requires repair")
+  private MutableCounterLong numRepairContainerDiff;
+
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
@@ -60,12 +69,27 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Merkle tree creation latency")
   private MutableRate merkleTreeCreateLatencyNS;
 
+  @Metric(about = "Merkle tree diff latency")
+  private MutableRate merkleTreeDiffLatencyNS;
+
   public void incrementMerkleTreeWriteFailures() {
     this.numMerkleTreeWriteFailure.incr();
   }
 
   public void incrementMerkleTreeReadFailures() {
     this.numMerkleTreeReadFailure.incr();
+  }
+
+  public void incrementMerkleTreeDiffFailures() {
+    this.numMerkleTreeDiffFailure.incr();
+  }
+
+  public void incrementNoRepairContainerDiffs() {
+    this.numNoRepairContainerDiff.incr();
+  }
+
+  public void incrementRepairContainerDiffs() {
+    this.numRepairContainerDiff.incr();
   }
 
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
@@ -78,5 +102,21 @@ public class ContainerMerkleTreeMetrics {
 
   public MutableRate getCreateMerkleTreeLatencyNS() {
     return this.merkleTreeCreateLatencyNS;
+  }
+
+  public MutableRate getMerkleTreeDiffLatencyNS() {
+    return this.merkleTreeDiffLatencyNS;
+  }
+
+  public long getNoRepairContainerDiffs() {
+    return this.numNoRepairContainerDiff.value();
+  }
+
+  public long getRepairContainerDiffs() {
+    return this.numRepairContainerDiff.value();
+  }
+
+  public long getMerkleTreeDiffFailure() {
+    return this.numMerkleTreeDiffFailure.value();
   }
 }

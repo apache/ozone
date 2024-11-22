@@ -151,7 +151,8 @@ public class ContainerMerkleTree {
    * This class computes one checksum for the whole chunk by aggregating these.
    */
   private static class ChunkMerkleTree {
-    private final ContainerProtos.ChunkInfo chunk;
+    private ContainerProtos.ChunkInfo chunk;
+    private boolean isHealthy = true;
 
     ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
       this.chunk = chunk;
@@ -172,6 +173,7 @@ public class ContainerMerkleTree {
       return ContainerProtos.ChunkMerkleTree.newBuilder()
           .setOffset(chunk.getOffset())
           .setLength(chunk.getLen())
+          .setIsHealthy(isHealthy)
           .setChunkChecksum(checksumImpl.getValue())
           .build();
     }
