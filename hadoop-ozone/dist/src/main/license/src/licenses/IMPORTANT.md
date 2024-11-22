@@ -14,5 +14,8 @@
 
 # Important
 
+The files from this directory are copied automatically to the source distribution package
+via the `hadoop-ozone/dist/src/main/assemblies/ozone-src.xml` file.
+
 If you add any of the files to here,
- * and copy the dependency to ../../bin/licenses (if it's included in the bin tar)
+ * copy the dependency to ../../bin/licenses (if it's included in the bin tar)
