@@ -85,6 +85,10 @@ public class DNContainerOperationClient implements AutoCloseable {
     return xceiverClientManager;
   }
 
+  public TokenHelper getTokenHelper() {
+    return tokenHelper;
+  }
+
   /**
    * Reads {@link ContainerProtos.ContainerChecksumInfo} for a specified container for the specified datanode.
    *
