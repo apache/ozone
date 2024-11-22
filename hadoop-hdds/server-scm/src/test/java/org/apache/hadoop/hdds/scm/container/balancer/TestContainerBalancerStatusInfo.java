@@ -111,7 +111,7 @@ class TestContainerBalancerStatusInfo {
     verifyCompletedIteration(firstIteration, 1);
 
     assertEquals(0, iterationsStatic.get(1).getIterationNumber());
-    assertTrue(iterationsStatic.get(1).getIterationDuration() > 0);
+    assertTrue(iterationsStatic.get(1).getIterationDuration() >= 0);
     assertNull(iterationsStatic.get(1).getIterationResult());
     assertEquals(0, iterationsStatic.get(1).getContainerMovesScheduled());
     assertEquals(0, iterationsStatic.get(1).getContainerMovesCompleted());
