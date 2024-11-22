@@ -182,9 +182,7 @@ public final class ChunkUtils {
         channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
         try (FileLock ignored = channel.lock()) {
-          int len = data.remaining();
-          writeDataToChannel(channel, data, offset);
-          return len;
+          return writeDataToChannel(channel, data, offset);
         }
       } catch (IOException e) {
         throw new UncheckedIOException(e);
