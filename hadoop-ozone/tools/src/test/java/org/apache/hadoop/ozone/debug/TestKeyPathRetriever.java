@@ -21,8 +21,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -41,7 +43,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +90,19 @@ public class TestKeyPathRetriever {
     containerSet.add(500L);
     containerSet.add(800L);
     PrintWriter writer = new PrintWriter(out);
+
+    Map<Long, String> dirInfoMap = new HashMap<>();
+    Table<Long, String> dirTreeTable = mock(Table.class);
+    keyPathRetriever.setDirTreeTable(dirTreeTable);
+
+    doAnswer(invocation -> {
+      Long objectId = invocation.getArgument(0);
+      String val = invocation.getArgument(1);
+      dirInfoMap.put(objectId, val);
+      return null;
+    }).when(dirTreeTable).put(anyLong(), anyString());
+
+    when(dirTreeTable.get(anyLong())).thenAnswer(inv -> dirInfoMap.get((Long)inv.getArgument(0)));
 
     OMMetadataManager mock = mock(OMMetadataManager.class);
     when(mock.getVolumeId(anyString())).thenReturn(1L);

@@ -30,10 +30,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -56,6 +64,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
     description = "retrieve full key path with matching criteria")
 @MetaInfServices(SubcommandWithParent.class)
 public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
+  private static final DBColumnFamilyDefinition<Long, String> DIRTREE_COLUMN_FAMILY
+      = new DBColumnFamilyDefinition<>("dirTreeTable", LongCodec.get(), StringCodec.get());
+
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
 
@@ -79,9 +90,16 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       description = "out file name")
   private String fileName;
 
+  private DBStore dirTreeDbStore = null;
+  private Table<Long, String> dirTreeTable = null;
+
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
+  }
+
+  public void setDirTreeTable(Table<Long, String> table) {
+    this.dirTreeTable = table;
   }
 
   @Override
@@ -119,9 +137,18 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
+    dirTreeDbStore = openDb(new File(dbFile).getParentFile());
+    if (dirTreeDbStore == null) {
+      writer.close();
+      metadataManager.stop();
+      return null;
+    }
+    dirTreeTable = dirTreeDbStore.getTable(DIRTREE_COLUMN_FAMILY.getName(), Long.class, String.class);
+
     try {
       retrieve(metadataManager, writer, containerIds);
     } finally {
+      dirTreeDbStore.close();
       writer.close();
       metadataManager.stop();
     }
@@ -131,9 +158,9 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
   public void retrieve(
       OMMetadataManager metadataManager, PrintWriter writer, Set<Long> containerIds) {
     // build dir tree
-    Map<Long, Pair<Long, String>> dirObjNameParentMap = new HashMap<>();
+    Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
     try {
-      prepareDirIdTree(metadataManager, dirObjNameParentMap);
+      prepareDirIdTree(metadataManager, bucketVolMap);
     } catch (Exception e) {
       System.out.println("Exception occurred reading directory Table, " + e);
       return;
@@ -141,7 +168,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
 
     // iterate file table and filter for container
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> fileItr
-            = metadataManager.getFileTable().iterator()) {
+             = metadataManager.getFileTable().iterator()) {
       while (fileItr.hasNext()) {
         KeyValue<String, OmKeyInfo> next = fileItr.next();
         boolean found = next.getValue().getKeyLocationVersions().stream().anyMatch(
@@ -150,15 +177,27 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
         if (found) {
           StringBuilder sb = new StringBuilder(next.getValue().getKeyName());
           Long prvParent = next.getValue().getParentObjectID();
-          while (dirObjNameParentMap.containsKey(prvParent)) {
-            Pair<Long, String> nameParentPair = dirObjNameParentMap.get(prvParent);
-            sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
-            prvParent = nameParentPair.getKey();
-            if (null == prvParent) {
-              // add to output as reached till volume
-              writer.println(sb);
+          while (prvParent != null) {
+            // check reached for bucket volume level
+            if (bucketVolMap.containsKey(prvParent)) {
+              Pair<Long, String> nameParentPair = bucketVolMap.get(prvParent);
+              sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
+              prvParent = nameParentPair.getKey();
+              if (null == prvParent) {
+                // add to output as reached till volume
+                writer.println(sb);
+                break;
+              }
+              continue;
+            }
+
+            // check dir tree
+            Pair<Long, String> nameParentPair = getFromDirTree(prvParent);
+            if (nameParentPair == null) {
               break;
             }
+            sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
+            prvParent = nameParentPair.getKey();
           }
         }
       }
@@ -179,16 +218,16 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
     return new OmMetadataManagerImpl(conf, file.getParentFile(), file.getName());
   }
 
-  private static void prepareDirIdTree(
-      OMMetadataManager metadataManager, Map<Long, Pair<Long, String>> dirObjNameParentMap) throws IOException {
+  private void prepareDirIdTree(
+      OMMetadataManager metadataManager, Map<Long, Pair<Long, String>> bucketVolMap) throws IOException {
     // add bucket volume tree
     try (TableIterator<String, ? extends KeyValue<String, OmBucketInfo>> bucItr
              = metadataManager.getBucketTable().iterator()) {
       while (bucItr.hasNext()) {
         KeyValue<String, OmBucketInfo> next = bucItr.next();
-        dirObjNameParentMap.put(next.getValue().getObjectID(),
+        bucketVolMap.put(next.getValue().getObjectID(),
             Pair.of(metadataManager.getVolumeId(next.getValue().getVolumeName()), next.getValue().getBucketName()));
-        dirObjNameParentMap.putIfAbsent(metadataManager.getVolumeId(next.getValue().getVolumeName()),
+        bucketVolMap.putIfAbsent(metadataManager.getVolumeId(next.getValue().getVolumeName()),
             Pair.of(null, next.getValue().getVolumeName()));
       }
     }
@@ -197,10 +236,57 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
              = metadataManager.getDirectoryTable().iterator()) {
       while (dirItr.hasNext()) {
         KeyValue<String, OmDirectoryInfo> next = dirItr.next();
-        dirObjNameParentMap.put(next.getValue().getObjectID(), Pair.of(next.getValue().getParentObjectID(),
-            next.getValue().getName()));
+        addToDirTree(next.getValue().getObjectID(), next.getValue().getParentObjectID(), next.getValue().getName());
       }
     }
+  }
+
+  private DBStore openDb(File omPath) {
+    File dirTreeDbPath = new File(omPath, "omdirtree.db");
+    System.out.println("Creating database of dir tree path at " + dirTreeDbPath);
+    try {
+      // Delete the DB from the last run if it exists.
+      if (dirTreeDbPath.exists()) {
+        FileUtils.deleteDirectory(dirTreeDbPath);
+      }
+      ConfigurationSource conf = new OzoneConfiguration();
+      DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(conf);
+      dbStoreBuilder.setName(dirTreeDbPath.getName());
+      dbStoreBuilder.setPath(dirTreeDbPath.getParentFile().toPath());
+      dbStoreBuilder.addTable(DIRTREE_COLUMN_FAMILY.getName());
+      dbStoreBuilder.addCodec(DIRTREE_COLUMN_FAMILY.getKeyType(), DIRTREE_COLUMN_FAMILY.getKeyCodec());
+      dbStoreBuilder.addCodec(DIRTREE_COLUMN_FAMILY.getValueType(), DIRTREE_COLUMN_FAMILY.getValueCodec());
+      return dbStoreBuilder.build();
+    } catch (IOException e) {
+      System.out.println("Error creating omdirtree.db " + e);
+      return null;
+    }
+  }
+
+  private void addToDirTree(Long objectId, Long parentId, String name) throws IOException {
+    if (null == parentId) {
+      dirTreeTable.put(objectId, name + "#");
+    } else {
+      dirTreeTable.put(objectId, name + "#" + parentId);
+    }
+  }
+
+  private Pair<Long, String> getFromDirTree(Long objectId) throws IOException {
+    String val = dirTreeTable.get(objectId);
+    if (null == val) {
+      return null;
+    }
+    return getDirParentNamePair(val);
+  }
+
+  public static Pair<Long, String> getDirParentNamePair(String val) {
+    int hashIdx = val.lastIndexOf('#');
+    String strParentId = val.substring(hashIdx + 1);
+    Long parentId = null;
+    if (!StringUtils.isEmpty(strParentId)) {
+      parentId = Long.parseLong(strParentId);
+    }
+    return Pair.of(parentId, val.substring(0, hashIdx));
   }
 
   private static PrintWriter out() {
