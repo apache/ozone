@@ -32,6 +32,10 @@ source "${COMPOSE_DIR}/../testlib.sh"
 export SECURITY_ENABLED=true
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
+dd if=/dev/urandom of=${TEST_DATA_DIR}/1mb bs=1048576 count=1 >/dev/null 2>&1
+dd if=/dev/urandom of=${TEST_DATA_DIR}/2mb bs=1048576 count=2 >/dev/null 2>&1
+dd if=/dev/urandom of=${TEST_DATA_DIR}/3mb bs=1048576 count=3 >/dev/null 2>&1
+
 old_client() {
   OZONE_DIR=/opt/ozone
   container=${client}
@@ -110,21 +114,6 @@ test_ec_cross_compatibility() {
   for cluster_version in ${cluster_versions_with_ec}; do
     export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
     OZONE_KEEP_RESULTS=true start_docker_env 5
-
-    echo -n "Generating data locally...   "
-    dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3 >/dev/null 2>&1
-    echo "done"
-    echo -n "Copy data into client containers...   "
-    for container in $(docker ps --format '{{.Names}}' | grep client); do
-      docker cp /tmp/1mb ${container}:/tmp/1mb
-      docker cp /tmp/2mb ${container}:/tmp/2mb
-      docker cp /tmp/3mb ${container}:/tmp/3mb
-    done
-    echo "done"
-    rm -f /tmp/1mb /tmp/2mb /tmp/3mb
-
 
     local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
     OZONE_DIR=/opt/hadoop

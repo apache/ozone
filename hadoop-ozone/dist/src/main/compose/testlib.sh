@@ -30,7 +30,28 @@ fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
 
+: ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
+: ${TMPDIR:=/tmp}
+
+# create temp directory for test data; only once, even if testlib.sh is sourced again
+if [[ -z "${TEST_DATA_DIR:-}" ]]; then
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR}"/robot-data-XXXXXX)"
+  _compose_delete_test_data() {
+    rm -frv "${TEST_DATA_DIR}"
+  }
+fi
+
+_compose_cleanup() {
+  if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
+    stop_docker_env || true
+  fi
+  if [[ "function" == $(type -t _compose_delete_test_data) ]]; then
+    _compose_delete_test_data
+  fi
+}
+
+trap _compose_cleanup EXIT HUP INT TERM
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
@@ -140,13 +161,12 @@ start_docker_env(){
 
   docker-compose --ansi never down
 
-  trap stop_docker_env EXIT HUP INT TERM
-
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
   fi
 
+  OZONE_COMPOSE_RUNNING=true
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
@@ -368,6 +388,7 @@ stop_docker_env(){
     for i in $(seq 1 $down_repeats)
     do
       if docker-compose --ansi never down; then
+        OZONE_COMPOSE_RUNNING=false
         return
       fi
       if [[ ${i} -eq 1 ]]; then
