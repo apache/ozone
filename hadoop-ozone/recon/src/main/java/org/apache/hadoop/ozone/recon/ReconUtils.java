@@ -73,9 +73,6 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
-import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
-import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -87,6 +84,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -786,7 +784,8 @@ public class ReconUtils {
                                            OzoneStorageContainerManager reconSCM)
       throws IOException {
     try {
-      String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+      String[] names = EntityHandler.parseRequestPath(
+          EntityHandler.normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
       Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // Root-Level: Return the original path
@@ -815,7 +814,7 @@ public class ReconUtils {
 
       // Directory or Key-Level: Check both key and directory
       BucketHandler handler =
-          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
+          BucketHandler.getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
 
       if (names.length >= 3) {
         String lastEntiry = names[names.length - 1];

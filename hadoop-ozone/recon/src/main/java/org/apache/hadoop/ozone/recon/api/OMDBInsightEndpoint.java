@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -82,15 +83,8 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
-import static org.apache.hadoop.ozone.recon.ReconUtils.convertToObjectPath;
-import static org.apache.hadoop.ozone.recon.ReconUtils.constructObjectPathWithPrefix;
-import static org.apache.hadoop.ozone.recon.ReconUtils.gatherSubPaths;
-import static org.apache.hadoop.ozone.recon.ReconUtils.validateNames;
 import static org.apache.hadoop.ozone.recon.ReconUtils.extractKeysFromTable;
 import static org.apache.hadoop.ozone.recon.ReconUtils.validateStartPrefix;
-import static org.apache.hadoop.ozone.recon.ReconUtils.convertToEpochMillis;
-import static org.apache.hadoop.ozone.recon.ReconUtils.isInitializationComplete;
-import static org.apache.hadoop.ozone.recon.ReconUtils.constructFullPath;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
@@ -1014,7 +1008,7 @@ public class OMDBInsightEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     ListKeysResponse listKeysResponse = new ListKeysResponse();
-    if (!isInitializationComplete(omMetadataManager)) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       listKeysResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(listKeysResponse).build();
     }
@@ -1122,7 +1116,7 @@ public class OMDBInsightEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]),
+      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]),
           Long.parseLong(names[1]), reconNamespaceSummaryManager);
       // Iterate over the subpaths and retrieve the files
       for (String subPath : subPaths) {
@@ -1169,23 +1163,23 @@ public class OMDBInsightEndpoint {
 
     // Volume-Level :- Fetch the volumeID
     String volumeName = names[0];
-    validateNames(volumeName);
+    ReconUtils.validateNames(volumeName);
     String volumeKey = omMetadataManager.getVolumeKey(volumeName);
     long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey)
         .getObjectID();
     if (names.length == 1) {
-      return constructObjectPathWithPrefix(volumeId);
+      return ReconUtils.constructObjectPathWithPrefix(volumeId);
     }
 
     // Bucket-Level :- Fetch the bucketID
     String bucketName = names[1];
-    validateNames(bucketName);
+    ReconUtils.validateNames(bucketName);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo bucketInfo =
         omMetadataManager.getBucketTable().getSkipCache(bucketKey);
     long bucketId = bucketInfo.getObjectID();
     if (names.length == 2) {
-      return constructObjectPathWithPrefix(volumeId, bucketId);
+      return ReconUtils.constructObjectPathWithPrefix(volumeId, bucketId);
     }
 
     // Fetch the immediate parentID which could be a directory or the bucket itself
@@ -1203,7 +1197,7 @@ public class OMDBInsightEndpoint {
     } catch (Exception ioe) {
       throw new IllegalArgumentException("Not valid path: " + ioe);
     }
-    return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
+    return ReconUtils.constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
   }
 
   /**
@@ -1268,7 +1262,7 @@ public class OMDBInsightEndpoint {
     LOG.debug("Applying filters on : {}", entry.getKey());
 
     long epochMillis =
-        convertToEpochMillis(paramInfo.getCreationDate(), "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+        ReconUtils.convertToEpochMillis(paramInfo.getCreationDate(), "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
     Predicate<Table.KeyValue<String, OmKeyInfo>> keyAgeFilter = keyData -> {
       try {
         return keyData.getValue().getCreationTime() >= epochMillis;
@@ -1321,7 +1315,7 @@ public class OMDBInsightEndpoint {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
     keyEntityInfo.setIsKey(keyInfo.isFile());
-    keyEntityInfo.setPath(constructFullPath(keyInfo, reconNamespaceSummaryManager, omMetadataManager));
+    keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager, omMetadataManager));
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());
