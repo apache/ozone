@@ -143,12 +143,15 @@ public final class BufferUtils {
   /**
    * Write all remaining bytes in buffer to the given channel.
    */
-  public static void writeFully(GatheringByteChannel ch, ByteBuffer bb) throws IOException {
+  public static long writeFully(GatheringByteChannel ch, ByteBuffer bb) throws IOException {
+    long written = 0;
     while (bb.remaining() > 0) {
       int n = ch.write(bb);
       if (n <= 0) {
         throw new IllegalStateException("no bytes written");
       }
+      written += n;
     }
+    return written;
   }
 }
