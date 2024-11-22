@@ -33,7 +33,6 @@ Prepare For Tests
 
 # xcompat/test.sh creates unified test data files in /tmp for client containers
 Prepare Data For Xcompat Tests
-    Execute             ozone sh volume create /vol1
     Execute             ozone sh bucket create /vol1/default-${SUFFIX}
     Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${SUFFIX}
     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${SUFFIX}
