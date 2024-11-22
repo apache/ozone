@@ -102,7 +102,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public void writeFully(GatheringByteChannel channel) throws IOException {
+  public void writeTo(GatheringByteChannel channel) throws IOException {
     BufferUtils.writeFully(channel, buffer);
   }
 

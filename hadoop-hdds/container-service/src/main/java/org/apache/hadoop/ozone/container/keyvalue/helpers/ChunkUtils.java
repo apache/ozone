@@ -194,7 +194,7 @@ public final class ChunkUtils {
   private static void writeDataToChannel(FileChannel channel, ChunkBuffer data, long offset) {
     try {
       channel.position(offset);
-      data.writeFully(channel);
+      data.writeTo(channel);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
