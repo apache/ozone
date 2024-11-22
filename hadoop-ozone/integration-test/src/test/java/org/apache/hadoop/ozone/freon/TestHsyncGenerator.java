@@ -99,8 +99,8 @@ public class TestHsyncGenerator {
 
       int exitCode = cmd.execute(
           "--path", rootPath,
-          "--bytes-per-write", "1024",
-          "--number-of-files", "2",
+          "--bytes-per-write", "8",
+          "--writes-per-transaction", "64",
           "-t", "5",
           "-n", "100");
       assertEquals(0, exitCode);

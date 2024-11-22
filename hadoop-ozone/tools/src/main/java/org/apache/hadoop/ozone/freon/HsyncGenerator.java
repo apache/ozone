@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * To simulate hlog that generates 1M hsync calls with 5 threads:
  *
- *    ozone freon hlog-emulator -t 5 --writes-per-transaction=32 --bytes-per-write=8 -n 1000000
+ *    ozone freon hsync-generator -t 5 --writes-per-transaction=32 --bytes-per-write=8 -n 1000000
  *
  */
 @Command(name = "hg",
