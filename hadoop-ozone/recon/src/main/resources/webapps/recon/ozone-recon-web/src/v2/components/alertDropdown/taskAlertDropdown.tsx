@@ -53,17 +53,14 @@ const TaskAlertDropdown: React.FC<TaskAlertDropdownProps> = ({ data, failedTasks
     </Menu>
   }
 
-  console.log(failedTasks);
-  console.log(notStartedTasks);
-
   return (
     <Dropdown overlay={generateMenu(data)} trigger={['click']}>
       <Badge count={
-        failedTasks > notStartedTasks
+        failedTasks >= notStartedTasks
           ? failedTasks
           : notStartedTasks
         } style={{ backgroundColor: 
-          failedTasks > notStartedTasks
+          failedTasks >= notStartedTasks
             ? '#FF595E'
             : '#E49F00'
         }}>
