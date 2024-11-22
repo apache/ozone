@@ -92,13 +92,13 @@ public final class BlockDeletingServiceMetrics {
   private MutableGaugeLong containerChosenCountInLastIteration;
 
   @Metric(about = "Total number of successful delete blocks in latest iteration.")
-  private MutableCounterLong successCountInLastIteration;
+  private MutableGaugeLong successCountInLastIteration;
 
   @Metric(about = "The total bytes for blocks successfully deleted in the latest iteration.")
-  private MutableCounterLong successBytesInLastIteration;
+  private MutableGaugeLong successBytesInLastIteration;
 
   @Metric(about = "The number of failed delete blocks in the latest iteration.")
-  private MutableCounterLong failureCountInLastIteration;
+  private MutableGaugeLong failureCountInLastIteration;
 
 
   private BlockDeletingServiceMetrics() {
@@ -131,8 +131,8 @@ public final class BlockDeletingServiceMetrics {
     this.successBytes.incr(bytes);
   }
 
-  public void incrFailureCount() {
-    this.failureCount.incr();
+  public void incrFailureCount(long delta) {
+    this.failureCount.incr(delta);
   }
 
   public void incrReceivedTransactionCount(long count) {
@@ -225,16 +225,24 @@ public final class BlockDeletingServiceMetrics {
     this.containerChosenCountInLastIteration.set(containerChosenCountInLastIteration);
   }
 
-  public void incrSuccessCountInLastIteration(long delta) {
-    this.successCountInLastIteration.incr(delta);
+  public void setSuccessCountInLastIteration(long delta) {
+    this.successCountInLastIteration.set(delta);
   }
 
-  public void incrSuccessBytesInLastIteration(long delta) {
-    this.successBytesInLastIteration.incr(delta);
+  public void setSuccessBytesInLastIteration(long delta) {
+    this.successBytesInLastIteration.set(delta);
   }
 
-  public void incrFailureCountInLastIteration(long delta) {
-    this.failureCountInLastIteration.incr(delta);
+  public void setFailureCountInLastIteration(long delta) {
+    this.failureCountInLastIteration.set(delta);
+  }
+
+  public long getBlockChosenCountInLastIteration() {
+    return blockChosenCountInLastIteration.value();
+  }
+
+  public long getContainerChosenCountInLastIteration() {
+    return containerChosenCountInLastIteration.value();
   }
 
   @Override

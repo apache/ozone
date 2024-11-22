@@ -159,9 +159,9 @@ public class BlockDeletingService extends BackgroundService {
       metrics.setContainerChosenCountInLastIteration(containers.size());
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
-      metrics.incrSuccessCountInLastIteration(BlockDeletingTask.getSuccessBlockDeleteInLastIteration());
-      metrics.incrSuccessBytesInLastIteration(BlockDeletingTask.getSuccessBytesDeletedInLastIteration());
-      metrics.incrFailureCountInLastIteration(BlockDeletingTask.getFailBlockDeleteInLastIteration());
+      metrics.setSuccessCountInLastIteration(BlockDeletingTask.getSuccessBlockDeleteInLastIteration());
+      metrics.setSuccessBytesInLastIteration(BlockDeletingTask.getSuccessBytesDeletedInLastIteration());
+      metrics.setFailureCountInLastIteration(BlockDeletingTask.getFailBlockDeleteInLastIteration());
       if (containers.size() > 0) {
         LOG.debug("Queued {} blocks from {} containers for deletion",
             totalBlocks, containers.size());
