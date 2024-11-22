@@ -64,3 +64,12 @@ export type StorageReport = {
   remaining: number;
   committed: number;
 }
+
+export type TaskStatus = {
+  taskName: string;
+  lastUpdatedTimestamp: number;
+  lastUpdatedSeqNumber: number;
+  lastTaskSuccessful: boolean | null;
+}
+
+export type TaskStatusResponse = TaskStatus[];

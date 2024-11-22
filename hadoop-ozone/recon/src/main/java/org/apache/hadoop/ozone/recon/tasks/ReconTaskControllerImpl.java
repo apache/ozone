@@ -85,7 +85,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     taskFailureCounter.put(taskName, new AtomicInteger(0));
     // Create DB record for the task.
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-        0L, 0L);
+        0L, 0L, null);
     if (!reconTaskStatusDao.existsById(taskName)) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
     }
@@ -179,15 +179,18 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           executorService.invokeAll(tasks);
       for (Future<Pair<String, Boolean>> f : results) {
         String taskName = f.get().getLeft();
+        ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
+          System.currentTimeMillis(),
+          omMetadataManager.getLastSequenceNumberFromDB(), null);
+
         if (!f.get().getRight()) {
           LOG.info("Init failed for task {}.", taskName);
+          reconTaskStatusRecord.setLastTaskSuccessful(false);
         } else {
           //store the timestamp for the task
-          ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-              System.currentTimeMillis(),
-              omMetadataManager.getLastSequenceNumberFromDB());
-          reconTaskStatusDao.update(reconTaskStatusRecord);
+          reconTaskStatusRecord.setLastTaskSuccessful(true);
         }
+        reconTaskStatusDao.update(reconTaskStatusRecord);
       }
     } catch (ExecutionException e) {
       LOG.error("Unexpected error : ", e);
@@ -199,11 +202,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * for that task.
    * @param taskName taskname to be updated.
    * @param lastSequenceNumber contains the new sequence number.
+   * @param lastTaskSuccessful contains if the last run of the task was successful
    */
   private void storeLastCompletedTransaction(
-      String taskName, long lastSequenceNumber) {
+      String taskName, long lastSequenceNumber, boolean lastTaskSuccessful) {
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-        System.currentTimeMillis(), lastSequenceNumber);
+        System.currentTimeMillis(), lastSequenceNumber, lastTaskSuccessful);
     reconTaskStatusDao.update(reconTaskStatusRecord);
   }
 
@@ -251,9 +255,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       if (!f.get().getRight()) {
         LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft());
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), false);
       } else {
         taskFailureCounter.get(taskName).set(0);
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber());
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), true);
       }
     }
     return failedTasks;
