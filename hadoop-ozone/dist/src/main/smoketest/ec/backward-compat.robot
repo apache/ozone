@@ -22,6 +22,22 @@ Resource            lib.resource
 ${PREFIX}    ${EMPTY}
 ${VOLUME}    vol${PREFIX}
 
+*** Keywords ***
+Assert Unsupported
+    [arguments]    ${cmd}
+    ${result} =     Execute and checkrc         ${cmd}       255
+                    Should Contain  ${result}   NOT_SUPPORTED_OPERATION
+
+Bucket Replication
+    [arguments]    ${args}
+    ${result} =     Execute    ozone sh bucket info ${args} | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
+    [return]    ${result}
+
+Key List With Replication
+    [arguments]    ${args}
+    ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    [return]    ${result}
+
 *** Test Cases ***
 Setup Cluster Data
     [Tags]  setup-ec-data
@@ -31,9 +47,7 @@ Test Read Key Compat
     [Tags]  test-ec-compat
     Key Should Match Local File     /${VOLUME}/ratis/3mb      /tmp/3mb
     Key Should Match Local File     /${VOLUME}/default/3mb    /tmp/3mb
-
-    ${result} =     Execute and checkrc         ozone sh key get -f /${VOLUME}/ecbucket/3mb /dev/null       255
-                    Should Contain  ${result}   NOT_SUPPORTED_OPERATION
+    Assert Unsupported    ozone sh key get -f /${VOLUME}/ecbucket/3mb /dev/null
 
 Test Listing Compat
     [Tags]  test-ec-compat
@@ -43,23 +57,21 @@ Test Listing Compat
                     Should contain  ${result}   default
                     Should contain  ${result}   ratis
                     Should contain  ${result}   ec
-    ${result} =     Execute     ozone sh key list /${VOLUME}/default/ | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    ${result} =     Key List With Replication    /${VOLUME}/default/
                     Should contain  ${result}   3mb RATIS 3
-    ${result} =     Execute     ozone sh key list /${VOLUME}/ratis/ | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    ${result} =     Key List With Replication    /${VOLUME}/ratis/
                     Should contain  ${result}   3mb RATIS 3
-
-    ${result} =     Execute and checkrc         ozone sh key list /${VOLUME}/ecbucket/   255
-                    Should contain  ${result}   NOT_SUPPORTED_OPERATION
+    Assert Unsupported    ozone sh key list /${VOLUME}/ecbucket/
 
 Test Info Compat
     [Tags]  test-ec-compat
     ${result} =     Execute     ozone sh volume info ${VOLUME} | jq -r '.name'
                     Should contain  ${result}   ${VOLUME}
-    ${result} =     Execute     ozone sh bucket info /${VOLUME}/default | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
+    ${result} =     Bucket Replication    /${VOLUME}/default
                     Should contain  ${result}   default        # there is no replication config in the old client for bucket info
-    ${result} =     Execute     ozone sh bucket info /${VOLUME}/ratis | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
+    ${result} =     Bucket Replication    /${VOLUME}/ratis
                     Should contain  ${result}   ratis        # there is no replication config in the old client for bucket info
-    ${result} =     Execute     ozone sh bucket info /${VOLUME}/ecbucket | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
+    ${result} =     Bucket Replication    /${VOLUME}/ecbucket
                     Should contain  ${result}   ec        # there is no replication config in the old client for bucket info
 
 Test FS Compat
