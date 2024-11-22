@@ -115,14 +115,13 @@ test_ec_cross_compatibility() {
     export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
     OZONE_KEEP_RESULTS=true start_docker_env 5
 
-    local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
     OZONE_DIR=/opt/hadoop
     new_client _kinit
     execute_robot_test new_client -N "xcompat-cluster-${cluster_version}-client-${client_version}-EC-write" \
       -v CLIENT_VERSION:${client_version} \
       -v CLUSTER_VERSION:${cluster_version} \
       -v SUFFIX:${client_version} \
-      --include setup-ec-data -v prefix:"${prefix}" ec/backward-compat.robot
+      --include setup-ec-data ec/backward-compat.robot
      OZONE_DIR=/opt/ozone
 
     local data_version="$cluster_version"
@@ -135,7 +134,7 @@ test_ec_cross_compatibility() {
         -v CLUSTER_VERSION:${cluster_version} \
         -v DATA_VERSION:${data_version} \
         -v SUFFIX:${data_version} \
-        --include test-ec-compat -v prefix:"${prefix}" ec/backward-compat.robot
+        --include test-ec-compat ec/backward-compat.robot
     done
 
     KEEP_RUNNING=false stop_docker_env
