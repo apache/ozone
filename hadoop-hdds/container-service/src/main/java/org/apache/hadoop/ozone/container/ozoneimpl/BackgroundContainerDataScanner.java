@@ -103,17 +103,16 @@ public class BackgroundContainerDataScanner extends
           metrics.incNumUnHealthyContainers();
         }
       }
-      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
       metrics.incNumContainersScanned();
+      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
     }
 
-    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
     Instant now = Instant.now();
-    logScanCompleted(containerData, now);
-
     if (!result.isDeleted()) {
       controller.updateDataScanTimestamp(containerId, now);
     }
+    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+    logScanCompleted(containerData, now);
   }
 
   @Override

@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,9 +56,11 @@ public final class OnDemandContainerDataScanner {
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
   private final long minScanGap;
+  private final ContainerChecksumTreeManager checksumManager;
 
   private OnDemandContainerDataScanner(
-      ContainerScannerConfiguration conf, ContainerController controller) {
+      ContainerScannerConfiguration conf, ContainerController controller,
+      ContainerChecksumTreeManager checksumManager) {
     containerController = controller;
     throttler = new DataTransferThrottler(
         conf.getOnDemandBandwidthPerVolume());
@@ -67,16 +69,17 @@ public final class OnDemandContainerDataScanner {
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
     minScanGap = conf.getContainerScanMinGap();
+    this.checksumManager = checksumManager;
   }
 
-  public static synchronized void init(
-      ContainerScannerConfiguration conf, ContainerController controller) {
+  public static synchronized void init(ContainerScannerConfiguration conf, ContainerController controller,
+      ContainerChecksumTreeManager checksumManager) {
     if (instance != null) {
       LOG.warn("Trying to initialize on demand scanner" +
           " a second time on a datanode.");
       return;
     }
-    instance = new OnDemandContainerDataScanner(conf, controller);
+    instance = new OnDemandContainerDataScanner(conf, controller, checksumManager);
   }
 
   private static boolean shouldScan(Container<?> container) {
@@ -133,7 +136,7 @@ public final class OnDemandContainerDataScanner {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
 
-      ScanResult result = container.scanData(instance.throttler, instance.canceler);
+      DataScanResult result = container.scanData(instance.throttler, instance.canceler);
       // Metrics for skipped containers should not be updated.
       if (result.isDeleted()) {
         LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
@@ -146,17 +149,17 @@ public final class OnDemandContainerDataScanner {
             instance.metrics.incNumUnHealthyContainers();
           }
         }
-        // TODO HDDS-10374 will need to update the merkle tree here as well.
         instance.metrics.incNumContainersScanned();
+        instance.checksumManager.writeContainerDataTree(containerData, result.getDataTree());
       }
 
-      // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
       Instant now = Instant.now();
-      logScanCompleted(containerData, now);
-
       if (!result.isDeleted()) {
         instance.containerController.updateDataScanTimestamp(containerId, now);
       }
+
+      // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+      logScanCompleted(containerData, now);
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);

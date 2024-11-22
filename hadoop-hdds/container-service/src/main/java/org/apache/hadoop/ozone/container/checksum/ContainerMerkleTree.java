@@ -56,10 +56,12 @@ public class ContainerMerkleTree {
    * If the block entry already exists, the chunks will be added to the existing chunks for that block.
    *
    * @param blockID The ID of the block that these chunks belong to.
+   * @param healthy True if there were no errors detected with these chunks. False indicates that all the chunks
+   *                being added had errors.
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
-  public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
+  public void addChunks(long blockID, boolean healthy, ContainerProtos.ChunkInfo... chunks) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(healthy, chunks);
   }
 
   /**
@@ -106,11 +108,13 @@ public class ContainerMerkleTree {
      * Adds the specified chunks to this block. The offset value of the chunk must be unique within the block,
      * otherwise it will overwrite the previous value at that offset.
      *
+     * @param healthy True if there were no errors detected with these chunks. False indicates that all the chunks
+     *                being added had errors.
      * @param chunks A list of chunks to add to this block.
      */
-    public void addChunks(Collection<ContainerProtos.ChunkInfo> chunks) {
+    public void addChunks(boolean healthy, ContainerProtos.ChunkInfo... chunks) {
       for (ContainerProtos.ChunkInfo chunk: chunks) {
-        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
+        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk, healthy));
       }
     }
 
@@ -151,11 +155,12 @@ public class ContainerMerkleTree {
    * This class computes one checksum for the whole chunk by aggregating these.
    */
   private static class ChunkMerkleTree {
-    private ContainerProtos.ChunkInfo chunk;
-    private boolean isHealthy = true;
+    private final ContainerProtos.ChunkInfo chunk;
+    private final boolean isHealthy;
 
-    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
+    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk, boolean healthy) {
       this.chunk = chunk;
+      this.isHealthy = healthy;
     }
 
     /**
