@@ -70,6 +70,21 @@ Create Key
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
 
+Assert Unsupported
+    [arguments]    ${cmd}
+    ${result} =     Execute and checkrc         ${cmd}       255
+                    Should Contain  ${result}   NOT_SUPPORTED_OPERATION
+
+Bucket Replication
+    [arguments]    ${args}
+    ${result} =     Execute    ozone sh bucket info ${args} | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
+    [return]    ${result}
+
+Key List With Replication
+    [arguments]    ${args}
+    ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    [return]    ${result}
+
 Verify Bucket Empty Replication Config
     [arguments]    ${bucket}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig'
