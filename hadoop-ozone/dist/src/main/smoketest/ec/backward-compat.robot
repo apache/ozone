@@ -99,9 +99,9 @@ Test FS Client Can Read Own Writes
     Execute         ozone fs -put /tmp/1mb ofs://om/${VOLUME}/default/1mb
     Execute         ozone fs -put /tmp/1mb ofs://om/${VOLUME}/ratis/1mb
     Execute         ozone fs -put /tmp/1mb ofs://om/${VOLUME}/ecbucket/1mb
+    Key Should Match Local File     /${VOLUME}/default/1mb      /tmp/1mb
     Key Should Match Local File     /${VOLUME}/ratis/1mb      /tmp/1mb
-    Key Should Match Local File     /${VOLUME}/ratis/1mb      /tmp/1mb
-    Key Should Match Local File     /${VOLUME}/ratis/1mb      /tmp/1mb
+    Key Should Match Local File     /${VOLUME}/ecbucket/1mb      /tmp/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/${VOLUME}/default/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/${VOLUME}/ratis/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/${VOLUME}/ecbucket/1mb
@@ -111,9 +111,9 @@ Test Client Can Read Own Writes
     Execute         ozone sh key put /${VOLUME}/default/2mb /tmp/2mb
     Execute         ozone sh key put /${VOLUME}/ratis/2mb /tmp/2mb
     Execute         ozone sh key put /${VOLUME}/ecbucket/2mb /tmp/2mb
+    Key Should Match Local File     /${VOLUME}/default/2mb      /tmp/2mb
     Key Should Match Local File     /${VOLUME}/ratis/2mb      /tmp/2mb
-    Key Should Match Local File     /${VOLUME}/ratis/2mb      /tmp/2mb
-    Key Should Match Local File     /${VOLUME}/ratis/2mb      /tmp/2mb
+    Key Should Match Local File     /${VOLUME}/ecbucket/2mb      /tmp/2mb
     Execute         ozone sh key delete /${VOLUME}/default/2mb
     Execute         ozone sh key delete /${VOLUME}/ratis/2mb
     Execute         ozone sh key delete /${VOLUME}/ecbucket/2mb
