@@ -158,6 +158,7 @@ enum Result {
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
+  CONTAINER_ID_MISMATCH = 48;
 }
 
 /**
@@ -558,6 +559,7 @@ message ChunkMerkleTree {
   optional int64 offset = 1;
   optional int64 length = 2;
   optional int64 chunkChecksum = 3;
+  optional bool isHealthy = 4;
 }
 
 message BlockMerkleTree {
