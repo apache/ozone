@@ -51,6 +51,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +59,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -116,7 +118,7 @@ public class ContainerBalancerTask implements Runnable {
   private IterationResult iterationResult;
   private int nextIterationIndex;
   private boolean delayStart;
-  private final ConcurrentLinkedQueue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
+  private Queue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -320,25 +322,29 @@ public class ContainerBalancerTask implements Runnable {
             .stream()
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(
-                ConcurrentHashMap::new,
-                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
-                ConcurrentHashMap::putAll
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
             ),
         findSourceStrategy.getSizeLeavingNodes()
             .entrySet()
             .stream()
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(
-                ConcurrentHashMap::new,
-                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
-                ConcurrentHashMap::putAll
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
             )
     );
     iterationsStatistic.offer(iterationStatistic);
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    int lastIterationNumber = iterationsStatistic.stream()
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+
+    int lastIterationNumber = resultList.stream()
         .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
         .max()
         .orElse(0);
@@ -357,21 +363,22 @@ public class ContainerBalancerTask implements Runnable {
             .stream()
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(
-                ConcurrentHashMap::new,
-                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
-                ConcurrentHashMap::putAll
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
             ),
         findSourceStrategy.getSizeLeavingNodes()
             .entrySet()
             .stream()
             .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
             .collect(
-                ConcurrentHashMap::new,
-                (map, entry) -> map.put(entry.getKey().getUuid(), entry.getValue() / OzoneConsts.GB),
-                ConcurrentHashMap::putAll
+                Collectors.toMap(
+                    entry -> entry.getKey().getUuid(),
+                    entry -> entry.getValue() / OzoneConsts.GB
+                )
             )
     );
-    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
     resultList.add(currentIterationStatistic);
     return resultList;
   }

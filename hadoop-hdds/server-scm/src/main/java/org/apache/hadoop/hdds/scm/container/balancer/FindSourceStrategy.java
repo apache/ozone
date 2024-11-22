@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * This interface can be used to implement strategies to get a
@@ -87,5 +87,5 @@ public interface FindSourceStrategy {
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
 
-  ConcurrentHashMap<DatanodeDetails, Long> getSizeLeavingNodes();
+  Map<DatanodeDetails, Long> getSizeLeavingNodes();
 }

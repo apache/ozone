@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Information about balancer task iteration.
@@ -33,8 +33,8 @@ public class ContainerBalancerTaskIterationStatusInfo {
   private final long containerMovesCompleted;
   private final long containerMovesFailed;
   private final long containerMovesTimeout;
-  private final ConcurrentHashMap<UUID, Long> sizeEnteringNodesGB;
-  private final ConcurrentHashMap<UUID, Long> sizeLeavingNodesGB;
+  private final Map<UUID, Long> sizeEnteringNodesGB;
+  private final Map<UUID, Long> sizeLeavingNodesGB;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerBalancerTaskIterationStatusInfo(
@@ -46,8 +46,8 @@ public class ContainerBalancerTaskIterationStatusInfo {
       long containerMovesCompleted,
       long containerMovesFailed,
       long containerMovesTimeout,
-      ConcurrentHashMap<UUID, Long> sizeEnteringNodesGB,
-      ConcurrentHashMap<UUID, Long> sizeLeavingNodesGB) {
+      Map<UUID, Long> sizeEnteringNodesGB,
+      Map<UUID, Long> sizeLeavingNodesGB) {
     this.iterationNumber = iterationNumber;
     this.iterationResult = iterationResult;
     this.sizeScheduledForMoveGB = sizeScheduledForMoveGB;
@@ -92,11 +92,11 @@ public class ContainerBalancerTaskIterationStatusInfo {
     return containerMovesTimeout;
   }
 
-  public ConcurrentHashMap<UUID, Long> getSizeEnteringNodesGB() {
+  public Map<UUID, Long> getSizeEnteringNodesGB() {
     return sizeEnteringNodesGB;
   }
 
-  public ConcurrentHashMap<UUID, Long> getSizeLeavingNodesGB() {
+  public Map<UUID, Long> getSizeLeavingNodesGB() {
     return sizeLeavingNodesGB;
   }
 }

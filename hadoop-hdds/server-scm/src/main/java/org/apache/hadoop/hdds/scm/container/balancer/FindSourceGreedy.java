@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FindSourceGreedy implements FindSourceStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
-  private ConcurrentHashMap<DatanodeDetails, Long> sizeLeavingNode;
+  private Map<DatanodeDetails, Long> sizeLeavingNode;
   private PriorityQueue<DatanodeUsageInfo> potentialSources;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
@@ -202,7 +203,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   }
 
   @Override
-  public ConcurrentHashMap<DatanodeDetails, Long> getSizeLeavingNodes() {
+  public Map<DatanodeDetails, Long> getSizeLeavingNodes() {
     return sizeLeavingNode;
   }
 }

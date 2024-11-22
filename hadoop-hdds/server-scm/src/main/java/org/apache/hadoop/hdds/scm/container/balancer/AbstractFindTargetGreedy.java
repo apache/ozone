@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +46,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   private Logger logger;
   private ContainerManager containerManager;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
-  private ConcurrentHashMap<DatanodeDetails, Long> sizeEnteringNode;
+  private Map<DatanodeDetails, Long> sizeEnteringNode;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
@@ -279,7 +280,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   }
 
   @Override
-  public ConcurrentHashMap<DatanodeDetails, Long> getSizeEnteringNodes() {
+  public Map<DatanodeDetails, Long> getSizeEnteringNodes() {
     return sizeEnteringNode;
   }
 }
