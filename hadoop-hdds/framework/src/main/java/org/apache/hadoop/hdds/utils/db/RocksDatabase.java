@@ -306,7 +306,7 @@ public final class RocksDatabase implements Closeable {
         ByteBuffer value) throws IOException {
       if (LOG.isDebugEnabled()) {
         LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
-        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+        LOG.debug("batchPut buffer value size {}", value.remaining());
       }
 
       try (UncheckedAutoCloseable ignored = acquire()) {
@@ -681,7 +681,7 @@ public final class RocksDatabase implements Closeable {
     try (UncheckedAutoCloseable ignored = acquire()) {
       final int size = db.get().get(family.getHandle(),
           DEFAULT_READ_OPTION, key, outValue);
-      LOG.debug("get: size={}, remaining={}",
+      LOG.trace("get: size={}, remaining={}",
           size, outValue.asReadOnlyBuffer().remaining());
       return size == ManagedRocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
@@ -841,7 +841,7 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs, a map of TableName to prefixUsed.
+   * @param prefixPairs a map of TableName to prefixUsed.
    */
   public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs)
       throws IOException, RocksDBException {

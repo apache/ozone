@@ -37,19 +37,19 @@ public class TestExcludeList {
   public void excludeNodesShouldBeCleanedBasedOnGivenTime() {
     ExcludeList list = new ExcludeList(10, clock);
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .setIpAddress("127.0.0.1").setHostName("localhost")
+        .addPort(DatanodeDetails.newStandalonePort(2001))
         .build());
     assertEquals(1, list.getDatanodes().size());
     clock.fastForward(11);
     assertEquals(0, list.getDatanodes().size());
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .setIpAddress("127.0.0.2").setHostName("localhost").addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .setIpAddress("127.0.0.2").setHostName("localhost")
+        .addPort(DatanodeDetails.newStandalonePort(2001))
         .build());
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .setIpAddress("127.0.0.3").setHostName("localhost").addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .setIpAddress("127.0.0.3").setHostName("localhost")
+        .addPort(DatanodeDetails.newStandalonePort(2001))
         .build());
     assertEquals(2, list.getDatanodes().size());
   }
@@ -58,8 +58,8 @@ public class TestExcludeList {
   public void excludeNodeShouldNotBeCleanedIfExpiryTimeIsZero() {
     ExcludeList list = new ExcludeList(0, clock);
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .setIpAddress("127.0.0.1").setHostName("localhost")
+        .addPort(DatanodeDetails.newStandalonePort(2001))
         .build());
     assertEquals(1, list.getDatanodes().size());
     clock.fastForward(1);

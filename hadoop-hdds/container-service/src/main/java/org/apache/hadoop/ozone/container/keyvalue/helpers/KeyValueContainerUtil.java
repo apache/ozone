@@ -356,6 +356,29 @@ public final class KeyValueContainerUtil {
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
     ContainerInspectorUtil.process(kvContainerData, store);
+
+    // Load finalizeBlockLocalIds for container in memory.
+    populateContainerFinalizeBlock(kvContainerData, store);
+  }
+
+  /**
+   * Loads finalizeBlockLocalIds for container in memory.
+   * @param kvContainerData - KeyValueContainerData
+   * @param store - DatanodeStore
+   * @throws IOException
+   */
+  private static void populateContainerFinalizeBlock(
+      KeyValueContainerData kvContainerData, DatanodeStore store)
+      throws IOException {
+    if (store.getFinalizeBlocksTable() != null) {
+      try (BlockIterator<Long> iter =
+               store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
+                   kvContainerData.getUnprefixedKeyFilter())) {
+        while (iter.hasNext()) {
+          kvContainerData.addToFinalizedBlockSet(iter.nextBlock());
+        }
+      }
+    }
   }
 
   /**
@@ -416,13 +439,13 @@ public final class KeyValueContainerUtil {
 
   /**
    * Moves container directory to a new location
-   * under "<volume>/hdds/<cluster-id>/tmp/deleted-containers"
+   * under "volume/hdds/cluster-id/tmp/deleted-containers"
    * and updates metadata and chunks path.
    * Containers will be moved under it before getting deleted
    * to avoid, in case of failure, having artifact leftovers
    * on the default container path on the disk.
    *
-   * Delete operation for Schema < V3
+   * Delete operation for Schema &lt; V3
    * 1. Container is marked DELETED
    * 2. Container is removed from memory container set
    * 3. Container DB handler from cache is removed and closed
@@ -437,7 +460,6 @@ public final class KeyValueContainerUtil {
    * 5. Container is deleted from tmp directory.
    *
    * @param keyValueContainerData
-   * @return true if renaming was successful
    */
   public static void moveToDeletedContainerDir(
       KeyValueContainerData keyValueContainerData,

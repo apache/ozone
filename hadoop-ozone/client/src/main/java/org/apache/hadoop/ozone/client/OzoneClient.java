@@ -26,6 +26,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * OzoneClient connects to Ozone Cluster and
@@ -76,6 +77,7 @@ public class OzoneClient implements Closeable {
   private final ClientProtocol proxy;
   private final ObjectStore objectStore;
   private  ConfigurationSource conf;
+  private final UncheckedAutoCloseable leakTracker = OzoneClientFactory.track(this);
 
   /**
    * Creates a new OzoneClient object, generally constructed
@@ -119,7 +121,11 @@ public class OzoneClient implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    proxy.close();
+    try {
+      proxy.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 
   /**

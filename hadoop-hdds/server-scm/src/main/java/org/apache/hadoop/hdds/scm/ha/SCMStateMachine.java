@@ -137,6 +137,7 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
+      LOG.info("{}: initialize {}", server.getId(), id);
     });
   }
 
@@ -149,6 +150,9 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
+      }
       try {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
@@ -233,8 +237,8 @@ public class SCMStateMachine extends BaseStateMachine {
     String leaderAddress = roleInfoProto.getFollowerInfo()
         .getLeaderInfo().getId().getAddress();
     Optional<SCMNodeDetails> leaderDetails =
-        scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
-            p -> p.getRatisHostPortStr().equals(leaderAddress))
+        scm.getSCMHANodeDetails().getPeerNodeDetails().stream()
+            .filter(p -> p.getRatisHostPortStr().equals(leaderAddress))
             .findFirst();
     Preconditions.checkState(leaderDetails.isPresent());
     final String leaderNodeId = leaderDetails.get().getNodeId();
@@ -389,6 +393,7 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void pause() {
     final LifeCycle lc = getLifeCycle();
+    LOG.info("{}: Try to pause from current LifeCycle state {}", getId(), lc);
     if (lc.getCurrentState() != LifeCycle.State.NEW) {
       lc.transition(LifeCycle.State.PAUSING);
       lc.transition(LifeCycle.State.PAUSED);
@@ -413,6 +418,8 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.error("Failed to reinitialize SCMStateMachine.", e);
       throw new IOException(e);
     }
+
+    LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -27,6 +28,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 /**
  * JSON Utility functions used in ozone for Test classes.
@@ -67,4 +70,25 @@ public final class JsonTestUtils {
   public static JsonNode readTree(String content) throws IOException {
     return MAPPER.readTree(content);
   }
+
+  public static List<Map<String, Object>> readTreeAsListOfMaps(String json)
+      throws IOException {
+    return MAPPER.readValue(json,
+        new TypeReference<List<Map<String, Object>>>() {
+        });
+  }
+
+  /**
+   * Converts a JsonNode into a Java object of the specified type.
+   * @param node The JsonNode to convert.
+   * @param valueType The target class of the Java object.
+   * @param <T> The type of the Java object.
+   * @return A Java object of type T, populated with data from the JsonNode.
+   * @throws IOException
+   */
+  public static <T> T treeToValue(JsonNode node, Class<T> valueType)
+      throws IOException {
+    return MAPPER.treeToValue(node, valueType);
+  }
+
 }

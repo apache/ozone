@@ -26,10 +26,10 @@ REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
-JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout)
+JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout -Dscan=false)
 
 #Install jacoco cli
-mvn --non-recursive --no-transfer-progress \
+mvn --non-recursive --no-transfer-progress -Dscan=false \
   org.apache.maven.plugins:maven-dependency-plugin:copy \
   -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
@@ -53,4 +53,5 @@ find target/coverage-classes -type d \( -name proto -or -name proto3 -or -name g
   | xargs rm -rf
 
 #generate the reports
-jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"
+src=$(find hadoop-* -path '*/src/main/java' | sed 's/^/--sourcefiles /g' | xargs echo)
+jacoco report "$REPORT_DIR/jacoco-all.exec" $src --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"

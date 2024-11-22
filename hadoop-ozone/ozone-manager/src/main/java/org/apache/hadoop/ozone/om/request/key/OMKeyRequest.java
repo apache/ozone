@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -177,6 +178,80 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Define the parameters carried when verifying the Key.
+   */
+  public static class ValidateKeyArgs {
+    private String snapshotReservedWord;
+    private String keyName;
+    private boolean validateSnapshotReserved;
+    private boolean validateKeyName;
+
+    ValidateKeyArgs(String snapshotReservedWord, String keyName,
+        boolean validateSnapshotReserved, boolean validateKeyName) {
+      this.snapshotReservedWord = snapshotReservedWord;
+      this.keyName = keyName;
+      this.validateSnapshotReserved = validateSnapshotReserved;
+      this.validateKeyName = validateKeyName;
+    }
+
+    public String getSnapshotReservedWord() {
+      return snapshotReservedWord;
+    }
+
+    public String getKeyName() {
+      return keyName;
+    }
+
+    public boolean isValidateSnapshotReserved() {
+      return validateSnapshotReserved;
+    }
+
+    public boolean isValidateKeyName() {
+      return validateKeyName;
+    }
+
+    /**
+     * Tools for building {@link ValidateKeyArgs}.
+     */
+    public static class Builder {
+      private String snapshotReservedWord;
+      private String keyName;
+      private boolean validateSnapshotReserved;
+      private boolean validateKeyName;
+
+      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
+        this.snapshotReservedWord = snapshotReservedWord;
+        this.validateSnapshotReserved = true;
+        return this;
+      }
+
+      public Builder setKeyName(String keyName) {
+        this.keyName = keyName;
+        this.validateKeyName = true;
+        return this;
+      }
+
+      public ValidateKeyArgs build() {
+        return new ValidateKeyArgs(snapshotReservedWord, keyName,
+            validateSnapshotReserved, validateKeyName);
+      }
+    }
+  }
+
+  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
+      throws OMException {
+    if (validateKeyArgs.isValidateSnapshotReserved()) {
+      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
+    }
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
+      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
+    }
+  }
+
+  /**
    * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
    * in one rpc call.
    * @throws IOException
@@ -234,7 +309,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /* Optimize ugi lookup for RPC operations to avoid a trip through
    * UGI.getCurrentUser which is synch'ed.
    */
-  private UserGroupInformation getRemoteUser() throws IOException {
+  protected UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
@@ -611,7 +686,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Get FileEncryptionInfoProto from KeyArgs.
    * @param keyArgs
-   * @return
+   * @return FileEncryptionInfo
    */
   protected FileEncryptionInfo getFileEncryptionInfo(KeyArgs keyArgs) {
     FileEncryptionInfo encryptionInfo = null;
@@ -623,7 +698,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
-   * @paran metadataManager
+   * @param metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
@@ -775,10 +850,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
-      // Clear the old one when the key is overwritten.
       dbKeyInfo.getMetadata().clear();
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
+
+      // Construct a new tags from KeyArgs
+      // Clear the old one when the key is overwritten
+      dbKeyInfo.getTags().clear();
+      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getTagsList()));
+
+      if (keyArgs.hasExpectedDataGeneration()) {
+        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+      }
 
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
@@ -821,6 +905,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
                 keyArgs, omBucketInfo, omPathInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
+            .addAllTags(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getTagsList()))
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
@@ -900,7 +986,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   protected String getDBMultipartOpenKey(String volumeName, String bucketName,

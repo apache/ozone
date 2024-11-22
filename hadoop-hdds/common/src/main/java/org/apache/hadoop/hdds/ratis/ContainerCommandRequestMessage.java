@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.ratis.protocol.Message;
@@ -43,6 +44,9 @@ public final class ContainerCommandRequestMessage implements Message {
         = ContainerCommandRequestProto.newBuilder(request);
     if (traceId != null) {
       b.setTraceID(traceId);
+    }
+    if (!request.hasVersion()) {
+      b.setVersion(ClientVersion.CURRENT.toProtoValue());
     }
 
     ByteString data = ByteString.EMPTY;

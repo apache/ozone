@@ -55,3 +55,9 @@ S3 Gateway Generate Secret By Username For Other User
     ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
                         Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
                         Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
+
+S3 Gateway Reject Secret Generation By Non-admin User
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+    Run Keyword                                             Kinit test user   testuser2   testuser2.keytab
+    ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Should contain          ${result}   HTTP/1.1 403 FORBIDDEN    ignore_case=True

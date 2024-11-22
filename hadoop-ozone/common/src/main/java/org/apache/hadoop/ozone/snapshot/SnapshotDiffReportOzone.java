@@ -47,6 +47,7 @@ public class SnapshotDiffReportOzone
       Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
+      DiffReportEntry.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
@@ -89,6 +90,14 @@ public class SnapshotDiffReportOzone
     return super.getDiffList();
   }
 
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
   public String getToken() {
     return token;
   }
@@ -101,16 +110,12 @@ public class SnapshotDiffReportOzone
         .append(" and snapshot: ")
         .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
-    if (!getDiffList().isEmpty()) {
-      for (DiffReportEntry entry : getDiffList()) {
-        str.append(entry.toString()).append(LINE_SEPARATOR);
-      }
-      if (StringUtils.isNotEmpty(token)) {
-        str.append("Next token: ")
-            .append(token);
-      }
-    } else {
-      str.append("No diff or no more diff for the request parameters.");
+    for (DiffReportEntry entry : getDiffList()) {
+      str.append(entry.toString()).append(LINE_SEPARATOR);
+    }
+    if (StringUtils.isNotEmpty(token)) {
+      str.append("Next token: ")
+          .append(token);
     }
     return str.toString();
   }

@@ -28,12 +28,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
@@ -98,7 +99,6 @@ public final class BlockUtils {
    * opened by this thread, the other thread will get a RocksDB exception.
    * @param containerData The container data
    * @param conf Configuration
-   * @return
    * @throws IOException
    */
   public static DatanodeStore getUncachedDatanodeStore(
@@ -220,7 +220,7 @@ public final class BlockUtils {
    * @param blockID requested block info
    * @throws IOException if cannot support block's blockCommitSequenceId
    */
-  public static void verifyBCSId(KeyValueContainer container, BlockID blockID)
+  public static void verifyBCSId(Container container, BlockID blockID)
       throws IOException {
     long bcsId = blockID.getBlockCommitSequenceId();
     Preconditions.checkNotNull(blockID,
@@ -234,6 +234,26 @@ public final class BlockUtils {
           "Unable to find the block with bcsID " + bcsId + " .Container "
               + container.getContainerData().getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
+    }
+  }
+
+  /**
+   * Verify if request's replicaIndex matches with containerData.
+   *
+   * @param container container object.
+   * @param blockID requested block info
+   * @throws IOException if replicaIndex mismatches.
+   */
+  public static void verifyReplicaIdx(Container container, BlockID blockID)
+      throws IOException {
+    Integer containerReplicaIndex = container.getContainerData().getReplicaIndex();
+    Integer blockReplicaIndex = blockID.getReplicaIndex();
+    if (containerReplicaIndex > 0 && blockReplicaIndex != null && blockReplicaIndex != 0 &&
+        !containerReplicaIndex.equals(blockReplicaIndex)) {
+      throw new StorageContainerException(
+          "Unable to find the Container with replicaIdx " + blockID.getReplicaIndex() + ". Container "
+              + container.getContainerData().getContainerID() + " replicaIdx is "
+              + containerReplicaIndex + ".", CONTAINER_NOT_FOUND);
     }
   }
 

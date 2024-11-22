@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,10 +35,13 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
+import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
+
+import com.amazonaws.services.s3.AmazonS3;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -141,9 +145,16 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /**
    * Returns a {@link ReconServer} instance.
    *
-   * @return List of {@link ReconServer}
+   * @return {@link ReconServer} instance if it is initialized, otherwise null.
    */
   ReconServer getReconServer();
+
+  /**
+   * Returns a {@link Gateway} instance.
+   *
+   * @return {@link Gateway} instance if it is initialized, otherwise null.
+   */
+  Gateway getS3G();
 
   /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
@@ -152,6 +163,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return {@link OzoneClient}
    */
   OzoneClient newClient() throws IOException;
+
+  /**
+   * Returns an {@link AmazonS3} to access the {@link MiniOzoneCluster}.
+   */
+  AmazonS3 newS3Client();
 
   /**
    * Returns StorageContainerLocationClient to communicate with
@@ -219,6 +235,21 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void stopRecon();
 
   /**
+   * Start S3G.
+   */
+  void startS3G();
+
+  /**
+   * Restart S3G.
+   */
+  void restartS3G();
+
+  /**
+   * Stop S3G.
+   */
+  void stopS3G();
+
+  /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
@@ -270,8 +301,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
-    
+
     protected boolean includeRecon = false;
+    protected boolean includeS3G = false;
+
+    protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
+    protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
@@ -344,6 +379,30 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
+    /**
+     * Set the initialVersion for all datanodes.
+     *
+     * @param val initialVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeInitialVersion(int val) {
+      dnInitialVersion = val;
+      return this;
+    }
+
+    /**
+     * Set the currentVersion for all datanodes.
+     *
+     * @param val currentVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeCurrentVersion(int val) {
+      dnCurrentVersion = val;
+      return this;
+    }
+
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
       return this;
@@ -351,6 +410,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
+      return this;
+    }
+
+    public Builder includeS3G(boolean include) {
+      this.includeS3G = include;
       return this;
     }
 

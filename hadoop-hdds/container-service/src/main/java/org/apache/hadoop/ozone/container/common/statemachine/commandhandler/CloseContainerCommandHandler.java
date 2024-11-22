@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +31,8 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
@@ -58,11 +59,11 @@ public class CloseContainerCommandHandler implements CommandHandler {
 
   private final AtomicLong invocationCount = new AtomicLong(0);
   private final AtomicInteger queuedCount = new AtomicInteger(0);
-  private final ExecutorService executor;
-  private long totalTime;
+  private final ThreadPoolExecutor executor;
+  private final MutableRate opsLatencyMs;
 
   /**
-   * Constructs a ContainerReport handler.
+   * Constructs a close container command handler.
    */
   public CloseContainerCommandHandler(
       int threadPoolSize, int queueSize, String threadNamePrefix) {
@@ -73,6 +74,9 @@ public class CloseContainerCommandHandler implements CommandHandler {
         new ThreadFactoryBuilder()
             .setNameFormat(threadNamePrefix + "CloseContainerThread-%d")
             .build());
+    MetricsRegistry registry = new MetricsRegistry(
+        CloseContainerCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.closeContainerCommand + "Ms");
   }
 
   /**
@@ -156,7 +160,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
         LOG.error("Can't close container #{}", containerId, e);
       } finally {
         long endTime = Time.monotonicNow();
-        totalTime += endTime - startTime;
+        this.opsLatencyMs.add(endTime - startTime);
       }
     }, executor).whenComplete((v, e) -> queuedCount.decrementAndGet());
   }
@@ -205,19 +209,26 @@ public class CloseContainerCommandHandler implements CommandHandler {
    */
   @Override
   public long getAverageRunTime() {
-    if (invocationCount.get() > 0) {
-      return totalTime / invocationCount.get();
-    }
-    return 0;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override
   public int getQueuedCount() {
     return queuedCount.get();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return executor.getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return executor.getActiveCount();
   }
 }

@@ -121,12 +121,28 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
+   */
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
+      = false;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
       = "ozone.fs.hsync.enabled";
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
       = false;
+
+  /**
+   * hsync lease soft limit.
+   */
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT
+      = "ozone.om.lease.soft.limit";
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
+      = "60s";
 
 
   /**
@@ -185,9 +201,6 @@ public final class OzoneConfigKeys {
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
-  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
-      "ozone.ec.grpc.zerocopy.enabled";
-  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
 
   /**
    * Ozone administrator users delimited by comma.
@@ -527,10 +540,6 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
-  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
-      "ozone.client.list.trash.keys.max";
-  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
-
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   public static final String OZONE_HTTP_POLICY_KEY =
@@ -559,11 +568,6 @@ public final class OzoneConfigKeys {
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-      "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-      false;
-
   public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
       "ozone.client.key.provider.cache.expiry";
@@ -574,6 +578,13 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
+      "ozone.client.server-defaults.validity.period.ms";
+
+  public static final long
+      OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1); // 1 hour
 
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
           "ozone.network.flexible.fqdn.resolution.enabled";

@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -117,8 +116,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
 
-    OmUtils.verifyKeyNameWithSnapshotReservedWord(
-        createDirectoryRequest.getKeyArgs().getKeyName());
+    KeyArgs keyArgs = createDirectoryRequest.getKeyArgs();
+    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
+        .setSnapshotReservedWord(keyArgs.getKeyName()).build();
+    validateKey(ozoneManager, validateArgs);
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());
@@ -240,7 +241,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, result,
@@ -257,7 +258,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param bucketInfo
    * @param omPathInfo
    * @param trxnLogIndex
-   * @return
+   * @return {@code List<OmKeyInfo>}
    * @throws IOException
    */
   public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,

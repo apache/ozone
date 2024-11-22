@@ -112,6 +112,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -319,7 +320,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
         String.valueOf(keyArgs.getMultipartNumber()));
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
         auditMap, exception,
         getOmRequest().getUserInfo()));

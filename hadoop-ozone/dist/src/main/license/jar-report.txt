@@ -3,6 +3,11 @@ share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/aopalliance.jar
 share/ozone/lib/aopalliance-repackaged.jar
+share/ozone/lib/asm-analysis.jar
+share/ozone/lib/asm-commons.jar
+share/ozone/lib/asm.jar
+share/ozone/lib/asm-tree.jar
+share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
 share/ozone/lib/aws-java-sdk-core.jar
@@ -58,7 +63,7 @@ share/ozone/lib/hadoop-common.jar
 share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
-share/ozone/lib/hadoop-shaded-protobuf_3_7.jar
+share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
 share/ozone/lib/hdds-annotation-processing.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
@@ -129,8 +134,7 @@ share/ozone/lib/jersey-hk2.jar
 share/ozone/lib/jersey-media-jaxb.jar
 share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
-share/ozone/lib/jersey-server.jar
-share/ozone/lib/jersey-servlet.jar
+share/ozone/lib/jettison.jar
 share/ozone/lib/jetty-client.jar
 share/ozone/lib/jetty-http.jar
 share/ozone/lib/jetty-io.jar
@@ -141,6 +145,8 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jffi.jar
+share/ozone/lib/jffi-native.jar
 share/ozone/lib/jgrapht-core.jar
 share/ozone/lib/jgrapht-ext.jar
 share/ozone/lib/jgraphx.jar
@@ -148,6 +154,11 @@ share/ozone/lib/jheaps.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
+share/ozone/lib/jnr-a64asm.jar
+share/ozone/lib/jnr-constants.jar
+share/ozone/lib/jnr-ffi.jar
+share/ozone/lib/jnr-posix.jar
+share/ozone/lib/jnr-x86asm.jar
 share/ozone/lib/joda-time.jar
 share/ozone/lib/jooq-codegen.jar
 share/ozone/lib/jooq.jar
@@ -192,6 +203,7 @@ share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
+share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
@@ -242,6 +254,7 @@ share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar
 share/ozone/lib/ratis-server.jar
+share/ozone/lib/ratis-shell.jar
 share/ozone/lib/ratis-thirdparty-misc.jar
 share/ozone/lib/ratis-tools.jar
 share/ozone/lib/re2j.jar

@@ -104,8 +104,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -122,10 +125,11 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -154,6 +158,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+
+  /**
+   * This is used to check if 'leader' or 'follower' exists,
+   * in order to confirm whether we have enabled Ratis.
+   */
+  private final List<String> scmRatisRolesToCheck = Arrays.asList("leader", "follower");
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -380,19 +390,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count)
+  public ContainerListResult listContainer(long startContainerID, int count)
       throws IOException {
     return listContainer(startContainerID, count, null, null, null);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
     return listContainer(startContainerID, count, state, null, null);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -434,12 +444,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainersList()) {
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
-    return containerList;
+
+    if (response.hasContainerCount()) {
+      return new ContainerListResult(containerList, response.getContainerCount());
+    } else {
+      return new ContainerListResult(containerList, -1);
+    }
   }
 
   @Deprecated
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
       throws IOException {
     throw new UnsupportedOperationException("Should no longer be called from " +
@@ -758,8 +773,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setScmId(resp.getScmId())
         .setRatisPeerRoles(resp.getPeerRolesList());
 
-    return builder.build();
+    // By default, we assume that SCM Ratis is not enabled.
 
+    // If the response contains the `ScmRatisEnabled` field,
+    // we will set it directly; otherwise,
+    // we will determine if Ratis is enabled based on
+    // whether the `peerRolesList` contains the keywords 'leader' or 'follower'.
+    if (resp.hasScmRatisEnabled()) {
+      builder.setScmRatisEnabled(resp.getScmRatisEnabled());
+    } else {
+      List<String> peerRolesList = resp.getPeerRolesList();
+      if (!peerRolesList.isEmpty()) {
+        boolean containsScmRoles = peerRolesList.stream().map(String::toLowerCase)
+            .anyMatch(scmRatisRolesToCheck::contains);
+        builder.setScmRatisEnabled(containsScmRoles);
+      }
+    }
+    return builder.build();
   }
 
   @Override
@@ -1025,6 +1055,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   }
 
+  @Override
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException {
+
+    ContainerBalancerStatusInfoRequestProto request =
+            ContainerBalancerStatusInfoRequestProto.getDefaultInstance();
+    ContainerBalancerStatusInfoResponseProto response =
+            submitRequest(Type.GetContainerBalancerStatusInfo,
+                    builder -> builder.setContainerBalancerStatusInfoRequest(request))
+                    .getContainerBalancerStatusInfoResponse();
+    return response;
+
+  }
+
   /**
    * Builds request for datanode usage information and receives response.
    *
@@ -1172,7 +1215,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainer(startContainerID, count, state);
+    return listContainer(startContainerID, count, state).getContainerInfoList();
   }
 
   @Override

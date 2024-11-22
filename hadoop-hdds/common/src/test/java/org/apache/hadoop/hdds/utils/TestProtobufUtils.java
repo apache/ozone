@@ -18,16 +18,17 @@
 package org.apache.hadoop.hdds.utils;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
-import static org.apache.hadoop.util.ProtobufUtils.fromProtobuf;
-import static org.apache.hadoop.util.ProtobufUtils.toProtobuf;
+import static org.apache.hadoop.ozone.util.ProtobufUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.util.ProtobufUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Test-cases for {@link org.apache.hadoop.util.ProtobufUtils}.
+ * Test-cases for {@link ProtobufUtils}.
  */
 public class TestProtobufUtils {
   @Test

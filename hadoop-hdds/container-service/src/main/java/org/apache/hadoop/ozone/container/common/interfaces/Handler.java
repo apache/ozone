@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -93,7 +94,8 @@ public abstract class Handler {
    *
    * @return datanode Id
    */
-  protected String getDatanodeId() {
+  @VisibleForTesting
+  public String getDatanodeId() {
     return datanodeId;
   }
 
@@ -212,6 +214,10 @@ public abstract class Handler {
    */
   public abstract void deleteUnreferenced(Container container, long localID)
       throws IOException;
+
+  public abstract void addFinalizedBlock(Container container, long localID);
+
+  public abstract boolean isFinalizedBlockExist(Container container, long localID);
 
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;

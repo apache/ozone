@@ -41,6 +41,8 @@ import org.yaml.snakeyaml.nodes.Tag;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
@@ -92,6 +94,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private long blockCommitSequenceId;
 
+  private final Set<Long> finalizedBlockSet;
+
   static {
     // Initialize YAML fields
     KV_YAML_FIELDS = Lists.newArrayList();
@@ -114,6 +118,7 @@ public class KeyValueContainerData extends ContainerData {
         size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
+    finalizedBlockSet =  ConcurrentHashMap.newKeySet();
   }
 
   public KeyValueContainerData(KeyValueContainerData source) {
@@ -123,6 +128,7 @@ public class KeyValueContainerData extends ContainerData {
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
+    finalizedBlockSet = ConcurrentHashMap.newKeySet();
   }
 
   /**
@@ -276,6 +282,34 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
+   * Add the given localID of a block to the finalizedBlockSet.
+   */
+  public void addToFinalizedBlockSet(long localID) {
+    finalizedBlockSet.add(localID);
+  }
+
+  public Set<Long> getFinalizedBlockSet() {
+    return finalizedBlockSet;
+  }
+
+  public boolean isFinalizedBlockExist(long localID) {
+    return finalizedBlockSet.contains(localID);
+  }
+
+  public void clearFinalizedBlock(DBHandle db) throws IOException {
+    if (!finalizedBlockSet.isEmpty()) {
+      // delete from db and clear memory
+      // Should never fail.
+      Preconditions.checkNotNull(db, "DB cannot be null here");
+      try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
+        db.getStore().getFinalizeBlocksTable().deleteBatchWithPrefix(batch, containerPrefix());
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+      finalizedBlockSet.clear();
+    }
+  }
+
+  /**
    * Returns a ProtoBuf Message from ContainerData.
    *
    * @return Protocol Buffer Message
@@ -396,7 +430,6 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Schema v3 use a prefix as startKey,
    * for other schemas just return null.
-   * @return
    */
   public String startKeyEmpty() {
     if (hasSchema(SCHEMA_V3)) {
@@ -408,7 +441,6 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Schema v3 use containerID as key prefix,
    * for other schemas just return null.
-   * @return
    */
   public String containerPrefix() {
     if (hasSchema(SCHEMA_V3)) {

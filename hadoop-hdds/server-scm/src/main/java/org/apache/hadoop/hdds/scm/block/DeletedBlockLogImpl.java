@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -138,6 +137,7 @@ public class DeletedBlockLogImpl
             }
           }
         } else {
+          iter.seek(startTxId);
           while (iter.hasNext() && failedTXs.size() < count) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
             if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
@@ -198,20 +198,6 @@ public class DeletedBlockLogImpl
         .addAllLocalID(blocks)
         .setCount(0)
         .build();
-  }
-
-  private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "Got block deletion ACK from datanode, TXIDs={}, " + "success={}",
-          result.getTxID(), result.getSuccess());
-    }
-    if (!result.getSuccess()) {
-      LOG.warn("Got failed ACK for TXID={}, prepare to resend the "
-          + "TX in next interval", result.getTxID());
-      return true;
-    }
-    return false;
   }
 
   @Override
@@ -300,26 +286,46 @@ public class DeletedBlockLogImpl
             .setCount(transactionStatusManager.getOrDefaultRetryCount(
               tx.getTxID(), 0))
             .build();
+
     for (ContainerReplica replica : replicas) {
       DatanodeDetails details = replica.getDatanodeDetails();
-      if (!dnList.contains(details)) {
-        continue;
-      }
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+        metrics.incrProcessedTransaction();
       }
     }
   }
 
   private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
-      DeletedBlocksTransaction txn) throws ContainerNotFoundException {
+      DeletedBlocksTransaction txn,
+      Set<DatanodeDetails> dnList) throws ContainerNotFoundException {
     ContainerInfo containerInfo = containerManager
         .getContainer(ContainerID.valueOf(txn.getContainerID()));
     ReplicationManager replicationManager =
         scmContext.getScm().getReplicationManager();
     ContainerHealthResult result = replicationManager
         .getContainerReplicationHealth(containerInfo, replicas);
+
+    // We have made an improvement here, and we expect that all replicas
+    // of the Container being sent will be included in the dnList.
+    // This change benefits ACK confirmation and improves deletion speed.
+    // The principle behind it is that
+    // DN can receive the command to delete a certain Container at the same time and provide
+    // feedback to SCM at roughly the same time.
+    // This avoids the issue of deletion blocking,
+    // where some replicas of a Container are deleted while others do not receive the delete command.
+    long containerId = txn.getContainerID();
+    for (ContainerReplica replica : replicas) {
+      DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
+      if (!dnList.contains(datanodeDetails)) {
+        DatanodeDetails dnDetail = replica.getDatanodeDetails();
+        LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
+            containerId, dnDetail.getUuid());
+        return true;
+      }
+    }
+
     return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
@@ -345,6 +351,7 @@ public class DeletedBlockLogImpl
                 .getCommandStatusByTxId(dnList.stream().
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
+        metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
@@ -358,23 +365,25 @@ public class DeletedBlockLogImpl
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
             if (containerManager.getContainer(id).isDeleted()) {
-              LOG.warn("Container: " + id + " was deleted for the " +
-                  "transaction: " + txn);
+              LOG.warn("Container: {} was deleted for the " +
+                  "transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
-              if (checkInadequateReplica(replicas, txn)) {
+              if (checkInadequateReplica(replicas, txn, dnList)) {
+                metrics.incrSkippedTransaction();
                 continue;
               }
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
+            } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
+              metrics.incrSkippedTransaction();
             }
           } catch (ContainerNotFoundException ex) {
-            LOG.warn("Container: " + id + " was not found for the transaction: "
-                + txn);
+            LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
         }

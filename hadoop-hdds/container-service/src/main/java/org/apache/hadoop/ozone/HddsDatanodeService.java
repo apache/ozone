@@ -33,16 +33,14 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -119,10 +117,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
+  private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
-  private DatanodeCRLStore dnCRLStore;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
@@ -175,7 +171,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public Void call() throws Exception {
     OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
-      StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+      HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
     }
     start(configuration);
@@ -214,6 +210,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      @Override
+      public String getNamespace() {
+        return SCMHAUtils.getScmServiceId(conf);
+      }
+    };
     serviceRuntimeInfo.setStartTime();
 
     ratisReporterList = RatisDropwizardExports
@@ -226,14 +228,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
+      serviceRuntimeInfo.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -272,9 +273,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         layoutStorage.initialize();
       }
 
-      // initialize datanode CRL store
-      dnCRLStore = new DatanodeCRLStoreImpl(conf);
-
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
 
@@ -296,29 +294,36 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
+      datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
+          dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                  httpServer.getHttpAddress().getPort()));
+          int httpPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP, httpPort));
+          serviceRuntimeInfo.setHttpPort(String.valueOf(httpPort));
         }
+
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                  httpServer.getHttpsAddress().getPort()));
+          int httpsPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
+          serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
+
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
+
+      int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
+      serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
 
       // Get admin list
       String starterUser =
@@ -424,17 +429,19 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
+    DatanodeDetails details;
     if (idFile.exists()) {
-      return ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      // Current version is always overridden to the latest
+      details.setCurrentVersion(getDefaultCurrentVersion());
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
-      return details;
+      details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      details.setInitialVersion(getDefaultInitialVersion());
+      details.setCurrentVersion(getDefaultCurrentVersion());
     }
+    return details;
   }
 
   /**
@@ -504,11 +511,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return clientProtocolServer;
   }
 
-  @VisibleForTesting
-  public DatanodeCRLStore getCRLStore() {
-    return dnCRLStore;
-  }
-
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -560,14 +562,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         getClientProtocolServer().stop();
       }
       unregisterMXBean();
-      // stop dn crl store
-      try {
-        if (dnCRLStore != null) {
-          dnCRLStore.stop();
-        }
-      } catch (Exception ex) {
-        LOG.error("Datanode CRL store stop failed", ex);
-      }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
       if (secretKeyClient != null) {
@@ -639,6 +633,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  public boolean isStopped() {
+    return isStopped.get();
+  }
+
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
@@ -677,5 +675,21 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
+  }
+
+  /**
+   * Returns the initial version of the datanode.
+   */
+  @VisibleForTesting
+  public static int getDefaultInitialVersion() {
+    return DatanodeVersion.CURRENT_VERSION;
+  }
+
+  /**
+   * Returns the current version of the datanode.
+   */
+  @VisibleForTesting
+  public static int getDefaultCurrentVersion() {
+    return DatanodeVersion.CURRENT_VERSION;
   }
 }

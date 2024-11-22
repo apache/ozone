@@ -31,7 +31,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 /**
  * Test Recon SCM HA Snapshot Download implementation.
  */
-@Timeout(100)
+@Timeout(300)
 public class TestReconScmHASnapshot {
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;

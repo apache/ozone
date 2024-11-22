@@ -19,13 +19,13 @@
 package org.apache.hadoop.ozone.shell.keys;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,9 +37,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -68,9 +68,13 @@ public class PutKeyHandler extends KeyHandler {
   @Mixin
   private ShellReplicationOptions replication;
 
+  @Option(names = "--expectedGeneration",
+      description = "Store key only if it already exists and its generation matches the value provided")
+  private Long expectedGeneration;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
@@ -79,7 +83,7 @@ public class PutKeyHandler extends KeyHandler {
     File dataFile = new File(fileName);
 
     if (isVerbose()) {
-      try (InputStream stream = new FileInputStream(dataFile)) {
+      try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
         String hash = DigestUtils.sha256Hex(stream);
         out().printf("File sha256 checksum : %s%n", hash);
       }
@@ -109,7 +113,7 @@ public class PutKeyHandler extends KeyHandler {
     }
   }
 
-  void async(
+  private void async(
       File dataFile, OzoneBucket bucket,
       String keyName, Map<String, String> keyMetadata,
       ReplicationConfig replicationConfig, int chunkSize)
@@ -117,14 +121,26 @@ public class PutKeyHandler extends KeyHandler {
     if (isVerbose()) {
       out().println("API: async");
     }
-    try (InputStream input = new FileInputStream(dataFile);
-         OutputStream output = bucket.createKey(keyName, dataFile.length(),
-             replicationConfig, keyMetadata)) {
+    try (InputStream input = Files.newInputStream(dataFile.toPath());
+         OutputStream output = createOrReplaceKey(bucket, keyName, dataFile.length(), keyMetadata, replicationConfig)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
   }
 
-  void stream(
+  private OzoneOutputStream createOrReplaceKey(OzoneBucket bucket, String keyName,
+      long size, Map<String, String> keyMetadata, ReplicationConfig replicationConfig
+  ) throws IOException {
+    if (expectedGeneration != null) {
+      final long existingGeneration = expectedGeneration;
+      Preconditions.checkArgument(existingGeneration > 0,
+          "expectedGeneration must be positive, but was %s", existingGeneration);
+      return bucket.rewriteKey(keyName, size, existingGeneration, replicationConfig, keyMetadata);
+    }
+
+    return bucket.createKey(keyName, size, replicationConfig, keyMetadata);
+  }
+
+  private void stream(
       File dataFile, OzoneBucket bucket,
       String keyName, Map<String, String> keyMetadata,
       ReplicationConfig replicationConfig, int chunkSize)

@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -32,6 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
@@ -67,6 +68,7 @@ public final class Pipeline {
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
   public static Codec<Pipeline> getCodec() {
@@ -113,7 +115,7 @@ public final class Pipeline {
     suggestedLeaderId = b.suggestedLeaderId;
     nodeStatus = b.nodeStatus;
     nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
-    replicaIndexes = b.replicaIndexes != null ? ImmutableMap.copyOf(b.replicaIndexes) : ImmutableMap.of();
+    replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
   }
@@ -241,6 +243,13 @@ public final class Pipeline {
   }
 
   /**
+   * Get the replicaIndex Map.
+   */
+  public Map<DatanodeDetails, Integer> getReplicaIndexes() {
+    return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));
+  }
+
+  /**
    * Returns the leader if found else defaults to closest node.
    *
    * @return {@link DatanodeDetails}
@@ -321,7 +330,11 @@ public final class Pipeline {
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
-    if (nodeStatus.get(dn) == null) {
+    //This is a workaround for the case a datanode restarted with reinitializing it's dnId but it still reports the
+    // same set of pipelines it was part of. The pipeline report should be accepted for this anomalous condition.
+    //  We rely on StaleNodeHandler in closing this pipeline eventually.
+    if (dn == null || (nodeStatus.get(dn) == null
+        && nodeStatus.keySet().stream().noneMatch(node -> node.compareNodeValues(dn)))) {
       throw new IOException(
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
@@ -353,12 +366,17 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
+    return getProtobufMessage(clientVersion, Collections.emptySet());
+  }
+
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts)
+      throws UnknownPipelineStateException {
 
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(clientVersion));
+      members.add(dn.toProto(clientVersion, filterPorts));
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 
@@ -510,7 +528,10 @@ public final class Pipeline {
         new StringBuilder(getClass().getSimpleName()).append("[");
     b.append(" Id: ").append(id.getId());
     b.append(", Nodes: ");
-    nodeStatus.keySet().forEach(b::append);
+    for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
+      b.append(datanodeDetails);
+      b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
+    }
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
@@ -541,7 +562,7 @@ public final class Pipeline {
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
-    private Map<DatanodeDetails, Integer> replicaIndexes;
+    private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
     public Builder() { }
 
@@ -555,13 +576,14 @@ public final class Pipeline {
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
       if (nodeStatus != null) {
-        replicaIndexes = new HashMap<>();
+        final ImmutableMap.Builder<DatanodeDetails, Integer> b = ImmutableMap.builder();
         for (DatanodeDetails dn : nodeStatus.keySet()) {
           int index = pipeline.getReplicaIndex(dn);
           if (index > 0) {
-            replicaIndexes.put(dn, index);
+            b.put(dn, index);
           }
         }
+        replicaIndexes = b.build();
       }
     }
 
@@ -598,7 +620,7 @@ public final class Pipeline {
 
     public Builder setNodeOrder(List<Integer> orders) {
       // for build from ProtoBuf
-      this.nodeOrder = orders;
+      this.nodeOrder = Collections.unmodifiableList(orders);
       return this;
     }
 
@@ -624,7 +646,7 @@ public final class Pipeline {
 
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
-      this.replicaIndexes = indexes;
+      this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);
       return this;
     }
 

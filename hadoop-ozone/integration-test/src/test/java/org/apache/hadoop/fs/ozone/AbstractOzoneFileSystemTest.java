@@ -83,6 +83,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -116,6 +117,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -172,6 +174,10 @@ abstract class AbstractOzoneFileSystemTest {
   private String bucketName;
   private Trash trash;
   private OMMetrics omMetrics;
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void init() throws Exception {
@@ -179,10 +185,13 @@ abstract class AbstractOzoneFileSystemTest {
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
-
+    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (!bucketLayout.equals(FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
@@ -217,6 +226,10 @@ abstract class AbstractOzoneFileSystemTest {
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
+
+    userO3fs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<OzoneFileSystem>)()
+            -> (OzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterAll
@@ -256,6 +269,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(fsRoot + "user/" + USER1),
+        userO3fs.getHomeDirectory());
   }
 
   @Test
@@ -391,7 +410,7 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   private void checkInvalidPath(Path path) {
-    InvalidPathException pathException = assertThrows(
+    InvalidPathException pathException = GenericTestUtils.assertThrows(
         InvalidPathException.class, () -> fs.create(path, false)
     );
     assertThat(pathException.getMessage()).contains("Invalid path Name");
@@ -1813,12 +1832,14 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, linkBucket1Name, linksVolume);
 
-    try {
-      FileSystem.get(URI.create(rootPath), cluster.getConf());
-      fail("Should throw Exception due to loop in Link Buckets");
+    try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
+        cluster.getConf())) {
+      fail("Should throw Exception due to loop in Link Buckets" +
+          " while initialising fs with URI " + fileSystem.getUri());
     } catch (OMException oe) {
       // Expected exception
-      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS, oe.getResult());
+      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
     } finally {
       volume.deleteBucket(linkBucket1Name);
       volume.deleteBucket(linkBucket2Name);
@@ -1836,13 +1857,17 @@ abstract class AbstractOzoneFileSystemTest {
     String rootPath2 = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, danglingLinkBucketName, linksVolume);
 
+    FileSystem fileSystem = null;
     try {
-      FileSystem.get(URI.create(rootPath2), cluster.getConf());
+      fileSystem = FileSystem.get(URI.create(rootPath2), cluster.getConf());
     } catch (OMException oe) {
       // Expected exception
       fail("Should not throw Exception and show orphan buckets");
     } finally {
       volume.deleteBucket(danglingLinkBucketName);
+      if (fileSystem != null) {
+        fileSystem.close();
+      }
     }
   }
 
@@ -2069,8 +2094,8 @@ abstract class AbstractOzoneFileSystemTest {
     final long initialListStatusCount = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 1);
-    assertEquals(initialListStatusCount + 1, omMetrics.getNumListStatus());
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
+    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
     dirPath = RandomStringUtils.randomAlphanumeric(5);
@@ -2081,11 +2106,46 @@ abstract class AbstractOzoneFileSystemTest {
 
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
-    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 4);
+    assertEquals(initialListStatusCount + 4, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertThat(Arrays.asList(statusList)).contains(fs.getFileStatus(p));
     }
+  }
+
+  @Test
+  public void testOzoneManagerListLocatedStatusAndListStatus() throws IOException {
+    String data = RandomStringUtils.randomAlphanumeric(20);
+    String directory = RandomStringUtils.randomAlphanumeric(5);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    RemoteIterator<LocatedFileStatus> listLocatedStatus = fs.listLocatedStatus(path);
+    int count = 0;
+    while (listLocatedStatus.hasNext()) {
+      LocatedFileStatus locatedFileStatus = listLocatedStatus.next();
+      assertTrue(locatedFileStatus.getBlockLocations().length >= 1);
+
+      for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
+        assertTrue(blockLocation.getNames().length >= 1);
+        assertTrue(blockLocation.getHosts().length >= 1);
+      }
+      count++;
+    }
+    assertEquals(1, count);
+    count = 0;
+    RemoteIterator<FileStatus> listStatus = fs.listStatusIterator(path);
+    while (listStatus.hasNext()) {
+      FileStatus fileStatus = listStatus.next();
+      assertFalse(fileStatus instanceof LocatedFileStatus);
+      count++;
+    }
+    assertEquals(1, count);
+    FileStatus[] fileStatuses = fs.listStatus(path.getParent());
+    assertEquals(1, fileStatuses.length);
+    assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
   }
 
   @Test
@@ -2212,7 +2272,8 @@ abstract class AbstractOzoneFileSystemTest {
       OzoneConfiguration config = new OzoneConfiguration(fs.getConf());
       config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
-      IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> FileSystem.get(config));
+      IllegalArgumentException e = GenericTestUtils.assertThrows(IllegalArgumentException.class,
+              () -> FileSystem.get(config));
       assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
     }
   }
@@ -2251,4 +2312,26 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(value, statistics.getLong(key).longValue());
   }
 
+  @Test
+  void testSnapshotRead() throws Exception {
+    // Init data
+    Path snapPath1 = fs.createSnapshot(new Path("/"), "snap1");
+
+    Path file1 = new Path("/key1");
+    Path file2 = new Path("/key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snapPath2 = fs.createSnapshot(new Path("/"), "snap2");
+
+    Path file3 = new Path("/key3");
+    ContractTestUtils.touch(fs, file3);
+    Path snapPath3 = fs.createSnapshot(new Path("/"), "snap3");
+
+    FileStatus[] f1 = fs.listStatus(snapPath1);
+    FileStatus[] f2 = fs.listStatus(snapPath2);
+    FileStatus[] f3 = fs.listStatus(snapPath3);
+    assertEquals(0, f1.length);
+    assertEquals(2, f2.length);
+    assertEquals(3, f3.length);
+  }
 }

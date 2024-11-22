@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -63,7 +64,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -108,13 +112,10 @@ public class TestSCMSafeModeManager {
     }
   }
 
-  @Test
-  public void testSafeModeState() throws Exception {
-    // Test 1: test for 0 containers
-    testSafeMode(0);
-
-    // Test 2: test for 20 containers
-    testSafeMode(20);
+  @ParameterizedTest
+  @ValueSource(ints = {0, 20})
+  public void testSafeModeState(int numContainers) throws Exception {
+    testSafeMode(numContainers);
   }
 
   @Test
@@ -215,36 +216,6 @@ public class TestSCMSafeModeManager {
     return conf;
   }
 
-  @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck1()
-      throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 30, 8, 0.90, 1);
-  }
-
-  @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck2()
-      throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0.10, 0.9);
-  }
-
-  @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck3()
-      throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 30, 8, 0, 0.9);
-  }
-
-  @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck4()
-      throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0, 0);
-  }
-
-  @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck5()
-      throws Exception {
-    testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0, 0.5);
-  }
-
   @ParameterizedTest
   @CsvSource(value = {"100,0.9,false", "0.9,200,false", "0.9,0.1,true"})
   public void testHealthyPipelinePercentWithIncorrectValue(double healthyPercent,
@@ -269,6 +240,18 @@ public class TestSCMSafeModeManager {
     assertThat(exception).hasMessageEndingWith("value should be >= 0.0 and <= 1.0");
   }
 
+  private static Stream<Arguments> testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck() {
+    return Stream.of(
+        Arguments.of(100, 30, 8, 0.90, 1),
+        Arguments.of(100, 90, 22, 0.10, 0.9),
+        Arguments.of(100, 30, 8, 0, 0.9),
+        Arguments.of(100, 90, 22, 0, 0),
+        Arguments.of(100, 90, 22, 0, 0.5)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testCaseForSafeModeExitRuleWithPipelineAvailabilityCheck")
   public void testSafeModeExitRuleWithPipelineAvailabilityCheck(
       int containerCount, int nodeCount, int pipelineCount,
       double healthyPipelinePercent, double oneReplicaPercent)
@@ -455,12 +438,11 @@ public class TestSCMSafeModeManager {
     assertFalse(scmSafeModeManager.getInSafeMode());
   }
 
-  @Test
-  public void testSafeModeDataNodeExitRule() throws Exception {
+  @ParameterizedTest
+  @ValueSource(ints = {0, 3, 5})
+  public void testSafeModeDataNodeExitRule(int numberOfDns) throws Exception {
     containers = new ArrayList<>();
-    testSafeModeDataNodes(0);
-    testSafeModeDataNodes(3);
-    testSafeModeDataNodes(5);
+    testSafeModeDataNodes(numberOfDns);
   }
 
   /**

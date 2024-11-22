@@ -20,12 +20,16 @@ package org.apache.hadoop.ozone.debug;
 
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
@@ -48,17 +52,15 @@ public final class DBDefinitionFactory {
   private DBDefinitionFactory() {
   }
 
-  private static HashMap<String, DBDefinition> dbMap;
-
-  private static String dnDBSchemaVersion;
+  private static final AtomicReference<String> DATANODE_DB_SCHEMA_VERSION = new AtomicReference<>();
+  private static final Map<String, DBDefinition> DB_MAP;
 
   static {
-    dbMap = new HashMap<>();
-    Arrays.asList(
-      new SCMDBDefinition(),
-        new OMDBDefinition(),
-        new ReconSCMDBDefinition()
-    ).forEach(dbDefinition -> dbMap.put(dbDefinition.getName(), dbDefinition));
+    final Map<String, DBDefinition> map = new HashMap<>();
+    Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get(),
+                  WitnessedContainerDBDefinition.get())
+        .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
+    DB_MAP = Collections.unmodifiableMap(map);
   }
 
   public static DBDefinition getDefinition(String dbName) {
@@ -66,10 +68,8 @@ public final class DBDefinitionFactory {
     if (!dbName.equals(OM_DB_NAME) && dbName.startsWith(OM_DB_NAME)) {
       dbName = OM_DB_NAME;
     }
-    if (dbMap.containsKey(dbName)) {
-      return dbMap.get(dbName);
-    }
-    return getReconDBDefinition(dbName);
+    final DBDefinition definition = DB_MAP.get(dbName);
+    return definition != null ? definition : getReconDBDefinition(dbName);
   }
 
   public static DBDefinition getDefinition(Path dbPath,
@@ -83,7 +83,7 @@ public final class DBDefinitionFactory {
     }
     String dbName = fileName.toString();
     if (dbName.endsWith(OzoneConsts.CONTAINER_DB_SUFFIX)) {
-      switch (dnDBSchemaVersion) {
+      switch (DATANODE_DB_SCHEMA_VERSION.get()) {
       case "V1":
         return new DatanodeSchemaOneDBDefinition(
             dbPath.toAbsolutePath().toString(), config);
@@ -102,12 +102,12 @@ public final class DBDefinitionFactory {
     if (dbName.startsWith(RECON_CONTAINER_KEY_DB)) {
       return new ReconDBDefinition(dbName);
     } else if (dbName.startsWith(RECON_OM_SNAPSHOT_DB)) {
-      return new OMDBDefinition();
+      return OMDBDefinition.get();
     }
     return null;
   }
 
   public static void setDnDBSchemaVersion(String dnDBSchemaVersion) {
-    DBDefinitionFactory.dnDBSchemaVersion = dnDBSchemaVersion;
+    DATANODE_DB_SCHEMA_VERSION.set(dnDBSchemaVersion);
   }
 }

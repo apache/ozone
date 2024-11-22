@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -30,6 +32,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -38,10 +42,12 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
@@ -158,21 +164,57 @@ public final class TestDataUtil {
   public static OzoneBucket createBucket(OzoneClient client,
       String vol, BucketArgs bucketArgs, String bukName)
       throws IOException {
+    return createBucket(client, vol, bucketArgs, bukName, false);
+  }
+
+  public static OzoneBucket createBucket(OzoneClient client,
+                                         String vol, BucketArgs bucketArgs, String bukName,
+                                         boolean createLinkedBucket)
+      throws IOException {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume volume = objectStore.getVolume(vol);
-    volume.createBucket(bukName, bucketArgs);
-    return volume.getBucket(bukName);
+    String sourceBucket = bukName;
+    if (createLinkedBucket) {
+      sourceBucket = bukName + RandomStringUtils.randomNumeric(5);
+    }
+    volume.createBucket(sourceBucket, bucketArgs);
+    OzoneBucket ozoneBucket = volume.getBucket(sourceBucket);
+    if (createLinkedBucket) {
+      ozoneBucket = createLinkedBucket(client, vol, sourceBucket, bukName);
+    }
+    return ozoneBucket;
+  }
+
+  public static OzoneBucket createLinkedBucket(OzoneClient client, String vol, String sourceBucketName,
+                                               String linkedBucketName) throws IOException {
+    BucketArgs.Builder bb = new BucketArgs.Builder()
+        .setStorageType(StorageType.DEFAULT)
+        .setVersioning(false)
+        .setSourceVolume(vol)
+        .setSourceBucket(sourceBucketName);
+    return createBucket(client, vol, bb.build(), linkedBucketName);
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      BucketLayout bucketLayout) throws IOException {
+                                                  BucketLayout bucketLayout)
+      throws IOException {
+    return createVolumeAndBucket(client, bucketLayout, false);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      BucketLayout bucketLayout, boolean createLinkedBucket) throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-        return createVolumeAndBucket(client, volumeName, bucketName,
+        OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
+        if (createLinkedBucket) {
+          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.randomNumeric(5);
+          ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
+        }
+        return ozoneBucket;
       } catch (OMException e) {
         if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS
             && e.getResult() != OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {
@@ -198,6 +240,42 @@ public final class TestDataUtil {
       }
     }
     return keyLocationMap;
+  }
+
+  public static void cleanupDeletedTable(OzoneManager ozoneManager) throws IOException {
+    Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
+    List<String> nameList = new ArrayList<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> keyIter = deletedTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+        nameList.add(kv.getKey());
+      }
+    }
+    nameList.forEach(k -> {
+      try {
+        deletedTable.delete(k);
+      } catch (IOException e) {
+        // do nothing
+      }
+    });
+  }
+
+  public static void cleanupOpenKeyTable(OzoneManager ozoneManager, BucketLayout bucketLayout) throws IOException {
+    Table<String, OmKeyInfo> openKeyTable = ozoneManager.getMetadataManager().getOpenKeyTable(bucketLayout);
+    List<String> nameList = new ArrayList<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openKeyTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        nameList.add(kv.getKey());
+      }
+    }
+    nameList.forEach(k -> {
+      try {
+        openKeyTable.delete(k);
+      } catch (IOException e) {
+        // do nothing
+      }
+    });
   }
 
   private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster,

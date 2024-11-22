@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -33,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.checksum.ChecksumHelperFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -247,6 +247,11 @@ public final class OzoneClientUtils {
             HddsProtos.ReplicationType.EC;
   }
 
+  public static boolean isKeyErasureCode(BasicOmKeyInfo keyInfo) {
+    return keyInfo.getReplicationConfig().getReplicationType() ==
+        HddsProtos.ReplicationType.EC;
+  }
+
   public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {
     return !Objects.isNull(keyInfo.getFileEncryptionInfo());
   }
@@ -270,14 +275,14 @@ public final class OzoneClientUtils {
   }
 
   public static void deleteSnapshot(ObjectStore objectStore,
-      String snapshot, OFSPath snapPath) {
+      String snapshot, String volumeName, String bucketName) {
     try {
-      objectStore.deleteSnapshot(snapPath.getVolumeName(),
-          snapPath.getBucketName(), snapshot);
+      objectStore.deleteSnapshot(volumeName,
+          bucketName, snapshot);
     } catch (IOException exception) {
       LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
               + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
-          snapPath.getBucketName(), snapPath.getVolumeName(),
+          bucketName, volumeName,
           exception.getMessage());
     }
   }

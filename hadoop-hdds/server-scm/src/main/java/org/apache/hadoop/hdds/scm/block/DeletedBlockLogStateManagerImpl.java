@@ -144,7 +144,9 @@ public class DeletedBlockLogStateManagerImpl
       @Override
       public TypedTable.KeyValue<Long, DeletedBlocksTransaction> seek(
           Long key) throws IOException {
-        throw new UnsupportedOperationException("seek");
+        iter.seek(key);
+        findNext();
+        return nextTx;
       }
 
       @Override

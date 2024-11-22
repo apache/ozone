@@ -53,13 +53,13 @@ public interface OmTransportFactory {
       Iterator<OmTransportFactory> iterator = transportFactoryServiceLoader.iterator();
       if (iterator.hasNext()) {
         OmTransportFactory next = iterator.next();
-        LOG.info("Found OM transport implementation {} from service loader.", next.getClass().getName());
+        LOG.debug("Found OM transport implementation {} from service loader.", next.getClass().getName());
         return next;
       }
 
       // Otherwise, load the transport implementation specified by configuration.
       String transportClassName = conf.get(OZONE_OM_TRANSPORT_CLASS, OZONE_OM_TRANSPORT_CLASS_DEFAULT);
-      LOG.info("Loading OM transport implementation {} as specified by configuration.", transportClassName);
+      LOG.debug("Loading OM transport implementation {} as specified by configuration.", transportClassName);
       return OmTransportFactory.class.getClassLoader()
           .loadClass(transportClassName)
           .asSubclass(OmTransportFactory.class)

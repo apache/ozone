@@ -48,6 +48,7 @@ import java.util.Base64;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -138,7 +139,7 @@ public class TestMultipartObjectGet {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(BUCKET, KEY, content.length(),
-        partNumber, uploadID, body);
+        partNumber, uploadID, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -167,9 +168,16 @@ public class TestMultipartObjectGet {
   private void getObjectMultipart(int partNumber, long bytes)
       throws IOException, OS3Exception {
     Response response =
-        REST.get(BUCKET, KEY, partNumber, null, 100, null);
+        REST.get(BUCKET, KEY, partNumber, null, 100, null, null);
     assertEquals(200, response.getStatus());
     assertEquals(bytes, response.getLength());
+    assertEquals("3", response.getHeaderString(MP_PARTS_COUNT));
+  }
+
+  private void headObjectMultipart() throws IOException, OS3Exception {
+    Response response = REST.head(BUCKET, KEY);
+    assertEquals(200, response.getStatus());
+    assertEquals("3", response.getHeaderString(MP_PARTS_COUNT));
   }
 
   @Test
@@ -199,6 +207,8 @@ public class TestMultipartObjectGet {
         CompleteMultipartUploadRequest();
     completeMultipartUploadRequest.setPartList(partsList);
     completeMultipartUpload(completeMultipartUploadRequest, uploadID);
+
+    headObjectMultipart();
 
     getObjectMultipart(0,
         (content1 + content2 + content3).getBytes(UTF_8).length);

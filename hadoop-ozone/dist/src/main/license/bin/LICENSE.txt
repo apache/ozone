@@ -218,6 +218,7 @@ EDL 1.0
 EPL 2.0
 =====================
 
+   com.github.jnr:jnr-posix
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
@@ -250,9 +251,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
-   com.sun.jersey:jersey-json
-   com.sun.jersey:jersey-server
-   com.sun.jersey:jersey-servlet
    javax.annotation:javax.annotation-api
    javax.el:javax.el-api
    javax.interceptor:javax.interceptor-api
@@ -280,6 +278,10 @@ Apache License 2.0
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
+   com.github.jnr:jnr-a64asm
+   com.github.jnr:jnr-constants
+   com.github.jnr:jnr-ffi
+   com.github.jnr:jffi
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
@@ -298,6 +300,7 @@ Apache License 2.0
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
    com.squareup.okio:okio
+   com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
@@ -405,6 +408,7 @@ Apache License 2.0
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api
+   org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift
@@ -428,6 +432,8 @@ Apache License 2.0
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
    org.jetbrains.kotlin:kotlin-stdlib-common
+   org.jetbrains.kotlin:kotlin-stdlib-jdk7
+   org.jetbrains.kotlin:kotlin-stdlib-jdk8
    org.jboss.weld.servlet:weld-servlet-shaded
    org.jheaps:jheaps
    org.jooq:jooq
@@ -446,6 +452,7 @@ MIT
 =====================
 
    com.bettercloud:vault-java-driver
+   com.github.jnr:jnr-x86asm
    com.kstruct:gethostname4j
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
@@ -472,6 +479,11 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   org.ow2.asm:asm
+   org.ow2.asm:asm-analysis
+   org.ow2.asm:asm-commons
+   org.ow2.asm:asm-tree
+   org.ow2.asm:asm-util
 
 
 BSD 2-Clause

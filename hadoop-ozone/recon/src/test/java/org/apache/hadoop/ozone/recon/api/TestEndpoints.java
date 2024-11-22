@@ -102,6 +102,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -144,6 +145,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -194,11 +196,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+  private StorageContainerLocationProtocol mockScmClient;
 
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private CommonUtils commonUtils;
   private PipelineManager pipelineManager;
   private ReconPipelineManager reconPipelineManager;
+  private List<HddsProtos.Node> nodes = getNodeDetails(2);
+  private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
+  private ArrayList<String> metrics = getMetrics();
 
   public TestEndpoints() {
     super();
@@ -236,8 +242,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
-    StorageContainerLocationProtocol mockScmClient = mock(
-        StorageContainerLocationProtocol.class);
+    mockScmClient = mock(
+        StorageContainerLocationProtocol.class, Mockito.RETURNS_DEEP_STUBS);
     StorageContainerServiceProvider mockScmServiceProvider = mock(
         StorageContainerServiceProviderImpl.class);
     when(mockScmServiceProvider.getPipeline(
@@ -313,7 +319,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, globalStatsDao,
-            containerHealthSchemaManager);
+            containerHealthSchemaManager, mock(OzoneConfiguration.class));
     containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
@@ -372,7 +378,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto)
             .setVersion("0.6.0")
             .setSetupTime(1596347628802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto1 =
@@ -403,7 +408,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto2)
             .setVersion("0.6.0")
             .setSetupTime(1596347636802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto3 =
@@ -435,7 +439,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto3)
             .setVersion("0.6.0")
             .setSetupTime(1596347628802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto5 =
@@ -1275,9 +1278,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
     DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("failedDatanodes");
     DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("removedDatanodes");
-    assertEquals(1, removedNodes.getTotalCount());
-    assertNull(errorDataNodes);
-    removedNodes.getDatanodes().forEach(datanodeMetadata -> {
+
+    assertEquals(1, errorDataNodes.getTotalCount());
+    assertNull(removedNodes);
+    errorDataNodes.getDatanodes().forEach(datanodeMetadata -> {
       assertEquals("host3.datanode", datanodeMetadata.getHostname());
     });
   }
@@ -1295,7 +1299,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertFalse(failedNodeErrorResponseMap.isEmpty());
     String nodeError = failedNodeErrorResponseMap.get(dnUUID);
     assertNotNull(nodeError);
-    assertEquals("DataNode should be in either DECOMMISSIONED operational state or DEAD node state.", nodeError);
+    assertEquals("DataNode should be in DEAD node status.", nodeError);
     assertEquals(Response.Status.OK.getStatusCode(), removedDNResponse.getStatus());
   }
 
@@ -1312,5 +1316,148 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(1, datanodes.size());
     DatanodeMetadata datanodeMetadata = datanodes.stream().findFirst().get();
     assertEquals(dnUUID, datanodeMetadata.getUuid());
+  }
+
+  @Test
+  public void testSuccessWhenDecommissionStatus() throws IOException {
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        nodes); // 2 nodes decommissioning
+    when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
+    Response datanodesDecommissionInfo = nodeEndpoint.getDatanodesDecommissionInfo();
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
+    DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> dnMetrics = (Map<String, Object>) dnDecommissionInfo.get(0).get("metrics");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
+    assertNotNull(datanode);
+    assertNotNull(dnMetrics);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertFalse(((String) dnMetrics.get("decommissionStartTime")).isEmpty());
+    assertEquals(1, dnMetrics.get("numOfUnclosedPipelines"));
+    assertEquals(3.0, dnMetrics.get("numOfUnderReplicatedContainers"));
+    assertEquals(3.0, dnMetrics.get("numOfUnclosedContainers"));
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  @Test
+  public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
+    when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    Response datanodesDecommissionInfo =
+        nodeEndpoint.getDecommissionInfoForDatanode("654c4b89-04ef-4015-8a3b-50d0fb0e1684", "");
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
+    DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
+    assertNotNull(datanode);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertEquals("654c4b89-04ef-4015-8a3b-50d0fb0e1684", datanode.getUuidString());
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  private List<HddsProtos.Node> getNodeDetailsForUuid(String uuid) {
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
+
+    HddsProtos.DatanodeDetailsProto.Builder dnd =
+        HddsProtos.DatanodeDetailsProto.newBuilder();
+    dnd.setHostName("hostName");
+    dnd.setIpAddress("1.2.3.5");
+    dnd.setNetworkLocation("/default");
+    dnd.setNetworkName("hostName");
+    dnd.addPorts(HddsProtos.Port.newBuilder()
+        .setName("ratis").setValue(5678).build());
+    dnd.setUuid(uuid);
+
+    HddsProtos.Node.Builder builder = HddsProtos.Node.newBuilder();
+    builder.addNodeOperationalStates(
+        HddsProtos.NodeOperationalState.DECOMMISSIONING);
+    builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
+    builder.setNodeID(dnd.build());
+    nodesList.add(builder.build());
+    return nodesList;
+  }
+
+  private List<HddsProtos.Node> getNodeDetails(int n) {
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
+
+    for (int i = 0; i < n; i++) {
+      HddsProtos.DatanodeDetailsProto.Builder dnd =
+          HddsProtos.DatanodeDetailsProto.newBuilder();
+      dnd.setHostName("host" + i);
+      dnd.setIpAddress("1.2.3." + i + 1);
+      dnd.setNetworkLocation("/default");
+      dnd.setNetworkName("host" + i);
+      dnd.addPorts(HddsProtos.Port.newBuilder()
+          .setName("ratis").setValue(5678).build());
+      dnd.setUuid(UUID.randomUUID().toString());
+
+      HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();
+      builder.addNodeOperationalStates(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING);
+      builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
+      builder.setNodeID(dnd.build());
+      nodesList.add(builder.build());
+    }
+    return nodesList;
+  }
+
+  private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
+    Map<String, List<ContainerID>> containerMap = new HashMap<>();
+    List<ContainerID> underReplicated = new ArrayList<>();
+    underReplicated.add(new ContainerID(1L));
+    underReplicated.add(new ContainerID(2L));
+    underReplicated.add(new ContainerID(3L));
+    containerMap.put("UnderReplicated", underReplicated);
+    List<ContainerID> unclosed = new ArrayList<>();
+    unclosed.add(new ContainerID(10L));
+    unclosed.add(new ContainerID(11L));
+    unclosed.add(new ContainerID(12L));
+    containerMap.put("UnClosed", unclosed);
+    return containerMap;
+  }
+
+  private ArrayList<String> getMetrics() {
+    ArrayList<String> result = new ArrayList<>();
+    // no nodes decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 0,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 0,    " +
+        "\"ContainersUnderReplicatedTotal\" : 0,    \"ContainersUnClosedTotal\" : 0,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}");
+    // 2 nodes in decommisioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 2,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 2,    " +
+        "\"ContainersUnderReplicatedTotal\" : 6,    \"ContainersUnclosedTotal\" : 6,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",    \"tag.Hostname.1\" : \"host0\",    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,    \"UnderReplicatedDN.1\" : 3,    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 111211,    " +
+        "\"tag.datanode.2\" : \"host1\",    \"tag.Hostname.2\" : \"host1\",    " +
+        "\"PipelinesWaitingToCloseDN.2\" : 1,    \"UnderReplicatedDN.2\" : 3,    " +
+        "\"SufficientlyReplicatedDN.2\" : 0,    \"UnclosedContainersDN.2\" : 3,    \"StartTimeDN.2\" : 221221} ]}");
+    // only host 1 decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 1,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 1,    " +
+        "\"ContainersUnderReplicatedTotal\" : 3,    \"ContainersUnclosedTotal\" : 3,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",\n    \"tag.Hostname.1\" : \"host0\",\n    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,\n    \"UnderReplicatedDN.1\" : 3,\n    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,\n    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 221221} ]}");
+    return result;
   }
 }

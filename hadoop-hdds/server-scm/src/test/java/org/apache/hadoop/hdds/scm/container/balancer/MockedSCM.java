@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -66,28 +66,32 @@ public final class MockedSCM {
   private final StorageContainerManager scm;
   private final TestableCluster cluster;
   private final MockNodeManager mockNodeManager;
-  private MockedReplicationManager mockedReplicaManager;
-  private MoveManager moveManager;
-  private ContainerManager containerManager;
-
+  private final MockedReplicationManager mockedReplicaManager;
+  private final MoveManager moveManager;
+  private final ContainerManager containerManager;
   private MockedPlacementPolicies mockedPlacementPolicies;
 
   public MockedSCM(@Nonnull TestableCluster testableCluster) {
     scm = mock(StorageContainerManager.class);
     cluster = testableCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
+    try {
+      moveManager = mockMoveManager();
+      containerManager = mockContainerManager(cluster);
+      mockedReplicaManager = MockedReplicationManager.doMock();
+    } catch (NodeNotFoundException | ContainerReplicaNotFoundException | ContainerNotFoundException |
+             TimeoutException e
+    ) {
+      throw new RuntimeException("Can't create MockedSCM instance: ", e);
+    }
   }
 
-  public void init(@Nonnull ContainerBalancerConfiguration balancerConfig) {
-    init(balancerConfig, new OzoneConfiguration());
-  }
-
-  public void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
+  void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
     ozoneCfg.setFromObject(balancerConfig);
     try {
       doMock(balancerConfig, ozoneCfg);
     } catch (IOException | NodeNotFoundException | TimeoutException e) {
-      throw new RuntimeException("Can't initialize TestOzoneHDDS: ", e);
+      throw new RuntimeException("Can't create MockedSCM instance: ", e);
     }
   }
 
@@ -96,9 +100,6 @@ public final class MockedSCM {
    */
   private void doMock(@Nonnull ContainerBalancerConfiguration cfg, @Nonnull OzoneConfiguration ozoneCfg)
       throws IOException, NodeNotFoundException, TimeoutException {
-    containerManager = mockContainerManager(cluster);
-    mockedReplicaManager = MockedReplicationManager.doMock();
-    moveManager = mockMoveManager();
     StatefulServiceStateManager stateManager = MockedServiceStateManager.doMock();
     SCMServiceManager scmServiceManager = mockSCMServiceManger();
 
@@ -137,7 +138,7 @@ public final class MockedSCM {
   }
 
   public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
-    init(config);
+    init(config, new OzoneConfiguration());
     return startBalancerTask(new ContainerBalancer(scm), config);
   }
 

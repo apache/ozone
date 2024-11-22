@@ -17,50 +17,27 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.xml.sax.InputSource;
-import org.xml.sax.XMLReader;
-
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.MessageBodyReader;
-import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.UnmarshallerHandler;
-import javax.xml.parsers.SAXParserFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import javax.ws.rs.ext.Provider;
 
-import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
  */
 @Provider
 public class CompleteMultipartUploadRequestUnmarshaller
-    implements MessageBodyReader<CompleteMultipartUploadRequest> {
-
-  private final JAXBContext context;
-  private final XMLReader xmlReader;
+    extends MessageUnmarshaller<CompleteMultipartUploadRequest> {
 
   public CompleteMultipartUploadRequestUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(CompleteMultipartUploadRequest.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-    } catch (Exception ex) {
-      throw new AssertionError("Can not instantiate " +
-          "CompleteMultipartUploadRequest parser", ex);
-    }
-  }
-  @Override
-  public boolean isReadable(Class<?> aClass, Type type,
-      Annotation[] annotations, MediaType mediaType) {
-    return type.equals(CompleteMultipartUploadRequest.class);
+    super(CompleteMultipartUploadRequest.class);
   }
 
   @Override
@@ -68,18 +45,15 @@ public class CompleteMultipartUploadRequestUnmarshaller
       Class<CompleteMultipartUploadRequest> aClass, Type type,
       Annotation[] annotations, MediaType mediaType,
       MultivaluedMap<String, String> multivaluedMap,
-      InputStream inputStream) throws IOException, WebApplicationException {
+      InputStream inputStream) throws WebApplicationException {
     try {
-      UnmarshallerHandler unmarshallerHandler =
-          context.createUnmarshaller().getUnmarshallerHandler();
-      XmlNamespaceFilter filter =
-          new XmlNamespaceFilter(S3_XML_NAMESPACE);
-      filter.setContentHandler(unmarshallerHandler);
-      filter.setParent(xmlReader);
-      filter.parse(new InputSource(inputStream));
-      return (CompleteMultipartUploadRequest) unmarshallerHandler.getResult();
-    } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
+      if (inputStream.available() == 0) {
+        throw wrapOS3Exception(INVALID_REQUEST.withMessage("You must specify at least one part"));
+      }
+      return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, inputStream);
+    } catch (IOException e) {
+      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
     }
   }
+
 }

@@ -45,6 +45,8 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
 
+  private final SCMContainerPlacementMetrics metrics;
+
   /**
    * Construct a random Block Placement policy.
    *
@@ -55,6 +57,7 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
       final ConfigurationSource conf, final NetworkTopology networkTopology,
       final boolean fallback, final SCMContainerPlacementMetrics metrics) {
     super(nodeManager, conf);
+    this.metrics = metrics;
   }
 
   /**
@@ -77,6 +80,7 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
           List<DatanodeDetails> favoredNodes, final int nodesRequired,
           long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
+    metrics.incrDatanodeRequestCount(nodesRequired);
     List<DatanodeDetails> healthyNodes =
         super.chooseDatanodesInternal(usedNodes, excludedNodes, favoredNodes,
                 nodesRequired, metadataSizeRequired, dataSizeRequired);
@@ -96,9 +100,11 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    */
   @Override
   public DatanodeDetails chooseNode(final List<DatanodeDetails> healthyNodes) {
+    metrics.incrDatanodeChooseAttemptCount();
     DatanodeDetails selectedNode =
         healthyNodes.get(getRand().nextInt(healthyNodes.size()));
     healthyNodes.remove(selectedNode);
+    metrics.incrDatanodeChooseSuccessCount();
     return selectedNode;
   }
 }

@@ -22,10 +22,12 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,7 +42,7 @@ import org.junit.jupiter.api.Test;
 public class TestOzoneAddressClientCreation {
 
   @Test
-  public void implicitNonHA() throws OzoneClientException, IOException {
+  public void implicitNonHA() throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
@@ -49,7 +51,7 @@ public class TestOzoneAddressClientCreation {
 
   @Test
   public void implicitHAOneServiceId()
-      throws OzoneClientException, IOException {
+      throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("/vol1/bucket1/key1");
     address.createClient(
@@ -60,7 +62,7 @@ public class TestOzoneAddressClientCreation {
 
   @Test
   public void implicitHaMultipleServiceId()
-      throws OzoneClientException, IOException {
+      throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("/vol1/bucket1/key1");
     assertThrows(OzoneClientException.class, () ->
@@ -69,8 +71,36 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
+  public void implicitHaMultipleServiceIdWithDefaultServiceId()
+      throws IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("/vol1/bucket1/key1");
+    InMemoryConfiguration conf = new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
+        "service1,service2");
+    conf.set(OZONE_OM_INTERNAL_SERVICE_ID, "service2");
+
+    address.createClient(conf);
+    assertFalse(address.simpleCreation);
+    assertEquals("service2", address.serviceId);
+  }
+
+  @Test
+  public void implicitHaMultipleServiceIdWithDefaultServiceIdForS3()
+      throws IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("/vol1/bucket1/key1");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, "service1,service2");
+    conf.set(OZONE_OM_INTERNAL_SERVICE_ID, "service2");
+
+    address.createClientForS3Commands(conf, null);
+    assertFalse(address.simpleCreation);
+    assertEquals("service2", address.serviceId);
+  }
+
+  @Test
   public void explicitHaMultipleServiceId()
-      throws OzoneClientException, IOException {
+      throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://service1/vol1/bucket1/key1");
     address.createClient(
@@ -81,7 +111,7 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
-  public void explicitNonHAHostPort() throws OzoneClientException, IOException {
+  public void explicitNonHAHostPort() throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
@@ -92,7 +122,7 @@ public class TestOzoneAddressClientCreation {
 
   @Test
   public void explicitHAHostPortWithServiceId()
-      throws OzoneClientException, IOException {
+      throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");
     address.createClient(
@@ -104,7 +134,7 @@ public class TestOzoneAddressClientCreation {
 
   @Test
   public void explicitAHostPortWithServiceIds()
-      throws OzoneClientException, IOException {
+      throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");
     address.createClient(
@@ -116,7 +146,7 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
-  public void explicitNonHAHost() throws OzoneClientException, IOException {
+  public void explicitNonHAHost() throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om/vol1/bucket1/key1");
     address.createClient(
@@ -126,7 +156,7 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
-  public void explicitHAHostPort() throws OzoneClientException, IOException {
+  public void explicitHAHostPort() throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:1234/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
@@ -136,7 +166,7 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
-  public void explicitWrongScheme() throws OzoneClientException, IOException {
+  public void explicitWrongScheme() throws IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("ssh://host/vol1/bucket1/key1");
     assertThrows(OzoneClientException.class, () ->

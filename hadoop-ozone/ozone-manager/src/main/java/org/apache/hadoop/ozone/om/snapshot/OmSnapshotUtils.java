@@ -77,7 +77,7 @@ public final class OmSnapshotUtils {
    * sst compaction backup directory)
    *
    * @param truncateLength - Length of initial path to trim in file path.
-   * @param hardLinkFiles  - Map of link->file paths.
+   * @param hardLinkFiles  - Map of link-&gt;file paths.
    * @return Path to the file of links created.
    */
   public static Path createHardLinkList(int truncateLength,

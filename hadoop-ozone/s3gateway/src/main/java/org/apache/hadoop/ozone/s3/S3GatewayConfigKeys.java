@@ -56,7 +56,7 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_KEY =
       "ozone.s3g.client.buffer.size";
   public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT =
-      "4KB";
+      "4MB";
 
   // S3G kerberos, principal config
   public static final String OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY =

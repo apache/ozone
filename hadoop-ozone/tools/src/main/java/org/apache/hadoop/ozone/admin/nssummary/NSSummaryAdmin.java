@@ -108,13 +108,18 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
    * Returns false if bucket is part of path but not a OBS bucket.
    * @param path
    * @return true if bucket is OBS bucket or not part of provided path.
-   * @throws IOException
    */
   public boolean isNotValidBucketOrOBSBucket(String path) {
     OFSPath ofsPath = new OFSPath(path,
         OzoneConfiguration.of(getOzoneConfig()));
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig())) {
       ObjectStore objectStore = ozoneClient.getObjectStore();
+      // Return false if path is root "/" or
+      // contains just the volume and no bucket like "/volume"
+      if (ofsPath.getVolumeName().isEmpty() ||
+          ofsPath.getBucketName().isEmpty()) {
+        return false;
+      }
       // Checks if the bucket is part of the path.
       OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
           .getBucket(ofsPath.getBucketName());

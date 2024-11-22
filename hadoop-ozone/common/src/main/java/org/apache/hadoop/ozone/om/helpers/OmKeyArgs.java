@@ -53,6 +53,14 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
+  private final Map<String, String> tags;
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long expectedDataGeneration = null;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -72,6 +80,8 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
+    this.tags = b.tags;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public boolean getIsMultipartKey() {
@@ -150,6 +160,14 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
+  public Map<String, String> getTags() {
+    return tags;
+  }
+
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -173,7 +191,7 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    return new OmKeyArgs.Builder()
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -189,12 +207,18 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
+        .addAllTags(tags);
+
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    return builder;
   }
 
   @Nonnull
   public KeyArgs toProtobuf() {
-    return KeyArgs.newBuilder()
+    KeyArgs.Builder builder = KeyArgs.newBuilder()
         .setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(getKeyName())
@@ -203,8 +227,11 @@ public final class OmKeyArgs implements Auditable {
         .setLatestVersionLocation(getLatestVersionLocation())
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
-            isForceUpdateContainerCacheFromSCM())
-        .build();
+            isForceUpdateContainerCacheFromSCM());
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    return builder.build();
   }
 
   /**
@@ -228,6 +255,8 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
+    private final Map<String, String> tags = new HashMap<>();
+    private Long expectedDataGeneration = null;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -302,6 +331,16 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder addTag(String key, String value) {
+      this.tags.put(key, value);
+      return this;
+    }
+
+    public Builder addAllTags(Map<String, String> tagmap) {
+      this.tags.putAll(tagmap);
+      return this;
+    }
+
     public Builder setSortDatanodesInPipeline(boolean sort) {
       this.sortDatanodesInPipeline = sort;
       return this;
@@ -324,6 +363,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
       this.forceUpdateContainerCacheFromSCM = value;
+      return this;
+    }
+
+    public Builder setExpectedDataGeneration(long generation) {
+      this.expectedDataGeneration = generation;
       return this;
     }
 

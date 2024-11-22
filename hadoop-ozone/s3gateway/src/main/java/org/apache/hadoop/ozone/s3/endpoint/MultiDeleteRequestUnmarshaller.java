@@ -18,21 +18,8 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.Provider;
-import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.UnmarshallerHandler;
-import javax.xml.parsers.SAXParserFactory;
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
-
-import org.xml.sax.InputSource;
-import org.xml.sax.XMLReader;
 
 /**
  * Custom unmarshaller to read MultiDeleteRequest w/wo namespace.
@@ -40,45 +27,10 @@ import org.xml.sax.XMLReader;
 @Provider
 @Produces(MediaType.APPLICATION_XML)
 public class MultiDeleteRequestUnmarshaller
-    implements MessageBodyReader<MultiDeleteRequest> {
-
-  private final JAXBContext context;
-  private final XMLReader xmlReader;
+    extends MessageUnmarshaller<MultiDeleteRequest> {
 
   public MultiDeleteRequestUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(MultiDeleteRequest.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-    } catch (Exception ex) {
-      throw new AssertionError("Can't instantiate MultiDeleteRequest parser",
-          ex);
-    }
+    super(MultiDeleteRequest.class);
   }
 
-  @Override
-  public boolean isReadable(Class<?> type, Type genericType,
-      Annotation[] annotations, MediaType mediaType) {
-    return type.equals(MultiDeleteRequest.class);
-  }
-
-  @Override
-  public MultiDeleteRequest readFrom(Class<MultiDeleteRequest> type,
-      Type genericType, Annotation[] annotations, MediaType mediaType,
-      MultivaluedMap<String, String> httpHeaders, InputStream entityStream) {
-    try {
-      UnmarshallerHandler unmarshallerHandler =
-          context.createUnmarshaller().getUnmarshallerHandler();
-
-      XmlNamespaceFilter filter =
-          new XmlNamespaceFilter("http://s3.amazonaws.com/doc/2006-03-01/");
-      filter.setContentHandler(unmarshallerHandler);
-      filter.setParent(xmlReader);
-      filter.parse(new InputSource(entityStream));
-      return (MultiDeleteRequest) unmarshallerHandler.getResult();
-    } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
-    }
-  }
 }

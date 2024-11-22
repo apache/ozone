@@ -77,7 +77,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       return request;
 
     } catch (IOException ioe) {
-      auditLog(auditLogger,
+      markForAudit(auditLogger,
           buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, ioe,
               request.getUserInfo()));
       throw ioe;
@@ -125,7 +125,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     }
 
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, exception,
             getOmRequest().getUserInfo()));
 

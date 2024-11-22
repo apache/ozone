@@ -20,22 +20,25 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
-import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.util.PayloadUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.util.PayloadUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -43,6 +46,8 @@ import picocli.CommandLine.Option;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+
+import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
 
 /**
  * Utility to generate RPC request to DN.
@@ -56,7 +61,8 @@ import java.util.concurrent.Callable;
         showDefaultValues = true)
 public class DNRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DNRPCLoadGenerator.class);
   private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
   private static final int MAX_SIZE_KB = 2097151;
   private Timer timer;
@@ -91,6 +97,16 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
       defaultValue = "1")
   private int numClients = 1;
 
+  @Option(names = {"--read-only"},
+      description = "if Ratis, read only or not",
+      defaultValue = "false")
+  private boolean readOnly = false;
+
+  @Option(names = {"--ratis"},
+      description = "if Ratis or grpc",
+      defaultValue = "false")
+  private boolean ratis = false;
+
   @CommandLine.ParentCommand
   private Freon freon;
 
@@ -121,15 +137,28 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
         .filter(p -> p.getId().equals(containerInfo.getPipelineID()))
         .findFirst()
         .orElse(null);
+    // If GRPC, use STANDALONE pipeline
+    if (!ratis) {
+      if (!readOnly) {
+        LOG.warn("Read only is not set to true for GRPC, setting it to true");
+        readOnly = true;
+      }
+      pipeline = Pipeline.newBuilder(pipeline)
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+              getLegacyFactor(pipeline.getReplicationConfig())))
+          .build();
+    }
     encodedContainerToken = scmClient.getEncodedContainerToken(containerID);
     XceiverClientFactory xceiverClientManager;
+    OzoneManagerProtocolClientSideTranslatorPB omClient;
     if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, configuration);
-      xceiverClientManager = new XceiverClientManager(configuration,
-          configuration.getObject(XceiverClientManager.ScmClientConfig.class),
+      omClient = createOmClient(configuration, null);
+      CACertificateProvider caCerts = () -> omClient.getServiceInfo().provideCACerts();
+      xceiverClientManager = new XceiverClientCreator(configuration,
           new ClientTrustManager(caCerts, null));
     } else {
-      xceiverClientManager = new XceiverClientManager(configuration);
+      omClient = null;
+      xceiverClientManager = new XceiverClientCreator(configuration);
     }
     clients = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
@@ -143,6 +172,9 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     try {
       runTests(this::sendRPCReq);
     } finally {
+      if (omClient != null) {
+        omClient.close();
+      }
       for (XceiverClientSpi client : clients) {
         xceiverClientManager.releaseClient(client, false);
       }
@@ -171,7 +203,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
       int clientIndex = (numClients == 1) ? 0 : (int)l % numClients;
       ContainerProtos.EchoResponseProto response =
           ContainerProtocolCalls.echo(clients.get(clientIndex), encodedContainerToken,
-              containerID, payloadReqBytes, payloadRespSize, sleepTimeMs);
+              containerID, payloadReqBytes, payloadRespSize, sleepTimeMs, readOnly);
       return null;
     });
   }
