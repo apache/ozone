@@ -121,7 +121,6 @@ import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -141,9 +140,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
@@ -175,7 +171,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
@@ -184,8 +179,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAUL
 import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 
 /**
  * Ozone RPC Client Implementation, it connects to OM, SCM and DataNode
@@ -209,8 +202,6 @@ public class RpcClient implements ClientProtocol {
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
   private UserGroupInformation s3gUgi;
-  private final ACLType[] userRights;
-  private final ACLType[] groupRights;
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -243,12 +234,8 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkNotNull(conf);
     this.conf = conf;
     this.ugi = UserGroupInformation.getCurrentUser();
-    // Get default acl rights for user and group.
-    OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
     replicationConfigValidator =
         this.conf.getObject(ReplicationConfigValidator.class);
-    this.userRights = aclConfig.getUserDefaultRights();
-    this.groupRights = aclConfig.getGroupDefaultRights();
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
@@ -449,13 +436,6 @@ public class RpcClient implements ClientProtocol {
         ugi.getShortUserName() : volArgs.getOwner();
     long quotaInNamespace = volArgs.getQuotaInNamespace();
     long quotaInBytes = volArgs.getQuotaInBytes();
-    List<OzoneAcl> listOfAcls =
-        OzoneAclUtil.getAclList(UserGroupInformation.createRemoteUser(owner), userRights, groupRights);
-    //ACLs from VolumeArgs
-    List<OzoneAcl> volumeAcls = volArgs.getAcls();
-    if (volumeAcls != null) {
-      listOfAcls.addAll(volumeAcls);
-    }
 
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder();
     builder.setVolume(volumeName);
@@ -465,11 +445,14 @@ public class RpcClient implements ClientProtocol {
     builder.setQuotaInNamespace(quotaInNamespace);
     builder.setUsedNamespace(0L);
     builder.addAllMetadata(volArgs.getMetadata());
-
-    //Remove duplicates and add ACLs
-    for (OzoneAcl ozoneAcl :
-        listOfAcls.stream().distinct().collect(Collectors.toList())) {
-      builder.addOzoneAcls(ozoneAcl);
+    //ACLs from VolumeArgs
+    List<OzoneAcl> volumeAcls = volArgs.getAcls();
+    if (volumeAcls != null) {
+      //Remove duplicates and add ACLs
+      for (OzoneAcl ozoneAcl :
+          volumeAcls.stream().distinct().collect(Collectors.toList())) {
+        builder.addOzoneAcls(ozoneAcl);
+      }
     }
 
     if (volArgs.getQuotaInBytes() == 0) {
@@ -659,17 +642,6 @@ public class RpcClient implements ClientProtocol {
           .setKeyName(bucketArgs.getEncryptionKey()).build();
     }
 
-    List<OzoneAcl> listOfAcls = getAclList();
-    //ACLs from BucketArgs
-    if (bucketArgs.getAcls() != null) {
-      listOfAcls.addAll(bucketArgs.getAcls());
-    }
-    // Link bucket default acl
-    if (bucketArgs.getSourceVolume() != null
-        && bucketArgs.getSourceBucket() != null) {
-      listOfAcls.add(linkBucketDefaultAcl());
-    }
-
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -680,9 +652,12 @@ public class RpcClient implements ClientProtocol {
         .setSourceBucket(bucketArgs.getSourceBucket())
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
-        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
         .setBucketLayout(bucketLayout)
         .setOwner(owner);
+
+    if (bucketArgs.getAcls() != null) {
+      builder.setAcls(bucketArgs.getAcls());
+    }
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
@@ -745,16 +720,6 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
-   * Helper function to get default acl list for current user.
-   *
-   * @return listOfAcls
-   * */
-  private List<OzoneAcl> getAclList() {
-    UserGroupInformation realUserInfo = getRealUserInfo();
-    return OzoneAclUtil.getAclList(realUserInfo, userRights, groupRights);
-  }
-
-  /**
    * Helper function to get the actual operating user.
    *
    * @return listOfAcls
@@ -767,16 +732,6 @@ public class RpcClient implements ClientProtocol {
       return s3gUgi;
     }
     return ugi;
-  }
-
-  /**
-   * Link bucket default acl defined [world::rw]
-   * which is similar to Linux POSIX symbolic.
-   *
-   * @return OzoneAcl
-   */
-  private OzoneAcl linkBucketDefaultAcl() {
-    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
   }
 
   /**
@@ -1418,7 +1373,6 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
         .addAllTags(tags)
-        .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName);
 
@@ -1527,7 +1481,6 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .addAllTags(tags)
         .setSortDatanodesInPipeline(true)
-        .setAcls(getAclList())
         .setOwnerName(ownerName);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
@@ -1946,7 +1899,6 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setReplicationConfig(replicationConfig)
-        .setAcls(getAclList())
         .addAllMetadataGdpr(metadata)
         .setOwnerName(ownerName)
         .addAllTags(tags)
@@ -1983,7 +1935,6 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
-        .setAcls(getAclList())
         .setOwnerName(ownerName)
         .build();
     return ozoneManagerClient.openKey(keyArgs);
@@ -2055,7 +2006,6 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setMultipartUploadID(uploadID)
-        .setAcls(getAclList())
         .setOwnerName(ownerName)
         .build();
 
@@ -2160,7 +2110,6 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setAcls(getAclList())
         .setOwnerName(ownerName)
         .build();
     ozoneManagerClient.createDirectory(keyArgs);
@@ -2241,7 +2190,6 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
-        .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
         .build();
@@ -2273,7 +2221,6 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
-        .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
         .setSortDatanodesInPipeline(true)
         .setOwnerName(ownerName)

@@ -66,10 +66,13 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
+import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.linkBucketDefaultAcl;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -246,8 +249,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       omBucketInfo.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
-      // Add default acls from volume.
-      addDefaultAcls(omBucketInfo, omVolumeArgs);
+      addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
 
       // check namespace quota
       checkQuotaInNamespace(omVolumeArgs, 1L);
@@ -322,16 +324,25 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * @param omVolumeArgs
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
-      OmVolumeArgs omVolumeArgs) {
-    // Add default acls for bucket creator.
+      OmVolumeArgs omVolumeArgs, OzoneManager ozoneManager) throws OMException {
+    // Add acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
     if (omBucketInfo.getAcls() != null) {
       acls.addAll(omBucketInfo.getAcls());
     }
 
+    // Add default acls
+    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfiguration()));
+    // Link bucket default acl
+    if (omBucketInfo.getSourceBucket() != null && omBucketInfo.getSourceVolume() != null) {
+      acls.add(linkBucketDefaultAcl());
+    }
+
     // Add default acls from volume.
     List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
     OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls, ACCESS);
+    // Remove the duplicates
+    acls = acls.stream().distinct().collect(Collectors.toList());
     omBucketInfo.setAcls(acls);
   }
 
