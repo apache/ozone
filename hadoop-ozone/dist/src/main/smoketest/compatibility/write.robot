@@ -37,11 +37,19 @@ Create Key in Encrypted Bucket
 Key Can Be Written
     Create Key    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
 
+Key Can Be Deleted
+    Create Key    /vol1/bucket1/to-be-deleted-${SUFFIX}    ${TESTFILE}
+    Execute       ozone sh key delete /vol1/bucket1/to-be-deleted-${SUFFIX}
+
 Dir Can Be Created
     Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${SUFFIX}
 
 File Can Be Put
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
+
+File Can Be Deleted
+    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/to-be-deleted
+    Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${SUFFIX}/to-be-deleted
 
 FSO Bucket Can Be Created and Used
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO

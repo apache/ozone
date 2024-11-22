@@ -30,7 +30,6 @@ Setup Cluster Data
 Test Read Key Compat
     [Tags]  test-ec-compat
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/3mb      /tmp/3mb
-    Key Should Match Local File     /vol1/default-${SUFFIX}/3mb    /tmp/3mb
     Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${SUFFIX}/3mb /dev/null
 
 Test Listing Compat
@@ -38,11 +37,8 @@ Test Listing Compat
     ${result} =     Execute     ozone sh volume list | jq -r '.name'
                     Should contain  ${result}   vol1
     ${result} =     Execute     ozone sh bucket list /vol1/ | jq -r '.name'
-                    Should contain  ${result}   default
                     Should contain  ${result}   ratis
                     Should contain  ${result}   ec
-    ${result} =     Key List With Replication    /vol1/default-${SUFFIX}/
-                    Should contain  ${result}   3mb RATIS 3
     ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
                     Should contain  ${result}   3mb RATIS 3
     Assert Unsupported    ozone sh key list /vol1/ecbucket-${SUFFIX}/
@@ -51,8 +47,6 @@ Test Info Compat
     [Tags]  test-ec-compat
     ${result} =     Execute     ozone sh volume info vol1 | jq -r '.name'
                     Should contain  ${result}   vol1
-    ${result} =     Bucket Replication    /vol1/default-${SUFFIX}
-                    Should contain  ${result}   default        # there is no replication config in the old client for bucket info
     ${result} =     Bucket Replication    /vol1/ratis-${SUFFIX}
                     Should contain  ${result}   ratis        # there is no replication config in the old client for bucket info
     ${result} =     Bucket Replication    /vol1/ecbucket-${SUFFIX}
@@ -63,11 +57,8 @@ Test FS Compat
     ${result} =     Execute     ozone fs -ls ofs://om/
                     Should contain  ${result}   /vol1
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/
-                    Should contain  ${result}   /vol1/default-${SUFFIX}
                     Should contain  ${result}   /vol1/ratis-${SUFFIX}
                     Should contain  ${result}   /vol1/ecbucket-${SUFFIX}
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/default-${SUFFIX}/3mb
-                    Should contain  ${result}   /vol1/default-${SUFFIX}/3mb
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${SUFFIX}/3mb
                     Should contain  ${result}   /vol1/ratis-${SUFFIX}/3mb
 
@@ -80,24 +71,18 @@ Test FS Compat
 
 Test FS Client Can Read Own Writes
     [Tags]  test-ec-compat
-    Execute         ozone fs -put /tmp/1mb ofs://om/vol1/default-${SUFFIX}/1mb
     Execute         ozone fs -put /tmp/1mb ofs://om/vol1/ratis-${SUFFIX}/1mb
     Execute         ozone fs -put /tmp/1mb ofs://om/vol1/ecbucket-${SUFFIX}/1mb
-    Key Should Match Local File     /vol1/default-${SUFFIX}/1mb      /tmp/1mb
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/1mb      /tmp/1mb
     Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/1mb      /tmp/1mb
-    Execute         ozone fs -rm -skipTrash ofs://om/vol1/default-${SUFFIX}/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/vol1/ratis-${SUFFIX}/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/vol1/ecbucket-${SUFFIX}/1mb
 
 Test Client Can Read Own Writes
     [Tags]  test-ec-compat
-    Execute         ozone sh key put /vol1/default-${SUFFIX}/2mb /tmp/2mb
     Execute         ozone sh key put /vol1/ratis-${SUFFIX}/2mb /tmp/2mb
     Execute         ozone sh key put /vol1/ecbucket-${SUFFIX}/2mb /tmp/2mb
-    Key Should Match Local File     /vol1/default-${SUFFIX}/2mb      /tmp/2mb
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/2mb      /tmp/2mb
     Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/2mb      /tmp/2mb
-    Execute         ozone sh key delete /vol1/default-${SUFFIX}/2mb
     Execute         ozone sh key delete /vol1/ratis-${SUFFIX}/2mb
     Execute         ozone sh key delete /vol1/ecbucket-${SUFFIX}/2mb

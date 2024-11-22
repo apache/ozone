@@ -24,6 +24,9 @@ Suite Setup         Create Local Test File
 ${SUFFIX}    ${EMPTY}
 
 *** Test Cases ***
+Bucket Replication Config
+    Verify Bucket Empty Replication Config    /vol1/bucket1
+
 Key Can Be Read
     Key Should Match Local File    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
 
@@ -31,13 +34,25 @@ Encrypted Key Can Be Read
     Key Should Match Local File    /vol1/encrypted-${SUFFIX}/key    ${TESTFILE}
 
 Dir Can Be Listed
-    Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
+    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
+                    Should contain    ${result}    dir-${SUFFIX}/file-${SUFFIX}
+    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
+                    Should contain    ${result}    dir-${SUFFIX}/file-${SUFFIX}
 
 Dir Can Be Listed Using Shell
-    ${result} =     Execute    ozone sh key list /vol1/bucket1
-                    Should Contain    ${result}    key-${SUFFIX}
+    Pass Execution If    '${DATA_VERSION}' >= '${EC_VERSION}'      New client creates RATIS/ONE key by default: BUG?
+
+    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
+        ${result} =     Key List With Replication    /vol1/bucket1
+                        Should contain    ${result}    key-${SUFFIX} RATIS 3
+    ELSE
+        ${result} =     Execute    ozone sh key list /vol1/bucket1
+                        Should Contain    ${result}    key-${SUFFIX}
+    END
 
 File Can Be Get
+    Key Should Match Local File    /vol1/bucket1/dir-${SUFFIX}/file-${SUFFIX}    ${TESTFILE}
+
     Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX} /tmp/
     Execute    diff -q ${TESTFILE} /tmp/file-${SUFFIX}
     [teardown]    Execute    rm -f /tmp/file-${SUFFIX}
