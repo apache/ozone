@@ -169,6 +169,8 @@ public final class ChunkUtils {
 
     LOG.debug("Written {} bytes at offset {} to {} in {} ms",
         bytesWritten, offset, filename, elapsed);
+
+    validateWriteSize(len, bytesWritten);
   }
 
   private static long writeDataToFile(File file, ChunkBuffer data,
@@ -442,6 +444,11 @@ public final class ChunkUtils {
   private static void validateReadSize(long expected, long actual)
       throws StorageContainerException {
     checkSize("read", expected, actual, CONTAINER_INTERNAL_ERROR);
+  }
+
+  private static void validateWriteSize(long expected, long actual)
+      throws StorageContainerException {
+    checkSize("write", expected, actual, INVALID_WRITE_SIZE);
   }
 
   public static void validateBufferSize(long expected, long actual)
