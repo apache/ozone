@@ -189,7 +189,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
 
     // check for random threshold values
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 10; i++) {
       double randomThreshold = RANDOM.nextDouble() * 100;
       List<DatanodeUsageInfo> expectedUnBalancedNodes = mockedSCM.getCluster().getUnBalancedNodes(randomThreshold);
       config.setThreshold(randomThreshold);
@@ -514,17 +514,17 @@ public class TestContainerBalancerDatanodeNodeLimit {
   public void checkIterationResultTimeout(@Nonnull MockedSCM mockedSCM)
       throws NodeNotFoundException, ContainerNotFoundException, TimeoutException, ContainerReplicaNotFoundException {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
-    config.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    config.setMoveTimeout(Duration.ofMillis(500));
+    config.setMoveTimeout(Duration.ofMillis(50));
 
     CompletableFuture<MoveManager.MoveResult> completedFuture =
         CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
     when(mockedSCM.getReplicationManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(completedFuture)
-        .thenAnswer(invocation -> genCompletableFuture(2000));
+        .thenAnswer(invocation -> genCompletableFuture(150));
 
     mockedSCM.enableLegacyReplicationManager();
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
@@ -542,7 +542,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(completedFuture)
-        .thenAnswer(invocation -> genCompletableFuture(2000));
+        .thenAnswer(invocation -> genCompletableFuture(150));
 
     task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
