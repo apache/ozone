@@ -79,15 +79,6 @@ _read() {
     compatibility/read.robot
 }
 
-_write_ec() {
-  _kinit
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-EC-write" \
-    -v CLIENT_VERSION:${client_version} \
-    -v CLUSTER_VERSION:${cluster_version} \
-    -v SUFFIX:${client_version} \
-    --include setup-ec-data ec/backward-compat.robot
-}
-
 _read_ec() {
   _kinit
   local data_version="$1"
@@ -123,8 +114,6 @@ test_cross_compatibility() {
 
   if [[ "${cluster_version}" == "${current_version}" ]]; then # until HDDS-11334
     echo "Running Erasure Coded storage backward compatibility tests."
-
-    new_client _write_ec
 
     local non_ec_client_versions="1.1.0 1.2.1"
     for client_version in ${non_ec_client_versions}; do

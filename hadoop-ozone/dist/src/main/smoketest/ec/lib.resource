@@ -30,10 +30,3 @@ Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3
     Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
-
-# xcompat/test.sh creates unified test data files in /tmp for client containers
-Prepare Data For Xcompat Tests
-    Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${SUFFIX}
-    Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${SUFFIX}
-    Execute             ozone sh key put /vol1/ratis-${SUFFIX}/3mb /tmp/3mb
-    Execute             ozone sh key put /vol1/ecbucket-${SUFFIX}/3mb /tmp/3mb

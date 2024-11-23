@@ -23,10 +23,6 @@ Resource            ../ozone-lib/shell.robot
 ${SUFFIX}    ${EMPTY}
 
 *** Test Cases ***
-Setup Cluster Data
-    [Tags]  setup-ec-data
-    Prepare Data For Xcompat Tests
-
 Test Read Key Compat
     [Tags]  test-ec-compat
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/3mb      /tmp/3mb
