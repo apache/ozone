@@ -79,17 +79,6 @@ _read() {
     compatibility/read.robot
 }
 
-_read_ec() {
-  _kinit
-  local data_version="$1"
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-EC-read" \
-    -v CLIENT_VERSION:${client_version} \
-    -v CLUSTER_VERSION:${cluster_version} \
-    -v DATA_VERSION:${data_version} \
-    -v SUFFIX:${data_version} \
-    --include test-ec-compat ec/backward-compat.robot
-}
-
 test_cross_compatibility() {
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
@@ -111,17 +100,6 @@ test_cross_compatibility() {
     old_client _read ${current_version}
     new_client _read ${client_version}
   done
-
-  if [[ "${cluster_version}" == "${current_version}" ]]; then # until HDDS-11334
-    echo "Running Erasure Coded storage backward compatibility tests."
-
-    local non_ec_client_versions="1.1.0 1.2.1"
-    for client_version in ${non_ec_client_versions}; do
-      client="old_client_${client_version//./_}"
-      unset OUTPUT_PATH # FIXME why is it unset?
-      old_client _read_ec ${current_version}
-    done
-  fi
 
   KEEP_RUNNING=false stop_docker_env
 }

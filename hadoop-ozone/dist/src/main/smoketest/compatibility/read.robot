@@ -70,3 +70,75 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
+
+EC Test Read Key Compat
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    Key Should Match Local File     /vol1/ratis-${SUFFIX}/3mb      /tmp/3mb
+    Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${SUFFIX}/3mb /dev/null
+
+EC Test Listing Compat
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    ${result} =     Execute     ozone sh volume list | jq -r '.name'
+                    Should contain  ${result}   vol1
+    ${result} =     Execute     ozone sh bucket list /vol1/ | jq -r '.name'
+                    Should contain  ${result}   ratis
+                    Should contain  ${result}   ec
+    ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
+                    Should contain  ${result}   3mb RATIS 3
+    Assert Unsupported    ozone sh key list /vol1/ecbucket-${SUFFIX}/
+
+EC Test Info Compat
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    ${result} =     Execute     ozone sh volume info vol1 | jq -r '.name'
+                    Should contain  ${result}   vol1
+    ${result} =     Bucket Replication    /vol1/ratis-${SUFFIX}
+                    Should contain  ${result}   ratis        # there is no replication config in the old client for bucket info
+    ${result} =     Bucket Replication    /vol1/ecbucket-${SUFFIX}
+                    Should contain  ${result}   ec        # there is no replication config in the old client for bucket info
+
+EC Test FS Compat
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    ${result} =     Execute     ozone fs -ls ofs://om/
+                    Should contain  ${result}   /vol1
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/
+                    Should contain  ${result}   /vol1/ratis-${SUFFIX}
+                    Should contain  ${result}   /vol1/ecbucket-${SUFFIX}
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${SUFFIX}/3mb
+                    Should contain  ${result}   /vol1/ratis-${SUFFIX}/3mb
+
+    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${SUFFIX}/     1
+                    Should contain  ${result}   ls: The list of keys contains keys with Erasure Coded replication set
+    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${SUFFIX}/3mb     1
+                    Should contain  ${result}   : No such file or directory
+    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${SUFFIX}/3mb    1
+                    Should contain  ${result}   : No such file or directory
+
+EC Test FS Client Can Read Own Writes
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    Execute         ozone fs -put /tmp/1mb ofs://om/vol1/ratis-${SUFFIX}/1mb
+    Execute         ozone fs -put /tmp/1mb ofs://om/vol1/ecbucket-${SUFFIX}/1mb
+    Key Should Match Local File     /vol1/ratis-${SUFFIX}/1mb      /tmp/1mb
+    Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/1mb      /tmp/1mb
+    Execute         ozone fs -rm -skipTrash ofs://om/vol1/ratis-${SUFFIX}/1mb
+    Execute         ozone fs -rm -skipTrash ofs://om/vol1/ecbucket-${SUFFIX}/1mb
+
+EC Test Client Can Read Own Writes
+    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
+    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    Execute         ozone sh key put /vol1/ratis-${SUFFIX}/2mb /tmp/2mb
+    Execute         ozone sh key put /vol1/ecbucket-${SUFFIX}/2mb /tmp/2mb
+    Key Should Match Local File     /vol1/ratis-${SUFFIX}/2mb      /tmp/2mb
+    Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/2mb      /tmp/2mb
+    Execute         ozone sh key delete /vol1/ratis-${SUFFIX}/2mb
+    Execute         ozone sh key delete /vol1/ecbucket-${SUFFIX}/2mb
