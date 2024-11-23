@@ -1006,7 +1006,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         RaftServer.Division division = ratisServer.getServer().getDivision(getGroupId());
         if (division.getInfo().isLeader()) {
           long minIndex = Arrays.stream(division.getInfo()
-              .getFollowerNextIndices()).min().getAsLong();
+              .getFollowerNextIndices()).min().orElse(0);
           LOG.debug("Removing data corresponding to log index {} min index {} "
                   + "from cache", index, minIndex);
           removeCacheDataUpTo(Math.min(minIndex, index));
