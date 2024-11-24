@@ -32,11 +32,10 @@ source ${_testlib_dir}/compose_v2_compatibility.sh
 
 : ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
-: ${TMPDIR:=/tmp}
 
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]]; then
-  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR}"/robot-data-XXXXXX)"
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
   _compose_delete_test_data() {
     rm -frv "${TEST_DATA_DIR}"
   }
