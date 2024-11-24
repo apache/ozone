@@ -71,25 +71,32 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
 
-EC Test Read Key Compat
+Key Read From Bucket With Replication
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/3mb      /tmp/3mb
-    Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${SUFFIX}/3mb /dev/null
+
+    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
+        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${SUFFIX}/3mb /dev/null
+    ELSE
+        Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/3mb      /tmp/3mb
+    END
 
 EC Test Listing Compat
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    ${result} =     Execute     ozone sh volume list | jq -r '.name'
-                    Should contain  ${result}   vol1
+
     ${result} =     Execute     ozone sh bucket list /vol1/ | jq -r '.name'
                     Should contain  ${result}   ratis
                     Should contain  ${result}   ec
-    ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
-                    Should contain  ${result}   3mb RATIS 3
-    Assert Unsupported    ozone sh key list /vol1/ecbucket-${SUFFIX}/
+
+    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
+        ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
+                        Should contain  ${result}   3mb RATIS 3
+
+        Assert Unsupported    ozone sh key list /vol1/ecbucket-${SUFFIX}/
+    END
 
 EC Test Info Compat
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
