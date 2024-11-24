@@ -23,7 +23,7 @@ x-old-config:
     - ../..:/opt/ozone
     - ../_keytabs:/etc/security/keytabs
     - ./krb5.conf:/etc/krb5.conf
-    - ${TEST_DATA_DIR}:/tmp
+    - ${TEST_DATA_DIR}:/testdata
   command: ["sleep","1000000"]
 
 x-new-config:
@@ -36,7 +36,7 @@ x-new-config:
     - ../..:/opt/hadoop
     - ../_keytabs:/etc/security/keytabs
     - ./krb5.conf:/etc/krb5.conf
-    - ${TEST_DATA_DIR}:/tmp
+    - ${TEST_DATA_DIR}:/testdata
   command: ["sleep","1000000"]
 
 services:

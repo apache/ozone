@@ -65,6 +65,7 @@ _write() {
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
     -v SUFFIX:${client_version} \
+    -v TEST_DATA_DIR:/testdata \
     compatibility/write.robot
 }
 
@@ -76,6 +77,7 @@ _read() {
     -v CLUSTER_VERSION:${cluster_version} \
     -v DATA_VERSION:${data_version} \
     -v SUFFIX:${data_version} \
+    -v TEST_DATA_DIR:/testdata \
     compatibility/read.robot
 }
 

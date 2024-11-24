@@ -33,8 +33,8 @@ Create Bucket With Replication Type
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${SUFFIX}
     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${SUFFIX}
-    Execute             ozone sh key put /vol1/ratis-${SUFFIX}/3mb /tmp/3mb
-    Execute             ozone sh key put /vol1/ecbucket-${SUFFIX}/3mb /tmp/3mb
+    Execute             ozone sh key put /vol1/ratis-${SUFFIX}/3mb ${TEST_DATA_DIR}/3mb
+    Execute             ozone sh key put /vol1/ecbucket-${SUFFIX}/3mb ${TEST_DATA_DIR}/3mb
 
 Create Encrypted Bucket
     Execute    ozone sh bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${SUFFIX}
