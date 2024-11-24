@@ -53,9 +53,9 @@ Dir Can Be Listed Using Shell
 File Can Be Get
     Key Should Match Local File    /vol1/bucket1/dir-${SUFFIX}/file-${SUFFIX}    ${TESTFILE}
 
-    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX} ${TEST_DATA_DIR}/
-    Execute    diff -q ${TESTFILE} ${TEST_DATA_DIR}/file-${SUFFIX}
-    [teardown]    Execute    rm -f ${TEST_DATA_DIR}/file-${SUFFIX}
+    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX} /tmp/
+    Execute    diff -q ${TESTFILE} /tmp/file-${SUFFIX}
+    [teardown]    Execute    rm -f /tmp/file-${SUFFIX}
 
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
