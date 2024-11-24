@@ -71,6 +71,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.S
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -365,6 +366,7 @@ public class TestLDBCli {
     assertEquals(0, exitCode1);
     assertTrue(tmpDir1.isDirectory());
     File[] subFiles = tmpDir1.listFiles();
+    assertNotNull(subFiles);
     assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
     for (File subFile : subFiles) {
       JsonElement jsonElement = JsonParser.parseReader(new FileReader(subFile));
@@ -441,7 +443,11 @@ public class TestLDBCli {
 
       Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
       // Insert the number of keys specified by recordsCount[0]
-      for (int i = 1; i <= recordsCount[0]; i++) {
+      int count = 5;
+      if (recordsCount.length > 0) {
+        count = recordsCount[0];
+      }
+      for (int i = 1; i <= count; i++) {
         String key = "key" + i;
         OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
             key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
