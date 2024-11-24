@@ -87,9 +87,10 @@ EC Test Listing Compat
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    ${result} =     Execute     ozone sh bucket list /vol1/ | jq -r '.[].name'
-                    Should contain  ${result}   ratis
-                    Should contain  ${result}   ecbucket
+    ${result} =     Execute     ozone sh bucket list --prefix ratis /vol1
+                    Should Not Be Empty    ${result}
+    ${result} =     Execute     ozone sh bucket list --prefix ecbucket /vol1
+                    Should Not Be Empty    ${result}
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
         ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
