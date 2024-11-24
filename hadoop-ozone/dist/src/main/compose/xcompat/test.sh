@@ -35,6 +35,8 @@ export SECURITY_ENABLED=true
 dd if=/dev/urandom of=${TEST_DATA_DIR}/1mb bs=1048576 count=1 >/dev/null 2>&1
 dd if=/dev/urandom of=${TEST_DATA_DIR}/2mb bs=1048576 count=2 >/dev/null 2>&1
 dd if=/dev/urandom of=${TEST_DATA_DIR}/3mb bs=1048576 count=3 >/dev/null 2>&1
+echo "TEST_DATA_DIR: ${TEST_DATA_DIR}"
+ls -la "${TEST_DATA_DIR}"
 
 old_client() {
   OZONE_DIR=/opt/ozone

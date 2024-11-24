@@ -36,6 +36,7 @@ source ${_testlib_dir}/compose_v2_compatibility.sh
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]]; then
   export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+  chmod go+rx "${TEST_DATA_DIR}"
   _compose_delete_test_data() {
     rm -frv "${TEST_DATA_DIR}"
   }
