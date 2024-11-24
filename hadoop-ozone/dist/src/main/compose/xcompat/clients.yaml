@@ -28,6 +28,7 @@ x-old-config:
 
 x-new-config:
   &new-config
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
   dns_search: .
   env_file:
     - docker-config
@@ -60,5 +61,6 @@ services:
     <<: *old-config
 
   new_client:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     <<: *new-config
+    environment:
+      OZONE_OPTS:
