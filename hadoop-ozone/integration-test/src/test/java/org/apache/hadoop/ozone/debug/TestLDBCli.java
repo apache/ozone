@@ -54,7 +54,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.FileReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -369,8 +370,10 @@ public class TestLDBCli {
     assertNotNull(subFiles);
     assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
     for (File subFile : subFiles) {
-      JsonElement jsonElement = JsonParser.parseReader(new FileReader(subFile));
-      assertTrue(jsonElement.isJsonArray() || jsonElement.isJsonObject());
+      try(FileInputStream inputStream =new FileInputStream(subFile)) {
+        JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream, "UTF-8"));
+        assertTrue(jsonElement.isJsonArray() || jsonElement.isJsonObject());
+      }
     }
 
     String scanDir2 = tempDir.getAbsolutePath() + "/scandir2";
