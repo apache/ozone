@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.debug;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -52,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -344,31 +347,37 @@ public class TestLDBCli {
   @Test
   void testScanWithRecordsPerFile() throws IOException {
     // Prepare dummy table
-    prepareTable(KEY_TABLE, false);
+    int recordsCount = 5;
+    prepareTable(KEY_TABLE, false, recordsCount);
 
     String scanDir1 = tempDir.getAbsolutePath() + "/scandir1";
     // Prepare scan args
+    int maxRecordsPerFile = 2;
     List<String> completeScanArgs1 = new ArrayList<>(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
-        "--column-family", KEY_TABLE, "--out", scanDir1,
-        "--max-records-per-file", "2"));
-
+        "--column-family", KEY_TABLE, "--out", scanDir1 + File.separator + "keytable",
+        "--max-records-per-file", String.valueOf(maxRecordsPerFile)));
     File tmpDir1 = new File(scanDir1);
     tmpDir1.deleteOnExit();
 
     int exitCode1 = cmd.execute(completeScanArgs1.toArray(new String[0]));
     assertEquals(0, exitCode1);
     assertTrue(tmpDir1.isDirectory());
-    assertEquals(3, tmpDir1.listFiles().length);
+    File[] subFiles = tmpDir1.listFiles();
+    assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
+    for (File subFile : subFiles) {
+      JsonElement jsonElement = JsonParser.parseReader(new FileReader(subFile));
+      assertTrue(jsonElement.isJsonArray() || jsonElement.isJsonObject());
+    }
 
     String scanDir2 = tempDir.getAbsolutePath() + "/scandir2";
     // Used with parameter '-l'
     List<String> completeScanArgs2 = new ArrayList<>(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
-        "--column-family", KEY_TABLE, "--out", scanDir2,
-        "--max-records-per-file", "3", "-l", "2"));
+        "--column-family", KEY_TABLE, "--out", scanDir2 + File.separator + "keytable",
+        "--max-records-per-file", String.valueOf(maxRecordsPerFile), "-l", "2"));
     File tmpDir2 = new File(scanDir2);
     tmpDir2.deleteOnExit();
 
@@ -421,7 +430,7 @@ public class TestLDBCli {
    * @param tableName table name
    * @param schemaV3 set to true for SchemaV3. applicable to block_data table
    */
-  private void prepareTable(String tableName, boolean schemaV3)
+  private void prepareTable(String tableName, boolean schemaV3, int... recordsCount)
       throws IOException {
 
     switch (tableName) {
@@ -431,8 +440,8 @@ public class TestLDBCli {
           .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
 
       Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
-      // Insert 5 keys
-      for (int i = 1; i <= 5; i++) {
+      // Insert the number of keys specified by recordsCount[0]
+      for (int i = 1; i <= recordsCount[0]; i++) {
         String key = "key" + i;
         OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
             key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
