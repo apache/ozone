@@ -370,7 +370,7 @@ public class TestLDBCli {
     assertNotNull(subFiles);
     assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
     for (File subFile : subFiles) {
-      try(FileInputStream inputStream =new FileInputStream(subFile)) {
+      try (FileInputStream inputStream = new FileInputStream(subFile)) {
         JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream, "UTF-8"));
         assertTrue(jsonElement.isJsonArray() || jsonElement.isJsonObject());
       }
