@@ -572,8 +572,8 @@ public class OzoneManagerServiceProviderImpl
           fullSnapshot = true;
         } else {
           ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-            OmSnapshotTaskName.OmDeltaRequest.name(),
-            System.currentTimeMillis(), getCurrentOMDBSequenceNumber(), null);
+              OmSnapshotTaskName.OmDeltaRequest.name(),
+              System.currentTimeMillis(), getCurrentOMDBSequenceNumber(), null);
 
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {

@@ -180,8 +180,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       for (Future<Pair<String, Boolean>> f : results) {
         String taskName = f.get().getLeft();
         ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-          System.currentTimeMillis(),
-          omMetadataManager.getLastSequenceNumberFromDB(), null);
+            System.currentTimeMillis(),
+            omMetadataManager.getLastSequenceNumberFromDB(), null);
 
         if (!f.get().getRight()) {
           LOG.info("Init failed for task {}.", taskName);
