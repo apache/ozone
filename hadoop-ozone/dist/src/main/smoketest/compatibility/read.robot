@@ -32,6 +32,14 @@ Buckets Can Be Listed
 Bucket Replication Config
     Verify Bucket Empty Replication Config    /vol1/bucket1
 
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
+        Verify Bucket Replica Replication Config    /vol1/ratis-${CLUSTER_VERSION}   RATIS   THREE
+        Verify Bucket EC Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}    RS    3    2    1048576
+    ELSE
+        Verify Bucket Empty Replication Config    /vol1/ratis-${CLUSTER_VERSION}
+        Verify Bucket Empty Replication Config    /vol1/bucket1-${CLUSTER_VERSION}
+    END
+
 Key Can Be Read
     Key Should Match Local File    /vol1/bucket1/key-${DATA_VERSION}    ${TESTFILE}
 
@@ -100,17 +108,6 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
-
-EC Test Info Compat
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    ${result} =     Execute     ozone sh volume info vol1 | jq -r '.name'
-                    Should contain  ${result}   vol1
-    ${result} =     Bucket Replication    /vol1/ratis-${DATA_VERSION}
-                    Should contain  ${result}   ratis        # there is no replication config in the old client for bucket info
-    ${result} =     Bucket Replication    /vol1/ecbucket-${DATA_VERSION}
-                    Should contain  ${result}   ecbucket     # there is no replication config in the old client for bucket info
 
 EC Test FS Compat
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
