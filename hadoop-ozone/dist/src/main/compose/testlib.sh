@@ -204,11 +204,11 @@ execute_robot_test(){
   local output_name=$(get_output_name)
 
   # find unique filename
-  declare -i i=0
-  OUTPUT_FILE="robot-${output_name}1.xml"
-  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let ++i
-    OUTPUT_FILE="robot-${output_name}${i}.xml"
+  for ((i=1; i<1000; i++)); do
+    OUTPUT_FILE="robot-${output_name}$(printf "%03d" ${i}).xml"
+    if [[ ! -f $RESULT_DIR/$OUTPUT_FILE ]]; then
+      break;
+    fi
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
