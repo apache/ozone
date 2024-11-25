@@ -109,7 +109,7 @@ Key List In Bucket With Replication
         ${result} =     Key List With Replication    /vol1/ratis-${CLUSTER_VERSION}/
                         Should contain  ${result}   key-${DATA_VERSION} RATIS 3
 
-        Assert Unsupported    ozone sh key list /vol1/ecbucket-${DATA_VERSION}/
+        Assert Unsupported    ozone sh key list /vol1/ecbucket-${CLUSTER_VERSION}/
     ELSE
         ${result} =     Execute    ozone sh key list /vol1/ratis-${CLUSTER_VERSION}
                         Should Contain    ${result}    key-${DATA_VERSION}
