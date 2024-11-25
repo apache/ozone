@@ -84,10 +84,10 @@ public class ReconLayoutVersionManager {
     // Get features that need finalization, sorted by version
     List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
 
-    try (Connection connection = scmFacade.getDataSource().getConnection()) {
-      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
+    for (ReconLayoutFeature feature : featuresToFinalize) {
+      try (Connection connection = scmFacade.getDataSource().getConnection()) {
+        connection.setAutoCommit(false); // Turn off auto-commit for transactional control
 
-      for (ReconLayoutFeature feature : featuresToFinalize) {
         try {
           // Fetch only the FINALIZE action for the feature
           Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
@@ -103,20 +103,19 @@ public class ReconLayoutVersionManager {
             LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
           }
         } catch (Exception e) {
-          // Rollback any pending changes for the current feature due to failure,
-          // should only be used when setAutoCommit is disabled
+          // Rollback any pending changes for the current feature due to failure
           connection.rollback();
           currentMLV = determineMLV(); // Rollback the MLV to the original value
           LOG.error("Failed to finalize feature {}. Rolling back changes.", feature.getVersion(), e);
           throw e;
         }
+      } catch (Exception e) {
+        // Log the error to both logs and ReconContext
+        LOG.error("Failed to finalize layout features: {}", e.getMessage());
+        reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
+        throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
       }
-    } catch (Exception e) {
-      // Log the error to both logs and ReconContext
-      LOG.error("Failed to finalize layout features: {}", e.getMessage());
-      reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
-      reconContext.updateHealthStatus(new AtomicBoolean(false));
-      throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
     }
   }
 
