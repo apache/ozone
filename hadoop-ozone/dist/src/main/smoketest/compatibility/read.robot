@@ -76,7 +76,7 @@ Key List In Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        ${result} =     Key List With Replication    /vol1/ratis-${DATA_VERSION}/
+        ${result} =     Key List With Replication    /vol1/ratis-${CLUSTER_VERSION}/
                         Should contain  ${result}   key-${DATA_VERSION} RATIS 3
 
         Assert Unsupported    ozone sh key list /vol1/ecbucket-${DATA_VERSION}/
@@ -116,8 +116,8 @@ EC Test FS Compat
     ${result} =     Execute     ozone fs -ls ofs://om/
                     Should contain  ${result}   /vol1
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/
-                    Should contain  ${result}   /vol1/ratis-${DATA_VERSION}
-                    Should contain  ${result}   /vol1/ecbucket-${DATA_VERSION}
+                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}
+                    Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
                     Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
 
