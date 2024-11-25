@@ -30,7 +30,11 @@ Buckets Can Be Listed
     END
 
 Bucket Without Replication Config
-    Verify Bucket Replication Config    /vol1/bucket1    null
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
+        Verify Bucket Replication Config    /vol1/bucket1    null
+    ELSE
+        Verify Bucket Replication Config    /vol1/bucket1    ${EMPTY}
+    END
 
 Bucket With Replication Config
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
@@ -40,7 +44,7 @@ Bucket With Replication Config
         Verify Bucket EC Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}    RS    3    2    1048576
     ELSE
         Verify Bucket Replication Config    /vol1/ratis-${CLUSTER_VERSION}    ${EMPTY}
-        Verify Bucket Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}    ${EMPTY}
+        Verify Bucket Replication Config    /vol1/bucket1-${CLUSTER_VERSION}    ${EMPTY}
     END
 
 Key Can Be Read
