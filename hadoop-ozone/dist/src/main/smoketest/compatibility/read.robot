@@ -48,6 +48,7 @@ Key Can Be Read
 
 Encrypted Key Can Be Read
     Key Should Match Local File    /vol1/encrypted-${DATA_VERSION}/key    ${TESTFILE}
+    File Should Match Local File    o3fs://encrypted-${DATA_VERSION}.vol1/key    ${TESTFILE}
 
 Key Read From Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
