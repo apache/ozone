@@ -28,7 +28,7 @@ Bucket Exists
     [Return]                  ${TRUE}
 
 Compare Key With Local File
-    [arguments]    ${key}    ${file}
+    [arguments]    ${key}    ${file}    ${cmd}='sh key get'
     ${postfix} =   Generate Random String  5  [NUMBERS]
     ${tmpfile} =   Set Variable    /tmp/tempkey-${postfix}
     Execute        ozone sh key get ${key} ${tmpfile}
@@ -40,6 +40,11 @@ Compare Key With Local File
 Key Should Match Local File
     [arguments]    ${key}    ${file}
     ${matches} =   Compare Key With Local File    ${key}    ${file}
+    Should Be True    ${matches}
+
+File Should Match Local File
+    [arguments]    ${key}    ${file}
+    ${matches} =   Compare Key With Local File    ${key}    ${file}    fs -get
     Should Be True    ${matches}
 
 Verify ACL

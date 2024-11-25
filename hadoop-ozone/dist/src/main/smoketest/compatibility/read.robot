@@ -49,18 +49,13 @@ Dir Can Be Listed Using Shell
 
 File Can Be Get
     Key Should Match Local File    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
-
-    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION} /tmp/
-    Execute    diff -q ${TESTFILE} /tmp/file-${DATA_VERSION}
-    [teardown]    Execute    rm -f /tmp/file-${DATA_VERSION}
+    File Should Match Local File    o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
 
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    Execute    ozone fs -get ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file ${TEMP_DIR}/
-    Execute    diff -q ${TESTFILE} ${TEMP_DIR}/file
-    [teardown]    Execute    rm -f ${TEMP_DIR}/file
+    File Should Match Local File    ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file    ${TESTFILE}
 
 HSync Lease Recover Can Be Used
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
