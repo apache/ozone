@@ -82,14 +82,14 @@ File Can Be Listed
 
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
-                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/file-${DATA_VERSION}
+                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/file-${DATA_VERSION}
 
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
-        ${result} =     Execute    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}
-                        Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}
+        ${result} =     Execute    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/file-${DATA_VERSION}
+                        Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}/file-${DATA_VERSION}
     ELSE
-        ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
+        ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/file-${DATA_VERSION}     1
                         Should contain  ${result}   : No such file or directory
     END
 
@@ -125,7 +125,7 @@ File Can Be Get
 File Can Be Get From Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    File Should Match Local File     ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+    File Should Match Local File     ofs://om/vol1/ratis-${CLUSTER_VERSION}/file-${DATA_VERSION}      ${TESTFILE}
 
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
         File Should Match Local File     ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
