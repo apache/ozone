@@ -82,10 +82,13 @@ File Can Be Listed
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
                     Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
 
-    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
-                    Should contain  ${result}   : No such file or directory
-    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
-                    Should contain  ${result}   : No such file or directory
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
+        ${result} =     Execute    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}
+                        Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}
+    ELSE
+        ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
+                        Should contain  ${result}   : No such file or directory
+    END
 
 Key List
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
@@ -118,8 +121,15 @@ File Can Be Get
 
 File Can Be Get From Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    File Should Match Local File     o3fs://ratis-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TESTFILE}
-    File Should Match Local File     o3fs://ecbucket-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TESTFILE}
+
+    File Should Match Local File     ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
+        File Should Match Local File     ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+    ELSE
+        ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${CLUSTER_VERSION}    1
+                        Should contain  ${result}   : No such file or directory
+    END
 
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
