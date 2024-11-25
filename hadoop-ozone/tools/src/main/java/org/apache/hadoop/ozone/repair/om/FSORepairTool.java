@@ -18,15 +18,13 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.TableConfig;
-import org.apache.hadoop.hdds.utils.db.DBProfile;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -39,26 +37,16 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.ratis.util.Preconditions;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.Stack;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
@@ -95,13 +83,8 @@ public class FSORepairTool {
   private final Table<String, SnapshotInfo> snapshotInfoTable;
   private final String volumeFilter;
   private final String bucketFilter;
-  // The temporary DB is used to track which items have been seen.
-  // Since usage of this DB is simple, use it directly from RocksDB.
-  private String reachableDBPath;
   private static final String REACHABLE_TABLE = "reachable";
-  private static final byte[] REACHABLE_TABLE_BYTES = REACHABLE_TABLE.getBytes(StandardCharsets.UTF_8);
-  private ColumnFamilyHandle reachableCFHandle;
-  private RocksDatabase reachableDB;
+  private DBStore reachableDB;
   private final ReportStatistics reachableStats;
   private final ReportStatistics unreachableStats;
   private final ReportStatistics unreferencedStats;
@@ -270,11 +253,8 @@ public class FSORepairTool {
         return;
       }
     }
-    dropReachableTableIfExists();
-    createReachableTable();
     markReachableObjectsInBucket(volume, bucketInfo);
     handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
-    dropReachableTableIfExists();
   }
 
   private Report buildReportAndLog() {
@@ -473,9 +453,9 @@ public class FSORepairTool {
    * of the connected FSO tree.
    */
   private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
-    byte[] reachableKey = buildReachableKey(volume, bucket, object).getBytes(StandardCharsets.UTF_8);
+    String reachableKey = buildReachableKey(volume, bucket, object);
     // No value is needed for this table.
-    reachableDB.put(reachableCFHandle, reachableKey, new byte[]{});
+    reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).put(reachableKey, new byte[]{});
   }
 
   /**
@@ -497,9 +477,9 @@ public class FSORepairTool {
    * @return true if the entry's parent is in the reachable table.
    */
   protected boolean isReachable(String fileOrDirKey) throws IOException {
-    byte[] reachableParentKey = buildReachableParentKey(fileOrDirKey).getBytes(StandardCharsets.UTF_8);
+    String reachableParentKey = buildReachableParentKey(fileOrDirKey);
 
-    return reachableDB.get(reachableCFHandle, reachableParentKey, REACHABLE_TABLE) != null;
+    return reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).get(reachableParentKey) != null;
   }
 
   /**
@@ -523,66 +503,30 @@ public class FSORepairTool {
         parentID;
   }
 
-  private void openReachableDB() throws IOException {
+  private void openReachableDB() {
     File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
     System.out.println("Creating database of reachable directories at " + reachableDBFile);
     // Delete the DB from the last run if it exists.
-    if (reachableDBFile.exists()) {
-      FileUtils.deleteDirectory(reachableDBFile);
-    }
-    reachableDBPath = reachableDBFile.toString();
-    reachableDB = buildReachableRocksDB(reachableDBFile);
-  }
-
-  private RocksDatabase buildReachableRocksDB(File reachableDBFile) throws IOException {
-    DBProfile profile = new OzoneConfiguration().getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE);
-    Set<TableConfig> tableConfigs = new HashSet<>();
-
     try {
-      tableConfigs.add(new TableConfig("default", profile.getColumnFamilyOptions()));
-
-      return RocksDatabase.open(reachableDBFile,
-          profile.getDBOptions(),
-          new ManagedWriteOptions(),
-          tableConfigs, false);
-    } finally {
-      for (TableConfig config : tableConfigs) {
-        config.close();
+      if (reachableDBFile.exists()) {
+        FileUtils.deleteDirectory(reachableDBFile);
       }
+
+      ConfigurationSource conf = new OzoneConfiguration();
+      reachableDB = DBStoreBuilder.newBuilder(conf)
+          .setName("reachable.db")
+          .setPath(reachableDBFile.getParentFile().toPath())
+          .addTable(REACHABLE_TABLE)
+          .build();
+    } catch (IOException e) {
+      System.out.println("Error creating reachable.db: " + e.getMessage());
     }
   }
 
-  private void closeReachableDB() {
+  private void closeReachableDB() throws IOException {
     if (reachableDB != null) {
       reachableDB.close();
     }
-  }
-
-  private void dropReachableTableIfExists() throws IOException {
-    try {
-      List<byte[]> availableCFs = reachableDB.listColumnFamiliesEmptyOptions(reachableDBPath);
-      boolean cfFound = false;
-      for (byte[] cfNameBytes: availableCFs) {
-        if (new String(cfNameBytes, UTF_8).equals(new String(REACHABLE_TABLE_BYTES, UTF_8))) {
-          cfFound = true;
-          break;
-        }
-      }
-
-      if (cfFound) {
-        reachableDB.dropColumnFamily(reachableCFHandle);
-      }
-    } catch (RocksDBException ex) {
-      throw new IOException(ex.getMessage(), ex);
-    } finally {
-      if (reachableCFHandle != null) {
-        reachableCFHandle.close();
-      }
-    }
-  }
-
-  private void createReachableTable() throws IOException {
-    reachableCFHandle = reachableDB.createColumnFamily(new ColumnFamilyDescriptor(REACHABLE_TABLE_BYTES));
   }
 
   /**
