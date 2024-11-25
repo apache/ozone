@@ -325,14 +325,14 @@ public class OMBucketCreateRequest extends OMClientRequest {
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
       OmVolumeArgs omVolumeArgs, OzoneManager ozoneManager) throws OMException {
-    // Add acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
+    // Add default acls
+    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfiguration()));
     if (omBucketInfo.getAcls() != null) {
+      // Add acls for bucket creator.
       acls.addAll(omBucketInfo.getAcls());
     }
 
-    // Add default acls
-    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfiguration()));
     // Link bucket default acl
     if (omBucketInfo.getSourceBucket() != null && omBucketInfo.getSourceVolume() != null) {
       acls.add(linkBucketDefaultAcl());

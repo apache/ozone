@@ -71,7 +71,7 @@ public class TestS3MultipartUploadCommitPartRequest
         bucketName, keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-            getS3InitiateMultipartUploadReq(initiateMPURequest);
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);

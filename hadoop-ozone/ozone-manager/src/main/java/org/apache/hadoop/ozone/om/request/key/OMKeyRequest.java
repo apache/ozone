@@ -416,11 +416,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
       PrefixManager prefixManager, OzoneConfiguration config) throws OMException {
 
     List<OzoneAcl> acls = new ArrayList<>();
+    acls.addAll(getDefaultAclList(createUGIForApi(), config));
     if (keyArgs.getAclsList() != null) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
-
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
 
     // Inherit DEFAULT acls from prefix.
     if (prefixManager != null) {
@@ -477,6 +476,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OMFileRequest.OMPathInfo omPathInfo, OzoneConfiguration config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
     List<OzoneAcl> acls = new ArrayList<>();
+    // add default ACLs
+    acls.addAll(getDefaultAclList(createUGIForApi(), config));
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
@@ -491,7 +492,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // add acls from clients
     acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
     acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
