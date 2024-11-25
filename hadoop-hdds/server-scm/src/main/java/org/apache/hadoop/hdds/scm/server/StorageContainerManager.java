@@ -1595,19 +1595,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    AtomicBoolean leaderIsDefined = new AtomicBoolean(false);
-    if (SCMHAUtils.isSCMHAEnabled(configuration)) {
-      getScmHAManager().getRatisServer().getRatisRoles().stream()
-          .filter(peerState -> peerState.contains("LEADER"))
-          .findFirst()
-          .ifPresent(peerState -> {
-            leaderIsDefined.set(true);
-            String[] peerInfo = peerState.split(":");
-            scmHAMetricsUpdate(peerInfo[3]);
-          });
-    }
-
-    if (!leaderIsDefined.get()) {
+    if (SCMHAUtils.isSCMHAEnabled(configuration) && getScmHAManager().getRatisServer().getLeaderId() != null) {
+      scmHAMetricsUpdate(getScmHAManager().getRatisServer().getLeaderId().toString());
+    } else {
       // At this point leader is not known
       scmHAMetricsUpdate(null);
     }

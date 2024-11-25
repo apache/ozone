@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -128,6 +129,9 @@ public class TestStorageContainerManagerHA {
       if (scm.checkLeader()) {
         count++;
         leaderScm = scm;
+      }
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        assertNotNull(scm.getScmHAManager().getRatisServer().getLeaderId());
       }
       assertEquals(peerSize, numOfSCMs);
     }

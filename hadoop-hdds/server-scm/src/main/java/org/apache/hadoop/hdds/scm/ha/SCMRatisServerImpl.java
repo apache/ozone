@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -145,6 +146,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public GrpcTlsConfig getGrpcTlsConfig() {
     return grpcTlsConfig;
+  }
+
+  @Override
+  @Nullable
+  public RaftPeerId getLeaderId() {
+    if (getLeader() != null) {
+      return getLeader().getId();
+    }
+    return null;
   }
 
   private static void waitForLeaderToBeReady(RaftServer server,
