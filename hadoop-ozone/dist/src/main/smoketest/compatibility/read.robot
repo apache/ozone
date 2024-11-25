@@ -39,6 +39,17 @@ Key Can Be Read
 Encrypted Key Can Be Read
     Key Should Match Local File    /vol1/encrypted-${DATA_VERSION}/key    ${TESTFILE}
 
+Key Read From Bucket With Replication
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+
+    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' OR '${DATA_VERSION}' == '${CLIENT_VERSION}'
+        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
+    ELSE
+        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
+    END
+
 Dir Can Be Listed
     ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}
                     Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
@@ -90,17 +101,6 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
-
-Key Read From Bucket With Replication
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
-
-    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' OR '${DATA_VERSION}' == '${CLIENT_VERSION}'
-        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
-    ELSE
-        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
-    END
 
 EC Test Info Compat
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
