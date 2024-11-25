@@ -43,7 +43,18 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -361,7 +372,9 @@ public class ContainerBalancerTask implements Runnable {
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
     List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = createCurrentIterationStatistic();
-    resultList.add(currentIterationStatistic);
+    if (currentIterationStatistic != null) {
+      resultList.add(currentIterationStatistic);
+    }
     return resultList;
   }
 
@@ -377,7 +390,7 @@ public class ContainerBalancerTask implements Runnable {
     if (isCurrentIterationInProgress.get()) {
       return getFilledCurrentIterationStatistic(lastIterationNumber, iterationDuration);
     } else {
-      return getEmptyCurrentIterationStatistic(iterationDuration);
+      return null;
     }
   }
 
