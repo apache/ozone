@@ -40,7 +40,7 @@ Bucket With Replication Config
         Verify Bucket EC Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}    RS    3    2    1048576
     ELSE
         Verify Bucket Empty Replication Config    /vol1/ratis-${CLUSTER_VERSION}
-        Verify Bucket Empty Replication Config    /vol1/bucket1-${CLUSTER_VERSION}
+        Verify Bucket Empty Replication Config    /vol1/ecbucket-${CLUSTER_VERSION}
     END
 
 Key Can Be Read
