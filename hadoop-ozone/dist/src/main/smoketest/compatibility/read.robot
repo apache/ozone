@@ -20,48 +20,45 @@ Resource            setup.robot
 Test Timeout        5 minutes
 Suite Setup         Create Local Test File
 
-*** Variables ***
-${SUFFIX}    ${EMPTY}
-
 *** Test Cases ***
 Bucket Replication Config
     Verify Bucket Empty Replication Config    /vol1/bucket1
 
 Key Can Be Read
-    Key Should Match Local File    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
+    Key Should Match Local File    /vol1/bucket1/key-${DATA_VERSION}    ${TESTFILE}
 
 Encrypted Key Can Be Read
-    Key Should Match Local File    /vol1/encrypted-${SUFFIX}/key    ${TESTFILE}
+    Key Should Match Local File    /vol1/encrypted-${DATA_VERSION}/key    ${TESTFILE}
 
 Dir Can Be Listed
-    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
-                    Should contain    ${result}    dir-${SUFFIX}/file-${SUFFIX}
-    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
-                    Should contain    ${result}    dir-${SUFFIX}/file-${SUFFIX}
+    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}
+                    Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
+    ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}
+                    Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
 
 Dir Can Be Listed Using Shell
     Pass Execution If    '${DATA_VERSION}' >= '${EC_VERSION}'      New client creates RATIS/ONE key by default: BUG?
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
         ${result} =     Key List With Replication    /vol1/bucket1
-                        Should contain    ${result}    key-${SUFFIX} RATIS 3
+                        Should contain    ${result}    key-${DATA_VERSION} RATIS 3
     ELSE
         ${result} =     Execute    ozone sh key list /vol1/bucket1
-                        Should Contain    ${result}    key-${SUFFIX}
+                        Should Contain    ${result}    key-${DATA_VERSION}
     END
 
 File Can Be Get
-    Key Should Match Local File    /vol1/bucket1/dir-${SUFFIX}/file-${SUFFIX}    ${TESTFILE}
+    Key Should Match Local File    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
 
-    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX} /tmp/
-    Execute    diff -q ${TESTFILE} /tmp/file-${SUFFIX}
-    [teardown]    Execute    rm -f /tmp/file-${SUFFIX}
+    Execute    ozone fs -get o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION} /tmp/
+    Execute    diff -q ${TESTFILE} /tmp/file-${DATA_VERSION}
+    [teardown]    Execute    rm -f /tmp/file-${DATA_VERSION}
 
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    Execute    ozone fs -get ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file ${TEMP_DIR}/
+    Execute    ozone fs -get ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file ${TEMP_DIR}/
     Execute    diff -q ${TESTFILE} ${TEMP_DIR}/file
     [teardown]    Execute    rm -f ${TEMP_DIR}/file
 
@@ -69,18 +66,18 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
-    Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
+    Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
 
 Key Read From Bucket With Replication
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${SUFFIX}      ${TESTFILE}
+    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX} /dev/null
+        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
     ELSE
-        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX}      ${TEST_DATA_DIR}/3mb
+        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
     END
 
 EC Test Listing Compat
@@ -93,10 +90,10 @@ EC Test Listing Compat
                     Should Not Be Empty    ${result}
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        ${result} =     Key List With Replication    /vol1/ratis-${SUFFIX}/
+        ${result} =     Key List With Replication    /vol1/ratis-${DATA_VERSION}/
                         Should contain  ${result}   key-${DATA_VERSION} RATIS 3
 
-        Assert Unsupported    ozone sh key list /vol1/ecbucket-${SUFFIX}/
+        Assert Unsupported    ozone sh key list /vol1/ecbucket-${DATA_VERSION}/
     END
 
 EC Test Info Compat
@@ -105,9 +102,9 @@ EC Test Info Compat
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     ${result} =     Execute     ozone sh volume info vol1 | jq -r '.name'
                     Should contain  ${result}   vol1
-    ${result} =     Bucket Replication    /vol1/ratis-${SUFFIX}
+    ${result} =     Bucket Replication    /vol1/ratis-${DATA_VERSION}
                     Should contain  ${result}   ratis        # there is no replication config in the old client for bucket info
-    ${result} =     Bucket Replication    /vol1/ecbucket-${SUFFIX}
+    ${result} =     Bucket Replication    /vol1/ecbucket-${DATA_VERSION}
                     Should contain  ${result}   ecbucket     # there is no replication config in the old client for bucket info
 
 EC Test FS Compat
@@ -117,16 +114,16 @@ EC Test FS Compat
     ${result} =     Execute     ozone fs -ls ofs://om/
                     Should contain  ${result}   /vol1
     ${result} =     Execute     ozone fs -ls ofs://om/vol1/
-                    Should contain  ${result}   /vol1/ratis-${SUFFIX}
-                    Should contain  ${result}   /vol1/ecbucket-${SUFFIX}
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${SUFFIX}
-                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${SUFFIX}
+                    Should contain  ${result}   /vol1/ratis-${DATA_VERSION}
+                    Should contain  ${result}   /vol1/ecbucket-${DATA_VERSION}
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
+                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
 
     ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/     1
                     Should contain  ${result}   ls: The list of keys contains keys with Erasure Coded replication set
-    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX}     1
+    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
                     Should contain  ${result}   : No such file or directory
-    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX}    1
+    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
                     Should contain  ${result}   : No such file or directory
 
 EC Test FS Client Can Read Own Writes
@@ -134,13 +131,13 @@ EC Test FS Client Can Read Own Writes
     Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${SUFFIX}      ${TESTFILE}
-    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX}      ${TEST_DATA_DIR}/1mb
+    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/1mb
 
 EC Test Client Can Read Own Writes
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${SUFFIX}      ${TESTFILE}
-    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${SUFFIX}      ${TEST_DATA_DIR}/2mb
+    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
+    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/2mb

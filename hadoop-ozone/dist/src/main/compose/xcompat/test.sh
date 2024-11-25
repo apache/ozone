@@ -66,7 +66,6 @@ _write() {
   execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" \
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
-    -v SUFFIX:${client_version} \
     -v TEST_DATA_DIR:/testdata \
     compatibility/write.robot
 }
@@ -78,7 +77,6 @@ _read() {
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
     -v DATA_VERSION:${data_version} \
-    -v SUFFIX:${data_version} \
     -v TEST_DATA_DIR:/testdata \
     compatibility/read.robot
 }
