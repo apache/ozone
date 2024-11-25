@@ -106,6 +106,7 @@ public class ReconLayoutVersionManager {
           // Rollback any pending changes for the current feature due to failure,
           // should only be used when setAutoCommit is disabled
           connection.rollback();
+          currentMLV = currentMLV - 1; // Rollback the MLV to the previous version
           LOG.error("Failed to finalize feature {}. Rolling back changes.", feature.getVersion(), e);
           throw e;
         }
