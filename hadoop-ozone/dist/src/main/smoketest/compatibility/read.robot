@@ -51,6 +51,11 @@ File Can Be Get
     Key Should Match Local File    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
     File Should Match Local File    o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
 
+File Can Be Get From Bucket With Replication
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+    File Should Match Local File     o3fs://ratis-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TESTFILE}
+    File Should Match Local File     o3fs://ecbucket-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TEST_DATA_DIR}/1mb
+
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
@@ -119,11 +124,3 @@ EC Test FS Compat
                     Should contain  ${result}   : No such file or directory
     ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
                     Should contain  ${result}   : No such file or directory
-
-EC Test FS Client Can Read Own Writes
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
-    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/1mb
