@@ -46,6 +46,7 @@ public class ChecksumCache {
   private static final int BLOCK_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
   public ChecksumCache(int bytesPerChecksum) {
+    LOG.info("Initializing ChecksumCache with bytesPerChecksum = {}", bytesPerChecksum);
     this.prevChunkLength = 0;
     this.bytesPerChecksum = bytesPerChecksum;
     // Set initialCapacity to avoid costly resizes
@@ -93,7 +94,7 @@ public class ChecksumCache {
         continue;
       }
 
-      // i can either point to:
+      // variable i can either point to:
       // 1. the last element in the list -- in which case the checksum needs to be updated
       // 2. one after the last element   -- in which case a new checksum needs to be added
       assert i == checksums.size() - 1 || i == checksums.size();

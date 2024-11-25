@@ -135,7 +135,6 @@ public class BlockOutputStream extends OutputStream {
   private List<ChunkBuffer> bufferList;
 
   private final List<DatanodeDetails> failedServers;
-  private final boolean chunkChecksumCacheEnabled;
   private final Checksum checksum;
 
   //number of buffers used before doing a flush/putBlock.
@@ -232,9 +231,7 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    this.chunkChecksumCacheEnabled = config.isChunkChecksumCacheEnabled();
-    this.checksum = new Checksum(config.getChecksumType(),
-        config.getBytesPerChecksum(), chunkChecksumCacheEnabled);
+    this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
@@ -581,6 +578,7 @@ public class BlockOutputStream extends OutputStream {
     final CompletableFuture<ContainerCommandResponseProto> flushFuture;
     final XceiverClientReply asyncReply;
     try {
+      // Note: checksum was previously appended to containerBlockData by WriteChunk
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
@@ -1136,9 +1134,9 @@ public class BlockOutputStream extends OutputStream {
     lastChunkBuffer.flip();
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
-    ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer, chunkChecksumCacheEnabled);
-    // Cache checksum here. This checksum is stored in blockData (and later transferred in PutBlock)
+    // checksum cache is utilized for this computation
+    // this checksum is stored in blockData and later transferred in PutBlock
+    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer, true);
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()

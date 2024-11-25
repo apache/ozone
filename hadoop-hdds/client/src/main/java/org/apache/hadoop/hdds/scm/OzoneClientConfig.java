@@ -178,15 +178,6 @@ public class OzoneClientConfig {
       tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private int bytesPerChecksum = 16 * 1024;
 
-  // Client-side block chunk checksum cache config
-  // TODO: Re-evaluate if this need to be exposed to end-users at all, e.g. to avoid confusion.
-  @Config(key = "chunk.checksum.cache.enabled",
-      defaultValue = "true",  // TODO: false by default?
-      description = "Increase client-side chunk checksum calculation efficiency when incremental chunk list is " +
-          "enabled by caching previously computed checksums in the same block chunk.",
-      tags = ConfigTag.CLIENT)
-  private boolean chunkChecksumCacheEnabled = true;
-
   @Config(key = "verify.checksum",
       defaultValue = "true",
       description = "Ozone client to verify checksum of the checksum "
@@ -456,14 +447,6 @@ public class OzoneClientConfig {
 
   public void setBytesPerChecksum(int bytesPerChecksum) {
     this.bytesPerChecksum = bytesPerChecksum;
-  }
-
-  public boolean isChunkChecksumCacheEnabled() {
-    return chunkChecksumCacheEnabled;
-  }
-
-  public void setChunkChecksumCacheEnabled(boolean chunkChecksumCacheEnabled) {
-    this.chunkChecksumCacheEnabled = chunkChecksumCacheEnabled;
   }
 
   public boolean isChecksumVerify() {
