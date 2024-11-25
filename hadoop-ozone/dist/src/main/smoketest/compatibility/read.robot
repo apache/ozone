@@ -29,8 +29,11 @@ Buckets Can Be Listed
         Should Contain    ${result}    ecbucket-${CLUSTER_VERSION}
     END
 
-Bucket Replication Config
+Bucket Without Replication Config
     Verify Bucket Empty Replication Config    /vol1/bucket1
+
+Bucket With Replication Config
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
         Verify Bucket Replica Replication Config    /vol1/ratis-${CLUSTER_VERSION}   RATIS   THREE
