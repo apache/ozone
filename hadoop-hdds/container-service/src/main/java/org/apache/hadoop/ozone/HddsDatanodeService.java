@@ -87,6 +87,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import picocli.CommandLine.Command;
 
 /**
@@ -152,6 +153,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
+      // redirect JUL to slf4j
+      SLF4JBridgeHandler.install();
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
       HddsDatanodeService hddsDatanodeService =
