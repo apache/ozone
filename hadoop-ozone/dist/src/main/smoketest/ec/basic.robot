@@ -64,7 +64,7 @@ Test Bucket Creation
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh bucket create /${VOLUME}/default
                     Should not contain  ${result}       Failed
-                    Verify Bucket Empty Replication Config      /${VOLUME}/default
+                    Verify Bucket Replication Config      /${VOLUME}/default    null
     ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${VOLUME}/ratis
                     Should not contain  ${result}       Failed
                     Verify Bucket Replica Replication Config    /${VOLUME}/ratis   RATIS   THREE
