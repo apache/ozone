@@ -258,8 +258,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       = new ThreadLocal<>();
   private boolean s3AuthCheck;
 
-  public static final int BLOCK_ALLOCATION_RETRY_COUNT = 5;
-  public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 3000;
+  public static final int BLOCK_ALLOCATION_RETRY_COUNT = 90;
+  public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 1000;
 
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
