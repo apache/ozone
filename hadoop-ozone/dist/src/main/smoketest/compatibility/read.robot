@@ -54,7 +54,7 @@ Key Read From Bucket With Replication
 
     Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
 
-    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' OR '${DATA_VERSION}' == '${CLIENT_VERSION}'
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
         Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
     ELSE
         Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
