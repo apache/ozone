@@ -132,8 +132,10 @@ public class TestReconLayoutVersionManager {
     layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
     // Verify that schema versions are updated for our custom features
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1, mockConnection);
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2, mockConnection);
+    verify(schemaVersionTableManager, times(1))
+        .updateSchemaVersion(1, mockConnection);
+    verify(schemaVersionTableManager, times(1))
+        .updateSchemaVersion(2, mockConnection);
   }
 
   /**
@@ -220,7 +222,8 @@ public class TestReconLayoutVersionManager {
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
 
     // Simulate an exception being thrown during the schema version update
-    doThrow(new RuntimeException("Schema update failed")).when(schemaVersionTableManager).updateSchemaVersion(1, mockConnection);
+    doThrow(new RuntimeException("Schema update failed")).when(schemaVersionTableManager).
+        updateSchemaVersion(1, mockConnection);
     when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
         .thenReturn(Optional.of(action1));
 

@@ -39,7 +39,7 @@ public class ReconSchemaVersionTableManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconSchemaVersionTableManager.class);
   public static final String RECON_SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
-  private final DSLContext dslContext;
+  private DSLContext dslContext;
   private final DataSource dataSource;
 
   @Inject
@@ -73,7 +73,7 @@ public class ReconSchemaVersionTableManager {
    * @param newVersion The new version to set.
    */
   public void updateSchemaVersion(int newVersion, Connection conn) {
-    DSLContext dslContext = DSL.using(conn);
+    dslContext = DSL.using(conn);
     boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
         .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));
 
