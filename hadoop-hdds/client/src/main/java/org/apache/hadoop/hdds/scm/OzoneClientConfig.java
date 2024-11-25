@@ -156,7 +156,7 @@ public class OzoneClientConfig {
       description =
           "Indicates the time duration in seconds a client will wait "
               + "before retrying a read key request on encountering "
-              + "a connectivity excepetion from Datanodes . "
+              + "a connectivity exception from Datanodes. "
               + "By default the interval is 1 second",
       tags = ConfigTag.CLIENT)
   private int readRetryInterval = 1;
