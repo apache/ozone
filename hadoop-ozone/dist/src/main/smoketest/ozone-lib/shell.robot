@@ -31,7 +31,7 @@ Compare Key With Local File
     [arguments]    ${key}    ${file}    ${cmd}='sh key get'
     ${postfix} =   Generate Random String  5  [NUMBERS]
     ${tmpfile} =   Set Variable    /tmp/tempkey-${postfix}
-    Execute        ozone sh key get ${key} ${tmpfile}
+    Execute        ozone ${cmd} ${key} ${tmpfile}
     ${rc} =        Run And Return Rc    diff -q ${file} ${tmpfile}
     Execute        rm -f ${tmpfile}
     ${result} =    Set Variable If    ${rc} == 0    ${TRUE}   ${FALSE}
