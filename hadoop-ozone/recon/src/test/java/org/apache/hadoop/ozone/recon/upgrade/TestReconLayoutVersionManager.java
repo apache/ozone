@@ -198,8 +198,47 @@ public class TestReconLayoutVersionManager {
     }
 
     // Verify that metadata layout version MLV was not updated as the transaction was rolled back
-    layoutVersionManager.getCurrentMLV();
     assertEquals(0, layoutVersionManager.getCurrentMLV());
+
+    // Verify that a rollback was triggered
+    verify(mockConnection, times(1)).rollback();
+  }
+
+  /**
+   * Tests the scenario where the schema version update fails. Ensures that if the schema
+   * version update fails, the transaction is rolled back and the metadata layout version
+   * is not updated.
+   */
+  @Test
+  public void testUpdateSchemaFailure() throws Exception {
+    // Reset existing mocks and set up new features for this specific test
+    mockedEnum.reset();
+
+    // Mock ReconLayoutFeature instances
+    ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
+    when(feature1.getVersion()).thenReturn(1);
+    ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
+
+    // Simulate an exception being thrown during the schema version update
+    doThrow(new RuntimeException("Schema update failed")).when(schemaVersionTableManager).updateSchemaVersion(1, mockConnection);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+        .thenReturn(Optional.of(action1));
+
+    // Mock the static values method to return the custom feature
+    mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1});
+
+    // Execute the layout feature finalization
+    try {
+      layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    } catch (Exception e) {
+      // Exception is expected, so it's fine to catch and ignore it here
+    }
+
+    // Verify that metadata layout version MLV was not updated as the transaction was rolled back
+    assertEquals(0, layoutVersionManager.getCurrentMLV());
+
+    // Verify that the upgrade action was not committed and a rollback was triggered
+    verify(mockConnection, times(1)).rollback();
   }
 
   /**
