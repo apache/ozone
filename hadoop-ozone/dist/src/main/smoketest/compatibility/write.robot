@@ -32,8 +32,6 @@ Create Bucket With Replication Type
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${CLIENT_VERSION}
     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${CLIENT_VERSION}
-    Execute             ozone sh key put /vol1/ratis-${CLIENT_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
-    Execute             ozone sh key put /vol1/ecbucket-${CLIENT_VERSION}/key-${CLIENT_VERSION} ${TEST_DATA_DIR}/3mb
 
 Create Encrypted Bucket
     Execute    ozone sh bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${CLIENT_VERSION}
@@ -45,10 +43,9 @@ Key Can Be Written
     Create Key    /vol1/bucket1/key-${CLIENT_VERSION}    ${TESTFILE}
 
 Key Can Be Written To Bucket With Replication Type
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute         ozone sh key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
-    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TEST_DATA_DIR}/2mb
+    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TEST_DATA_DIR}/3mb
 
 Key Can Be Deleted
     Create Key    /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}    ${TESTFILE}

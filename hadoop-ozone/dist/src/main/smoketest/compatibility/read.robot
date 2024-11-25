@@ -69,15 +69,14 @@ HSync Lease Recover Can Be Used
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
 
 Key Read From Bucket With Replication
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
     Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
 
-    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
-    ELSE
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' OR '${DATA_VERSION}' == '${CLIENT_VERSION}'
         Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
+    ELSE
+        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
     END
 
 EC Test Listing Compat
@@ -133,11 +132,3 @@ EC Test FS Client Can Read Own Writes
 
     Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
     Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/1mb
-
-EC Test Client Can Read Own Writes
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-
-    Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
-    Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/2mb
