@@ -280,7 +280,7 @@
   <property>
     <name>hdds.ratis.snapshot.threshold</name>
     <value>100000</value>
-    <tag>OZONE, RATIS</tag>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
       taken.
     </description>
