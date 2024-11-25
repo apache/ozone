@@ -85,12 +85,12 @@ Verify Balancer Iteration
 Verify Balancer Iteration History
     [arguments]       ${output}
     Should Contain                  ${output}             Iteration history list:
-    Should Contain X Times          ${output}             Size scheduled to move                    2      collapse_spaces=True
-    Should Contain X Times          ${output}             Moved data size                           2      collapse_spaces=True
-    Should Contain X Times          ${output}             Scheduled to move containers              2      collapse_spaces=True
-    Should Contain X Times          ${output}             Already moved containers                  2      collapse_spaces=True
-    Should Contain X Times          ${output}             Failed to move containers 0               2      collapse_spaces=True
-    Should Contain X Times          ${output}             Failed to move containers by timeout 0    2      collapse_spaces=True
+    Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
+    Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
+    Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True
+    Should Contain X Times          ${output}             Already moved containers                  1      collapse_spaces=True
+    Should Contain X Times          ${output}             Failed to move containers 0               1      collapse_spaces=True
+    Should Contain X Times          ${output}             Failed to move containers by timeout 0    1      collapse_spaces=True
     Should Contain                  ${output}             Iteration result ITERATION_COMPLETED             collapse_spaces=True
 
 Run Balancer Status

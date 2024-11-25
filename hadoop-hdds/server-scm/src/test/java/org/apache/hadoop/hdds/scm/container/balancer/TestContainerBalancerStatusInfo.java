@@ -139,7 +139,7 @@ class TestContainerBalancerStatusInfo {
     config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "1");
-    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, configuration,true);
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, configuration, true);
     // Delay in finishing the first iteration
     LambdaTestUtils.await(1100, 50, () -> task.getCurrentIterationsStatistic().size() == 1);
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();

@@ -78,15 +78,25 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             = balancerStatusInfo.getIterationsStatusInfoList();
 
         System.out.println("Current iteration info:");
-        System.out.println(
-            getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))
-        );
+        ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
+            .filter(it -> it.getIterationResult().isEmpty())
+            .findFirst()
+            .orElse(null);
+        if (currentIterationStatistic == null) {
+          System.out.println("-\n");
+        } else {
+          System.out.println(
+              getPrettyIterationStatusInfo(currentIterationStatistic)
+          );
+        }
+
 
         if (verboseWithHistory) {
           System.out.println("Iteration history list:");
           System.out.println(
-              iterationsStatusInfoList.subList(0, iterationsStatusInfoList.size() - 1)
+              iterationsStatusInfoList
                   .stream()
+                  .filter(it -> !it.getIterationResult().isEmpty())
                   .map(this::getPrettyIterationStatusInfo)
                   .collect(Collectors.joining("\n"))
           );

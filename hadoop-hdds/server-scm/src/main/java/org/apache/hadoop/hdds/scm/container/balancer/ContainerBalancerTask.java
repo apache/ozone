@@ -274,8 +274,10 @@ public class ContainerBalancerTask implements Runnable {
         return;
       }
 
-      IterationResult iR = doIteration();
-      saveIterationStatistic(i + 1, iR);
+      IterationResult currentIterationResult = doIteration();
+      ContainerBalancerTaskIterationStatusInfo iterationStatistic =
+          getIterationStatistic(i + 1, currentIterationResult, getCurrentIterationDuration());
+      iterationsStatistic.offer(iterationStatistic);
 
       isCurrentIterationInProgress.compareAndSet(true, false);
 
@@ -284,17 +286,17 @@ public class ContainerBalancerTask implements Runnable {
 
       metrics.incrementNumIterations(1);
 
-      LOG.info("Result of this iteration of Container Balancer: {}", iR);
+      LOG.info("Result of this iteration of Container Balancer: {}", currentIterationResult);
 
       // if no new move option is generated, it means the cluster cannot be
       // balanced anymore; so just stop balancer
-      if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        tryStopWithSaveConfiguration(iR.toString());
+      if (currentIterationResult == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
+        tryStopWithSaveConfiguration(currentIterationResult.toString());
         return;
       }
 
       // persist next iteration index
-      if (iR == IterationResult.ITERATION_COMPLETED) {
+      if (currentIterationResult == IterationResult.ITERATION_COMPLETED) {
         try {
           saveConfiguration(config, true, i + 1);
         } catch (IOException | TimeoutException e) {
@@ -325,30 +327,45 @@ public class ContainerBalancerTask implements Runnable {
     tryStopWithSaveConfiguration("Completed all iterations.");
   }
 
-  private void saveIterationStatistic(Integer iterationNumber, IterationResult currentIterationResult) {
-    long iterationDuration = now().toEpochSecond() - currentIterationStarted.toEpochSecond();
+  private ContainerBalancerTaskIterationStatusInfo getIterationStatistic(Integer iterationNumber,
+                                                                         IterationResult currentIterationResult,
+                                                                         long iterationDuration) {
+    String currentIterationResultName = currentIterationResult == null ? null : currentIterationResult.name();
     Map<UUID, Long> sizeEnteringDataToNodes =
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
     Map<UUID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     IterationInfo iterationInfo = new IterationInfo(
         iterationNumber,
-        currentIterationResult.name(),
+        currentIterationResultName,
         iterationDuration
     );
     ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
-    DataMoveInfo dataMoveInfo = new DataMoveInfo(
-        getSizeScheduledForMoveInLatestIteration(),
-        metrics.getDataSizeMovedInLatestIteration(),
-        sizeEnteringDataToNodes,
-        sizeLeavingDataFromNodes
-    );
-    ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-        iterationInfo,
-        containerMoveInfo,
-        dataMoveInfo
-    );
-    iterationsStatistic.offer(iterationStatistic);
+
+    DataMoveInfo dataMoveInfo =
+        getDataMoveInfo(currentIterationResultName, sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
+    return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
+  }
+
+  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<UUID, Long> sizeEnteringDataToNodes,
+                                       Map<UUID, Long> sizeLeavingDataFromNodes) {
+    if (currentIterationResultName == null) {
+      // For unfinished iteration
+      return new DataMoveInfo(
+          getSizeScheduledForMoveInLatestIteration(),
+          sizeActuallyMovedInLatestIteration,
+          sizeEnteringDataToNodes,
+          sizeLeavingDataFromNodes
+      );
+    } else {
+      // For finished iteration
+      return new DataMoveInfo(
+          getSizeScheduledForMoveInLatestIteration(),
+          metrics.getDataSizeMovedInLatestIteration(),
+          sizeEnteringDataToNodes,
+          sizeLeavingDataFromNodes
+      );
+    }
   }
 
   private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
@@ -388,7 +405,7 @@ public class ContainerBalancerTask implements Runnable {
     long iterationDuration = getCurrentIterationDuration();
 
     if (isCurrentIterationInProgress.get()) {
-      return getFilledCurrentIterationStatistic(lastIterationNumber, iterationDuration);
+      return getIterationStatistic(lastIterationNumber + 1, null, iterationDuration);
     } else {
       return null;
     }
