@@ -63,7 +63,7 @@ share/ozone/lib/hadoop-common.jar
 share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
-share/ozone/lib/hadoop-shaded-protobuf_3_7.jar
+share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
 share/ozone/lib/hdds-annotation-processing.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
@@ -134,6 +134,7 @@ share/ozone/lib/jersey-hk2.jar
 share/ozone/lib/jersey-media-jaxb.jar
 share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
+share/ozone/lib/jettison.jar
 share/ozone/lib/jetty-client.jar
 share/ozone/lib/jetty-http.jar
 share/ozone/lib/jetty-io.jar
@@ -202,6 +203,7 @@ share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
+share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar

@@ -180,7 +180,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CONTAINER_UNHEALTHY:
     case CLOSED_CONTAINER_IO:
     case DELETE_ON_OPEN_CONTAINER:
-    case UNSUPPORTED_REQUEST: // Blame client for sending unsupported request.
+    case UNSUPPORTED_REQUEST:// Blame client for sending unsupported request.
+    case CONTAINER_MISSING:
       return true;
     default:
       return false;
@@ -281,7 +282,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         getMissingContainerSet().remove(containerID);
       }
     }
-    if (getMissingContainerSet().contains(containerID)) {
+    if (cmdType != Type.CreateContainer && !HddsUtils.isReadOnly(msg)
+        && getMissingContainerSet().contains(containerID)) {
       StorageContainerException sce = new StorageContainerException(
           "ContainerID " + containerID
               + " has been lost and cannot be recreated on this DataNode",

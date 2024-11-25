@@ -27,6 +27,9 @@ ${SUFFIX}    ${EMPTY}
 Key Can Be Read
     Key Should Match Local File    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
 
+Encrypted Key Can Be Read
+    Key Should Match Local File    /vol1/encrypted-${SUFFIX}/key    ${TESTFILE}
+
 Dir Can Be Listed
     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${SUFFIX}
 
@@ -48,7 +51,7 @@ FSO Bucket Can Be Read
     [teardown]    Execute    rm -f ${TEMP_DIR}/file
 
 HSync Lease Recover Can Be Used
-    Pass Execution If    '${DATA_VERSION}' < '${HSYNC_VERSION}'      Skipped the test case
+    Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
