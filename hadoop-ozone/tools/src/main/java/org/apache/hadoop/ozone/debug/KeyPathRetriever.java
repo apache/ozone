@@ -64,6 +64,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
     description = "retrieve full key path with matching criteria")
 @MetaInfServices(SubcommandWithParent.class)
 public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
+  private static final String DIRTREEDBNAME = "omdirtree.db";
   private static final DBColumnFamilyDefinition<Long, String> DIRTREE_COLUMN_FAMILY
       = new DBColumnFamilyDefinition<>("dirTreeTable", LongCodec.get(), StringCodec.get());
 
@@ -119,7 +120,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       }
     }
     if (containerIds.isEmpty()) {
-      System.out.println("No containers to be filtered");
+      System.err.println("No containers to be filtered");
       return null;
     }
     // out stream
@@ -151,6 +152,11 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       dirTreeDbStore.close();
       writer.close();
       metadataManager.stop();
+      // delete temporary created db file
+      File dirTreeDbPath = new File(new File(dbFile).getParentFile(), DIRTREEDBNAME);
+      if (dirTreeDbPath.exists()) {
+        FileUtils.deleteDirectory(dirTreeDbPath);
+      }
     }
     return null;
   }
@@ -162,7 +168,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
     try {
       prepareDirIdTree(metadataManager, bucketVolMap);
     } catch (Exception e) {
-      System.out.println("Exception occurred reading directory Table, " + e);
+      System.err.println("Exception occurred reading directory Table, " + e);
       return;
     }
 
@@ -202,13 +208,13 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
         }
       }
     } catch (Exception e) {
-      System.out.println("Exception occurred reading file Table, " + e);
+      System.err.println("Exception occurred reading file Table, " + e);
     }
   }
 
   private static OMMetadataManager getOmMetadataManager(String db) throws IOException {
     if (!Files.exists(Paths.get(db))) {
-      System.out.println("DB with path not exist:" + db);
+      System.err.println("DB with path not exist:" + db);
       return null;
     }
     System.out.println("Db Path is:" + db);
@@ -242,7 +248,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
   }
 
   private DBStore openDb(File omPath) {
-    File dirTreeDbPath = new File(omPath, "omdirtree.db");
+    File dirTreeDbPath = new File(omPath, DIRTREEDBNAME);
     System.out.println("Creating database of dir tree path at " + dirTreeDbPath);
     try {
       // Delete the DB from the last run if it exists.
@@ -258,7 +264,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       dbStoreBuilder.addCodec(DIRTREE_COLUMN_FAMILY.getValueType(), DIRTREE_COLUMN_FAMILY.getValueCodec());
       return dbStoreBuilder.build();
     } catch (IOException e) {
-      System.out.println("Error creating omdirtree.db " + e);
+      System.err.println("Error creating omdirtree.db " + e);
       return null;
     }
   }

@@ -41,8 +41,7 @@ import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -147,10 +146,8 @@ public class TestKeyPathRetriever {
 
     keyPathRetriever.retrieve(mock, writer, containerSet);
     writer.close();
-    String outParam = out.toString();
-    assertTrue(outParam.contains("vol/bucket1/dir1/file1") && outParam.contains("vol/bucket1/dir1/file2")
-        && outParam.contains("vol/bucket1/dir1/file4"));
-    assertFalse(outParam.contains("file3"));
+    assertThat(out.toString()).contains("vol/bucket1/dir1/file1").contains("vol/bucket1/dir1/file2")
+        .contains("vol/bucket1/dir1/file4").doesNotContain("file3");
   }
 
   private static List<OmKeyLocationInfoGroup> getLocationGrpList(long containerId) {

@@ -77,8 +77,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Ozone Debug shell.
@@ -207,8 +205,8 @@ public class TestOzoneDebugShell {
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     String keyPrefix = volumeName + "/" + bucketName + "/dir1/";
-    assertTrue(stdout.toString().contains(keyPrefix + "file1") && stdout.toString().contains(keyPrefix + "file2"));
-    assertFalse(stdout.toString().contains(keyPrefix + "file3"));
+    assertThat(stdout.toString()).contains(keyPrefix + "file1").contains(keyPrefix + "file2")
+        .doesNotContain(keyPrefix + "file3");
   }
 
   private static String getSnapshotDBPath(String checkPointDir) {
