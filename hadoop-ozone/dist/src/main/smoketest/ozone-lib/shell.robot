@@ -90,10 +90,10 @@ Key List With Replication
     ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
     [return]    ${result}
 
-Verify Bucket Replication Config
-    [arguments]    ${bucket}    ${expected}
+Verify Bucket Empty Replication Config
+    [arguments]    ${bucket}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig'
-                   Should Be Equal          ${result}       ${expected}
+                   Should Be Equal          ${result}       null
 
 Verify Bucket Replica Replication Config
     [arguments]    ${bucket}    ${type}    ${factor}
