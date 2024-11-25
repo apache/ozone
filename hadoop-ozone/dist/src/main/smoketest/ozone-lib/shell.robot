@@ -28,7 +28,7 @@ Bucket Exists
     [Return]                  ${TRUE}
 
 Compare Key With Local File
-    [arguments]    ${key}    ${file}    ${cmd}='sh key get'
+    [arguments]    ${key}    ${file}    ${cmd}=sh key get
     ${postfix} =   Generate Random String  5  [NUMBERS]
     ${tmpfile} =   Set Variable    /tmp/tempkey-${postfix}
     Execute        ozone ${cmd} ${key} ${tmpfile}
