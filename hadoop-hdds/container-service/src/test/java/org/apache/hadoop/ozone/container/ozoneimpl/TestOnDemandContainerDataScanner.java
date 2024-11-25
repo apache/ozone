@@ -23,6 +23,8 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +36,7 @@ import org.mockito.stubbing.Answer;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -52,7 +55,9 @@ import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -64,9 +69,12 @@ import static org.mockito.Mockito.when;
 public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
 
+  private ContainerChecksumTreeManager mockChecksumManager;
+
   @BeforeEach
   public void setup() {
     super.setup();
+    mockChecksumManager = mock(ContainerChecksumTreeManager .class);
   }
 
   @Test
@@ -104,7 +112,7 @@ public class TestOnDemandContainerDataScanner extends
 
   @Test
   public void testScanTimestampUpdated() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     Optional<Future<?>> scanFuture =
         OnDemandContainerDataScanner.scanContainer(healthy);
     assertTrue(scanFuture.isPresent());
@@ -125,8 +133,8 @@ public class TestOnDemandContainerDataScanner extends
 
   @Test
   public void testContainerScannerMultipleInitsAndShutdowns() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     OnDemandContainerDataScanner.shutdown();
     OnDemandContainerDataScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
@@ -136,7 +144,7 @@ public class TestOnDemandContainerDataScanner extends
 
   @Test
   public void testSameContainerQueuedMultipleTimes() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     //Given a container that has not finished scanning
     CountDownLatch latch = new CountDownLatch(1);
     when(corruptData.scanData(
@@ -164,7 +172,7 @@ public class TestOnDemandContainerDataScanner extends
   @Test
   @Override
   public void testScannerMetrics() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
         corruptData));
@@ -186,7 +194,7 @@ public class TestOnDemandContainerDataScanner extends
   @Test
   @Override
   public void testScannerMetricsUnregisters() {
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
     OnDemandContainerDataScanner.shutdown();
@@ -226,7 +234,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testWithVolumeFailure() throws Exception {
     when(vol.isFailed()).thenReturn(true);
 
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
 
     scanContainer(healthy);
@@ -251,7 +259,7 @@ public class TestOnDemandContainerDataScanner extends
     });
 
     // Start the blocking scan.
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     OnDemandContainerDataScanner.scanContainer(healthy);
     // Shut down the on demand scanner. This will interrupt the blocked scan
     // on the healthy container.
@@ -298,8 +306,25 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
+  @Test
+  public void testMerkleTreeWritten() throws Exception {
+    // Merkle trees should not be written for open or deleted containers
+    for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
+      scanContainer(container);
+      verify(mockChecksumManager, times(0))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
+
+    // Merkle trees should be written for all other containers.
+    for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
+      scanContainer(container);
+      verify(mockChecksumManager, times(1))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
+  }
+
   private void scanContainer(Container<?> container) throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     Optional<Future<?>> scanFuture =
         OnDemandContainerDataScanner.scanContainer(container);
     if (scanFuture.isPresent()) {

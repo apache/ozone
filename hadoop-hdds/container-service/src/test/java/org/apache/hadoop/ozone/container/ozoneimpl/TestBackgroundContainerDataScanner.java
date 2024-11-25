@@ -24,6 +24,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +50,9 @@ import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,12 +64,13 @@ public class TestBackgroundContainerDataScanner extends
     TestContainerScannersAbstract {
 
   private BackgroundContainerDataScanner scanner;
+  private ContainerChecksumTreeManager mockChecksumManager;
 
   @BeforeEach
   public void setup() {
     super.setup();
-    scanner = new BackgroundContainerDataScanner(conf, controller, vol,
-        new ContainerChecksumTreeManager(new OzoneConfiguration()));
+    mockChecksumManager = mock(ContainerChecksumTreeManager.class);
+    scanner = new BackgroundContainerDataScanner(conf, controller, vol, mockChecksumManager);
   }
 
   @Test
@@ -224,7 +229,6 @@ public class TestBackgroundContainerDataScanner extends
     verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 
-
   @Test
   @Override
   public void testShutdownDuringScan() throws Exception {
@@ -244,6 +248,22 @@ public class TestBackgroundContainerDataScanner extends
     scanner.shutdown();
     // The container should remain healthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
 
+  @Test
+  public void testMerkleTreeWritten() throws Exception {
+    scanner.runIteration();
+
+    // Merkle trees should not be written for open or deleted containers
+    for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
+      verify(mockChecksumManager, times(0))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
+
+    // Merkle trees should be written for all other containers.
+    for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
+      verify(mockChecksumManager, times(1))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
   }
 }
