@@ -167,6 +167,7 @@ share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr311-api.jar
+share/ozone/lib/jul-to-slf4j.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
 share/ozone/lib/kerb-util.jar

@@ -462,6 +462,7 @@ MIT
    org.kohsuke.metainf-services:metainf-services
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
+   org.slf4j:jul-to-slf4j
 
 
 Public Domain
