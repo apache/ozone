@@ -40,18 +40,18 @@ if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; t
   _compose_delete_test_data() {
     rm -frv "${TEST_DATA_DIR}"
   }
+
+  trap _compose_cleanup EXIT HUP INT TERM
 fi
 
 _compose_cleanup() {
   if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
     stop_docker_env || true
   fi
-  if [[ "function" == $(type -t _compose_delete_test_data) ]]; then
+  if [[ "$(type -t _compose_delete_test_data || true)" == "function" ]]; then
     _compose_delete_test_data
   fi
 }
-
-trap _compose_cleanup EXIT HUP INT TERM
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
@@ -167,6 +167,7 @@ start_docker_env(){
   fi
 
   OZONE_COMPOSE_RUNNING=true
+  trap _compose_cleanup EXIT HUP INT TERM
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
