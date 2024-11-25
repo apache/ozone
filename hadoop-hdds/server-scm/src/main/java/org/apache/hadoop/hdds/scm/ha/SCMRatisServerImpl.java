@@ -151,8 +151,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   @Nullable
   public RaftPeerId getLeaderId() {
-    if (getLeader() != null) {
-      return getLeader().getId();
+    RaftPeer raftLeaderPeer = getLeader();
+    if (raftLeaderPeer != null) {
+      return raftLeaderPeer.getId();
     }
     return null;
   }
