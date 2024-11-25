@@ -22,9 +22,4 @@ Resource            ../ozone-lib/shell.robot
 ${EC_VERSION}     1.3.0
 ${FSO_VERSION}    1.3.0
 ${HSYNC_VERSION}  2.0.0
-
-
-*** Keywords ***
-Create Local Test File
-    Set Suite Variable    ${TESTFILE}    /tmp/test-data-${CLIENT_VERSION}.txt
-    Create File    ${TESTFILE}    Compatibility Test
+${TESTFILE}       ${TEST_DATA_DIR}/small

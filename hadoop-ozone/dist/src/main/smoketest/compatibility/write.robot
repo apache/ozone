@@ -20,7 +20,6 @@ Resource            setup.robot
 Resource            ../lib/fs.robot
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
-Suite Setup         Create Local Test File
 
 *** Variables ***
 ${ENCRYPTION_KEY}    key1

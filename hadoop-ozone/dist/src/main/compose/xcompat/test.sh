@@ -32,6 +32,7 @@ source "${COMPOSE_DIR}/../testlib.sh"
 export SECURITY_ENABLED=true
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
+echo 'Compatibility Test' > "${TEST_DATA_DIR}"/small
 dd if=/dev/urandom of=${TEST_DATA_DIR}/1mb bs=1048576 count=1 >/dev/null 2>&1
 dd if=/dev/urandom of=${TEST_DATA_DIR}/2mb bs=1048576 count=2 >/dev/null 2>&1
 dd if=/dev/urandom of=${TEST_DATA_DIR}/3mb bs=1048576 count=3 >/dev/null 2>&1

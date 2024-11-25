@@ -18,7 +18,6 @@ Documentation       Read Compatibility
 Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
 Test Timeout        5 minutes
-Suite Setup         Create Local Test File
 
 *** Test Cases ***
 Buckets Can Be Listed
