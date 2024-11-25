@@ -34,16 +34,15 @@ export SECURITY_ENABLED=true
 
 echo 'Compatibility Test' > "${TEST_DATA_DIR}"/small
 
-old_client() {
-  OZONE_DIR=/opt/ozone
-  container=${client}
-  "$@"
-}
+client() {
+  if [[ "${client_version}" == "${current_version}" ]]; then
+    OZONE_DIR=/opt/hadoop
+    container=new_client
+  else
+    OZONE_DIR=/opt/ozone
+    container="old_client_${client_version//./_}"
+  fi
 
-new_client() {
-  OZONE_DIR=/opt/hadoop
-  container=new_client
-  client_version=${current_version}
   "$@"
 }
 
@@ -86,21 +85,22 @@ test_cross_compatibility() {
 
   _init
 
-  new_client _write
+  # first write with client matching cluster version
+  client_version="${cluster_version}" client _write
 
   for client_version in "$@"; do
-    client="old_client_${client_version//./_}"
-    old_client _write
+    # skip write, since already done
+    if [[ "${client_version}" == "${cluster_version}" ]]; then
+      continue
+    fi
+    client _write
   done
 
   for client_version in "$@"; do
-    client="old_client_${client_version//./_}"
-    old_client _read ${client_version}
-    old_client _read ${current_version}
-    new_client _read ${client_version}
+    for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
+      client _read ${data_version}
+    done
   done
-
-  new_client _read ${current_version}
 
   KEEP_RUNNING=false stop_docker_env
 }
@@ -108,10 +108,10 @@ test_cross_compatibility() {
 create_results_dir
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions}
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
 
 # old cluster with clients: same version and current version
 for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
+  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
 done
