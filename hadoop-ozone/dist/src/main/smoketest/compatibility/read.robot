@@ -21,6 +21,15 @@ Test Timeout        5 minutes
 Suite Setup         Create Local Test File
 
 *** Test Cases ***
+Buckets Can Be Listed
+    ${result} =     Execute     ozone sh bucket list /vol1
+    Should Contain    ${result}    bucket1
+
+    IF    '${CLUSTER_VERSION}' >= '${EC_VERSION}'
+        Should Contain    ${result}    ratis-${CLUSTER_VERSION}
+        Should Contain    ${result}    ecbucket-${CLUSTER_VERSION}
+    END
+
 Bucket Replication Config
     Verify Bucket Empty Replication Config    /vol1/bucket1
 
@@ -36,16 +45,30 @@ Dir Can Be Listed
     ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}
                     Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
 
-Dir Can Be Listed Using Shell
-    Pass Execution If    '${DATA_VERSION}' >= '${EC_VERSION}'      New client creates RATIS/ONE key by default: BUG?
-
-    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        ${result} =     Key List With Replication    /vol1/bucket1
-                        Should contain    ${result}    key-${DATA_VERSION} RATIS 3
-    ELSE
+Key List
+    IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
         ${result} =     Execute    ozone sh key list /vol1/bucket1
                         Should Contain    ${result}    key-${DATA_VERSION}
+    ELSE IF    '${DATA_VERSION}' < '${EC_VERSION}' # New client creates RATIS/ONE key by default: BUG?
+        ${result} =     Key List With Replication    /vol1/bucket1
+                        Should contain    ${result}    key-${DATA_VERSION} RATIS 3
     END
+
+Key List In Bucket With Replication
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+
+    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
+        ${result} =     Key List With Replication    /vol1/ratis-${DATA_VERSION}/
+                        Should contain  ${result}   key-${DATA_VERSION} RATIS 3
+
+        Assert Unsupported    ozone sh key list /vol1/ecbucket-${DATA_VERSION}/
+    ELSE
+        ${result} =     Execute    ozone sh key list /vol1/ratis-${CLUSTER_VERSION}
+                        Should Contain    ${result}    key-${DATA_VERSION}
+        ${result} =     Execute    ozone sh key list /vol1/ecbucket-${CLUSTER_VERSION}
+                        Should Contain    ${result}    key-${DATA_VERSION}
+    END
+
 
 File Can Be Get
     Key Should Match Local File    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}    ${TESTFILE}
@@ -77,22 +100,6 @@ Key Read From Bucket With Replication
         Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
     ELSE
         Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
-    END
-
-EC Test Listing Compat
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-
-    ${result} =     Execute     ozone sh bucket list --prefix ratis /vol1
-                    Should Not Be Empty    ${result}
-    ${result} =     Execute     ozone sh bucket list --prefix ecbucket /vol1
-                    Should Not Be Empty    ${result}
-
-    IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
-        ${result} =     Key List With Replication    /vol1/ratis-${DATA_VERSION}/
-                        Should contain  ${result}   key-${DATA_VERSION} RATIS 3
-
-        Assert Unsupported    ozone sh key list /vol1/ecbucket-${DATA_VERSION}/
     END
 
 EC Test Info Compat
