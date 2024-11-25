@@ -21,6 +21,8 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  scorecard:
+    uses: ./.github/workflows/scorecard.yml
   CI:
     if: github.event_name == 'pull_request' || !startsWith(github.ref_name, 'dependabot')
     uses: ./.github/workflows/ci.yml
