@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -37,7 +36,7 @@ import java.util.concurrent.Callable;
 public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.ParentCommand
-  private OzoneRepair parent;
+  private OMRepair parent;
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -85,6 +84,6 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Class<?> getParentType() {
-    return OzoneRepair.class;
+    return OMRepair.class;
   }
 }
