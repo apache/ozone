@@ -44,7 +44,7 @@ Key Can Be Written
 Key Can Be Written To Bucket With Replication Type
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute         ozone sh key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
-    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TEST_DATA_DIR}/3mb
+    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
 
 Key Can Be Deleted
     Create Key    /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}    ${TESTFILE}
@@ -60,7 +60,7 @@ File Can Be Put To Bucket With Replication Type
     Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION}
-    Execute         ozone fs -put ${TEST_DATA_DIR}/1mb ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION}
+    Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION}
 
 File Can Be Deleted
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted

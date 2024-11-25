@@ -44,7 +44,7 @@ Key Read From Bucket With Replication
     Key Should Match Local File     /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
 
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' OR '${DATA_VERSION}' == '${CLIENT_VERSION}'
-        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TEST_DATA_DIR}/3mb
+        Key Should Match Local File     /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
     ELSE
         Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
     END
@@ -87,7 +87,7 @@ File Can Be Get
 File Can Be Get From Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     File Should Match Local File     o3fs://ratis-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TESTFILE}
-    File Should Match Local File     o3fs://ecbucket-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TEST_DATA_DIR}/1mb
+    File Should Match Local File     o3fs://ecbucket-${CLUSTER_VERSION}.vol1/key-${DATA_VERSION}      ${TESTFILE}
 
 FSO Bucket Can Be Read
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
