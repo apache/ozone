@@ -130,7 +130,7 @@ File Can Be Get From Bucket With Replication
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
         File Should Match Local File     ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}      ${TESTFILE}
     ELSE
-        ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${CLUSTER_VERSION}    1
+        ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
                         Should contain  ${result}   : No such file or directory
     END
 
