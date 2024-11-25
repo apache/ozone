@@ -79,6 +79,7 @@ public class TestProtobufUtils {
     assertEquals(containerID, request.getContainerID());
     assertEquals(datanodeID, request.getDatanodeUuid());
     assertEquals(localBlockID, request.getGetBlock().getBlockID().getLocalID());
+    assertEquals(containerID, request.getGetBlock().getBlockID().getContainerID());
     assertEquals(bcsid, request.getGetBlock().getBlockID().getBlockCommitSequenceId());
   }
 }

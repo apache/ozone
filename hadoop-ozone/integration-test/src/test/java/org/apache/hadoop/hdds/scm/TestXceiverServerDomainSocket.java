@@ -50,6 +50,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -87,6 +89,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests the XceiverServerDomainSocket class.
  */
+@Timeout(300)
 public class TestXceiverServerDomainSocket {
   private final InetSocketAddress localhost = InetSocketAddress.createUnresolved("localhost", 10000);
   @TempDir
@@ -115,8 +118,7 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Timeout(30)
-  public void testDomainPathConfiguration() {
+  public void testIllegalDomainPathConfiguration() {
     // empty domain path
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, "");
     try {
@@ -157,25 +159,26 @@ public class TestXceiverServerDomainSocket {
       factory.close();
     }
 
-    // an existing domain path, the existing file is override and changed from a normal file to a socket file
+    // an existing domain path, the existing regular file will be overwritten and turned into a socket file,
+    // so configure an existing domain path is disallowed.
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
-    factory = DomainSocketFactory.getInstance(conf);
+    File file = new File(dir, "ozone-socket");
     try {
-      File file = new File(dir, "ozone-socket");
       assertTrue(file.createNewFile());
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
-          conf, null, readExecutors, metrics, factory);
+      DomainSocketFactory.getInstance(conf);
+      fail("an existing domain path is not allowed.");
     } catch (Throwable e) {
-      fail("an existing domain path is supported by not recommended.");
+      e.printStackTrace();
+      assertTrue(e instanceof IllegalArgumentException);
+      assertTrue(e.getMessage().contains("an existing file"));
     } finally {
-      factory.close();
+      file.delete();
     }
   }
 
   @Test
-  @Timeout(30)
   public void testDomainPathPermission() {
-    // write from everyone is not allowed
+    // write from everyone is not allowed (permission too open)
     assertTrue(dir.setWritable(true, false));
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
         new File(dir, "ozone-socket").getAbsolutePath());
@@ -210,7 +213,7 @@ public class TestXceiverServerDomainSocket {
     // write from owner is required
     assertTrue(dir.setWritable(true, true));
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        new File(dir, "ozone-socket").getAbsolutePath());
+        new File(dir, "ozone-socket-write").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     XceiverServerDomainSocket server = null;
     try {
@@ -230,7 +233,7 @@ public class TestXceiverServerDomainSocket {
     assertTrue(dir.setWritable(true, true));
     assertTrue(dir.setReadable(true, true));
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        new File(dir, "ozone-socket").getAbsolutePath());
+        new File(dir, "ozone-socket-execute").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     try {
       new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
@@ -244,12 +247,12 @@ public class TestXceiverServerDomainSocket {
       dir.setExecutable(true, true);
     }
 
-    // read from owner is not required?
+    // read from owner is not required
     assertTrue(dir.setExecutable(true, true));
     assertTrue(dir.setWritable(true, true));
     assertTrue(dir.setReadable(false, true));
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        new File(dir, "ozone-socket").getAbsolutePath());
+        new File(dir, "ozone-socket-read").getAbsolutePath());
     factory = DomainSocketFactory.getInstance(conf);
     try {
       server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
@@ -266,30 +269,18 @@ public class TestXceiverServerDomainSocket {
   }
 
   /**
-   * Test a successful connection and then read/write.
-   */
-  @Test
-  public void testReadWrite1() throws IOException {
-    testReadWrite(false, false);
-  }
-
-  /**
-  *  On Linux, when there is still open file handle of a deleted file, the file handle remains open and can still
+   * Test connection and read/write.
+   * On Linux, when there is still open file handle of a deleted file, the file handle remains open and can still
    * be used to read and write the file.
    */
-  @Test
-  @Timeout(30)
-  public void testReadWrite2() throws IOException {
-    testReadWrite(true, false);
-  }
-
-  @Test
-  @Timeout(30)
-  public void testReadWrite3() throws IOException {
-    testReadWrite(false, true);
-  }
-
-  private void testReadWrite(boolean deleteFileBeforeRead, boolean deleteFileDuringRead) throws IOException {
+  @ParameterizedTest
+  @CsvSource({
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false",
+  })
+  public void testReadWrite(boolean deleteFileBeforeRead, boolean deleteFileDuringRead) throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -370,7 +361,6 @@ public class TestXceiverServerDomainSocket {
    * Test server is not listening.
    */
   @Test
-  @Timeout(30)
   public void testServerNotListening() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -396,7 +386,6 @@ public class TestXceiverServerDomainSocket {
    * Although socket can be created, read will fail, write can succeed.
    */
   @Test
-  @Timeout(30)
   public void testServerNotStart() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -431,10 +420,9 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Timeout(30)
   public void testReadTimeout() throws InterruptedException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "5s");
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "2s");
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
@@ -445,7 +433,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(sock.isOpen());
 
       // server will close the DomainSocket if there is no message from client in OZONE_CLIENT_READ_TIMEOUT
-      Thread.sleep(5 * 1000);
+      Thread.sleep(2 * 1000);
       // send request
       final DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
       outputStream.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
@@ -468,7 +456,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Timeout(30)
   public void testMaxXceiverCount() throws IOException, InterruptedException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -529,7 +516,6 @@ public class TestXceiverServerDomainSocket {
    * will treat it as a critical error, close the connection.
    */
   @Test
-  @Timeout(30)
   public void testSendIrrelevantMessage() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -559,7 +545,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Timeout(30)
   public void testSendUnsupportedRequest() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);

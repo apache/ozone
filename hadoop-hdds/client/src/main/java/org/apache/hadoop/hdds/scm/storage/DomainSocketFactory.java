@@ -26,6 +26,7 @@ import org.apache.hadoop.net.unix.DomainSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Timer;
@@ -152,6 +153,12 @@ public final class DomainSocketFactory {
         LOG.warn(FEATURE + " cannot be used because " + nativeLibraryLoadFailureReason);
         pathInfo = PathInfo.DISABLED;
       } else {
+        File file = new File(domainSocketPath);
+        if (file.exists()) {
+          throw new IllegalArgumentException(FEATURE + " is enabled but "
+              + OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH + " is an existing " +
+              (file.isDirectory() ? "directory" : "file"));
+        }
         pathInfo = PathInfo.VALID;
         isEnabled = true;
         timer = new Timer(DomainSocketFactory.class.getSimpleName() + "-Timer");

@@ -97,7 +97,7 @@ public class TestXceiverClientManager {
               HddsProtos.ReplicationFactor.ONE,
               OzoneConsts.OZONE);
       XceiverClientSpi client1 = clientManager
-          .acquireClientForReadData(container1.getPipeline(), true);
+          .acquireClient(container1.getPipeline());
       assertEquals(1, client1.getRefcount());
       // although allowShortCircuit true when calling acquireClientForReadData,
       // XceiverClientGrpc client will be allocated since short-circuit is by default disabled.
@@ -109,13 +109,12 @@ public class TestXceiverClientManager {
               HddsProtos.ReplicationFactor.THREE,
               OzoneConsts.OZONE);
       XceiverClientSpi client2 = clientManager
-          .acquireClientForReadData(container2.getPipeline(), true);
+          .acquireClient(container2.getPipeline());
       assertEquals(1, client2.getRefcount());
       assertThat(client2 instanceof XceiverClientGrpc);
 
       XceiverClientSpi client3 = clientManager
-          .acquireClientForReadData(container1.getPipeline(), true);
-      assertThat(client3 instanceof XceiverClientGrpc);
+          .acquireClient(container1.getPipeline());
       assertEquals(2, client3.getRefcount());
       assertEquals(2, client1.getRefcount());
       assertEquals(client1, client3);

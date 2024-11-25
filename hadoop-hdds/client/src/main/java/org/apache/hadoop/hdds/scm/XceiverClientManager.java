@@ -240,7 +240,9 @@ public class XceiverClientManager extends XceiverClientCreator {
         // Find a local DN and short circuit read is enabled
         key += "@" + localAddr.getHostName() + ":" + port + "/" + DomainSocketFactory.FEATURE_FLAG;
       }
-    } else if (topologyAware || isEC) {
+    }
+
+    if (localDN == null && (topologyAware || isEC)) {
       try {
         DatanodeDetails closestNode = pipeline.getClosestNode();
         // Pipeline cache key uses host:port suffix to handle
@@ -275,7 +277,7 @@ public class XceiverClientManager extends XceiverClientCreator {
             e.getMessage());
       }
     }
-    LOG.info("cache key {} for pipeline {}", key, pipeline);
+
     if (localDN != null) {
       localDNCache.put(key, localDN);
     }
@@ -341,7 +343,7 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     @Config(key = "idle.threshold",
         type = ConfigType.TIME, timeUnit = MILLISECONDS,
-        defaultValue = "300s",
+        defaultValue = "10s",
         tags = {OZONE, PERFORMANCE},
         description =
             "In the standalone pipelines, the SCM clients use netty to "
