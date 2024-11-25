@@ -102,7 +102,8 @@ public class Checksum {
   private final ChecksumType checksumType;
   private final int bytesPerChecksum;
   /**
-   * TODO: Make sure to clear this cache when a new block chunk is started.
+   * Caches computeChecksum() result when requested.
+   * This must be manually cleared when a new block chunk has been started.
    */
   private final ChecksumCache checksumCache;
 

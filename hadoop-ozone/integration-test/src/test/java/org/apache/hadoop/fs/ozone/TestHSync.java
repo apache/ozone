@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.common.ChecksumCache;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
@@ -225,8 +226,8 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
-
     GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ChecksumCache.LOG, Level.DEBUG);
 
     openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
