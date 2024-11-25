@@ -133,8 +133,7 @@ EC Test FS Client Can Read Own Writes
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute         ozone fs -put ${TEST_DATA_DIR}/1mb ofs://om/vol1/ratis-${SUFFIX}/1mb
-    Execute         ozone fs -put ${TEST_DATA_DIR}/1mb ofs://om/vol1/ecbucket-${SUFFIX}/1mb
+
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/1mb      ${TEST_DATA_DIR}/1mb
     Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/1mb      ${TEST_DATA_DIR}/1mb
     Execute         ozone fs -rm -skipTrash ofs://om/vol1/ratis-${SUFFIX}/1mb
@@ -144,8 +143,7 @@ EC Test Client Can Read Own Writes
     Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute         ozone sh key put /vol1/ratis-${SUFFIX}/2mb ${TEST_DATA_DIR}/2mb
-    Execute         ozone sh key put /vol1/ecbucket-${SUFFIX}/2mb ${TEST_DATA_DIR}/2mb
+
     Key Should Match Local File     /vol1/ratis-${SUFFIX}/2mb      ${TEST_DATA_DIR}/2mb
     Key Should Match Local File     /vol1/ecbucket-${SUFFIX}/2mb      ${TEST_DATA_DIR}/2mb
     Execute         ozone sh key delete /vol1/ratis-${SUFFIX}/2mb
