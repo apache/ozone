@@ -87,17 +87,20 @@ test_cross_compatibility() {
   _init
 
   new_client _write
-  new_client _read ${current_version}
 
   for client_version in "$@"; do
     client="old_client_${client_version//./_}"
-
     old_client _write
-    old_client _read ${client_version}
+  done
 
+  for client_version in "$@"; do
+    client="old_client_${client_version//./_}"
+    old_client _read ${client_version}
     old_client _read ${current_version}
     new_client _read ${client_version}
   done
+
+  new_client _read ${current_version}
 
   KEEP_RUNNING=false stop_docker_env
 }
