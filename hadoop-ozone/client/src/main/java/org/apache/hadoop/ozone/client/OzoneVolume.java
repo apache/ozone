@@ -20,12 +20,13 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import org.apache.commons.collections.ListUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -124,7 +125,7 @@ public class OzoneVolume extends WithMetadata {
             this.creationTime.getEpochSecond(), this.creationTime.getNano());
       }
     }
-    this.acls = builder.acls;
+    this.acls = new ArrayList<>(builder.acls);
     if (builder.conf != null) {
       this.listCacheSize = HddsClientUtils.getListCacheSize(builder.conf);
     }
@@ -203,7 +204,7 @@ public class OzoneVolume extends WithMetadata {
    * @return aclMap
    */
   public List<OzoneAcl> getAcls() {
-    return ListUtils.unmodifiableList(acls);
+    return Collections.unmodifiableList(acls);
   }
 
    /**

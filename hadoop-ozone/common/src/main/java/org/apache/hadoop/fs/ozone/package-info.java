@@ -9,23 +9,12 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
-package org.apache.hadoop.ozone.client.rpc;
-
-import org.junit.jupiter.api.BeforeAll;
-
+package org.apache.hadoop.fs.ozone;
 /**
- * Tests key output stream with zero-copy enabled.
+ * Ozone trash policy implementation.
  */
-public class TestECKeyOutputStreamWithZeroCopy extends
-    AbstractTestECKeyOutputStream {
-  @BeforeAll
-  public static void init() throws Exception {
-    init(true);
-  }
-}

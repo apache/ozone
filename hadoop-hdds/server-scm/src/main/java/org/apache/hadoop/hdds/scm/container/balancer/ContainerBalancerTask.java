@@ -43,19 +43,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -122,7 +113,7 @@ public class ContainerBalancerTask implements Runnable {
   private IterationResult iterationResult;
   private int nextIterationIndex;
   private boolean delayStart;
-  private List<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
+  private Queue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
   private AtomicBoolean isCurrentIterationInProgress = new AtomicBoolean(false);
 
@@ -173,7 +164,7 @@ public class ContainerBalancerTask implements Runnable {
       findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
           placementPolicyValidateProxy, nodeManager);
     }
-    this.iterationsStatistic = new ArrayList<>();
+    this.iterationsStatistic = new ConcurrentLinkedQueue<>();
   }
 
   /**
@@ -346,7 +337,7 @@ public class ContainerBalancerTask implements Runnable {
         containerMoveInfo,
         dataMoveInfo
     );
-    iterationsStatistic.add(iterationStatistic);
+    iterationsStatistic.offer(iterationStatistic);
   }
 
   private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
@@ -375,9 +366,12 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private ContainerBalancerTaskIterationStatusInfo createCurrentIterationStatistic() {
-    int lastIterationNumber = iterationsStatistic.isEmpty()
-        ? 0
-        : iterationsStatistic.get(iterationsStatistic.size() - 1).getIterationNumber();
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+
+    int lastIterationNumber = resultList.stream()
+        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+        .max()
+        .orElse(0);
     long iterationDuration = getCurrentIterationDuration();
 
     if (isCurrentIterationInProgress.get()) {

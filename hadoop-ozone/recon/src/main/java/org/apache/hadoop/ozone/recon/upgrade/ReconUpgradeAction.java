@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+
 /**
  * ReconUpgradeAction is an interface for executing upgrade actions in Recon.
  */
@@ -40,7 +42,7 @@ public interface ReconUpgradeAction {
   /**
    * Execute the upgrade action.
    */
-  void execute() throws Exception;
+  void execute(ReconStorageContainerManagerFacade scmFacade) throws Exception;
 
   /**
    * Provides the type of upgrade phase (e.g., FINALIZE).

@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,17 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.replication;
 
-import org.junit.jupiter.api.BeforeEach;
+package org.apache.hadoop.ozone.recon.api;
 
 /**
- * Tests {@link GrpcReplicationService}.
+ * This exception being thrown when Rest API service is still initializing and not yet ready.
  */
-class TestGrpcReplicationServiceWithZeroCopy
-    extends TestGrpcReplicationService {
-  @BeforeEach
-  public void setUp() throws Exception {
-    init(true);
+public class ServiceNotReadyException extends RuntimeException {
+  public ServiceNotReadyException(String message) {
+    super(message);
   }
 }
+
