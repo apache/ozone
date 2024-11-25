@@ -57,7 +57,6 @@ File Can Be Put
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/file-${CLIENT_VERSION}
 
 File Can Be Put To Bucket With Replication Type
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
     Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ratis-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
     Execute         ozone fs -put ${TESTFILE} ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/file-${CLIENT_VERSION}
