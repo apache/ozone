@@ -64,8 +64,29 @@ Key Read From Bucket With Replication
 Dir Can Be Listed
     ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}
                     Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
+
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/
+                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}
+                    Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}
+
+    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/     1
+                    Should contain  ${result}   ls: The list of keys contains keys with Erasure Coded replication set
+
+File Can Be Listed
     ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}
                     Should contain    ${result}    dir-${DATA_VERSION}/file-${DATA_VERSION}
+
+    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
+
+    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
+                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
+
+    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
+                    Should contain  ${result}   : No such file or directory
+    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
+                    Should contain  ${result}   : No such file or directory
 
 Key List
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}'
@@ -112,22 +133,3 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
-
-EC Test FS Compat
-    Pass Execution If    '${DATA_VERSION}' < '${EC_VERSION}'      Skipped write test case
-    Pass Execution If    '${CLIENT_VERSION}' >= '${EC_VERSION}'    Applies only to pre-EC client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    ${result} =     Execute     ozone fs -ls ofs://om/
-                    Should contain  ${result}   /vol1
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/
-                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}
-                    Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
-                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
-
-    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/     1
-                    Should contain  ${result}   ls: The list of keys contains keys with Erasure Coded replication set
-    ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}     1
-                    Should contain  ${result}   : No such file or directory
-    ${result} =     Execute and checkrc    ozone fs -get ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION}    1
-                    Should contain  ${result}   : No such file or directory
