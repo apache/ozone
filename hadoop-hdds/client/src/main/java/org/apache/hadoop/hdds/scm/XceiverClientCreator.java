@@ -85,13 +85,14 @@ public class XceiverClientCreator implements XceiverClientFactory {
       client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf, trustManager, errorInjector);
       break;
     case STAND_ALONE:
-      client = new XceiverClientGrpc(pipeline, conf, trustManager);
+      if (dn != null) {
+        client = new XceiverClientShortCircuit(pipeline, conf, dn);
+      } else {
+        client = new XceiverClientGrpc(pipeline, conf, trustManager);
+      }
       break;
     case EC:
       client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
-      break;
-    case SHORT_CIRCUIT:
-      client = new XceiverClientShortCircuit(pipeline, conf, dn);
       break;
     case CHAINED:
     default:

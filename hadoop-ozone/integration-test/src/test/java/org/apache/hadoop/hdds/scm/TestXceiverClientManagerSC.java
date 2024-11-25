@@ -94,8 +94,7 @@ public class TestXceiverClientManagerSC {
       assertEquals(client1, client2);
       clientManager.releaseClient(client1, true);
       clientManager.releaseClient(client2, true);
-      // client is still kept in the cache, for create a domain socket connection is expensive.
-      assertEquals(1, clientManager.getClientCache().size());
+      assertEquals(0, clientManager.getClientCache().size());
 
       XceiverClientSpi client3 = clientManager.acquireClientForReadData(container1.getPipeline(), false);
       assertTrue(client3 instanceof XceiverClientGrpc);

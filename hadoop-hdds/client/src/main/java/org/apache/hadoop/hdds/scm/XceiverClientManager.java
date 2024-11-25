@@ -200,17 +200,9 @@ public class XceiverClientManager extends XceiverClientCreator {
   protected XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
       throws IOException {
     try {
-      // create different client different pipeline node based on
-      // network topology
+      // create different client different pipeline node based on network topology
       String key = getPipelineCacheKey(pipeline, topologyAware, allowShortCircuit);
-      if (key.endsWith(DomainSocketFactory.FEATURE_FLAG)) {
-        final Pipeline newPipeline = Pipeline.newBuilder(pipeline).setReplicationConfig(
-            ReplicationConfig.fromTypeAndFactor(ReplicationType.SHORT_CIRCUIT,
-                ReplicationFactor.valueOf(pipeline.getReplicationConfig().getReplication()))).build();
-        return clientCache.get(key, () -> newClient(newPipeline, localDNCache.get(key)));
-      } else {
-        return clientCache.get(key, () -> newClient(pipeline));
-      }
+      return clientCache.get(key, () -> newClient(pipeline, localDNCache.get(key)));
     } catch (Exception e) {
       throw new IOException(
           "Exception getting XceiverClient: " + e, e);
