@@ -72,8 +72,7 @@ public class ReconSchemaVersionTableManager {
    *
    * @param newVersion The new version to set.
    */
-  public void updateSchemaVersion(int newVersion, Connection conn)
-      throws SQLException {
+  public void updateSchemaVersion(int newVersion, Connection conn) {
     DSLContext dslContext = DSL.using(conn);
     boolean recordExists = dslContext.fetchExists(dslContext.selectOne()
         .from(DSL.table(RECON_SCHEMA_VERSION_TABLE_NAME)));

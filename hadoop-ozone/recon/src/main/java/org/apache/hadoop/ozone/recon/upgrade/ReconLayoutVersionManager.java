@@ -84,16 +84,14 @@ public class ReconLayoutVersionManager {
     // Get features that need finalization, sorted by version
     List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
 
-    for (ReconLayoutFeature feature : featuresToFinalize) {
-      try {
-        // Fetch only the FINALIZE action for the feature
-        Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
-        if (action.isPresent()) {
-          try (Connection connection = scmFacade.getDataSource()
-              .getConnection()) {
-            connection.setAutoCommit(
-                false); // Turn off auto-commit for transactional control
+    try (Connection connection = scmFacade.getDataSource().getConnection()) {
+      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
 
+      for (ReconLayoutFeature feature : featuresToFinalize) {
+        try {
+          // Fetch only the FINALIZE action for the feature
+          Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
+          if (action.isPresent()) {
             // Update the schema version in the database
             updateSchemaVersion(feature.getVersion(), connection);
 
@@ -102,23 +100,22 @@ public class ReconLayoutVersionManager {
 
             // Commit the transaction only if both operations succeed
             connection.commit();
-            LOG.info("Feature versioned {} finalized successfully.",
-                feature.getVersion());
-          } catch (Exception e) {
-            // Rollback any pending change`s due to failure
-            LOG.error("Failed to finalize feature {}. Rolling back changes.",
-                feature.getVersion(), e);
-            throw e; // Re-throw to ensure consistent error handling
+            LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
           }
+        } catch (Exception e) {
+          // Rollback any pending changes for the current feature due to failure,
+          // should only be used when setAutoCommit is disabled
+          connection.rollback();
+          LOG.error("Failed to finalize feature {}. Rolling back changes.", feature.getVersion(), e);
+          throw e;
         }
-      } catch (Exception e) {
-        // Log the error to both logs and ReconContext
-        LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
-        reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
-        reconContext.updateHealthStatus(new AtomicBoolean(false));
-        // Stop further upgrades as an error occurred
-        throw new RuntimeException("Recon failed to finalize layout feature. Startup halted.");
       }
+    } catch (Exception e) {
+      // Log the error to both logs and ReconContext
+      LOG.error("Failed to finalize layout features: {}", e.getMessage());
+      reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
     }
   }
 
@@ -147,7 +144,7 @@ public class ReconLayoutVersionManager {
    * @param newVersion The new Metadata Layout Version (MLV) to set.
    * @param connection The database connection to use for the update operation.
    */
-  private void updateSchemaVersion(int newVersion, Connection connection) throws SQLException {
+  private void updateSchemaVersion(int newVersion, Connection connection) {
     schemaVersionTableManager.updateSchemaVersion(newVersion, connection);
     this.currentMLV = newVersion;
     LOG.info("MLV updated to: " + newVersion);
