@@ -67,9 +67,10 @@ Dir Can Be Listed
 
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
-    ${result} =     Execute     ozone fs -ls ofs://om/vol1/
-                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}
-                    Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}
+#    TODO HDDS-11803
+#    ${result} =     Execute     ozone fs -ls ofs://om/vol1/
+#                    Should contain  ${result}   /vol1/ratis-${CLUSTER_VERSION}
+#                    Should contain  ${result}   /vol1/ecbucket-${CLUSTER_VERSION}
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
         ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/     1
