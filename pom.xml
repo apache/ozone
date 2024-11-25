@@ -67,7 +67,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
 
     <hadoop2.version>2.10.2</hadoop2.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.1</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -79,7 +79,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.1.1</ratis.version>
+    <ratis.version>3.1.2</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
@@ -97,6 +97,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- platform encoding override -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <classpath.skip>true</classpath.skip>
 
     <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
@@ -118,10 +120,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
-    <zstd-jni.version>1.5.6-4</zstd-jni.version>
+    <zstd-jni.version>1.5.6-7</zstd-jni.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
-    <commons-io.version>2.17.0</commons-io.version>
-    <commons-lang3.version>3.14.0</commons-lang3.version>
+    <commons-io.version>2.18.0</commons-io.version>
+    <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-logging.version>1.2</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -139,10 +141,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <annotation-api.version>1.3.2</annotation-api.version>
     <assertj.version>3.26.3</assertj.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.78.1</bouncycastle.version>
+    <bouncycastle.version>1.79</bouncycastle.version>
     <derby.version>10.14.2.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
-    <cyclonedx.version>2.8.2</cyclonedx.version>
+    <cyclonedx.version>2.9.0</cyclonedx.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <jacoco.version>0.8.12</jacoco.version>
     <javassist.version>3.30.2-GA</javassist.version>
@@ -150,7 +152,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.19</jnr-posix.version>
+    <jnr-posix.version>3.1.20</jnr-posix.version>
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
@@ -179,7 +181,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>2.0.16</slf4j.version>
-    <log4j2.version>2.24.1</log4j2.version>
+    <log4j2.version>2.24.2</log4j2.version>
     <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
@@ -196,11 +198,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
     <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
-    <proto3.hadooprpc.protobuf.version>3.7.1</proto3.hadooprpc.protobuf.version>
-    <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
+    <proto3.hadooprpc.protobuf.version>3.23.4</proto3.hadooprpc.protobuf.version>
+    <hadoop-thirdparty.version>1.3.0</hadoop-thirdparty.version>
 
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <dnsjava.version>2.1.9</dnsjava.version>
+    <dnsjava.version>3.6.1</dnsjava.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -217,11 +219,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <guice.version>6.0.0</guice.version>
     <gson.version>2.10.1</gson.version>
 
-    <okhttp.version>2.7.5</okhttp.version>
-    <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <junit5.version>5.10.3</junit5.version>
+    <junit5.version>5.11.3</junit5.version>
     <zookeeper.version>3.8.4</zookeeper.version>
 
     <!-- Maven protoc compiler -->
@@ -235,7 +235,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <io.grpc.version>1.58.0</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
-    <sqlite.version>3.46.1.3</sqlite.version>
+    <sqlite.version>3.47.0.0</sqlite.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
@@ -260,7 +260,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-clean-plugin.version>3.4.0</maven-clean-plugin.version>
     <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.3</maven-install-plugin.version>
-    <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
+    <maven-resources-plugin.version>3.3.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
@@ -268,20 +268,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
-    <maven-javadoc-plugin.version>3.10.0</maven-javadoc-plugin.version>
+    <maven-javadoc-plugin.version>3.11.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <maven-deploy-plugin.version>3.1.3</maven-deploy-plugin.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
-    <maven-dependency-plugin.version>3.7.1</maven-dependency-plugin.version>
+    <maven-dependency-plugin.version>3.8.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
-    <docker-maven-plugin.version>0.45.0</docker-maven-plugin.version>
+    <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <exec-maven-plugin.version>3.4.1</exec-maven-plugin.version>
     <license-maven-plugin.version>2.4.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-M1</native-maven-plugin.version>
-    <maven-checkstyle-plugin.version>3.4.0</maven-checkstyle-plugin.version>
-    <maven-site-plugin.version>3.20.0</maven-site-plugin.version>
+    <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+    <maven-site-plugin.version>3.21.0</maven-site-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -297,7 +297,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
 
     <aspectj.version>1.9.7</aspectj.version>
-    <aspectj-plugin.version>1.15.0</aspectj-plugin.version>
+    <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
@@ -313,22 +313,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.9</maven.core.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>com.squareup.okio</groupId>
-        <artifactId>okio</artifactId>
-        <version>${okio.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.squareup.okhttp</groupId>
-        <artifactId>okhttp</artifactId>
-        <version>${okhttp.version}</version>
-      </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
@@ -1033,7 +1022,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
         <version>${hadoop-thirdparty.version}</version>
       </dependency>
       <dependency>
@@ -1310,11 +1299,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.xerial.snappy</groupId>
         <artifactId>snappy-java</artifactId>
         <version>${snappy-java.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-guava</artifactId>
-        <version>${hadoop-shaded-guava.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.vlsi.mxgraph</groupId>
@@ -1708,6 +1692,38 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-classpath-descriptor</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+              <prefix>$HDDS_LIB_JARS_DIR</prefix>
+              <outputFilterFile>true</outputFilterFile>
+              <includeScope>runtime</includeScope>
+              <skip>${classpath.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-jars</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/share/ozone/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+              <skip>${classpath.skip}</skip>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <artifactId>maven-clean-plugin</artifactId>
         <configuration>
           <filesets>
@@ -2079,12 +2095,26 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <properties>
         <test>void</test>
         <skip.npx>true</skip.npx>
-        <skip.installnpx>true</skip.installnpx>
+        <skip.installnodenpm>true</skip.installnodenpm>
         <skipDocs>true</skipDocs>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
       </properties>
     </profile>
+
+    <profile>
+      <id>skip-frontend</id>
+      <activation>
+        <property>
+          <name>skipRecon</name>
+        </property>
+      </activation>
+      <properties>
+        <skip.npx>true</skip.npx>
+        <skip.installnodenpm>true</skip.installnodenpm>
+      </properties>
+    </profile>
+
     <profile>
       <!-- @Native tests are excluded by default.  This profile removes the exclusion if native build is enabled. -->
       <id>rocks-native-tests</id>

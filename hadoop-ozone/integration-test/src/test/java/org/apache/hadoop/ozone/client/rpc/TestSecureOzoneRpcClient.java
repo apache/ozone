@@ -68,6 +68,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -99,15 +100,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
+  @TempDir
+  private static File testDir;
   private static String keyProviderUri = "kms://http@kms:9600/kms";
 
   @BeforeAll
   public static void init() throws Exception {
-    File testDir = GenericTestUtils.getTestDir(
-        TestSecureOzoneRpcClient.class.getSimpleName());
     OzoneManager.setTestSecureOmFlag(true);
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());

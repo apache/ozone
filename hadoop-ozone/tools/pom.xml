@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Tools</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <classpath.skip>false</classpath.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>

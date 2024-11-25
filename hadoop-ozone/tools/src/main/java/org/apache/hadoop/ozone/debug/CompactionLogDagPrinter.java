@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.kohsuke.MetaInfServices;
@@ -63,7 +62,7 @@ public class CompactionLogDagPrinter extends Handler
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     String message = client.getObjectStore()
         .printCompactionLogDag(fileNamePrefix, graphType);
     System.out.println(message);

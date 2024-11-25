@@ -27,7 +27,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <description>Apache Ozone Insight Tool</description>
   <name>Apache Ozone Insight Tool</name>
   <packaging>jar</packaging>
+
   <properties>
+    <classpath.skip>false</classpath.skip>
   </properties>
 
   <dependencies>
