@@ -112,7 +112,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SafeModeMetrics safeModeMetrics;
 
 
-  // TODO: Remove allContainers argument.
+  // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
              List<ContainerInfo> allContainers,
              ContainerManager containerManager, PipelineManager pipelineManager,
@@ -130,7 +130,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (isSafeModeEnabled) {
       this.safeModeMetrics = SafeModeMetrics.create();
 
-      // TODO: Remove the cyclic ("this") dependency
+      // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
       SafeModeRuleFactory.initialize(config, scmContext, eventQueue,
           this, pipelineManager, containerManager);
       SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();

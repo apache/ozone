@@ -39,7 +39,7 @@ public final class SafeModeRuleFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(SafeModeRuleFactory.class);
 
-  // TODO: Move the rule names to respective rules.
+  // TODO: Move the rule names to respective rules. (HDDS-11798)
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
@@ -51,7 +51,7 @@ public final class SafeModeRuleFactory {
   private final SCMContext scmContext;
   private final EventQueue eventQueue;
 
-  // TODO: Remove dependency on safeModeManager
+  // TODO: Remove dependency on safeModeManager (HDDS-11797)
   private final SCMSafeModeManager safeModeManager;
   private final PipelineManager pipelineManager;
   private final ContainerManager containerManager;
@@ -79,14 +79,14 @@ public final class SafeModeRuleFactory {
   }
 
   private void loadRules() {
-    // TODO: Use annotation to load the rules.
+    // TODO: Use annotation to load the rules. (HDDS-11730)
     safeModeRules.add(new ContainerSafeModeRule(CONT_EXIT_RULE, eventQueue, config,
         containerManager, safeModeManager));
     SafeModeExitRule<?> dnRule = new DataNodeSafeModeRule(DN_EXIT_RULE, eventQueue, config, safeModeManager);
     safeModeRules.add(dnRule);
     preCheckRules.add(dnRule);
 
-    // TODO: Move isRuleEnabled check to the Rule implementation.
+    // TODO: Move isRuleEnabled check to the Rule implementation. (HDDS-11799)
     if (config.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
@@ -101,7 +101,6 @@ public final class SafeModeRuleFactory {
 
   }
 
-  // TODO: Refactor and reduce the arguments.
   public static SafeModeRuleFactory getInstance() {
     if (instance != null) {
       return instance;
@@ -110,7 +109,7 @@ public final class SafeModeRuleFactory {
         " call initialize method before getInstance.");
   }
 
-  // TODO: Refactor and reduce the arguments.
+  // TODO: Refactor and reduce the arguments. (HDDS-11800)
   public static synchronized void initialize(
       final ConfigurationSource config,
       final SCMContext scmContext,
