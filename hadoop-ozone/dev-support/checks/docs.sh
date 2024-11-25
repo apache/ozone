@@ -33,10 +33,5 @@ rc=$?
 
 grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 
-wc -l "${REPORT_FILE}" | awk '{ print $1 }' > "${REPORT_DIR}/failures"
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
-
-exit ${rc}
+ERROR_PATTERN=""
+source "${DIR}/_post_process.sh"
