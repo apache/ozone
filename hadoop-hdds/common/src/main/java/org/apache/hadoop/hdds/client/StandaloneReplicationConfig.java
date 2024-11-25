@@ -128,4 +128,9 @@ public final class StandaloneReplicationConfig implements
   public String configFormat() {
     return toString();
   }
+
+  @Override
+  public int getMinimumNodes() {
+    return replicationFactor.getNumber();
+  }
 }
