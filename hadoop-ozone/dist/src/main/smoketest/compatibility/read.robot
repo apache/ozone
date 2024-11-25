@@ -74,7 +74,7 @@ Dir Can Be Listed
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
         ${result} =     Execute and checkrc    ozone fs -ls ofs://om/vol1/ecbucket-${CLUSTER_VERSION}/     1
                         Should contain  ${result}   ls: The list of keys contains keys with Erasure Coded replication set
-    FI
+    END
 
 File Can Be Listed
     ${result} =     Execute    ozone fs -ls o3fs://bucket1.vol1/dir-${DATA_VERSION}/file-${DATA_VERSION}
