@@ -357,6 +357,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT);
     RaftServerConfigKeys.Log.setPurgeGap(properties, purgeGap);
+    boolean purgeUpToSnapshotIndex =
+        conf.getBoolean(OzoneConfigKeys.HDDS_RATIS_LOG_PURGE_UPTO_INDEX_KEY,
+            OzoneConfigKeys.HDDS_RATIS_LOG_PURGE_UPTO_INDEX_DEFAULT);
+    long purgePreservationLogNum =
+        conf.getLong(OzoneConfigKeys.HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_KEY,
+            OzoneConfigKeys.HDDS_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT);
+    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(
+        properties, purgeUpToSnapshotIndex);
+    RaftServerConfigKeys.Log.setPurgePreservationLogNum(
+        properties, purgePreservationLogNum);
 
     //Set the number of Snapshots Retained.
     RatisServerConfiguration ratisServerConfiguration =
