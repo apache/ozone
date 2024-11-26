@@ -19,6 +19,14 @@ Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
 Test Timeout        5 minutes
 
+
+*** Keywords ***
+Key List With Replication
+    [arguments]    ${args}
+    ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    [return]    ${result}
+
+
 *** Test Cases ***
 Buckets Can Be Listed
     ${result} =     Execute     ozone sh bucket list /vol1
