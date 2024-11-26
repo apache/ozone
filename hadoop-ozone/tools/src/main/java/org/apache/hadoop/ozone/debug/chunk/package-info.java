@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -14,30 +14,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * <p>
+ *
  */
 
-package org.apache.hadoop.ozone.debug;
 /**
- * Class that gives datanode details on which the chunk is present.
+ * Command to debug chunk information.
  */
-public class ChunkDataNodeDetails {
-  private String ipAddress;
-  private String hostName;
-
-  public ChunkDataNodeDetails(String ipAddress, String hostName) {
-    this.ipAddress = ipAddress;
-    this.hostName = hostName;
-  }
-
-  @Override
-    public String toString() {
-    return "{"
-            + "ipAddress='"
-            + ipAddress
-            + '\''
-            + ", hostName='"
-            + hostName
-            + '\''
-            + '}';
-  }
-}
+package org.apache.hadoop.ozone.debug.chunk;
