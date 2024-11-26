@@ -23,7 +23,8 @@ Test Timeout        5 minutes
 *** Keywords ***
 Key List With Replication
     [arguments]    ${args}
-    ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
+    ${list} =      Execute    ozone sh key list ${args}
+    ${result} =    Execute    echo '${list}' | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
     [return]    ${result}
 
 
