@@ -321,16 +321,6 @@ public class TestSCMSafeModeManager {
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
 
-    for (Pipeline pipeline : pipelines) {
-      List<DatanodeDetails> nodes = pipeline.getNodes();
-      for (DatanodeDetails node : nodes) {
-        SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
-            new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(node, null);
-        queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
-            nodeRegistrationContainerReport);
-      }
-    }
-
     int healthyPipelineThresholdCount =
         scmSafeModeManager.getHealthyPipelineSafeModeRule()
             .getHealthyPipelineThresholdCount();
@@ -575,7 +565,7 @@ public class TestSCMSafeModeManager {
 
     // When the registration of the remaining containers is completed,
     // the threshold will reach 100%.
-    testECContainerThreshold(containers.subList(10, 25), 1.0, data);
+    testECContainerThreshold(containers.subList(10, 20), 1.0, data);
 
     ContainerSafeModeRule containerSafeModeRule =
         scmSafeModeManager.getContainerSafeModeRule();
@@ -703,15 +693,10 @@ public class TestSCMSafeModeManager {
 
       SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
           HddsTestUtils.createNodeRegistrationContainerReport(containers);
+      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
       queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
 
       assertTrue(scmSafeModeManager.getInSafeMode());
-
-      for (DatanodeDetails datanodeDetail : pipeline.getNodes()) {
-        SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationReport =
-            new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetail, null);
-        queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationReport);
-      }
 
       firePipelineEvent(pipelineManager, pipeline);
 
