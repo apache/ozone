@@ -192,7 +192,6 @@ public class KeyValueContainerCheck {
 
     LOG.debug("Running data checks for container {}", containerID);
     try {
-      // TODO HDDS-10374 this tree will get updated with the container's contents as it is scanned.
       ContainerMerkleTree dataTree = new ContainerMerkleTree();
       List<ContainerScanError> dataErrors = scanData(dataTree, throttler, canceler);
       if (containerIsDeleted()) {
@@ -422,6 +421,13 @@ public class KeyValueContainerCheck {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 
+    // Information used to populate the merkle tree. Chunk metadata will be the same, but we must fill in the
+    // checksums with what we actually observe.
+    ContainerProtos.ChunkInfo.Builder observedChunkBuilder = chunk.toBuilder();
+    ContainerProtos.ChecksumData.Builder observedChecksumData = chunk.getChecksumData().toBuilder();
+    observedChecksumData.clearChecksums();
+    boolean chunkHealthy = true;
+
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
     int checksumCount = checksumData.getChecksums().size();
@@ -434,10 +440,7 @@ public class KeyValueContainerCheck {
       if (layout == ContainerLayoutVersion.FILE_PER_BLOCK) {
         channel.position(chunk.getOffset());
       }
-      // Only report one error per chunk. Reporting corruption at every "bytes per checksum" interval will lead to a
-      // large amount of errors when a full chunk is corrupted.
-      boolean chunkHealthy = true;
-      for (int i = 0; i < checksumCount && chunkHealthy; i++) {
+      for (int i = 0; i < checksumCount; i++) {
         // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
         if (layout == ContainerLayoutVersion.FILE_PER_BLOCK &&
             i == checksumCount - 1 &&
@@ -457,7 +460,11 @@ public class KeyValueContainerCheck {
         ByteString expected = checksumData.getChecksums().get(i);
         ByteString actual = cal.computeChecksum(buffer)
             .getChecksums().get(0);
-        if (!expected.equals(actual)) {
+        observedChecksumData.addChecksums(actual);
+        // Only report one error per chunk. Reporting corruption at every "bytes per checksum" interval will lead to a
+        // large amount of errors when a full chunk is corrupted.
+        // Continue scanning the chunk even after the first error so the full merkle tree can be built.
+        if (chunkHealthy && !expected.equals(actual)) {
           String message = String
               .format("Inconsistent read for chunk=%s" +
                   " checksum item %d" +
@@ -469,26 +476,31 @@ public class KeyValueContainerCheck {
                   StringUtils.bytes2Hex(expected.asReadOnlyByteBuffer()),
                   StringUtils.bytes2Hex(actual.asReadOnlyByteBuffer()),
                   block.getBlockID());
+          chunkHealthy = false;
           scanErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK, chunkFile,
               new OzoneChecksumException(message)));
-          chunkHealthy = false;
         }
       }
       // If all the checksums match, also check that the length stored in the metadata matches the number of bytes
       // seen on the disk.
+      observedChunkBuilder.setLen(bytesRead);
       if (chunkHealthy && bytesRead != chunk.getLen()) {
         String message = String
             .format("Inconsistent read for chunk=%s expected length=%d"
                     + " actual length=%d for block %s",
                 chunk.getChunkName(),
                 chunk.getLen(), bytesRead, block.getBlockID());
+        chunkHealthy = false;
         scanErrors.add(new ContainerScanError(FailureType.INCONSISTENT_CHUNK_LENGTH, chunkFile,
             new IOException(message)));
       }
     } catch (IOException ex) {
+      chunkHealthy = false;
       scanErrors.add(new ContainerScanError(FailureType.MISSING_CHUNK_FILE, chunkFile, ex));
     }
 
+    observedChunkBuilder.setChecksumData(observedChecksumData);
+    currentTree.addChunks(block.getBlockID().getLocalID(), chunkHealthy, observedChunkBuilder.build());
     return scanErrors;
   }
 

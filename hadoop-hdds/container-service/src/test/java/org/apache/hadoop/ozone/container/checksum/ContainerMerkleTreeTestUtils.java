@@ -149,11 +149,10 @@ public final class ContainerMerkleTreeTestUtils {
     ContainerMerkleTree tree = new ContainerMerkleTree();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
-      List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+        tree.addChunks(blockIndex, true,
+            buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
-      tree.addChunks(blockIndex, chunks);
     }
     return tree;
   }

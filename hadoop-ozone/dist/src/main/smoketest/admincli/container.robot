@@ -121,8 +121,7 @@ Cannot reconcile open container
     # At this point we should have an open Ratis Three container.
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
     Execute and check rc    ozone admin container reconcile "${container}"    255
-    # The container should not yet have any replica checksums.
-    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
+    # The container should not yet have any replica checksums since it is still open.
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     # 0 is the hex value of an empty checksum.
     Should Be Equal As Strings    0    ${data_checksum}
@@ -137,9 +136,8 @@ Close container
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Reconcile closed container
-    # Check that info does not show replica checksums, since manual reconciliation has not yet been triggered.
-    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
     ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+    # TODO wait for container close to populate the checksum.
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     # 0 is the hex value of an empty checksum.
     Should Be Equal As Strings    0    ${data_checksum}

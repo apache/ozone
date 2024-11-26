@@ -407,7 +407,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerDataScanner.init(c, controller);
+    OnDemandContainerDataScanner.init(c, controller, checksumTreeManager);
   }
 
   /**

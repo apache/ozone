@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -46,6 +49,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -156,13 +160,20 @@ public class TestKeyValueContainerCheck
 
     DataScanResult result = kvCheck.fullCheck(throttler, null);
     assertTrue(result.isHealthy());
+    ContainerProtos.ContainerChecksumInfo healthyChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerID)
+        .setContainerMerkleTree(result.getDataTree().toProto())
+        .build();
 
     // Put different types of block failures in the middle of the container.
-    CORRUPT_BLOCK.applyTo(container, 1);
-    MISSING_BLOCK.applyTo(container, 2);
-    TRUNCATED_BLOCK.applyTo(container, 4);
+    long corruptBlockID = 1;
+    long missingBlockID = 2;
+    long truncatedBlockID = 4;
+    CORRUPT_BLOCK.applyTo(container, corruptBlockID);
+    MISSING_BLOCK.applyTo(container, missingBlockID);
+    TRUNCATED_BLOCK.applyTo(container, truncatedBlockID);
     List<FailureType> expectedErrors = new ArrayList<>();
-    // Corruption is applied to two different chunks within the block.
+    // Corruption is applied to two different chunks within the block, so the error will be raised twice.
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(MISSING_BLOCK.getExpectedResult());
@@ -177,12 +188,36 @@ public class TestKeyValueContainerCheck
 
     assertFalse(result.isHealthy());
     // Check that all data errors were detected in order.
-    // TODO HDDS-10374 Use merkle tree to check the actual content affected by the errors.
     assertEquals(expectedErrors.size(), result.getErrors().size());
     List<FailureType> actualErrors = result.getErrors().stream()
         .map(ContainerScanError::getFailureType)
         .collect(Collectors.toList());
     assertEquals(expectedErrors, actualErrors);
+
+    // Write the new tree into the container, as the scanner would do.
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    checksumManager.writeContainerDataTree(container.getContainerData(), result.getDataTree());
+    // This will read the corrupted tree from the disk, which represents the current state of the container, and
+    // compare it against the original healthy tree. The diff we get back should match the failures we injected.
+    ContainerDiffReport diffReport = checksumManager.diff(container.getContainerData(), healthyChecksumInfo);
+
+    // Check that the new tree identified all the expected errors by checking the diff.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks = diffReport.getCorruptChunks();
+    // One block had corrupted chunks.
+    assertEquals(1, corruptChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> corruptChunksInBlock = corruptChunks.get(corruptBlockID);
+    assertEquals(2, corruptChunksInBlock.size());
+
+    // Check missing block was correctly identified in the tree diff.
+    List<ContainerProtos.BlockMerkleTree> missingBlocks = diffReport.getMissingBlocks();
+    assertEquals(1, missingBlocks.size());
+    assertEquals(missingBlockID, missingBlocks.get(0).getBlockID());
+
+    // One block was truncated which resulted in all of its chunks being reported as missing.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks = diffReport.getMissingChunks();
+    assertEquals(1, missingChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> missingChunksInBlock = missingChunks.get(truncatedBlockID);
+    assertEquals(CHUNKS_PER_BLOCK, missingChunksInBlock.size());
   }
 
   /**
