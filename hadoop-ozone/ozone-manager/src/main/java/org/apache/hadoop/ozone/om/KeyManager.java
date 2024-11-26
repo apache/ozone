@@ -116,11 +116,14 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
    *
    * @param count max number of keys to return.
+   * @param deletedKeySupplier DeletedKeySupplier object.
    * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(int count,
+      KeyDeletingService.DeletedKeySupplier deletedKeySupplier)
+      throws IOException;
 
   /**
    * Returns a list rename entries from the snapshotRenamedTable.

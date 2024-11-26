@@ -87,6 +87,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
@@ -1587,132 +1588,131 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @throws IOException
    */
   public PendingKeysDeletion getPendingDeletionKeys(final int keyCount,
-                             OmSnapshotManager omSnapshotManager)
+      OmSnapshotManager omSnapshotManager,
+      KeyDeletingService.DeletedKeySupplier deletedKeySupplier)
       throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
-    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
-             keyIter = getDeletedTable().iterator()) {
-      int currentCount = 0;
-      while (keyIter.hasNext() && currentCount < keyCount) {
-        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
-        KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        if (kv != null) {
-          List<BlockGroup> blockGroupList = Lists.newArrayList();
-          // Get volume name and bucket name
-          String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
-          String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
-          OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
-          // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
-          SnapshotInfo previousSnapshotInfo = bucketInfo == null ? null :
-              SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
-              bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
-          // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
-          // iteration.
-          if (previousSnapshotInfo != null &&
-              (previousSnapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
-              !OmSnapshotManager.areSnapshotChangesFlushedToDB(ozoneManager.getMetadataManager(),
-                  previousSnapshotInfo))) {
-            continue;
-          }
-          // Get the latest snapshot in snapshot path.
-          try (ReferenceCounted<OmSnapshot> rcLatestSnapshot = previousSnapshotInfo == null ? null :
-              omSnapshotManager.getSnapshot(previousSnapshotInfo.getVolumeName(),
-                  previousSnapshotInfo.getBucketName(), previousSnapshotInfo.getName())) {
+    int currentCount = 0;
+    while (currentCount < keyCount) {
+      RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
+      KeyValue<String, RepeatedOmKeyInfo> kv = deletedKeySupplier.get();
+      if (kv != null) {
+        List<BlockGroup> blockGroupList = Lists.newArrayList();
+        // Get volume name and bucket name
+        String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
+        String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
+        OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
+        // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
+        SnapshotInfo previousSnapshotInfo = bucketInfo == null ? null :
+            SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
+                bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
+        // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
+        // iteration.
+        if (previousSnapshotInfo != null && (previousSnapshotInfo.getSnapshotStatus() !=
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE || !OmSnapshotManager.areSnapshotChangesFlushedToDB(
+            ozoneManager.getMetadataManager(), previousSnapshotInfo))) {
+          continue;
+        }
+        // Get the latest snapshot in snapshot path.
+        try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
+            previousSnapshotInfo == null ? null : omSnapshotManager.getSnapshot(
+                previousSnapshotInfo.getVolumeName(),
+                previousSnapshotInfo.getBucketName(),
+                previousSnapshotInfo.getName())) {
 
-            // Multiple keys with the same path can be queued in one DB entry
-            RepeatedOmKeyInfo infoList = kv.getValue();
-            for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
-              // Skip the key if it exists in the previous snapshot (of the same
-              // scope) as in this case its blocks should not be reclaimed
+          // Multiple keys with the same path can be queued in one DB entry
+          RepeatedOmKeyInfo infoList = kv.getValue();
+          for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
+            // Skip the key if it exists in the previous snapshot (of the same
+            // scope) as in this case its blocks should not be reclaimed
 
-              // If the last snapshot is deleted and the keys renamed in between
-              // the snapshots will be cleaned up by KDS. So we need to check
-              // in the renamedTable as well.
-              String dbRenameKey = getRenameKey(info.getVolumeName(),
-                  info.getBucketName(), info.getObjectID());
+            // If the last snapshot is deleted and the keys renamed in between
+            // the snapshots will be cleaned up by KDS. So we need to check
+            // in the renamedTable as well.
+            String dbRenameKey =
+                getRenameKey(info.getVolumeName(), info.getBucketName(),
+                    info.getObjectID());
 
-              if (rcLatestSnapshot != null) {
-                Table<String, OmKeyInfo> prevKeyTable =
-                    rcLatestSnapshot.get()
-                        .getMetadataManager()
-                        .getKeyTable(bucketInfo.getBucketLayout());
+            if (rcLatestSnapshot != null) {
+              Table<String, OmKeyInfo> prevKeyTable =
+                  rcLatestSnapshot.get().getMetadataManager()
+                      .getKeyTable(bucketInfo.getBucketLayout());
 
-                Table<String, RepeatedOmKeyInfo> prevDeletedTable =
-                    rcLatestSnapshot.get().getMetadataManager().getDeletedTable();
-                String prevKeyTableDBKey = getSnapshotRenamedTable()
-                    .get(dbRenameKey);
-                String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
-                    info.getBucketName(), info.getKeyName());
-                // format: /volName/bucketName/keyName/objId
-                prevDelTableDBKey = getOzoneDeletePathKey(info.getObjectID(),
-                    prevDelTableDBKey);
-
-                if (prevKeyTableDBKey == null &&
-                    bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-                  long volumeId = getVolumeId(info.getVolumeName());
-                  prevKeyTableDBKey = getOzonePathKey(volumeId,
-                      bucketInfo.getObjectID(),
-                      info.getParentObjectID(),
-                      info.getFileName());
-                } else if (prevKeyTableDBKey == null) {
-                  prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
-                      info.getBucketName(),
+              Table<String, RepeatedOmKeyInfo> prevDeletedTable =
+                  rcLatestSnapshot.get().getMetadataManager().getDeletedTable();
+              String prevKeyTableDBKey =
+                  getSnapshotRenamedTable().get(dbRenameKey);
+              String prevDelTableDBKey =
+                  getOzoneKey(info.getVolumeName(), info.getBucketName(),
                       info.getKeyName());
-                }
+              // format: /volName/bucketName/keyName/objId
+              prevDelTableDBKey =
+                  getOzoneDeletePathKey(info.getObjectID(), prevDelTableDBKey);
 
-                OmKeyInfo omKeyInfo = prevKeyTable.get(prevKeyTableDBKey);
-                // When key is deleted it is no longer in keyTable, we also
-                // have to check deletedTable of previous snapshot
-                RepeatedOmKeyInfo delOmKeyInfo =
-                    prevDeletedTable.get(prevDelTableDBKey);
-                if (versionExistsInPreviousSnapshot(omKeyInfo,
-                    info, delOmKeyInfo)) {
-                  // If the infoList size is 1, there is nothing to split.
-                  // We either delete it or skip it.
-                  if (!(infoList.getOmKeyInfoList().size() == 1)) {
-                    notReclaimableKeyInfo.addOmKeyInfo(info);
-                  }
-                  continue;
-                }
+              if (prevKeyTableDBKey == null && bucketInfo.getBucketLayout()
+                  .isFileSystemOptimized()) {
+                long volumeId = getVolumeId(info.getVolumeName());
+                prevKeyTableDBKey =
+                    getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+                        info.getParentObjectID(), info.getFileName());
+              } else if (prevKeyTableDBKey == null) {
+                prevKeyTableDBKey =
+                    getOzoneKey(info.getVolumeName(), info.getBucketName(),
+                        info.getKeyName());
               }
 
-              // Add all blocks from all versions of the key to the deletion
-              // list
-              for (OmKeyLocationInfoGroup keyLocations :
-                  info.getKeyLocationVersions()) {
-                List<BlockID> item = keyLocations.getLocationList().stream()
-                    .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                    .collect(Collectors.toList());
-                BlockGroup keyBlocks = BlockGroup.newBuilder()
-                    .setKeyName(kv.getKey())
-                    .addAllBlockIDs(item)
-                    .build();
-                blockGroupList.add(keyBlocks);
+              OmKeyInfo omKeyInfo = prevKeyTable.get(prevKeyTableDBKey);
+              // When key is deleted it is no longer in keyTable, we also
+              // have to check deletedTable of previous snapshot
+              RepeatedOmKeyInfo delOmKeyInfo =
+                  prevDeletedTable.get(prevDelTableDBKey);
+              if (versionExistsInPreviousSnapshot(omKeyInfo, info,
+                  delOmKeyInfo)) {
+                // If the infoList size is 1, there is nothing to split.
+                // We either delete it or skip it.
+                if (!(infoList.getOmKeyInfoList().size() == 1)) {
+                  notReclaimableKeyInfo.addOmKeyInfo(info);
+                }
+                continue;
               }
-              currentCount++;
             }
 
-            List<OmKeyInfo> notReclaimableKeyInfoList =
-                notReclaimableKeyInfo.getOmKeyInfoList();
-            // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
-            SnapshotInfo newPreviousSnapshotInfo = bucketInfo == null ? null :
-                SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
-                bucketInfo.getBucketName(), ozoneManager, snapshotChainManager);
-            // Check if the previous snapshot in the chain hasn't changed.
-            if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
-                Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) {
-              // If all the versions are not reclaimable, then do nothing.
-              if (notReclaimableKeyInfoList.size() > 0 &&
-                  notReclaimableKeyInfoList.size() !=
-                      infoList.getOmKeyInfoList().size()) {
-                keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
-              }
+            // Add all blocks from all versions of the key to the deletion
+            // list
+            for (OmKeyLocationInfoGroup keyLocations : info.getKeyLocationVersions()) {
+              List<BlockID> item = keyLocations.getLocationList().stream()
+                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+                  .collect(Collectors.toList());
+              BlockGroup keyBlocks =
+                  BlockGroup.newBuilder().setKeyName(kv.getKey())
+                      .addAllBlockIDs(item).build();
+              blockGroupList.add(keyBlocks);
+            }
+            currentCount++;
+          }
 
-              if (notReclaimableKeyInfoList.size() !=
-                  infoList.getOmKeyInfoList().size()) {
-                keyBlocksList.addAll(blockGroupList);
-              }
+          List<OmKeyInfo> notReclaimableKeyInfoList =
+              notReclaimableKeyInfo.getOmKeyInfoList();
+          // If Bucket deleted bucketInfo would be null, thus making previous snapshot also null.
+          SnapshotInfo newPreviousSnapshotInfo = bucketInfo == null ? null :
+              SnapshotUtils.getLatestSnapshotInfo(bucketInfo.getVolumeName(),
+                  bucketInfo.getBucketName(), ozoneManager,
+                  snapshotChainManager);
+          // Check if the previous snapshot in the chain hasn't changed.
+          if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo)
+                  .map(SnapshotInfo::getSnapshotId),
+              Optional.ofNullable(previousSnapshotInfo)
+                  .map(SnapshotInfo::getSnapshotId))) {
+            // If all the versions are not reclaimable, then do nothing.
+            if (notReclaimableKeyInfoList.size() > 0 && notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList()
+                .size()) {
+              keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
+            }
+
+            if (notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList()
+                .size()) {
+              keyBlocksList.addAll(blockGroupList);
             }
           }
         }

@@ -422,6 +422,11 @@ public final class OMConfigKeys {
 
   public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
 
+  public static final String OZONE_THREAD_NUMBER_KEY_DELETION =
+      "ozone.thread.number.key.deletion";
+
+  public static final int OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT = 10;
+
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
   public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
