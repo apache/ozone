@@ -31,6 +31,7 @@ data:
   OZONE-SITE.XML_ozone.om.address: om-0.om
   OZONE-SITE.XML_ozone.scm.client.address: scm-0.scm
   OZONE-SITE.XML_ozone.scm.names: scm-0.scm
+  OZONE-SITE.XML_ozone.recon.address: recon-0.recon
   OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "3"
   OZONE-SITE.XML_ozone.datanode.pipeline.limit: "1"
   OZONE-SITE.XML_dfs.datanode.use.datanode.hostname: "true"
