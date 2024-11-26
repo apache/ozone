@@ -21,7 +21,6 @@ Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${SCM}       scm
-${SUFFIX}    ${EMPTY}
 
 *** Keywords ***
 Prepare For Tests
