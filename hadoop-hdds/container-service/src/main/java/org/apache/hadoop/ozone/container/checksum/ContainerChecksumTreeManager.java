@@ -82,6 +82,8 @@ public class ContainerChecksumTreeManager {
    * The data merkle tree within the file is replaced with the {@code tree} parameter, but all other content of the
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
+   * This method also updates the container's data checksum in the {@code data} parameter, which will be seen by SCM
+   * on container reports.
    */
   public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     long containerID = data.getContainerID();
@@ -99,11 +101,15 @@ public class ContainerChecksumTreeManager {
         checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
       }
 
+      ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
+          tree::toProto);
+      long dataChecksum = treeProto.getDataChecksum();
+      data.setDataChecksum(dataChecksum);
       checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
+          .setContainerMerkleTree(treeProto);
       write(data, checksumInfoBuilder.build());
-      LOG.debug("Data merkle tree for container {} updated", containerID);
+      LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID, dataChecksum);
     } finally {
       writeLock.unlock();
     }
