@@ -80,11 +80,6 @@ Assert Unsupported
     ${result} =     Execute and checkrc         ${cmd}       255
                     Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
-Bucket Replication
-    [arguments]    ${args}
-    ${result} =     Execute    ozone sh bucket info ${args} | jq -r '[.name, .replicationType, .replicationFactor] | join (" ")'
-    [return]    ${result}
-
 Key List With Replication
     [arguments]    ${args}
     ${result} =     Execute    ozone sh key list ${args} | jq -r '[.name, .replicationType, (.replicationFactor | tostring)] | join (" ")'
