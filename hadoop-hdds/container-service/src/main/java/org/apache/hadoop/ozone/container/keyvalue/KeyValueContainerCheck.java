@@ -421,9 +421,11 @@ public class KeyValueContainerCheck {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 
-    // Information used to populate the merkle tree.
+    // Information used to populate the merkle tree. Chunk metadata will be the same, but we must fill in the
+    // checksums with what we actually observe.
     ContainerProtos.ChunkInfo.Builder observedChunkBuilder = chunk.toBuilder();
-    ContainerProtos.ChecksumData.Builder observedChecksums = chunk.getChecksumData().toBuilder();
+    ContainerProtos.ChecksumData.Builder observedChecksumData = chunk.getChecksumData().toBuilder();
+    observedChecksumData.clearChecksums();
     boolean chunkHealthy = true;
 
     ChecksumData checksumData =
@@ -458,7 +460,7 @@ public class KeyValueContainerCheck {
         ByteString expected = checksumData.getChecksums().get(i);
         ByteString actual = cal.computeChecksum(buffer)
             .getChecksums().get(0);
-        observedChecksums.addChecksums(actual);
+        observedChecksumData.addChecksums(actual);
         // Only report one error per chunk. Reporting corruption at every "bytes per checksum" interval will lead to a
         // large amount of errors when a full chunk is corrupted.
         // Continue scanning the chunk even after the first error so the full merkle tree can be built.
@@ -497,7 +499,7 @@ public class KeyValueContainerCheck {
       scanErrors.add(new ContainerScanError(FailureType.MISSING_CHUNK_FILE, chunkFile, ex));
     }
 
-    observedChunkBuilder.setChecksumData(observedChecksums);
+    observedChunkBuilder.setChecksumData(observedChecksumData);
     currentTree.addChunks(block.getBlockID().getLocalID(), chunkHealthy, observedChunkBuilder.build());
     return scanErrors;
   }
