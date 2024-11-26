@@ -58,15 +58,10 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -86,8 +81,6 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
-import static org.apache.hadoop.ozone.recon.ReconUtils.extractKeysFromTable;
-import static org.apache.hadoop.ozone.recon.ReconUtils.validateStartPrefix;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
@@ -215,7 +208,7 @@ public class OMDBInsightEndpoint {
       if (includeNonFso) {
         // Search for non-FSO keys in KeyTable
         Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-        obsKeys = extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+        obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
         for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
           keysFound = true;
           skipPrevKeyDone = true; // Don't use the prevKey for the file table
@@ -270,8 +263,8 @@ public class OMDBInsightEndpoint {
       throws IOException, IllegalArgumentException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
-    String startPrefixObjectPath =
-        convertToObjectPath(startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
+    String startPrefixObjectPath = ReconUtils.convertToObjectPathForOpenKeySearch(
+            startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
     String[] names = parseRequestPath(startPrefixObjectPath);
     Table<String, OmKeyInfo> openFileTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -294,13 +287,13 @@ public class OMDBInsightEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
+      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
           reconNamespaceSummaryManager);
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
         matchedKeys.putAll(
-            extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
+            ReconUtils.extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -310,7 +303,7 @@ public class OMDBInsightEndpoint {
 
     // If the search level is at the volume, bucket or key level, directly search the openFileTable
     matchedKeys.putAll(
-        extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
+        ReconUtils.extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
     return matchedKeys;
   }
 
@@ -518,7 +511,7 @@ public class OMDBInsightEndpoint {
     // Search for deleted keys in DeletedTable
     Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
     Map<String, RepeatedOmKeyInfo> deletedKeys =
-        extractKeysFromTable(deletedTable, startPrefix, limit, prevKey);
+        ReconUtils.extractKeysFromTable(deletedTable, startPrefix, limit, prevKey);
 
     // Iterate over the retrieved keys and populate the response
     for (Map.Entry<String, RepeatedOmKeyInfo> entry : deletedKeys.entrySet()) {

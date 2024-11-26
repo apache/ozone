@@ -610,7 +610,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Create Bucket in volb
     createBucket("volb", "bucketb1", 1000 + 1000 + 1000 + 1000 + 1000,
-            getOBSBucketLayout());
+        getOBSBucketLayout());
     createBucket("volb", "bucketb2", 0, getOBSBucketLayout()); // Empty Bucket
 
     // Create Bucket in volc
