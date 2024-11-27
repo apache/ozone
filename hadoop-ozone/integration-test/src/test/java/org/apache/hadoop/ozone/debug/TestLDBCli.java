@@ -17,10 +17,9 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -54,8 +53,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -370,10 +367,8 @@ public class TestLDBCli {
     assertNotNull(subFiles);
     assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
     for (File subFile : subFiles) {
-      try (FileInputStream inputStream = new FileInputStream(subFile)) {
-        JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream, "UTF-8"));
-        assertTrue(jsonElement.isJsonArray() || jsonElement.isJsonObject());
-      }
+      JsonNode jsonNode = MAPPER.readTree(subFile);
+      assertNotNull(jsonNode);
     }
 
     String scanDir2 = tempDir.getAbsolutePath() + "/scandir2";
