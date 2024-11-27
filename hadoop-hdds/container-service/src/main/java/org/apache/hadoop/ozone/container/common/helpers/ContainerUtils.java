@@ -30,6 +30,8 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSE
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -169,25 +171,37 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
-      throws IOException {
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path) throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
+
+    DatanodeDetails datanodeDetails;
     try {
-      return DatanodeIdYaml.readDatanodeIdFile(path);
+      datanodeDetails = DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from {}",
-          path.getAbsolutePath(), e);
+      LOG.warn("Error loading DatanodeDetails yaml from {}", path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
-        return DatanodeDetails.getFromProtoBuf(
-            HddsProtos.DatanodeDetailsProto.parseFrom(in));
+        datanodeDetails = DatanodeDetails.getFromProtoBuf(HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {
-        throw new IOException("Failed to parse DatanodeDetails from "
-            + path.getAbsolutePath(), io);
+        throw new IOException("Failed to parse DatanodeDetails from " + path.getAbsolutePath(), io);
       }
     }
+
+    try {
+      InetAddress inetAddress = InetAddress.getByName(datanodeDetails.getHostName());
+
+      if (!inetAddress.getHostAddress().equals(datanodeDetails.getIpAddress())) {
+        LOG.warn("Resolved IP address '{}' differs from the persisted IP address '{}' for the datanode '{}'",
+            inetAddress.getHostAddress(), datanodeDetails.getIpAddress(), datanodeDetails.getHostName());
+        datanodeDetails.setIpAddress(inetAddress.getHostAddress());
+      }
+    } catch (UnknownHostException e) {
+      LOG.warn("Failed to validate IP address for the datanode '{}'", datanodeDetails.getHostName(), e);
+    }
+
+    return datanodeDetails;
   }
 
   /**
