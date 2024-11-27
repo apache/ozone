@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -57,6 +58,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   private final BiPredicate<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
   private  String realVolume = null;
   private  String realBucket = null;
+
   public OMBucketAclRequest(OMRequest omRequest,
       BiPredicate<List<OzoneAcl>, OmBucketInfo> aclOp) {
     super(omRequest);
@@ -84,6 +86,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long transactionLogIndex = termIndex.getIndex();
+    Preconditions.checkNotNull(realBucket);
+    Preconditions.checkNotNull(realVolume);
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -163,6 +167,14 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     onComplete(operationResult, exception, ozoneManager.getMetrics(),
         ozoneManager.getAuditLogger(), auditMap);
     return omClientResponse;
+  }
+
+  public String getRealVolume() {
+    return realVolume;
+  }
+
+  public String getRealBucket() {
+    return realBucket;
   }
 
   /**
