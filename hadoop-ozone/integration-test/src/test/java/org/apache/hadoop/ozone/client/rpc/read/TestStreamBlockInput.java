@@ -54,7 +54,7 @@ public class TestStreamBlockInput {
       try (OzoneClient client = cluster.newClient()) {
         TestBucket bucket = TestBucket.newBuilder(client).build();
 
-        testChunkReadBuffers(bucket);
+        testBlockReadBuffers(bucket);
         testBufferRelease(bucket);
         testCloseReleasesBuffers(bucket);
       }
@@ -63,10 +63,10 @@ public class TestStreamBlockInput {
 
 
   /**
-   * Test to verify that data read from chunks is stored in a list of buffers
+   * Test to verify that data read from blocks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testChunkReadBuffers(TestBucket bucket) throws Exception {
+  private void testBlockReadBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
     byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);

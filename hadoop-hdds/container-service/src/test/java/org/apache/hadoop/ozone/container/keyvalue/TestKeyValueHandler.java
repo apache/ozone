@@ -502,7 +502,7 @@ public class TestKeyValueHandler {
     for (int i = 0; i < 4; i++) {
       chunkInfoList.add(ContainerProtos.ChunkInfo
           .newBuilder()
-          .setOffset(CHUNK_SIZE * i)
+          .setOffset(0)
           .setLen(CHUNK_SIZE)
           .setChecksumData(
               ChecksumData.newBuilder().setBytesPerChecksum((int) BYTES_PER_CHECKSUM)

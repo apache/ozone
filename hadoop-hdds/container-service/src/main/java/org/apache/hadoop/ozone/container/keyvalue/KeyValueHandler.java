@@ -1375,10 +1375,14 @@ public class KeyValueHandler extends Handler {
       List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
       long blockOffset = 0;
       int chunkIndex = -1;
+      long chunkOffset = 0;
+      long offset = readBlock.getOffset();
       for (int i = 0; i < chunkInfos.size(); i++) {
-        blockOffset += chunkInfos.get(i).getLen();
-        if (blockOffset > readBlock.getOffset()) {
+        final long chunkLen = chunkInfos.get(i).getLen();
+        blockOffset += chunkLen;
+        if (blockOffset > offset) {
           chunkIndex = i;
+          chunkOffset = offset - blockOffset + chunkLen;
           break;
         }
       }
@@ -1389,21 +1393,21 @@ public class KeyValueHandler extends Handler {
       }
 
       ChunkBuffer data;
-      long offset = readBlock.getOffset();
+
       long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;
       do {
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
         if (readBlock.getVerifyChecksum()) {
           Pair<Long, Long> adjustedOffsetAndLength =
-              computeChecksumBoundaries(chunk, offset, len);
+              computeChecksumBoundaries(chunk, chunkOffset, len);
           adjustedChunkOffset = adjustedOffsetAndLength.getLeft();
           adjustedChunkLen = adjustedOffsetAndLength.getRight();
           adjustedChunkOffset += chunk.getOffset();
         } else {
-          adjustedChunkOffset = offset;
+          adjustedChunkOffset = chunkOffset;
           adjustedChunkLen = Math.min(
-              chunk.getLen() + chunk.getOffset() - offset, len);
+              chunk.getLen() + chunk.getOffset() - chunkOffset, len);
         }
 
         ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
@@ -1421,8 +1425,8 @@ public class KeyValueHandler extends Handler {
                 blockData.getProtoBufMessage().getBlockID(),
                 chunkInfo.getProtoBufMessage(),
                 data, byteBufferToByteString));
-        len -= adjustedChunkLen + adjustedChunkOffset - offset;
-        offset = adjustedChunkOffset + adjustedChunkLen;
+        len -= adjustedChunkLen + adjustedChunkOffset - chunkOffset;
+        chunkOffset = 0;
         chunkIndex++;
       } while (len > 0);
 
