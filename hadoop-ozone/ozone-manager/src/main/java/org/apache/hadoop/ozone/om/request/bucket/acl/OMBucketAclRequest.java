@@ -55,11 +55,30 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public abstract class OMBucketAclRequest extends OMClientRequest {
 
   private final BiPredicate<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
-
+  private  String realVolume = null;
+  private  String realBucket = null;
   public OMBucketAclRequest(OMRequest omRequest,
       BiPredicate<List<OzoneAcl>, OmBucketInfo> aclOp) {
     super(omRequest);
     omBucketAclOp = aclOp;
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    ObjectParser objectParser = new ObjectParser(getPath(),
+        ObjectType.BUCKET);
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+    realVolume = resolvedBucket.realVolume();
+    realBucket = resolvedBucket.realBucket();
+
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+          realVolume, realBucket, null);
+    }
+    return super.preExecute(ozoneManager);
   }
 
   @Override
@@ -79,29 +98,15 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
     boolean operationResult = false;
     try {
-      ObjectParser objectParser = new ObjectParser(getPath(),
-          ObjectType.BUCKET);
-      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
-      volume = resolvedBucket.realVolume();
-      bucket = resolvedBucket.realBucket();
-
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, null);
-      }
       mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
-              bucket));
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, realVolume,
+              realBucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
 
-      String dbBucketKey = omMetadataManager.getBucketKey(volume, bucket);
+      String dbBucketKey = omMetadataManager.getBucketKey(realVolume,
+          realBucket);
       omBucketInfo = omMetadataManager.getBucketTable().get(dbBucketKey);
       if (omBucketInfo == null) {
         throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
@@ -141,8 +146,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     } finally {
       if (lockAcquired) {
         mergeOmLockDetails(
-            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
-                bucket));
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, realVolume,
+                realBucket));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
