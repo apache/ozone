@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -110,6 +111,20 @@ public final class OMClientRequestUtils {
       return false;
     default:
       return true;
+    }
+  }
+  public static void validateBucketName(String bucketName) throws IOException {
+    if (StringUtils.isBlank(bucketName)) {
+      throw new OMException("Invalid, Bucket name is empty",
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
+  public static void validateKeyName(String keyName) throws IOException {
+    if (StringUtils.isBlank(keyName)) {
+      throw new OMException("Directory create failed. Cannot create " +
+          "directory at root of the filesystem",
+          OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
     }
   }
 }

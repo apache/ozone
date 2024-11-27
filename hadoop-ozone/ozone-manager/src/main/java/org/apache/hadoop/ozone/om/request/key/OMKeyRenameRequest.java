@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateKeyName;
 
 /**
  * Handles rename key request.
@@ -80,6 +81,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
+
+    validateKeyName(renameKeyRequest.getToKeyName());
+    validateKeyName(renameKeyRequest.getKeyArgs().getKeyName());
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
     ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
@@ -150,10 +154,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     String toKey = null, fromKey = null;
     Result result = null;
     try {
-      if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
-        throw new OMException("Key name is empty",
-            OMException.ResultCodes.INVALID_KEY_NAME);
-      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();

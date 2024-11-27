@@ -65,6 +65,18 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // check Acl
+    String volume = getOmRequest().getDeleteVolumeRequest().getVolumeName();
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
+          null, null);
+    }
+    return super.preExecute(ozoneManager);
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long transactionLogIndex = termIndex.getIndex();
 
@@ -87,13 +99,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
-            null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();

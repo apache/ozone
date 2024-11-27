@@ -71,12 +71,20 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
+
     // Verify resource name
     OmUtils.validateVolumeName(volumeInfo.getVolume(),
         ozoneManager.isStrictS3());
+
+    // check acl
+    String volume = volumeInfo.getVolume();
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
+          null, null);
+    }
 
     // Set creation time & set modification time
     long initialTime = Time.now();
@@ -131,13 +139,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
 
       auditMap = omVolumeArgs.toAuditMap();
-
-      // check acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
-            null, null);
-      }
 
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(

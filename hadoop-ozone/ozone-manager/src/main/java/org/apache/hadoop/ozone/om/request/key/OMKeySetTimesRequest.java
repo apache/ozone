@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -35,18 +29,23 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -60,7 +59,18 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    if (getModificationTime() < -1) {
+      throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
+    }
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+          getVolumeName(), getBucketName(), getKeyName());
+    }
+
     OMRequest request = super.preExecute(ozoneManager);
+
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();
     String normalizedKeyPath =
@@ -190,19 +200,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     boolean operationResult = false;
     Result result;
     try {
-      if (getModificationTime() < -1) {
-        throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
-      }
-      volume = getVolumeName();
-      bucket = getBucketName();
-      key = getKeyName();
-
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key);
-      }
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
               bucket));
