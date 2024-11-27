@@ -207,7 +207,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
           }
         }
       }
-    } catch (Exception e) {
+    } catch (IOException e) {
       System.err.println("Exception occurred reading file Table, " + e);
     }
   }

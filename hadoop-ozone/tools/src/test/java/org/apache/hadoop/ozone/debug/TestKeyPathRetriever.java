@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.debug;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -88,7 +89,7 @@ public class TestKeyPathRetriever {
     Set<Long> containerSet = new HashSet<>();
     containerSet.add(500L);
     containerSet.add(800L);
-    PrintWriter writer = new PrintWriter(out);
+    PrintWriter writer = new PrintWriter(new OutputStreamWriter(out, UTF_8));
 
     Map<Long, String> dirInfoMap = new HashMap<>();
     Table<Long, String> dirTreeTable = mock(Table.class);
@@ -146,7 +147,7 @@ public class TestKeyPathRetriever {
 
     keyPathRetriever.retrieve(mock, writer, containerSet);
     writer.close();
-    assertThat(out.toString()).contains("vol/bucket1/dir1/file1").contains("vol/bucket1/dir1/file2")
+    assertThat(out.toString(UTF_8.name())).contains("vol/bucket1/dir1/file1").contains("vol/bucket1/dir1/file2")
         .contains("vol/bucket1/dir1/file4").doesNotContain("file3");
   }
 
