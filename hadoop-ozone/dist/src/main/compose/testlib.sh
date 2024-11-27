@@ -381,13 +381,6 @@ stop_docker_env(){
   fi
 }
 
-## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
-cleanup_docker_images() {
-  if [[ "${KEEP_IMAGE:-true}" == false ]]; then
-    docker image rm "$@"
-  fi
-}
-
 ## @description  Run Robot Framework report generator (rebot) in ozone-runner container.
 ## @param input directory where source Robot XML files are
 ## @param output directory where report should be placed

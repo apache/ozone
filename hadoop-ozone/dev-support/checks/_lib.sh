@@ -72,6 +72,11 @@ _install_bats() {
   curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar -xz -f -
 }
 
+install_diffoscope() {
+  sudo apt update -q
+  sudo apt install -y diffoscope
+}
+
 install_k3s() {
   _install_tool k3s
 }
