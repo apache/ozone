@@ -350,7 +350,7 @@ public class TestLDBCli {
   void testScanWithRecordsPerFile() throws IOException {
     // Prepare dummy table
     int recordsCount = 5;
-    prepareTable(KEY_TABLE, false, recordsCount);
+    prepareKeyTable(recordsCount);
 
     String scanDir1 = tempDir.getAbsolutePath() + "/scandir1";
     // Prepare scan args
@@ -435,7 +435,7 @@ public class TestLDBCli {
    * @param tableName table name
    * @param schemaV3 set to true for SchemaV3. applicable to block_data table
    */
-  private void prepareTable(String tableName, boolean schemaV3, int... recordsCount)
+  private void prepareTable(String tableName, boolean schemaV3)
       throws IOException {
 
     switch (tableName) {
@@ -445,12 +445,8 @@ public class TestLDBCli {
           .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
 
       Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
-      // Insert the number of keys specified by recordsCount[0]
-      int count = 5;
-      if (recordsCount.length > 0) {
-        count = recordsCount[0];
-      }
-      for (int i = 1; i <= count; i++) {
+      // Insert 5 keys
+      for (int i = 1; i <= 5; i++) {
         String key = "key" + i;
         OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
             key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
@@ -504,6 +500,28 @@ public class TestLDBCli {
       break;
     default:
       throw new IllegalArgumentException("Unsupported table: " + tableName);
+    }
+  }
+
+  /**
+   * Prepare the keytable for testing.
+   * @param recordsCount prepare the number of keys
+   */
+  private void prepareKeyTable(int recordsCount) throws IOException {
+    if (recordsCount < 1) {
+      throw new IllegalArgumentException("recordsCount must be greater than 1.");
+    }
+    dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+        .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
+    Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+    for (int i = 1; i <= recordsCount; i++) {
+      String key = "key" + i;
+      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
+          key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE,
+              HddsProtos.ReplicationFactor.ONE)).build();
+      keyTable.put(key.getBytes(UTF_8), value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+      // Populate map
+      dbMap.put(key, toMap(value));
     }
   }
 
