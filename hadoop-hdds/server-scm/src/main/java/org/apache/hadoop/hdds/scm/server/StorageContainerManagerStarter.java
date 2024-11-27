@@ -59,6 +59,7 @@ public class StorageContainerManagerStarter extends GenericCli {
 
   public static void main(String[] args) {
     // redirect JUL to slf4j
+    SLF4JBridgeHandler.removeHandlersForRootLogger();
     SLF4JBridgeHandler.install();
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
             new OzoneConfiguration());

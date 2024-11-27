@@ -154,6 +154,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public static void main(String[] args) {
     try {
       // redirect JUL to slf4j
+      SLF4JBridgeHandler.removeHandlersForRootLogger();
       SLF4JBridgeHandler.install();
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
