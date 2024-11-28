@@ -55,9 +55,11 @@ For some advanced cluster admins who have the high performance requirement, he/s
 </property>
 <property>
    <name>hdds.datanode.failed.db.volumes.tolerated</name>
-   <value>-1</value>
+   <value>0</value>
    <description>The number of db volumes that are allowed to fail before a datanode stops offering service.
-   Default -1 means unlimited, but we should have at least one good volume left.</description>
+      By default, any volume failure will cause a datanode to shutdown.
+      The value should be greater than or equal to -1 , -1 represents minimum 1 valid volume.
+   </description>
 </property>
 ```
 

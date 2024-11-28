@@ -79,7 +79,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
-  static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
+  static final int FAILED_VOLUMES_TOLERATED_DEFAULT = 0;
 
   public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
 
@@ -330,35 +330,38 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 
   @Config(key = "failed.data.volumes.tolerated",
-      defaultValue = "-1",
+      defaultValue = "0",
       type = ConfigType.INT,
       tags = { DATANODE },
       description = "The number of data volumes that are allowed to fail "
-          + "before a datanode stops offering service. "
-          + "Config this to -1 means unlimited, but we should have "
-          + "at least one good volume left."
+          + "before a datanode stops offering service. By default, "
+          + "any volume failure will cause a datanode to shutdown. "
+          + "The value should be greater than or equal to -1 , -1 represents minimum "
+          + "1 valid volume."
   )
   private int failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
   @Config(key = "failed.metadata.volumes.tolerated",
-      defaultValue = "-1",
+      defaultValue = "0",
       type = ConfigType.INT,
       tags = { DATANODE },
       description = "The number of metadata volumes that are allowed to fail "
-          + "before a datanode stops offering service. "
-          + "Config this to -1 means unlimited, but we should have "
-          + "at least one good volume left."
+          + "before a datanode stops offering service. By default, "
+          + "any volume failure will cause a datanode to shutdown. "
+          + "The value should be greater than or equal to -1 , -1 represents minimum "
+          + "1 valid volume."
   )
   private int failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
   @Config(key = "failed.db.volumes.tolerated",
-      defaultValue = "-1",
+      defaultValue = "0",
       type = ConfigType.INT,
       tags = { DATANODE },
       description = "The number of db volumes that are allowed to fail "
-          + "before a datanode stops offering service. "
-          + "Config this to -1 means unlimited, but we should have "
-          + "at least one good volume left."
+          + "before a datanode stops offering service. By default, "
+          + "any volume failure will cause a datanode to shutdown. "
+          + "The value should be greater than or equal to -1 , -1 represents minimum "
+          + "1 valid volume."
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
