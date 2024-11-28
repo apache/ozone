@@ -496,10 +496,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return acls;
   }
 
-  static long getMaxNumOfRecursiveDirs() {
-    return MAX_NUM_OF_RECURSIVE_DIRS;
-  }
-
   /**
    * Construct OmDirectoryInfo for every parent directory in missing list.
    *
@@ -520,7 +516,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // maxObjId represents the largest object id allocation possible inside
     // the transaction.
     long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-    long maxObjId = baseObjId + getMaxNumOfRecursiveDirs();
+    long maxObjId = baseObjId + MAX_NUM_OF_RECURSIVE_DIRS;
     long objectCount = 1;
 
     String volumeName = keyArgs.getVolumeName();
@@ -533,7 +529,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long nextObjId = baseObjId + objectCount;
       if (nextObjId > maxObjId) {
         throw new OMException("Too many directories in path. Exceeds limit of "
-            + getMaxNumOfRecursiveDirs() + ". Unable to create directory: "
+            + MAX_NUM_OF_RECURSIVE_DIRS + ". Unable to create directory: "
             + keyName + " in volume/bucket: " + volumeName + "/" + bucketName,
             INVALID_KEY_NAME);
       }
@@ -596,7 +592,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
 
       OmKeyInfo parentKeyInfo =
-          createDirectoryKeyInfoWithNoACL(missingKey, keyArgs, nextObjId,
+          createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
               bucketInfo, omPathInfo, trxnLogIndex,
               ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
       objectCount++;
@@ -615,6 +611,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param parentObjectId
    * @param bucketInfo
    * @param omPathInfo
+   * @param config
    * @return the OmDirectoryInfo structure
    */
   @SuppressWarnings("parameternumber")
@@ -646,10 +643,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param omPathInfo
    * @param transactionIndex
    * @param serverDefaultReplConfig
+   * @param config
    * @return the OmKeyInfo structure
    */
   @SuppressWarnings("parameternumber")
-  protected OmKeyInfo createDirectoryKeyInfoWithNoACL(String keyName,
+  protected OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
       KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
       ReplicationConfig serverDefaultReplConfig, OzoneConfiguration config) throws OMException {

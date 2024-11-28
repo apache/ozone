@@ -188,7 +188,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         OmBucketInfo omBucketInfo =
             getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-        dirKeyInfo = createDirectoryKeyInfoWithNoACL(keyName, keyArgs, baseObjId,
+        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
             omBucketInfo, omPathInfo, trxnLogIndex,
             ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
 
