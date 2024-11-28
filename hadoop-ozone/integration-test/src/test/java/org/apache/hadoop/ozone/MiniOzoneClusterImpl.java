@@ -145,7 +145,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
-  private static volatile MockedStatic mockDNStatic;
+  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -571,16 +571,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.secretKeyClient = client;
   }
 
-  public static void mockDatanode() {
-    if (mockDNStatic == null) {
-      synchronized (MiniOzoneClusterImpl.class) {
-        if (mockDNStatic == null) {
-          mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
-        }
-      }
-    }
-  }
-
   private static void stopDatanodes(
       Collection<HddsDatanodeService> hddsDatanodes) {
     if (!hddsDatanodes.isEmpty()) {
@@ -877,7 +867,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      */
     protected List<HddsDatanodeService> createHddsDatanodes()
         throws IOException {
-      mockDatanode();
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
 
       // Override default datanode initial and current version if necessary

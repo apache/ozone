@@ -1595,12 +1595,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    if (SCMHAUtils.isSCMHAEnabled(configuration) && getScmHAManager().getRatisServer().getLeaderId() != null) {
-      scmHAMetricsUpdate(getScmHAManager().getRatisServer().getLeaderId().toString());
-    } else {
-      // At this point leader is not known
-      scmHAMetricsUpdate(null);
-    }
+    RaftPeerId leaderId = SCMHAUtils.isSCMHAEnabled(configuration)
+        ? getScmHAManager().getRatisServer().getLeaderId() : null;
+    scmHAMetricsUpdate(Objects.toString(leaderId, null));
 
     if (scmCertificateClient != null) {
       // In case root CA certificate is rotated during this SCM is offline
