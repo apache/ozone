@@ -1445,8 +1445,7 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfo, long startByteIndex, long dataLen) {
 
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-    long chunkOffset = chunkInfo.getOffset();
-    startByteIndex = startByteIndex - chunkOffset;
+
     // index of the last byte to be read from chunk, inclusively.
     final long endByteIndex = startByteIndex + dataLen - 1;
 
