@@ -435,22 +435,7 @@ public class TestLDBCli {
 
     switch (tableName) {
     case KEY_TABLE:
-      // Dummy om.db with only keyTable
-      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
-          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
-
-      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
-      // Insert 5 keys
-      for (int i = 1; i <= 5; i++) {
-        String key = "key" + i;
-        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
-            key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
-        keyTable.put(key.getBytes(UTF_8),
-            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
-
-        // Populate map
-        dbMap.put(key, toMap(value));
-      }
+      prepareKeyTable(5);
       break;
 
     case BLOCK_DATA:
@@ -506,6 +491,7 @@ public class TestLDBCli {
     if (recordsCount < 1) {
       throw new IllegalArgumentException("recordsCount must be greater than 1.");
     }
+    // Dummy om.db with only keyTable
     dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
         .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
     Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
