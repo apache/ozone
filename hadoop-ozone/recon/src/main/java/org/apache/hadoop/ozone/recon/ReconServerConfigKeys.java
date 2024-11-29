@@ -186,6 +186,11 @@ public final class  ReconServerConfigKeys {
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 
+  public static final String OZONE_RECON_TASK_STATUS_STORAGE_DURATION =
+      "ozone.recon.task.status.storage.duration";
+
+  public static final String OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT = "30m";
+
   /**
    * Private constructor for utility class.
    */

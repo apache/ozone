@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ public abstract class ReconScmTask {
     String taskName = getTaskName();
     if (!reconTaskStatusDao.existsById(taskName)) {
       ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L);
+          taskName, 0L, 0L, null);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
     }
@@ -89,7 +90,8 @@ public abstract class ReconScmTask {
 
   protected void recordSingleRunCompletion() {
     reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
-        System.currentTimeMillis(), 0L));
+        System.currentTimeMillis(), 0L, true));
+    ReconTaskStatusCounter.updateCounter(getClass(), true);
   }
 
   protected boolean canRun() {
