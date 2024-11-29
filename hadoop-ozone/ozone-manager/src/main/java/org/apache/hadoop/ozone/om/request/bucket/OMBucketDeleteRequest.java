@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -174,6 +175,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex));
+      QuotaResource.Factory.removeQuotaResource(omBucketInfo.getObjectID());
 
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());

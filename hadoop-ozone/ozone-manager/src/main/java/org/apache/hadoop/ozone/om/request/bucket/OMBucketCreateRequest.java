@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -260,6 +261,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           CacheValue.get(transactionLogIndex, omVolumeArgs));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex, omBucketInfo));
+      QuotaResource.Factory.registerQuotaResource(omBucketInfo.getObjectID());
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());

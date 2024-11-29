@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.ratis.execution.OMGateway;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -475,6 +476,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean fsSnapshotEnabled;
 
+  private final OMGateway omGateway;
+
   /**
    * OM Startup mode.
    */
@@ -723,6 +726,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
+
+    // init om gateway for request
+    omGateway = new OMGateway(this);
+
     ShutdownHookManager.get().addShutdownHook(this::saveOmMetrics,
         SHUTDOWN_HOOK_PRIORITY);
 
@@ -1749,6 +1756,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       bootstrap(omNodeDetails);
     }
 
+    omGateway.start();
+
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
@@ -1826,6 +1835,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     startJVMPauseMonitor();
     setStartTime();
+    omGateway.start();
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
@@ -2266,6 +2276,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
+      omGateway.stop();
       // Cancel the metrics timer and set to null.
       if (metricsTimer != null) {
         metricsTimer.cancel();
@@ -5031,5 +5042,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (disabledFeatures.contains(feature.name())) {
       throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
+  }
+
+  public OMGateway getOmGateway() {
+    return omGateway;
   }
 }

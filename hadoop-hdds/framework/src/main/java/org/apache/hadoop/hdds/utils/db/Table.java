@@ -328,6 +328,10 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void loadFromFile(File externalFile) throws IOException;
 
+  default Table<byte[], byte[]> getRawTable() {
+    throw new NotImplementedException("getRawTable is not implemented");
+  }
+
   /**
    * Class used to represent the key and value pair of a db entry.
    */

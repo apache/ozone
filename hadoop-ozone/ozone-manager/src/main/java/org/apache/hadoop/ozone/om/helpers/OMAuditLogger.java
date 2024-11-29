@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.execution.request.ExecutionContext;
+import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -124,6 +126,17 @@ public final class OMAuditLogger {
     }
   }
 
+  public static void log(OMAuditLogger.Builder builder, ExecutionContext executionContext) {
+    if (builder.isLog.get()) {
+      if (null == builder.getAuditMap()) {
+        builder.setAuditMap(new HashMap<>());
+      }
+      builder.getAuditMap().put("Transaction", "" + executionContext.getIndex());
+      builder.getMessageBuilder().withParams(builder.getAuditMap());
+      builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
+    }
+  }
+
   public static void log(OMAuditLogger.Builder builder) {
     if (builder.isLog.get()) {
       builder.getMessageBuilder().withParams(builder.getAuditMap());
@@ -151,6 +164,34 @@ public final class OMAuditLogger {
       builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getUserInfo());
+      builder.setLog(true);
+      builder.setAuditLogger(om.getAuditLogger());
+      log(builder);
+    } catch (Exception ex) {
+      LOG.error("Exception occurred while write audit log, ", ex);
+    }
+  }
+
+  public static void log(OMAuditLogger.Builder builder, OMRequestExecutor request, OzoneManager om,
+                         ExecutionContext executionContext, Throwable th) {
+    if (builder.isLog.get()) {
+      builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
+      return;
+    }
+
+    OMAction action = getAction(request.getOmRequest());
+    if (null == action) {
+      // no audit log defined
+      return;
+    }
+    if (builder.getAuditMap() == null) {
+      builder.setAuditMap(new HashMap<>());
+    }
+    try {
+      builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
+      builder.getAuditMap().put("Transaction", "" + executionContext.getIndex());
+      request.buildAuditMessage(action, builder.getAuditMap(),
+          th, request.getOmRequest().getUserInfo());
       builder.setLog(true);
       builder.setAuditLogger(om.getAuditLogger());
       log(builder);

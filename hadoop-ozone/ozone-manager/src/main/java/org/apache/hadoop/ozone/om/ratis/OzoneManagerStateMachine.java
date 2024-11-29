@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.execution.LeaderExecutionEnabler;
+import org.apache.hadoop.ozone.om.ratis.execution.PostExecutor;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
@@ -102,6 +104,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
+  private final PostExecutor postExecutor;
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
@@ -113,6 +116,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
+    this.postExecutor = new PostExecutor(ozoneManager);
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +
@@ -354,6 +358,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
       LOG.debug("{}: applyTransaction {}", getId(), termIndex);
+
+      if (LeaderExecutionEnabler.isOptimizedApplyTransaction(request, ozoneManager)) {
+        OMResponse response = runOptimizedCommand(request, termIndex);
+        CompletableFuture<Message> future = new CompletableFuture<>();
+        future.complete(processResponse(response));
+        return future;
+      }
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -656,5 +667,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
+  }
+
+  /**
+   * Submits write request to OM and returns the response Message.
+   *
+   * @param request OMRequest
+   * @return response from OM
+   */
+  public OMResponse runOptimizedCommand(OMRequest request, TermIndex termIndex) {
+    OMResponse omResponse = postExecutor.runCommand(request, termIndex);
+    ozoneManagerDoubleBuffer.add(new DummyOMClientResponse(omResponse), termIndex);
+    return omResponse;
+  }
+
+  public PostExecutor getPostExecutor() {
+    return postExecutor;
   }
 }

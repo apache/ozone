@@ -134,11 +134,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return key == null ? null : keyCodec.toDirectCodecBuffer(key);
   }
 
+  public CodecBuffer encodeValueCodecBuffer(VALUE value) throws IOException {
+    return value == null ? null : valueCodec.toDirectCodecBuffer(value);
+  }
+
   private byte[] encodeKey(KEY key) throws IOException {
     return key == null ? null : keyCodec.toPersistedFormat(key);
   }
 
-  private byte[] encodeValue(VALUE value) throws IOException {
+  public byte[] encodeValue(VALUE value) throws IOException {
     return value == null ? null : valueCodec.toPersistedFormat(value);
   }
 
@@ -541,6 +545,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void loadFromFile(File externalFile) throws IOException {
     rawTable.loadFromFile(externalFile);
+  }
+
+  @Override
+  public Table<byte[], byte[]> getRawTable() {
+    return rawTable;
   }
 
   @Override
