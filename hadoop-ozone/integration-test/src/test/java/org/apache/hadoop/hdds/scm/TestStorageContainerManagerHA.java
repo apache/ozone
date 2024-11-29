@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestMiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -77,7 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Timeout(300)
 public class TestStorageContainerManagerHA {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestMiniOzoneCluster.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestStorageContainerManagerHA.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
@@ -341,39 +340,37 @@ public class TestStorageContainerManagerHA {
     // GIVEN
     int scmInstancesCount = 3;
     conf = new OzoneConfiguration();
-    MiniOzoneCluster.Builder haMiniClusterBuilder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder haMiniClusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("scm-service-id")
         .setOMServiceId("om-service-id")
         .setNumOfActiveOMs(0)
         .setNumOfStorageContainerManagers(scmInstancesCount)
-        .setNumOfActiveSCMs(1)
-        .setNumDatanodes(0);
+        .setNumOfActiveSCMs(1);
+    haMiniClusterBuilder.setNumDatanodes(0);
 
     // start single SCM instance without other Ozone services
     // in order to initialize and bootstrap SCM instances only
-    cluster = (MiniOzoneHAClusterImpl) haMiniClusterBuilder.build();
+    cluster = haMiniClusterBuilder.build();
 
-    List<StorageContainerManager> storageContainerManagersList =
-        ((MiniOzoneHAClusterImpl) cluster).getStorageContainerManagersList();
+    List<StorageContainerManager> storageContainerManagersList = cluster.getStorageContainerManagersList();
 
     // stop the single SCM instance in order to imitate further simultaneous start of SCMs
     storageContainerManagersList.get(0).stop();
     storageContainerManagersList.get(0).join();
 
     // WHEN (imitate simultaneous start of the SCMs)
-    CountDownLatch scmInstancesCounter = new CountDownLatch(scmInstancesCount);
     int retryCount = 0;
     while (true) {
+      CountDownLatch scmInstancesCounter = new CountDownLatch(scmInstancesCount);
       AtomicInteger failedSCMs = new AtomicInteger();
       for (StorageContainerManager scm : storageContainerManagersList) {
-        CountDownLatch finalScmInstancesCounter = scmInstancesCounter;
         new Thread(() -> {
           try {
             scm.start();
           } catch (IOException e) {
             failedSCMs.incrementAndGet();
           } finally {
-            finalScmInstancesCounter.countDown();
+            scmInstancesCounter.countDown();
           }
         }).start();
       }
@@ -391,19 +388,18 @@ public class TestStorageContainerManagerHA {
         LOG.info("SCMs port conflicts, retried {} times",
             retryCount);
         failedSCMs.set(0);
-        scmInstancesCounter = new CountDownLatch(scmInstancesCount);
       }
     }
 
-    // THEN expect at least one SCM node (leader) will have 'scmha_metrics_scmha_leader_state' metric set to 1
-    boolean leaderMetricDefined = false;
+    // THEN expect only one SCM node (leader) will have 'scmha_metrics_scmha_leader_state' metric set to 1
+    int leaderCount = 0;
     for (StorageContainerManager scm : storageContainerManagersList) {
       if (scm.getScmHAMetrics() != null && scm.getScmHAMetrics().getSCMHAMetricsInfoLeaderState() == 1) {
-        leaderMetricDefined = true;
+        leaderCount++;
         break;
       }
     }
-    assertTrue(leaderMetricDefined);
+    assertEquals(1, leaderCount);
   }
 
 }
