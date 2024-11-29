@@ -148,7 +148,7 @@ public class LeaderRequestExecutor {
       OMClientResponse omClientResponse = omClientRequest.process(ozoneManager, exeCtx);
       ctx.setResponse(omClientResponse.getOMResponse());
       if (!omClientResponse.getOMResponse().getSuccess()) {
-        omClientRequest.changeRecorder().clear();
+        omClientRequest.changeRecorder().clear(exeCtx.getIndex());
         OMAuditLogger.log(omClientRequest.getAuditBuilder(), exeCtx);
       } else {
         if (omClientRequest.changeRecorder().getTableRecordsMap().isEmpty()) {
@@ -157,7 +157,7 @@ public class LeaderRequestExecutor {
         }
       }
     } catch (Throwable th) {
-      omClientRequest.changeRecorder().clear();
+      omClientRequest.changeRecorder().clear(exeCtx.getIndex());
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, ozoneManager, exeCtx, th);
       throw th;
     }
@@ -294,7 +294,7 @@ public class LeaderRequestExecutor {
   private void handleBatchUpdateComplete(Collection<RequestContext> ctxs, Throwable th, String leaderOMNodeId) {
     for (RequestContext ctx : ctxs) {
       // reset quota resource and release memory for change update
-      ctx.getRequestExecutor().changeRecorder().clear();
+      ctx.getRequestExecutor().changeRecorder().clear(ctx.getExecutionContext().getIndex());
 
       if (th != null) {
         OMAuditLogger.log(ctx.getRequestExecutor().getAuditBuilder(), ctx.getRequestExecutor(), ozoneManager,

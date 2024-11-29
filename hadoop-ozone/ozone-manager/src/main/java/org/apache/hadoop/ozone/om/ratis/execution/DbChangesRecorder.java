@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -47,11 +48,12 @@ public class DbChangesRecorder {
     throw new OMException("Incorrect Table type passed", OMException.ResultCodes.INTERNAL_ERROR);
   }
 
-  public void add(OmBucketInfo omBucketInfo, long incUsedBytes, long incNamespace) {
+  public void add(long trackId, OmBucketInfo omBucketInfo, long incUsedBytes, long incNamespace) {
     BucketChangeInfo bucketChangeInfo = bucketUsedQuotaMap.computeIfAbsent(omBucketInfo.getObjectID(),
         k -> new BucketChangeInfo(omBucketInfo.getVolumeName(), omBucketInfo.getBucketName()));
     bucketChangeInfo.setIncUsedBytes(incUsedBytes + bucketChangeInfo.getIncUsedBytes());
     bucketChangeInfo.setIncNamespace(incNamespace + bucketChangeInfo.getIncNamespace());
+    QuotaResource.Factory.addReserveTracker(trackId, omBucketInfo.getObjectID(), incUsedBytes, incNamespace);
   }
 
   public Map<String, Map<String, CodecBuffer>> getTableRecordsMap() {
@@ -101,7 +103,7 @@ public class DbChangesRecorder {
       quotaBuilder.setDiffUsedNamespace(quotaBuilder.getDiffUsedNamespace() + entry.getValue().getIncNamespace());
     }
   }
-  public void clear() {
+  public void clear(long trackId) {
     for (Map<String, CodecBuffer> records : tableRecordsMap.values()) {
       records.values().forEach(e -> {
         if (e != null) {
@@ -110,12 +112,8 @@ public class DbChangesRecorder {
       });
     }
     tableRecordsMap.clear();
-    for (Map.Entry<Long, DbChangesRecorder.BucketChangeInfo> entry : getBucketUsedQuotaMap().entrySet()) {
-      BucketQuotaResource.BucketQuota bucketQuota = BucketQuotaResource.instance().get(entry.getKey());
-      bucketQuota.addUsedBytes(-entry.getValue().getIncUsedBytes());
-      bucketQuota.addUsedNamespace(-entry.getValue().getIncNamespace());
-    }
     bucketUsedQuotaMap.clear();
+    QuotaResource.Factory.resetReservedSpace(trackId);
   }
 
   /**

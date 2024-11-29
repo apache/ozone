@@ -359,7 +359,7 @@ public class OMKeyCommitExecutor extends OMKeyExecutor {
       omBucketInfo.incrUsedNamespace(nameSpaceUsed);
       omBucketInfo.incrUsedBytes(correctedSpace);
       OmKeyUtils.checkUpdateBucketQuota(omBucketInfo, correctedSpace, nameSpaceUsed);
-      changeRecorder().add(omBucketInfo, correctedSpace, nameSpaceUsed);
+      changeRecorder().add(exeCtx.getIndex(), omBucketInfo, correctedSpace, nameSpaceUsed);
 
       // Add to cache of open key table and key table.
       if (!isHSync) {

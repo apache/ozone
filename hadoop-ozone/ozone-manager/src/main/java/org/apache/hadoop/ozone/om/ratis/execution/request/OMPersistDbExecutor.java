@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -110,6 +111,8 @@ public class OMPersistDbExecutor extends OMRequestExecutor {
           metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, quota.getVolName(), quota.getBucketName());
         }
       }
+      // reset reserved quota for all bucket update as soon bucketInfo is updated
+      resetBucketReservedQuota();
       omResponse.setPersistDbResponse(OzoneManagerProtocolProtos.PersistDbResponse.newBuilder().build());
     } catch (IOException ex) {
       audit(ozoneManager, getOmRequest(), exeCtx, ex);
@@ -174,5 +177,10 @@ public class OMPersistDbExecutor extends OMRequestExecutor {
       ozoneManager.getSystemAuditLogger().logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(
           OMSystemAction.DBPERSIST, auditMap));
     }
+  }
+
+  private void resetBucketReservedQuota() {
+    OzoneManagerProtocolProtos.ExecutionControlRequest execControlReq = getOmRequest().getExecutionControlRequest();
+    execControlReq.getRequestInfoList().forEach(e -> QuotaResource.Factory.resetReservedSpace(e.getIndex()));
   }
 }

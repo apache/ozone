@@ -68,8 +68,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
-import org.apache.hadoop.ozone.om.ratis.execution.BucketQuotaResource;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
@@ -394,21 +394,17 @@ public final class OmKeyUtils {
    */
   public static void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo, long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      BucketQuotaResource.BucketQuota bucketQuota = BucketQuotaResource.instance().get(omBucketInfo.getObjectID());
-      long curUsedBytes = bucketQuota.addUsedBytes(allocateSize);
-      curUsedBytes += omBucketInfo.getUsedBytes();
+      long curUsedBytes = omBucketInfo.getUsedBytes() + allocateSize;
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes < curUsedBytes) {
-        bucketQuota.addUsedBytes(-allocateSize);
         throw new OMException("The DiskSpace quota of bucket:" + omBucketInfo.getBucketName()
             + " exceeded quotaInBytes: " + quotaInBytes + " Bytes but diskspace consumed: "
             + curUsedBytes + " Bytes.", OMException.ResultCodes.QUOTA_EXCEEDED);
       }
-      bucketQuota.addUsedBytes(-allocateSize);
     }
   }
   /**
-   * Check bucket quota in bytes.
+   * Check and update bucket quota in bytes.
    * @param omBucketInfo
    * @param allocateSize
    * @param allocateNamespace
@@ -416,22 +412,25 @@ public final class OmKeyUtils {
    */
   public static void checkUpdateBucketQuota(OmBucketInfo omBucketInfo, long allocateSize, long allocateNamespace)
       throws IOException {
-    BucketQuotaResource.BucketQuota bucketQuota = BucketQuotaResource.instance().get(omBucketInfo.getObjectID());
+    QuotaResource bucketQuota = QuotaResource.Factory.getQuotaResource(omBucketInfo.getObjectID());
+    assert bucketQuota != null;
+    long reservedSize = 0;
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long curUsedBytes = bucketQuota.addUsedBytes(allocateSize);
-      curUsedBytes += omBucketInfo.getUsedBytes();
+      bucketQuota.addUsedBytes(allocateSize);
+      long curUsedBytes = omBucketInfo.getUsedBytes();
       if (omBucketInfo.getQuotaInBytes() < curUsedBytes) {
         bucketQuota.addUsedBytes(-allocateSize);
         throw new OMException("The DiskSpace quota of bucket:" + omBucketInfo.getBucketName()
             + " exceeded quotaInBytes: " + omBucketInfo.getQuotaInBytes() + " Bytes but diskspace consumed: "
             + curUsedBytes + " Bytes.", OMException.ResultCodes.QUOTA_EXCEEDED);
       }
+      reservedSize = allocateSize;
     }
     if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
-      long curUsedNamespace = bucketQuota.addUsedNamespace(allocateNamespace);
-      curUsedNamespace += omBucketInfo.getUsedNamespace();
+      bucketQuota.addUsedNamespace(allocateNamespace);
+      long curUsedNamespace = omBucketInfo.getUsedNamespace();
       if (omBucketInfo.getQuotaInNamespace() < curUsedNamespace) {
-        bucketQuota.addUsedBytes(-allocateSize);
+        bucketQuota.addUsedBytes(-reservedSize);
         bucketQuota.addUsedNamespace(-allocateNamespace);
         throw new OMException("The namespace quota of Bucket:" + omBucketInfo.getBucketName()
             + " exceeded: quotaInNamespace: " + omBucketInfo.getQuotaInNamespace() + " but namespace consumed: "

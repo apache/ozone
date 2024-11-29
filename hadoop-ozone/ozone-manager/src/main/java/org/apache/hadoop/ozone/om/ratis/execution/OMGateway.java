@@ -19,16 +19,22 @@ package org.apache.hadoop.ozone.om.ratis.execution;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProcessingDetails;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaResource;
 import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.ratis.execution.factory.OmRequestFactory;
 import org.apache.hadoop.ozone.om.ratis.execution.request.OMRequestExecutor;
@@ -67,6 +73,14 @@ public class OMGateway {
   }
 
   public void start() {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> itr
+             = om.getMetadataManager().getBucketTable().cacheIterator();
+    while (itr.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = itr.next();
+      if (entry.getValue().getCacheValue() != null) {
+        QuotaResource.Factory.registerQuotaResource(entry.getValue().getCacheValue().getObjectID());
+      }
+    }
     omLockOpr.start();
     leaderExecutor.start();
   }
