@@ -22,7 +22,7 @@ export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
 current_version="${ozone.version}"
-old_versions="1.0.0 1.1.0 1.2.1 1.3.0 1.4.0" # container is needed for each version in clients.yaml
+old_versions="1.0.0 1.1.0 1.2.1 1.3.0 1.4.1" # container is needed for each version in clients.yaml
 
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"

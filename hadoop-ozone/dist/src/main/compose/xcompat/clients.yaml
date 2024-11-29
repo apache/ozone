@@ -52,6 +52,13 @@ services:
     volumes:
       - ../..:/opt/ozone
     command: ["sleep","1000000"]
+  old_client_1_4_1:
+    image: ${OZONE_IMAGE}:1.4.1${OZONE_IMAGE_FLAVOR}
+    env_file:
+      - docker-config
+    volumes:
+      - ../..:/opt/ozone
+    command: ["sleep","1000000"]
   new_client:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     env_file:
