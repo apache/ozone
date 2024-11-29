@@ -61,6 +61,10 @@ services:
     image: ${OZONE_IMAGE}:1.4.0${OZONE_IMAGE_FLAVOR}
     <<: *old-config
 
+  old_client_1_4_1:
+    image: ${OZONE_IMAGE}:1.4.1${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   new_client:
     <<: *new-config
     environment:
