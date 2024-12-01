@@ -51,7 +51,7 @@ public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
       assertNotNull(getDao(dao));
     });
     ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, true));
     assertEquals(1, dao.findAll().size());
   }
 }

@@ -61,10 +61,14 @@ public class TaskStatusService {
   }
 
   @GET
-  @Path("metrics")
+  @Path("metrics/{taskName}")
   public Response getTaskMetrics(
-    @QueryParam("taskName") String taskName
+    @PathParam("taskName") String taskName
   ) {
-    return Response.ok(taskStatusCounter.getTaskStatusCounts(taskName)).build();
+    try {
+      return Response.ok(taskStatusCounter.getTaskStatusCounts(taskName)).build();
+    } catch (NullPointerException npe) {
+      return Response.status(500, npe.getMessage()).build();
+    }
   }
 }

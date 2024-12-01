@@ -122,7 +122,6 @@ public class ReconControllerModule extends AbstractModule {
     bind(MetricsServiceProviderFactory.class).in(Singleton.class);
 
     bind(HeatMapServiceImpl.class).in(Singleton.class);
-    bind(ReconTaskStatusCounter.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {

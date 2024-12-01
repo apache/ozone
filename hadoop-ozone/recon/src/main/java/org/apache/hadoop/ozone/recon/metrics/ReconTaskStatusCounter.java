@@ -2,6 +2,10 @@ package org.apache.hadoop.ozone.recon.metrics;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.ReconServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT;
 
@@ -11,8 +15,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class ReconTaskStatusCounter {
+  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusCounter.class);
+
   @Inject
   static OzoneConfiguration conf;
+
+  private static ReconTaskStatusCounter instance;
+  private final long timeoutDuration;
 
   public enum ReconTasks {
     ContainerHealthTask,
@@ -30,15 +39,29 @@ public class ReconTaskStatusCounter {
 
   static Map<ReconTasks, Pair<Integer, Integer>> taskStatusCounter= new EnumMap<>(ReconTasks.class);
 
-  ReconTaskStatusCounter() {
-    initialize();
-  }
-
-  public void initialize() {
+  public ReconTaskStatusCounter() {
     initializationTime = System.currentTimeMillis();
+    timeoutDuration = conf.getTimeDuration(
+      OZONE_RECON_TASK_STATUS_STORAGE_DURATION,
+      OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
+      TimeUnit.MILLISECONDS
+    );
+    LOG.info("Timeout Duration: {}", timeoutDuration);
     for (ReconTasks task: ReconTasks.values()) {
       taskStatusCounter.put(task, Pair.of(0, 0));
     }
+  }
+
+  /**
+   * Get an instance of <code>this</code> {@link ReconTaskStatusCounter} in order to persist state
+   * of the task counters between multiple modules/packages
+   * @return an instance of current {@link ReconTaskStatusCounter}
+   */
+  public static ReconTaskStatusCounter getCurrentInstance() {
+    if (null == instance) {
+      instance = new ReconTaskStatusCounter();
+    }
+    return instance;
   }
 
   public void updateCounter(Class<?> clazz, boolean successful) {
@@ -69,13 +92,8 @@ public class ReconTaskStatusCounter {
    * @return A {@link Pair} of <code> {successes, failures} for provided task name </code>
    */
   public Pair<Integer, Integer> getTaskStatusCounts(String taskName) {
-    long timeoutDuration = conf.getTimeDuration(
-      OZONE_RECON_TASK_STATUS_STORAGE_DURATION,
-      OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
-      TimeUnit.MILLISECONDS
-    );
     if ((initializationTime - System.currentTimeMillis()) > timeoutDuration) {
-      initialize();
+      instance = new ReconTaskStatusCounter();
       return Pair.of(0, 0);
     }
 

@@ -32,10 +32,12 @@ public abstract class ReconScmTask {
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
   private Thread taskThread;
   private ReconTaskStatusDao reconTaskStatusDao;
+  private ReconTaskStatusCounter taskStatusCounter;
   private volatile boolean running;
 
   protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
+    this.taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
   }
 
   private void register() {
@@ -89,9 +91,9 @@ public abstract class ReconScmTask {
   }
 
   protected void recordSingleRunCompletion() {
+    taskStatusCounter.updateCounter(getTaskName(), true);
     reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
         System.currentTimeMillis(), 0L, true));
-    ReconTaskStatusCounter.updateCounter(getClass(), true);
   }
 
   protected boolean canRun() {
