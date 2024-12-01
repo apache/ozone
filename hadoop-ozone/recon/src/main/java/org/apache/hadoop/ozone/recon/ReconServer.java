@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -87,6 +88,7 @@ public class ReconServer extends GenericCli {
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
   private ReconTaskStatusMetrics reconTaskStatusMetrics;
+  private ReconTaskMetrics reconTaskMetrics;
 
   private volatile boolean isStarted = false;
 
@@ -157,7 +159,7 @@ public class ReconServer extends GenericCli {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
-
+      this.reconTaskMetrics = injector.getInstance(ReconTaskMetrics.class);
       // Handle Recon Schema Versioning
       ReconSchemaVersionTableManager versionTableManager =
           injector.getInstance(ReconSchemaVersionTableManager.class);
@@ -239,6 +241,9 @@ public class ReconServer extends GenericCli {
       HddsServerUtil.initializeMetrics(configuration, "Recon");
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.register();
+      }
+      if (null != reconTaskMetrics) {
+        reconTaskMetrics.register();
       }
       if (httpServer != null) {
         httpServer.start();

@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -120,6 +122,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(MetricsServiceProviderFactory.class).in(Singleton.class);
 
     bind(HeatMapServiceImpl.class).in(Singleton.class);
+    bind(ReconTaskStatusCounter.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {

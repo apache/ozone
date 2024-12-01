@@ -14,7 +14,7 @@ public class ReconTaskStatusCounter {
   @Inject
   static OzoneConfiguration conf;
 
-  enum ReconTasks {
+  public enum ReconTasks {
     ContainerHealthTask,
     ContainerKeyMapperTask,
     ContainerSizeCountTask,
@@ -28,16 +28,20 @@ public class ReconTaskStatusCounter {
   }
   static long initializationTime = 0L;
 
-  static Map<ReconTasks, Pair<Integer, Integer>> taskStatusCounter= new EnumMap<ReconTasks, Pair<Integer, Integer>>(ReconTasks.class);
+  static Map<ReconTasks, Pair<Integer, Integer>> taskStatusCounter= new EnumMap<>(ReconTasks.class);
 
-  public static void initialize() {
+  ReconTaskStatusCounter() {
+    initialize();
+  }
+
+  public void initialize() {
     initializationTime = System.currentTimeMillis();
     for (ReconTasks task: ReconTasks.values()) {
       taskStatusCounter.put(task, Pair.of(0, 0));
     }
   }
 
-  public static void updateCounter(Class<?> clazz, boolean successful) {
+  public void updateCounter(Class<?> clazz, boolean successful) {
     int successes = taskStatusCounter.get(ReconTasks.valueOf(clazz.getName())).getLeft();
     int failures = taskStatusCounter.get(ReconTasks.valueOf(clazz.getName())).getRight();
     if (successful) {
@@ -48,7 +52,7 @@ public class ReconTaskStatusCounter {
     }
   }
 
-  public static void updateCounter(String taskName, boolean successful) {
+  public void updateCounter(String taskName, boolean successful) {
     int successes = taskStatusCounter.get(ReconTasks.valueOf(taskName)).getLeft();
     int failures = taskStatusCounter.get(ReconTasks.valueOf(taskName)).getRight();
     if (successful) {
@@ -64,7 +68,7 @@ public class ReconTaskStatusCounter {
    * @param taskName Stores the task name for which we want to fetch the counts
    * @return A {@link Pair} of <code> {successes, failures} for provided task name </code>
    */
-  public static Pair<Integer, Integer> getTaskStatusCounts(String taskName) {
+  public Pair<Integer, Integer> getTaskStatusCounts(String taskName) {
     long timeoutDuration = conf.getTimeDuration(
       OZONE_RECON_TASK_STATUS_STORAGE_DURATION,
       OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
@@ -76,5 +80,9 @@ public class ReconTaskStatusCounter {
     }
 
     return taskStatusCounter.get(ReconTasks.valueOf(taskName));
+  }
+
+  public Map<ReconTasks, Pair<Integer, Integer>> getTaskCounts() {
+    return taskStatusCounter;
   }
 }

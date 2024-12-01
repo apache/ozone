@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -60,15 +61,18 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
   private ReconTaskStatusDao reconTaskStatusDao;
+  private ReconTaskStatusCounter taskStatusCounter;
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
                                  ReconTaskStatusDao reconTaskStatusDao,
-                                 Set<ReconOmTask> tasks) {
+                                 Set<ReconOmTask> tasks,
+                                 ReconTaskStatusCounter taskStatusCounter) {
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.reconTaskStatusDao = reconTaskStatusDao;
+    this.taskStatusCounter = taskStatusCounter;
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
@@ -85,7 +89,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     taskFailureCounter.put(taskName, new AtomicInteger(0));
     // Create DB record for the task.
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-        0L, 0L);
+        0L, 0L, null);
     if (!reconTaskStatusDao.existsById(taskName)) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
     }
@@ -179,13 +183,18 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           executorService.invokeAll(tasks);
       for (Future<Pair<String, Boolean>> f : results) {
         String taskName = f.get().getLeft();
+        ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
+          System.currentTimeMillis(),
+          omMetadataManager.getLastSequenceNumberFromDB(), null);
+
         if (!f.get().getRight()) {
           LOG.info("Init failed for task {}.", taskName);
+          reconTaskStatusRecord.setLastTaskSuccessful(false);
+          taskStatusCounter.updateCounter(taskName, false);
         } else {
           //store the timestamp for the task
-          ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-              System.currentTimeMillis(),
-              omMetadataManager.getLastSequenceNumberFromDB());
+          reconTaskStatusRecord.setLastTaskSuccessful(true);
+          taskStatusCounter.updateCounter(taskName, true);
           reconTaskStatusDao.update(reconTaskStatusRecord);
         }
       }
@@ -201,9 +210,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * @param lastSequenceNumber contains the new sequence number.
    */
   private void storeLastCompletedTransaction(
-      String taskName, long lastSequenceNumber) {
+      String taskName, long lastSequenceNumber, boolean isLastTaskSuccessful) {
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-        System.currentTimeMillis(), lastSequenceNumber);
+        System.currentTimeMillis(), lastSequenceNumber, isLastTaskSuccessful);
     reconTaskStatusDao.update(reconTaskStatusRecord);
   }
 
@@ -251,9 +260,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       if (!f.get().getRight()) {
         LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft());
+        taskStatusCounter.updateCounter(taskName, false);
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), false);
       } else {
         taskFailureCounter.get(taskName).set(0);
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber());
+        taskStatusCounter.updateCounter(taskName, true);
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), true);
       }
     }
     return failedTasks;
