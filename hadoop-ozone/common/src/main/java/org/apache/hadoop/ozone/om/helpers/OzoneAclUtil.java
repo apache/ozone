@@ -40,8 +40,6 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 
 /**
  * Helper class for ozone acls operations.
@@ -78,16 +76,6 @@ public final class OzoneAclUtil {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
     }
     return listOfAcls;
-  }
-
-  /**
-   * Link bucket default acl defined [world::rw]
-   * which is similar to Linux POSIX symbolic.
-   *
-   * @return OzoneAclInfo
-   */
-  public static OzoneAcl linkBucketDefaultAcl() {
-    return new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
   }
 
   public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType userPrivilege, ACLType groupPrivilege) {
