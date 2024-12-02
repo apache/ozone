@@ -190,12 +190,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           LOG.info("Init failed for task {}.", taskName);
           reconTaskStatusRecord.setLastTaskSuccessful(false);
           taskStatusCounter.updateCounter(taskName, false);
-          LOG.info("Task Name: {}, Counts: {}", taskName, taskStatusCounter.getTaskStatusCounts(taskName));
         } else {
           //store the timestamp for the task
           reconTaskStatusRecord.setLastTaskSuccessful(true);
           taskStatusCounter.updateCounter(taskName, true);
-          LOG.info("Task Name: {}, Counts: {}", taskName, taskStatusCounter.getTaskStatusCounts(taskName));
           reconTaskStatusDao.update(reconTaskStatusRecord);
         }
       }

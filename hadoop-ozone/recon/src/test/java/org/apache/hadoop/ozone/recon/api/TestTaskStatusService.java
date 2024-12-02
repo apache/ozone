@@ -27,6 +27,8 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
 
@@ -55,12 +57,13 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     });
   }
 
-  @Test
-  public void testGetTaskTimes() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetTaskTimes(boolean isLastTaskSuccessful) {
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        "Dummy_Task", System.currentTimeMillis(), 0L, false);
+        "Dummy_Task", System.currentTimeMillis(), 0L, isLastTaskSuccessful);
     reconTaskStatusDao.insert(reconTaskStatusRecord);
 
     List<ReconTaskStatus> resultList = new ArrayList<>();

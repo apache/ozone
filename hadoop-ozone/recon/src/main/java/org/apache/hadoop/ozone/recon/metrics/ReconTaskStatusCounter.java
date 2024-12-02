@@ -2,21 +2,15 @@ package org.apache.hadoop.ozone.recon.metrics;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.ReconServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT;
 
-import javax.inject.Inject;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class ReconTaskStatusCounter {
-  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusCounter.class);
-
   private static ReconTaskStatusCounter instance;
   private final long timeoutDuration;
 
@@ -100,7 +94,6 @@ public class ReconTaskStatusCounter {
     try {
       return taskStatusCounter.get(ReconTasks.valueOf(taskName));
     } catch (NullPointerException npe) {
-      LOG.debug("Could not find a task with name: {}", taskName);
       throw new NullPointerException("Couldn't find task with name " + taskName);
     }
   }

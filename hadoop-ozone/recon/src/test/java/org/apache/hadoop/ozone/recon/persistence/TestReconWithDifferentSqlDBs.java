@@ -38,6 +38,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import com.google.inject.Provider;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test Recon schema with different DBs.
@@ -60,7 +61,8 @@ public class TestReconWithDifferentSqlDBs {
    */
   @ParameterizedTest
   @MethodSource("parametersSource")
-  public void testSchemaSetup(Provider<DataSourceConfiguration> provider)
+  @ValueSource(booleans = {true, false})
+  public void testSchemaSetup(Provider<DataSourceConfiguration> provider, boolean isLastTaskSuccessful)
       throws SQLException, IOException {
     AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
     reconSqlDB.createReconSchemaForTest(temporaryFolder);
@@ -72,7 +74,7 @@ public class TestReconWithDifferentSqlDBs {
       assertNotNull(reconSqlDB.getDao(dao));
     });
     ReconTaskStatusDao dao = reconSqlDB.getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, false));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, isLastTaskSuccessful));
     assertEquals(1, dao.findAll().size());
 
     int numRows = reconSqlDB.getDslContext().
