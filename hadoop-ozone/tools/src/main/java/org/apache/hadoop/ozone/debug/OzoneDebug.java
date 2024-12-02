@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-
+import org.apache.hadoop.ozone.shell.Shell;
 import picocli.CommandLine;
 
 /**
@@ -32,7 +31,7 @@ import picocli.CommandLine;
         description = "Developer tools for Ozone Debug operations",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)
-public class OzoneDebug extends GenericCli implements ExtensibleParentCommand {
+public class OzoneDebug extends Shell implements ExtensibleParentCommand {
 
   public static void main(String[] argv) {
     new OzoneDebug().run(argv);
