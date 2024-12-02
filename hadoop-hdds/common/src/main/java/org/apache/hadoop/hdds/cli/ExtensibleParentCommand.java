@@ -42,7 +42,7 @@ public interface ExtensibleParentCommand {
       ServiceLoader<?> subcommands = ServiceLoader.load(parentCommand.subcommandType());
       for (Object subcommand : subcommands) {
         final CommandLine.Command commandAnnotation = subcommand.getClass().getAnnotation(CommandLine.Command.class);
-        CommandLine subcommandCommandLine = new CommandLine(subcommand);
+        CommandLine subcommandCommandLine = new CommandLine(subcommand, cli.getFactory());
         cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
       }
     }

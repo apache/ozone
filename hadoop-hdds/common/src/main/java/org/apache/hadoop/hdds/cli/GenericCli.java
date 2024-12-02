@@ -56,15 +56,20 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   public GenericCli(Class<?> type) {
-    cmd = new CommandLine(this);
+    this(CommandLine.defaultFactory(), type);
+  }
+
+  public GenericCli(CommandLine.IFactory factory, Class<?> type) {
+    cmd = new CommandLine(this, factory);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
 
     if (type != null) {
-      addSubcommands(getCmd(), type);
+      addSubcommands(cmd, type);
     }
+
     ExtensibleParentCommand.addSubcommands(cmd);
   }
 
@@ -75,7 +80,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
       if (subcommand.getParentType().equals(type)) {
         final Command commandAnnotation =
             subcommand.getClass().getAnnotation(Command.class);
-        CommandLine subcommandCommandLine = new CommandLine(subcommand);
+        CommandLine subcommandCommandLine = new CommandLine(subcommand, cli.getFactory());
         addSubcommands(subcommandCommandLine, subcommand.getClass());
         cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
       }
