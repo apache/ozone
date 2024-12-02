@@ -31,7 +31,8 @@ import java.util.Set;
  */
 public enum ReconLayoutFeature {
   // Represents the starting point for Recon's layout versioning system.
-  INITIAL_VERSION(0, "Recon Layout Versioning Introduction");
+  INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
+  TASK_STATUS_COLUMN_ADDITION(1, "Adds a new column to the RECON_TASK_STATUS_TABLE to store last task status");
 
   private final int version;
   private final String description;
