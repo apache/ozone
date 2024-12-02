@@ -42,27 +42,27 @@ import java.util.List;
 public class ReconTaskStatusMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =
-    ReconTaskStatusMetrics.class.getSimpleName();
+      ReconTaskStatusMetrics.class.getSimpleName();
 
   @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
 
   private static final MetricsInfo RECORD_INFO_LAST_UPDATED_TS =
-    Interns.info("lastUpdatedTimestamp",
-      "Last updated timestamp of corresponding Recon Task");
+      Interns.info("lastUpdatedTimestamp",
+        "Last updated timestamp of corresponding Recon Task");
 
   private static final MetricsInfo RECORD_INFO_LAST_UPDATED_SEQ =
-    Interns.info("lastUpdatedSeqNumber",
-      "Last updated sequence number of corresponding Recon Task");
+      Interns.info("lastUpdatedSeqNumber",
+        "Last updated sequence number of corresponding Recon Task");
 
   public void register() {
     DefaultMetricsSystem.instance()
-      .register(SOURCE_NAME, "Recon Task Metrics", this);
+        .register(SOURCE_NAME, "Recon Task Metrics", this);
   }
 
   public void unregister() {
     DefaultMetricsSystem.instance()
-      .unregisterSource(SOURCE_NAME);
+        .unregisterSource(SOURCE_NAME);
   }
 
   public void getMetrics(MetricsCollector collector, boolean all) {
@@ -70,13 +70,13 @@ public class ReconTaskStatusMetrics implements MetricsSource {
     rows.forEach((rts) -> {
       MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
       builder.add(
-        new MetricsTag(
-          Interns.info("type", "Recon Task type"),
-          rts.getTaskName()));
+          new MetricsTag(
+            Interns.info("type", "Recon Task type"),
+            rts.getTaskName()));
       builder.addGauge(RECORD_INFO_LAST_UPDATED_TS,
-        rts.getLastUpdatedTimestamp());
+          rts.getLastUpdatedTimestamp());
       builder.addCounter(RECORD_INFO_LAST_UPDATED_SEQ,
-        rts.getLastUpdatedSeqNumber());
+          rts.getLastUpdatedSeqNumber());
       builder.endRecord();
     });
   }
