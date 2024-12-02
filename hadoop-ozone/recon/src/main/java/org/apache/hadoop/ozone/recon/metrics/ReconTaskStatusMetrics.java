@@ -49,11 +49,11 @@ public class ReconTaskStatusMetrics implements MetricsSource {
 
   private static final MetricsInfo RECORD_INFO_LAST_UPDATED_TS =
       Interns.info("lastUpdatedTimestamp",
-        "Last updated timestamp of corresponding Recon Task");
+          "Last updated timestamp of corresponding Recon Task");
 
   private static final MetricsInfo RECORD_INFO_LAST_UPDATED_SEQ =
       Interns.info("lastUpdatedSeqNumber",
-        "Last updated sequence number of corresponding Recon Task");
+          "Last updated sequence number of corresponding Recon Task");
 
   public void register() {
     DefaultMetricsSystem.instance()
@@ -71,8 +71,8 @@ public class ReconTaskStatusMetrics implements MetricsSource {
       MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
       builder.add(
           new MetricsTag(
-            Interns.info("type", "Recon Task type"),
-            rts.getTaskName()));
+              Interns.info("type", "Recon Task type"),
+              rts.getTaskName()));
       builder.addGauge(RECORD_INFO_LAST_UPDATED_TS,
           rts.getLastUpdatedTimestamp());
       builder.addCounter(RECORD_INFO_LAST_UPDATED_SEQ,
