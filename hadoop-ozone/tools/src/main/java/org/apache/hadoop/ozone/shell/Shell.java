@@ -49,7 +49,7 @@ public abstract class Shell extends GenericCli {
           "Any unspecified information will be identified from\n" +
           "the config files.\n";
 
-  private final String name;
+  private String name;
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -63,7 +63,6 @@ public abstract class Shell extends GenericCli {
 
   public Shell(Class<?> type) {
     super(new PicocliCommandsFactory(), type);
-    name = spec.name();
   }
 
   public String name() {
@@ -77,6 +76,8 @@ public abstract class Shell extends GenericCli {
 
   @Override
   public void run(String[] argv) {
+    name = spec.name();
+
     try {
       // parse args to check if interactive mode is requested
       getCmd().parseArgs(argv);
