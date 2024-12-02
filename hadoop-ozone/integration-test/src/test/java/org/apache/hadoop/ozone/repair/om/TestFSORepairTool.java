@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,10 +67,10 @@ public class TestFSORepairTool {
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
   private static final String DEFAULT_ENCODING = UTF_8.name();
-  private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
-  private static OzoneClient client;
-  private static OzoneConfiguration conf = null;
+  private MiniOzoneCluster cluster;
+  private FileSystem fs;
+  private OzoneClient client;
+  private OzoneConfiguration conf = null;
 
   @BeforeEach
   public void init() throws Exception {
@@ -101,10 +100,7 @@ public class TestFSORepairTool {
     // restore system streams
     System.setOut(OLD_OUT);
     System.setErr(OLD_ERR);
-  }
 
-  @AfterAll
-  public static void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -417,9 +413,9 @@ public class TestFSORepairTool {
 
   private String serializeReport(FSORepairTool.Report report) {
     return String.format(
-        "Reachable:\n\tDirectories: %d\n\tFiles: %d\n\tBytes: %d\n" +
-        "Unreachable:\n\tDirectories: %d\n\tFiles: %d\n\tBytes: %d\n" +
-        "Unreferenced:\n\tDirectories: %d\n\tFiles: %d\n\tBytes: %d",
+        "Reachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
+        "Unreachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
+        "Unreferenced:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d",
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
