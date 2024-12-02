@@ -39,8 +39,7 @@ public class TaskStatusService {
 
   @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
-  @Inject
-  private ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusCounter taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
 
   /**
    * Return the list of Recon Tasks and the last successful timestamp and
