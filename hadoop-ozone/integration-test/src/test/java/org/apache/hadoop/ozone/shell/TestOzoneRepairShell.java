@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.hadoop.ozone.repair.RDBRepair;
 import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
+import org.apache.hadoop.ozone.repair.om.FSORepairCLI;
+import org.apache.hadoop.ozone.repair.om.OMRepair;
 import org.apache.hadoop.ozone.repair.quota.QuotaRepair;
 import org.apache.hadoop.ozone.repair.quota.QuotaStatus;
 import org.apache.hadoop.ozone.repair.quota.QuotaTrigger;
@@ -159,5 +161,22 @@ public class TestOzoneRepairShell {
       }
       return false;
     }, 1000, 10000);
+  }
+
+  @Test
+  public void testFSORepair() throws Exception {
+    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
+            .addSubcommand(new FSORepairCLI()));
+    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
+
+    cluster.getOzoneManager().stop();
+
+    String[] args = new String[] {"om", "fso-tree", "--db", dbPath};
+    int exitCode = cmd.execute(args);
+
+    assertEquals(0, exitCode);
+    assertThat(out.toString(DEFAULT_ENCODING)).contains("Creating database of reachable directories at");
+
+    cluster.getOzoneManager().restart();
   }
 }

@@ -145,78 +145,82 @@ public class FSORepairTool {
   }
 
   public FSORepairTool.Report run() throws Exception {
-
-    if (bucketFilter != null && volumeFilter == null) {
-      System.out.println("--bucket flag cannot be used without specifying --volume.");
-      return null;
-    }
-
-    if (volumeFilter != null) {
-      OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
-      if (volumeArgs == null) {
-        System.out.println("Volume '" + volumeFilter + "' does not exist.");
+    try {
+      if (bucketFilter != null && volumeFilter == null) {
+        System.out.println("--bucket flag cannot be used without specifying --volume.");
         return null;
       }
-    }
 
-    // Iterate all volumes or a specific volume if specified
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             volumeIterator = volumeTable.iterator()) {
-      openReachableDB();
-
-      while (volumeIterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> volumeEntry = volumeIterator.next();
-        String volumeKey = volumeEntry.getKey();
-
-        if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
-          continue;
+      if (volumeFilter != null) {
+        OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
+        if (volumeArgs == null) {
+          System.out.println("Volume '" + volumeFilter + "' does not exist.");
+          return null;
         }
+      }
 
-        System.out.println("Processing volume: " + volumeKey);
+      // Iterate all volumes or a specific volume if specified
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+               volumeIterator = volumeTable.iterator()) {
+        openReachableDB();
+        while (volumeIterator.hasNext()) {
+          Table.KeyValue<String, OmVolumeArgs> volumeEntry = volumeIterator.next();
+          String volumeKey = volumeEntry.getKey();
 
-        if (bucketFilter != null) {
-          OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
-          if (bucketInfo == null) {
-            //Bucket does not exist in the volume
-            System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
-            return null;
-          }
-
-          if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-            System.out.println("Skipping non-FSO bucket " + bucketFilter);
+          if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
             continue;
           }
 
-          processBucket(volumeEntry.getValue(), bucketInfo);
-        } else {
+          System.out.println("Processing volume: " + volumeKey);
 
-        // Iterate all buckets in the volume.
-          try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-                   bucketIterator = bucketTable.iterator()) {
-            bucketIterator.seek(volumeKey);
-            while (bucketIterator.hasNext()) {
-              Table.KeyValue<String, OmBucketInfo> bucketEntry = bucketIterator.next();
-              String bucketKey = bucketEntry.getKey();
-              OmBucketInfo bucketInfo = bucketEntry.getValue();
+          if (bucketFilter != null) {
+            OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
+            if (bucketInfo == null) {
+              //Bucket does not exist in the volume
+              System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
+              return null;
+            }
 
-              if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-                System.out.println("Skipping non-FSO bucket " + bucketKey);
-                continue;
+            if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+              System.out.println("Skipping non-FSO bucket " + bucketFilter);
+              continue;
+            }
+
+            processBucket(volumeEntry.getValue(), bucketInfo);
+          } else {
+
+            // Iterate all buckets in the volume.
+            try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+                         bucketIterator = bucketTable.iterator()) {
+              bucketIterator.seek(volumeKey);
+              while (bucketIterator.hasNext()) {
+                Table.KeyValue<String, OmBucketInfo> bucketEntry = bucketIterator.next();
+                String bucketKey = bucketEntry.getKey();
+                OmBucketInfo bucketInfo = bucketEntry.getValue();
+
+                if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+                  System.out.println("Skipping non-FSO bucket " + bucketKey);
+                  continue;
+                }
+
+                // Stop this loop once we have seen all buckets in the current
+                // volume.
+                if (!bucketKey.startsWith(volumeKey)) {
+                  break;
+                }
+
+                processBucket(volumeEntry.getValue(), bucketInfo);
               }
-
-              // Stop this loop once we have seen all buckets in the current
-              // volume.
-              if (!bucketKey.startsWith(volumeKey)) {
-                break;
-              }
-
-              processBucket(volumeEntry.getValue(), bucketInfo);
             }
           }
         }
       }
+    } catch (IOException e) {
+      System.out.println("An error occurred while processing" + e.getMessage());
+      throw e;
     } finally {
       closeReachableDB();
+      store.close();
     }
 
     return buildReportAndLog();
@@ -526,6 +530,10 @@ public class FSORepairTool {
   private void closeReachableDB() throws IOException {
     if (reachableDB != null) {
       reachableDB.close();
+    }
+    File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
+    if (reachableDBFile.exists()) {
+      FileUtils.deleteDirectory(reachableDBFile);
     }
   }
 
