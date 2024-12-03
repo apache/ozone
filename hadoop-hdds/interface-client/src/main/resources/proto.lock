@@ -2433,6 +2433,18 @@
                 "name": "containerCount",
                 "type": "int64",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "committed",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "freeSpaceToSpare",
+                "type": "int64",
+                "optional": true
               }
             ]
           },

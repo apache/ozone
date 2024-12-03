@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.chunk;
 /**
  * Class that gives datanode details on which the chunk is present.
  */

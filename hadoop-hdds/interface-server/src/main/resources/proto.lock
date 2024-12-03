@@ -1427,6 +1427,30 @@
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 8,
+                "name": "committed",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "name": "freeSpaceToSpare",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
               }
             ]
           },

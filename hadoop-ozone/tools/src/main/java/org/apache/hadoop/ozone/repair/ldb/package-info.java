@@ -17,6 +17,6 @@
  */
 
 /**
- * Ozone Quota Repair tools.
+ * RDB related repair tools.
  */
-package org.apache.hadoop.ozone.repair.quota;
+package org.apache.hadoop.ozone.repair.ldb;
