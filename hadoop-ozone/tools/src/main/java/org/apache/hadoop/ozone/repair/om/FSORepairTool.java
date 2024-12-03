@@ -162,7 +162,12 @@ public class FSORepairTool {
       // Iterate all volumes or a specific volume if specified
       try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
                volumeIterator = volumeTable.iterator()) {
-        openReachableDB();
+        try {
+          openReachableDB();
+        } catch (IOException e) {
+          System.out.println("Failed to open reachable database: " + e.getMessage());
+          throw e;
+        }
         while (volumeIterator.hasNext()) {
           Table.KeyValue<String, OmVolumeArgs> volumeEntry = volumeIterator.next();
           String volumeKey = volumeEntry.getKey();
@@ -507,24 +512,20 @@ public class FSORepairTool {
         parentID;
   }
 
-  private void openReachableDB() {
+  private void openReachableDB() throws IOException {
     File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
     System.out.println("Creating database of reachable directories at " + reachableDBFile);
     // Delete the DB from the last run if it exists.
-    try {
-      if (reachableDBFile.exists()) {
-        FileUtils.deleteDirectory(reachableDBFile);
-      }
-
-      ConfigurationSource conf = new OzoneConfiguration();
-      reachableDB = DBStoreBuilder.newBuilder(conf)
-          .setName("reachable.db")
-          .setPath(reachableDBFile.getParentFile().toPath())
-          .addTable(REACHABLE_TABLE)
-          .build();
-    } catch (IOException e) {
-      System.out.println("Error creating reachable.db: " + e.getMessage());
+    if (reachableDBFile.exists()) {
+      FileUtils.deleteDirectory(reachableDBFile);
     }
+
+    ConfigurationSource conf = new OzoneConfiguration();
+    reachableDB = DBStoreBuilder.newBuilder(conf)
+        .setName("reachable.db")
+        .setPath(reachableDBFile.getParentFile().toPath())
+        .addTable(REACHABLE_TABLE)
+        .build();
   }
 
   private void closeReachableDB() throws IOException {
@@ -579,7 +580,7 @@ public class FSORepairTool {
     }
 
     public String toString() {
-      return "Reachable: " + reachable + "\nUnreachable: " + unreachable + "\nUnreferenced: " + unreferenced;
+      return "Reachable:" + reachable + "\nUnreachable:" + unreachable + "\nUnreferenced:" + unreferenced;
     }
 
     @Override

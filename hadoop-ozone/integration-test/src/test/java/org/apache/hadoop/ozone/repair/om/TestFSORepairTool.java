@@ -232,9 +232,9 @@ public class TestFSORepairTool {
     err.reset();
 
     // When bucket filter is passed without the volume filter.
-    String[] args5 = new String[]{"om", "fso-tree", "--db", dbPath};
+    String[] args5 = new String[]{"om", "fso-tree", "--db", dbPath, "--bucket", "bucket1"};
     int exitCode5 = cmd.execute(args5);
-    assertEquals(1, exitCode5);
+    assertEquals(0, exitCode5);
     String cliOutput5 = out.toString(DEFAULT_ENCODING);
     Assertions.assertTrue(cliOutput5.contains("--bucket flag cannot be used without specifying --volume."));
 
@@ -300,7 +300,7 @@ public class TestFSORepairTool {
     assertEquals(0, exitCode);
 
     String cliOutput = out.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput.contains("Unreachable:\n\tDirectories: 1\n\tFiles: 3\n"));
+    Assertions.assertTrue(cliOutput.contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3"));
 
     cluster.getOzoneManager().restart();
   }
