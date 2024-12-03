@@ -127,9 +127,6 @@ public class ReconServer extends GenericCli {
       try {
         if (reconStorage.getState() != INITIALIZED) {
           reconStorage.initialize();
-          // If the version information is not already set, this is the first time the version
-          // will be added, hence update it to the current code SLV
-          reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
         }
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
@@ -177,6 +174,10 @@ public class ReconServer extends GenericCli {
       // Run the upgrade framework to finalize layout features if needed
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
           (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+
+      // If the version information is not already set, this is the first time the version
+      // will be added, hence update it to the current code SLV
+      reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
       layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
