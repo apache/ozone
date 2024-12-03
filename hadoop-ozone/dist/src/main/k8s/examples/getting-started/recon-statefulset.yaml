@@ -41,7 +41,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: recon
-        image: 'apache/ozone:1.4.0'
+        image: '@docker.image@'
         args:
         - ozone
         - recon
