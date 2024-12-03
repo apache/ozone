@@ -235,7 +235,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           long startTime = Time.monotonicNow();
           while (remainNum > 0) {
-            pendingDeletedDirInfo = deletedDirSupplier.get();
+            pendingDeletedDirInfo = getPendingDeletedDirInfo();
             if (pendingDeletedDirInfo == null) {
               break;
             }
@@ -356,6 +356,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
       return false;
     }
+  }
+
+  public KeyValue<String, OmKeyInfo> getPendingDeletedDirInfo()
+      throws IOException {
+    return deletedDirSupplier.get();
   }
 
 }
