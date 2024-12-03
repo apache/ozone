@@ -14,23 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resources:
-- config-configmap.yaml
-- datanode-service.yaml
-- datanode-statefulset.yaml
-- om-service.yaml
-- om-statefulset.yaml
-- s3g-service.yaml
-- s3g-statefulset.yaml
-- scm-service.yaml
-- scm-statefulset.yaml
-- httpfs-service.yaml
-- httpfs-statefulset.yaml
-- recon-service.yaml
-- recon-statefulset.yaml
-- datanode-public-service.yaml
-- om-public-service.yaml
-- s3g-public-service.yaml
-- scm-public-service.yaml
-- httpfs-public-service.yaml
-- recon-public-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpfs
+spec:
+  ports:
+  - port: 14000
+    name: rest
+  clusterIP: None
+  selector:
+    app: ozone
+    component: httpfs
