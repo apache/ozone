@@ -150,7 +150,7 @@ public class ReconServer extends GenericCli {
       LOG.debug("Recon schema creation done.");
 
       SchemaVersionTableDefinition reconVersionSchemaInstance =
-        injector.getInstance(SchemaVersionTableDefinition.class);
+          injector.getInstance(SchemaVersionTableDefinition.class);
       try {
         // If the version information is not already set, this is the first time the version
         // will be added, hence update it to the current code SLV
