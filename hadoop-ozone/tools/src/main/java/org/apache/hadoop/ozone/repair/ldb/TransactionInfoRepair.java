@@ -22,13 +22,11 @@
 package org.apache.hadoop.ozone.repair.ldb;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -42,7 +40,6 @@ import java.util.concurrent.Callable;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
-
 /**
  * Tool to update the highest term-index in transactionInfoTable.
  */
@@ -52,9 +49,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class TransactionInfoRepair
-    implements Callable<Void>, SubcommandWithParent  {
+public class TransactionInfoRepair implements Callable<Void>  {
 
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
@@ -125,11 +120,6 @@ public class TransactionInfoRepair
 
   protected RDBRepair getParent() {
     return parent;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBRepair.class;
   }
 
 }
