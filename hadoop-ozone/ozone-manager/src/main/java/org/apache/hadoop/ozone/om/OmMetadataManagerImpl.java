@@ -1716,6 +1716,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             }
           }
         }
+      } else {
+        break;
       }
     }
     return new PendingKeysDeletion(keyBlocksList, keysToModify);
