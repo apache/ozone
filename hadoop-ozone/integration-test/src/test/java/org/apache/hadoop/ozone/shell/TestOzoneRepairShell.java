@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.debug.DBScanner;
-import org.apache.hadoop.ozone.debug.RDBParser;
+import org.apache.hadoop.ozone.debug.ldb.DBScanner;
+import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
-import org.apache.hadoop.ozone.repair.RDBRepair;
-import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
+import org.apache.hadoop.ozone.repair.ldb.RDBRepair;
+import org.apache.hadoop.ozone.repair.ldb.TransactionInfoRepair;
 import org.apache.hadoop.ozone.repair.quota.QuotaRepair;
 import org.apache.hadoop.ozone.repair.quota.QuotaStatus;
 import org.apache.hadoop.ozone.repair.quota.QuotaTrigger;

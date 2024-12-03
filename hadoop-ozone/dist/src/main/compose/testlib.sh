@@ -138,7 +138,7 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --ansi never down
+  docker-compose --ansi never down --remove-orphans
 
   trap stop_docker_env EXIT HUP INT TERM
 
@@ -200,7 +200,7 @@ execute_robot_test(){
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
-      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
@@ -367,7 +367,7 @@ stop_docker_env(){
     down_repeats=3
     for i in $(seq 1 $down_repeats)
     do
-      if docker-compose --ansi never down; then
+      if docker-compose --ansi never --profile "*" down --remove-orphans; then
         return
       fi
       if [[ ${i} -eq 1 ]]; then
@@ -398,7 +398,7 @@ run_rebot() {
 
   shift 2
 
-  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
+  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
   if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
