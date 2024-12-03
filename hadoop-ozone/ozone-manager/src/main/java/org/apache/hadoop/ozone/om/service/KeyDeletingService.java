@@ -174,7 +174,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * DeletedKeySupplier class.
    */
   public final class DeletedKeySupplier {
-    private TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+    public TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
         deleteKeyTableIterator;
 
     public synchronized Table.KeyValue<String, RepeatedOmKeyInfo> get()
@@ -185,15 +185,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       return null;
     }
 
-    private synchronized void closeItr() {
+    public synchronized void closeItr() {
       IOUtils.closeQuietly(deleteKeyTableIterator);
       deleteKeyTableIterator = null;
     }
 
-    private synchronized void reInitItr() throws IOException {
+    public synchronized void reInitItr() throws IOException {
       closeItr();
       deleteKeyTableIterator =
-          getOzoneManager().getMetadataManager().getDeletedTable().iterator();
+          manager.getMetadataManager().getDeletedTable().iterator();
 
     }
   }
@@ -278,6 +278,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 expectedPreviousSnapshotId, run);
             deletedKeyCount.addAndGet(delCount);
           }
+          taskCount.getAndDecrement();
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
