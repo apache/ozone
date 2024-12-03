@@ -15,8 +15,8 @@ import java.sql.SQLException;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 
-//@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_COLUMN_ADDITION,
-//    type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
+@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_COLUMN_ADDITION,
+    type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
 public class ReconLastTaskStatusUpgradeAction implements ReconUpgradeAction {
 
   public static final Logger LOG = LoggerFactory.getLogger(ReconLastTaskStatusUpgradeAction.class);
