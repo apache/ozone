@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -52,8 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
@@ -86,11 +83,6 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       description = "file with container id in new line")
   private String containerFileName;
 
-  @CommandLine.Option(names = {"--out", "-o"},
-      required = false,
-      description = "out file name")
-  private String fileName;
-
   private DBStore dirTreeDbStore = null;
   private Table<Long, String> dirTreeTable = null;
 
@@ -108,11 +100,9 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
     // get containerIds filter
     Set<Long> containerIds = new HashSet<>();
     if (!StringUtils.isEmpty(strContainerIds)) {
-      if (!StringUtils.isEmpty(strContainerIds)) {
-        String[] split = strContainerIds.split(",");
-        for (String id : split) {
-          containerIds.add(Long.parseLong(id));
-        }
+      String[] split = strContainerIds.split(",");
+      for (String id : split) {
+        containerIds.add(Long.parseLong(id));
       }
     } else if (!StringUtils.isEmpty(containerFileName)) {
       try (Stream<String> stream = Files.lines(Paths.get(containerFileName))) {
@@ -124,12 +114,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       return null;
     }
     // out stream
-    PrintWriter writer;
-    if (StringUtils.isEmpty(fileName)) {
-      writer = out();
-    } else {
-      writer = new PrintWriter(new BufferedWriter(new PrintWriter(fileName, UTF_8.name())));
-    }
+    PrintWriter writer = out();
 
     // db handler
     OMMetadataManager metadataManager = getOmMetadataManager(dbFile);
@@ -217,7 +202,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
       System.err.println("DB with path not exist:" + db);
       return null;
     }
-    System.out.println("Db Path is:" + db);
+    System.err.println("Db Path is:" + db);
     File file = new File(db);
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -249,7 +234,7 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
 
   private DBStore openDb(File omPath) {
     File dirTreeDbPath = new File(omPath, DIRTREEDBNAME);
-    System.out.println("Creating database of dir tree path at " + dirTreeDbPath);
+    System.err.println("Creating database of dir tree path at " + dirTreeDbPath);
     try {
       // Delete the DB from the last run if it exists.
       if (dirTreeDbPath.exists()) {
