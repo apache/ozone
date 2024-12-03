@@ -130,11 +130,9 @@ public class ReconServer extends GenericCli {
         }
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
-              "Initializing certificate.");
+            "Initializing certificate.");
           initializeCertificateClient();
         }
-      } catch (SQLException se) {
-        LOG.error("Failed to set the MLV version, defaulting to -1");
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
@@ -175,9 +173,13 @@ public class ReconServer extends GenericCli {
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
           (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
 
-      // If the version information is not already set, this is the first time the version
-      // will be added, hence update it to the current code SLV
-      reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
+      try {
+        // If the version information is not already set, this is the first time the version
+        // will be added, hence update it to the current code SLV
+        reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
+      } catch (SQLException se) {
+        LOG.error("Failed to update version_number, defaulting to -1.");
+      }
       layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
