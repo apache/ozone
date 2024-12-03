@@ -51,7 +51,8 @@ import java.util.Objects;
  * Copied from Hadoop and migrated to AssertJ.
  */
 public final class MetricsAsserts {
-
+  // workaround for HADOOP-19301.
+  private static final MutableQuantiles QUANTILES = new MutableQuantiles();
   private static final Logger LOG = LoggerFactory.getLogger(MetricsAsserts.class);
   private static final Offset<Double> EPSILON = Offset.offset(0.00001);
   private static final Offset<Float> EPSILON_FLOAT = Offset.offset(0.00001f);
@@ -411,7 +412,7 @@ public final class MetricsAsserts {
   public static void assertQuantileGauges(String prefix,
       MetricsRecordBuilder rb, String valueName) {
     verify(rb).addGauge(eqName(info(prefix + "NumOps", "")), geq(0L));
-    for (Quantile q : MutableQuantiles.quantiles) {
+    for (Quantile q : QUANTILES.getQuantiles()) {
       String nameTemplate = prefix + "%dthPercentile" + valueName;
       int percentile = (int) (100 * q.quantile);
       verify(rb).addGauge(
@@ -432,7 +433,7 @@ public final class MetricsAsserts {
   public static void assertInverseQuantileGauges(String prefix,
       MetricsRecordBuilder rb, String valueName) {
     verify(rb).addGauge(eqName(info(prefix + "NumOps", "")), geq(0L));
-    for (Quantile q : MutableQuantiles.quantiles) {
+    for (Quantile q : QUANTILES.getQuantiles()) {
       String nameTemplate = prefix + "%dthInversePercentile" + valueName;
       int percentile = (int) (100 * q.quantile);
       verify(rb).addGauge(

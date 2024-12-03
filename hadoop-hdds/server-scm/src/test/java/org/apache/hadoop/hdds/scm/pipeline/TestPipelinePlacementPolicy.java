@@ -397,9 +397,9 @@ public class TestPipelinePlacementPolicy {
         .setUuid(datanode.getUuid())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.STANDALONE))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.RATIS))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.REST))
+        .addPort(datanode.getStandalonePort())
+        .addPort(datanode.getRatisPort())
+        .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
     return result;
   }

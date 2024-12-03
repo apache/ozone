@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -85,7 +84,7 @@ public class TestChecksumKeyHandler {
 
   @Test
   public void testChecksumKeyHandler()
-      throws OzoneClientException, IOException {
+      throws IOException {
     OzoneAddress address = new OzoneAddress("o3://ozone1/volume/bucket/key");
     long keySize = 1024L;
 

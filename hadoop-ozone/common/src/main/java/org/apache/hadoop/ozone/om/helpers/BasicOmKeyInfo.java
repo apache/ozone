@@ -110,6 +110,10 @@ public final class BasicOmKeyInfo {
     return ownerName;
   }
 
+  public long getReplicatedSize() {
+    return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
+  }
+
   /**
    * Builder of BasicOmKeyInfo.
    */

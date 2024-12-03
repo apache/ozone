@@ -24,7 +24,6 @@ import java.util.Iterator;
 import com.google.common.base.Strings;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.ListOptions;
@@ -47,7 +46,7 @@ public class ListKeyHandler extends VolumeBucketHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     if (!Strings.isNullOrEmpty(address.getBucketName())) {
       listKeysInsideBucket(client, address);

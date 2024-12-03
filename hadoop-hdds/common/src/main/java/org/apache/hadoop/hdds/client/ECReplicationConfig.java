@@ -218,6 +218,11 @@ public class ECReplicationConfig implements ReplicationConfig {
         + "/" + data + "-" + parity + "-" + chunkKB();
   }
 
+  @Override
+  public int getMinimumNodes() {
+    return data;
+  }
+
   private String chunkKB() {
     return ecChunkSize / 1024 + "k";
   }

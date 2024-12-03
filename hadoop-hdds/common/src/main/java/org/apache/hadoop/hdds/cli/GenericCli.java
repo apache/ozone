@@ -52,16 +52,20 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   private final CommandLine cmd;
 
   public GenericCli() {
+    this(null);
+  }
+
+  public GenericCli(Class<?> type) {
     cmd = new CommandLine(this);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
-  }
 
-  public GenericCli(Class<?> type) {
-    this();
-    addSubcommands(getCmd(), type);
+    if (type != null) {
+      addSubcommands(getCmd(), type);
+    }
+    ExtensibleParentCommand.addSubcommands(cmd);
   }
 
   private void addSubcommands(CommandLine cli, Class<?> type) {

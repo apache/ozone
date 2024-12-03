@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,31 +172,38 @@ public class NativeLibraryLoader {
               getSystemProperty(NATIVE_LIB_TMP_DIR) : "";
       final File dir = new File(nativeLibDir).getAbsoluteFile();
 
-      // create a temporary file to copy the library to
-      final File temp = File.createTempFile(libraryName, getLibOsSuffix(), dir);
-      if (!temp.exists()) {
+      // create a temporary dir to copy the library to
+      final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      final File tempDir = tempPath.toFile();
+      if (!tempDir.exists()) {
         return Pair.of(Optional.empty(), null);
-      } else {
-        temp.deleteOnExit();
       }
 
-      Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      Path libPath = tempPath.resolve(libraryFileName);
+      Files.copy(is, libPath, StandardCopyOption.REPLACE_EXISTING);
+      File libFile = libPath.toFile();
+      if (libFile.exists()) {
+        libFile.deleteOnExit();
+      }
+
       List<File> dependentFiles = new ArrayList<>();
       for (String fileName : dependentFileNames) {
         if (is != null) {
           is.close();
         }
         is = getResourceStream(fileName);
-        File file = new File(dir, fileName);
-        Files.copy(is, file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Path path = tempPath.resolve(fileName);
+        Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+        File file = path.toFile();
         if (file.exists()) {
           file.deleteOnExit();
         }
         dependentFiles.add(file);
       }
-      ShutdownHookManager.get().addShutdownHook(temp::delete,
+      ShutdownHookManager.get().addShutdownHook(
+          () -> FileUtil.fullyDelete(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
-      return Pair.of(Optional.of(temp), dependentFiles);
+      return Pair.of(Optional.of(libFile), dependentFiles);
     } finally {
       if (is != null) {
         is.close();

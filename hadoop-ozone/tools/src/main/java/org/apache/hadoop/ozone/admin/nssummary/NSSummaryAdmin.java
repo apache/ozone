@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
@@ -62,8 +62,8 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
         QuotaUsageSubCommand.class,
         FileSizeDistSubCommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class NSSummaryAdmin extends GenericCli implements AdminSubcommand {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
@@ -78,11 +78,6 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 
   private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {

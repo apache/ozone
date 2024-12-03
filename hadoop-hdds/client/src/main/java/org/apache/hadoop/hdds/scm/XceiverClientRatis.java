@@ -282,7 +282,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   // gets the minimum log index replicated to all servers
   @Override
   public long getReplicatedMinCommitIndex() {
-    return commitInfoMap.values().parallelStream()
+    return commitInfoMap.values().stream()
         .mapToLong(Long::longValue).min().orElse(0);
   }
 

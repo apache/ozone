@@ -303,7 +303,7 @@ public class KeyOutputStream extends OutputStream
       if (retry) {
         current.writeOnRetry(len);
       } else {
-        waitForRetryHandling(current);
+        current.waitForRetryHandling(retryHandlingCondition);
         current.write(b, off, writeLen);
         offset += writeLen;
       }
@@ -584,7 +584,7 @@ public class KeyOutputStream extends OutputStream
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
             // If the current block is to handle retries, wait until all the retries are done.
-            waitForRetryHandling(entry);
+            doInWriteLock(() -> entry.waitForRetryHandling(retryHandlingCondition));
             entry.registerCallReceived();
             try {
               handleStreamAction(entry, op);
@@ -606,10 +606,6 @@ public class KeyOutputStream extends OutputStream
         }
       }
     }
-  }
-
-  private void waitForRetryHandling(BlockOutputStreamEntry currentEntry) throws InterruptedException {
-    doInWriteLock(() -> currentEntry.waitForRetryHandling(retryHandlingCondition));
   }
 
   private void handleStreamAction(BlockOutputStreamEntry entry,

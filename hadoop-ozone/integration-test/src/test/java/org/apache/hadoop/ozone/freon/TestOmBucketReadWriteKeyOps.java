@@ -34,6 +34,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -43,6 +44,7 @@ import org.slf4j.event.Level;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Iterator;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,8 +57,8 @@ public class TestOmBucketReadWriteKeyOps {
 
   // TODO: Remove code duplication of TestOmBucketReadWriteKeyOps with
   //  TestOmBucketReadWriteFileOps.
-
-  private String path;
+  @TempDir
+  private Path path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
@@ -66,12 +68,8 @@ public class TestOmBucketReadWriteKeyOps {
 
   @BeforeEach
   public void setup() {
-    path = GenericTestUtils
-        .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
-    File baseDir = new File(path);
-    baseDir.mkdirs();
   }
 
   /**
@@ -111,7 +109,7 @@ public class TestOmBucketReadWriteKeyOps {
   public void testOmBucketReadWriteKeyOps(boolean fsPathsEnabled) throws Exception {
     try {
       startCluster(fsPathsEnabled);
-      FileOutputStream out = FileUtils.openOutputStream(new File(path,
+      FileOutputStream out = FileUtils.openOutputStream(new File(path.toString(),
           "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
@@ -157,7 +155,7 @@ public class TestOmBucketReadWriteKeyOps {
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
     volume.createBucket(parameterBuilder.bucketName);
     OzoneBucket bucket = volume.getBucket(parameterBuilder.bucketName);
-    String confPath = new File(path, "conf").getAbsolutePath();
+    String confPath = new File(path.toString(), "conf").getAbsolutePath();
 
     long startTime = System.currentTimeMillis();
     new Freon().execute(

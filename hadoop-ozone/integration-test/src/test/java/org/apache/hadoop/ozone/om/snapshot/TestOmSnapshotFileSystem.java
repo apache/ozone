@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -54,9 +55,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,9 +71,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -99,6 +102,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Abstract class for OmSnapshot file system tests.
  */
 @Timeout(120)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestOmSnapshotFileSystem {
   protected static final String VOLUME_NAME =
       "volume" + RandomStringUtils.randomNumeric(5);
@@ -107,26 +111,29 @@ public abstract class TestOmSnapshotFileSystem {
   protected static final String BUCKET_NAME_LEGACY =
       "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static OzoneConfiguration conf;
-  private static OzoneManagerProtocol writeClient;
-  private static OzoneManager ozoneManager;
-  private static String keyPrefix;
+  private MiniOzoneCluster cluster = null;
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private OzoneConfiguration conf;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager ozoneManager;
+  private String keyPrefix;
   private final String bucketName;
+  private final boolean createLinkedBuckets;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
+  private Map<String, String> linkedBucketMaps = new HashMap<>();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
-  public TestOmSnapshotFileSystem(String bucketName) {
+  public TestOmSnapshotFileSystem(String bucketName, boolean createLinkedBuckets) throws Exception {
     this.bucketName = bucketName;
+    this.createLinkedBuckets = createLinkedBuckets;
+    init();
   }
 
-  @BeforeAll
-  public static void init() throws Exception {
+  private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newBuilder(conf).build();
@@ -138,12 +145,20 @@ public abstract class TestOmSnapshotFileSystem {
     ozoneManager = cluster.getOzoneManager();
 
     TestDataUtil.createVolume(client, VOLUME_NAME);
-    TestDataUtil.createBucket(client, VOLUME_NAME,
+    OzoneBucket bucket = TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(FILE_SYSTEM_OPTIMIZED).build(),
-        BUCKET_NAME_FSO);
-    TestDataUtil.createBucket(client, VOLUME_NAME,
+        BUCKET_NAME_FSO, createLinkedBuckets);
+    if (createLinkedBuckets) {
+      linkedBucketMaps.put(bucket.getName(), bucket.getSourceBucket());
+    }
+    bucket = TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
-        BUCKET_NAME_LEGACY);
+        BUCKET_NAME_LEGACY, createLinkedBuckets);
+    if (createLinkedBuckets) {
+      linkedBucketMaps.put(bucket.getName(), bucket.getSourceBucket());
+    }
+
+
 
     // stop the deletion services so that keys can still be read
     KeyManagerImpl keyManager = (KeyManagerImpl) ozoneManager.getKeyManager();
@@ -163,7 +178,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   @AfterAll
-  public static void tearDown() throws Exception {
+  void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
@@ -273,7 +288,7 @@ public abstract class TestOmSnapshotFileSystem {
     deleteSnapshot(snapshotName);
     String expectedMessage = String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName);
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName);
     OMException exception = assertThrows(OMException.class,
         () -> ozoneBucket.listKeys(keyPrefix + "a/", null));
     assertEquals(expectedMessage, exception.getMessage());
@@ -376,7 +391,7 @@ public abstract class TestOmSnapshotFileSystem {
     assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
-  private static void setKeyPrefix(String s) {
+  private void setKeyPrefix(String s) {
     keyPrefix = s;
   }
 
@@ -493,21 +508,21 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot1));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName1), exception1.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName1), exception1.getMessage());
 
     deleteSnapshot(snapshotName2);
     FileNotFoundException exception2 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotRoot2));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName2), exception2.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName2), exception2.getMessage());
 
     deleteSnapshot(snapshotName3);
     FileNotFoundException exception3 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotParent3));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName3), exception3.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName3), exception3.getMessage());
   }
 
   @Test
@@ -542,7 +557,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName), exception.getMessage());
   }
 
   @Test
@@ -578,7 +593,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName), exception.getMessage());
   }
 
   @Test
@@ -619,7 +634,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.open(fileInSnapshot));
     assertEquals(String.format("FILE_NOT_FOUND: Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName), exception.getMessage());
   }
 
   private void createAndCommitKey(String keyName) throws IOException {
@@ -669,7 +684,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName), exception.getMessage());
   }
 
   /**
@@ -726,7 +741,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, linkedBucketMaps.getOrDefault(bucketName, bucketName), snapshotName), exception.getMessage());
   }
 
   private String createSnapshot(String snapshotName)
@@ -736,9 +751,10 @@ public abstract class TestOmSnapshotFileSystem {
     writeClient.createSnapshot(VOLUME_NAME, bucketName, snapshotName);
 
     // wait till the snapshot directory exists
+    OzoneSnapshot snapshot = objectStore.getSnapshotInfo(VOLUME_NAME, bucketName, snapshotName);
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(VOLUME_NAME, bucketName, snapshotName));
+        .get(SnapshotInfo.getTableKey(snapshot.getVolumeName(), snapshot.getBucketName(), snapshotName));
     String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
         OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),

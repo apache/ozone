@@ -1071,7 +1071,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
     return adapter.listStatus(pathStr, recursive, startPath, numEntries,
-        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
+        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername(), false)
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }
 

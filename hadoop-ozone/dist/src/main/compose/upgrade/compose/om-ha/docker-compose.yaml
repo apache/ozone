@@ -19,7 +19,7 @@ x-common-config:
   &common-config
   env_file:
     - docker-config
-  image: ${OZONE_IMAGE}
+  image: ${OZONE_TEST_IMAGE}
 
 x-environment:
   &environment

@@ -25,13 +25,13 @@ summary: Ozone DataNode Container模式简介V3
 
 在 Ozone 中，用户数据被分割成blocks并存储在 HDDS Container中。Container是 Ozone/HDDS 的基本复制单元。每个Container都有自己的元数据和数据, 数据以文件形式保存在磁盘上，元数据保存在RocksDB中。
 
-目前，数据节点上的每个Container都有一个RocksDB。随着用户数据的不断增长，一个DataNode上将会有成百上千个RocksDB实例。在一个JVM中管理如此多的RocksDB实例是一个巨大的挑战。
+之前，数据节点上每个Container都有一个RocksDB。随着用户数据的不断增长，一个DataNode上将会有成百上千个RocksDB实例。在一个JVM中管理如此多的RocksDB实例是一个巨大的挑战。
 
-与当前使用方法不同，"Merge Container RocksDB in DN"功能将为每个Volume只使用一个RocksDB，并在此RocksDB中保存所有Container的元数据。
+与以前的用法不同，"Merge Container RocksDB in DN"功能将为每个Volume只使用一个RocksDB，并在此RocksDB中保存所有Container的元数据。
   
 ## 配置
 
-这主要是DataNode的功能，不需要太多配置。
+这主要是DataNode的功能，不需要太多配置。默认情况下，它是启用的。
 
 如果更倾向于为每个Container使用一个RocksDB的模式，那么这下面的配置可以禁用上面所介绍的功能。请注意，一旦启用该功能，强烈建议以后不要再禁用。
 

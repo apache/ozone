@@ -44,6 +44,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +85,7 @@ public class MutableVolumeSet implements VolumeSet {
   private String clusterID;
 
   private final StorageVolumeChecker volumeChecker;
-  private Runnable failedVolumeListener;
+  private CheckedRunnable<IOException> failedVolumeListener;
   private StateContext context;
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
@@ -132,7 +133,7 @@ public class MutableVolumeSet implements VolumeSet {
     initializeVolumeSet();
   }
 
-  public void setFailedVolumeListener(Runnable runnable) {
+  public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
     failedVolumeListener = runnable;
   }
 

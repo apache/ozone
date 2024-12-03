@@ -233,8 +233,7 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    checksum = new Checksum(config.getChecksumType(),
-        config.getBytesPerChecksum());
+    this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
@@ -587,6 +586,7 @@ public class BlockOutputStream extends OutputStream {
     final CompletableFuture<ContainerCommandResponseProto> flushFuture;
     final XceiverClientReply asyncReply;
     try {
+      // Note: checksum was previously appended to containerBlockData by WriteChunk
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
@@ -854,6 +854,8 @@ public class BlockOutputStream extends OutputStream {
     if (lastChunkBuffer != null) {
       DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
       lastChunkBuffer = null;
+      // Clear checksum cache
+      checksum.clearChecksumCache();
     }
   }
 
@@ -903,7 +905,10 @@ public class BlockOutputStream extends OutputStream {
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    ChecksumData checksumData = checksum.computeChecksum(chunk);
+    // chunk is incremental, don't cache its checksum
+    ChecksumData checksumData = checksum.computeChecksum(chunk, false);
+    // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
+    // current impl does not support caching both
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -1053,6 +1058,7 @@ public class BlockOutputStream extends OutputStream {
           lastChunkBuffer.capacity() - lastChunkBuffer.position();
       appendLastChunkBuffer(chunk, 0, remainingBufferSize);
       updateBlockDataWithLastChunkBuffer();
+      // TODO: Optional refactoring: Can attach ChecksumCache to lastChunkBuffer rather than Checksum
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
@@ -1069,10 +1075,13 @@ public class BlockOutputStream extends OutputStream {
     LOG.debug("lastChunkInfo = {}", lastChunkInfo);
     long lastChunkSize = lastChunkInfo.getLen();
     addToBlockData(lastChunkInfo);
-
+    // Set ByteBuffer limit to capacity, pos to 0. Does not erase data
     lastChunkBuffer.clear();
+
     if (lastChunkSize == config.getStreamBufferSize()) {
       lastChunkOffset += config.getStreamBufferSize();
+      // Reached stream buffer size (chunk size), starting new chunk, need to clear checksum cache
+      checksum.clearChecksumCache();
     } else {
       lastChunkBuffer.position((int) lastChunkSize);
     }
@@ -1136,8 +1145,9 @@ public class BlockOutputStream extends OutputStream {
     lastChunkBuffer.flip();
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
-    ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer);
+    // checksum cache is utilized for this computation
+    // this checksum is stored in blockData and later transferred in PutBlock
+    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer, true);
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()

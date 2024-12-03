@@ -254,7 +254,7 @@ public class BlockData {
         size = singleChunk.getLen();
       } else {
         chunkList = chunks;
-        size = chunks.parallelStream()
+        size = chunks.stream()
             .mapToLong(ContainerProtos.ChunkInfo::getLen)
             .sum();
       }

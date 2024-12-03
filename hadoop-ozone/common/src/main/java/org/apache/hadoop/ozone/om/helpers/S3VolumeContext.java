@@ -69,7 +69,6 @@ public class S3VolumeContext {
   /**
    * Builder for S3VolumeContext.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private OmVolumeArgs omVolumeArgs;
     private String userPrincipal;

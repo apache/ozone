@@ -36,20 +36,104 @@
                  volume.TotalCapacity = transform(volume.TotalCapacity);
                 })
                 });
+
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=SCMConnectionManager")
+                .then(function (result) {
+                    ctrl.heartbeatmetrics = result.data.beans;
+                    ctrl.heartbeatmetrics.forEach(scm => {
+                        var scmServers = scm.SCMServers;
+                        scmServers.forEach(scmServer => {
+                            scmServer.lastSuccessfulHeartbeat = convertTimestampToDate(scmServer.lastSuccessfulHeartbeat)
+                        })
+                    })
+                });
         }
     });
-        function transform(v) {
-          var UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'ZB'];
-          var prev = 0, i = 0;
-          while (Math.floor(v) > 0 && i < UNITS.length) {
+
+    // Register ioStatus Controller
+    angular.module('ozone').config(function ($routeProvider) {
+        $routeProvider.when('/iostatus', {
+            templateUrl: 'iostatus.html',
+            controller: 'IOStatusController as ioStatusCtrl',
+        });
+    });
+
+    angular.module('ozone')
+        .controller('IOStatusController', function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=VolumeIOStats*")
+                .then(function (result) {
+                    ctrl.dniostatus = result.data.beans;
+                });
+        });
+
+    // Register Scanner Controller
+    angular.module('ozone').config(function ($routeProvider) {
+        $routeProvider.when('/dn-scanner', {
+            templateUrl: 'dn-scanner.html',
+            controller: 'DNScannerController as scannerStatusCtrl',
+        });
+    });
+
+    angular.module('ozone')
+        .controller('DNScannerController', function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=ContainerDataScannerMetrics*")
+                .then(function (result) {
+                    ctrl.dnscanner = result.data.beans;
+                });
+        });
+
+    angular.module('ozone')
+        .filter('millisecondsToMinutes', function() {
+            return function(milliseconds) {
+                if (isNaN(milliseconds)) {
+                    return 'Invalid input';
+                }
+                var minutes = Math.floor(milliseconds / 60000); // 1 minute = 60000 milliseconds
+                var seconds = Math.floor((milliseconds % 60000) / 1000);
+                return minutes + ' mins ' + seconds + ' secs';
+            };
+        });
+
+    angular.module('ozone')
+        .filter('twoDecimalPlaces', function() {
+            return function(input) {
+                if (isNaN(input)) {
+                    return 'Invalid input';
+                }
+                return parseFloat(input).toFixed(2);
+            };
+        });
+
+    function transform(v) {
+        var UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'ZB'];
+        var prev = 0, i = 0;
+        while (Math.floor(v) > 0 && i < UNITS.length) {
             prev = v;
             v /= 1024;
             i += 1;
-          }
-          if (i > 0 && i < UNITS.length) {
+        }
+        if (i > 0 && i < UNITS.length) {
             v = prev;
             i -= 1;
-          }
-          return Math.round(v * 100) / 100 + ' ' + UNITS[i];
         }
+        return Math.round(v * 100) / 100 + ' ' + UNITS[i];
+    }
+
+    function convertTimestampToDate(timestamp) {
+        if (!timestamp) return '';
+        var milliseconds = timestamp * 1000;
+
+        var date = new Date(milliseconds);
+
+        var year = date.getFullYear();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var seconds = date.getSeconds();
+
+        return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
 })();

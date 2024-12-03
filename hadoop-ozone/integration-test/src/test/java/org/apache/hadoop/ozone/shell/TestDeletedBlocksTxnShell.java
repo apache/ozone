@@ -259,5 +259,27 @@ public class TestDeletedBlocksTxnShell {
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
     assertEquals(30, currentValidTxnNum);
+
+    // Fail first 20 txns be failed
+    // increment retry count than threshold, count will be set to -1
+    for (int i = 0; i < maxRetry + 1; i++) {
+      deletedBlockLog.incrementCount(txIds);
+    }
+    flush();
+
+    GetFailedDeletedBlocksTxnSubcommand getFailedBlockCommand =
+        new GetFailedDeletedBlocksTxnSubcommand();
+    outContent.reset();
+    cmd = new CommandLine(getFailedBlockCommand);
+    // set start transaction as 15
+    cmd.parseArgs("-c", "5", "-s", "15");
+    getFailedBlockCommand.execute(scmClient);
+    matchCount = 0;
+    p = Pattern.compile("\"txID\" : \\d+", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    while (m.find()) {
+      matchCount += 1;
+    }
+    assertEquals(5, matchCount);
   }
 }

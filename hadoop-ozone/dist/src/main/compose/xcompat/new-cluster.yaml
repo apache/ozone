@@ -34,9 +34,9 @@ services:
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
-    command: [ "krb5kdc","-n" ]
+    command: ["/opt/hadoop/compose/common/init-kdc.sh"]
   kms:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: kms
     dns_search: .
     ports:

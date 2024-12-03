@@ -17,7 +17,7 @@
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-old-config:
   &old-config
-  image: apache/ozone:${OZONE_VERSION}-rocky
+  image: ${OZONE_IMAGE}:${OZONE_VERSION}${OZONE_IMAGE_FLAVOR}
   dns_search: .
   env_file:
     - docker-config
@@ -34,9 +34,9 @@ services:
     volumes:
       - ../..:/opt/ozone
       - ../_keytabs:/etc/security/keytabs
-    command: [ "krb5kdc","-n" ]
+    command: ["/opt/ozone/compose/common/init-kdc.sh"]
   kms:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: kms
     dns_search: .
     ports:

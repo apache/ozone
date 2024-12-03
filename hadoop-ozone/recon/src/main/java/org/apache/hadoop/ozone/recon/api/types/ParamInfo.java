@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.hadoop.ozone.recon.ReconUtils;
+
+import java.util.TimeZone;
+
 /**
  * Wrapper object for statistics of records of a page in API response.
  */
@@ -36,6 +40,8 @@ public class ParamInfo {
    * creation date filter for keys to filter.
    */
   private String creationDate;
+
+  private long creationDateEpoch = -1;
 
   /**
    *
@@ -85,6 +91,14 @@ public class ParamInfo {
 
   public String getCreationDate() {
     return creationDate;
+  }
+
+  public long getCreationDateEpoch() {
+    if (creationDateEpoch == -1) {
+      creationDateEpoch = ReconUtils.convertToEpochMillis(
+          getCreationDate(), "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+    }
+    return creationDateEpoch;
   }
 
   public String getReplicationType() {

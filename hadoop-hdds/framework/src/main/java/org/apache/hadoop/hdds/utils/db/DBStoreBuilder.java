@@ -163,7 +163,8 @@ public final class DBStoreBuilder {
         OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT, StorageUnit.BYTES);
   }
 
-  private void applyDBDefinition(DBDefinition definition) {
+  public static File getDBDirPath(DBDefinition definition,
+                                  ConfigurationSource configuration) {
     // Set metadata dirs.
     File metadataDir = definition.getDBLocation(configuration);
 
@@ -174,6 +175,12 @@ public final class DBStoreBuilder {
           HddsConfigKeys.OZONE_METADATA_DIRS);
       metadataDir = getOzoneMetaDirPath(configuration);
     }
+    return metadataDir;
+  }
+
+  private void applyDBDefinition(DBDefinition definition) {
+    // Set metadata dirs.
+    File metadataDir = getDBDirPath(definition, configuration);
 
     setName(definition.getName());
     setPath(Paths.get(metadataDir.getPath()));

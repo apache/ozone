@@ -21,9 +21,11 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
@@ -78,30 +80,45 @@ public class ReconLayoutVersionManager {
    * Finalizes the layout features that need to be upgraded, by executing the upgrade action for each
    * feature that is registered for finalization.
    */
-  public void finalizeLayoutFeatures() {
+  public void finalizeLayoutFeatures(ReconStorageContainerManagerFacade scmFacade) {
     // Get features that need finalization, sorted by version
     List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
 
-    for (ReconLayoutFeature feature : featuresToFinalize) {
-      try {
-        // Fetch only the FINALIZE action for the feature
-        Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
-        if (action.isPresent()) {
-          // Execute the upgrade action & update the schema version in the DB
-          action.get().execute();
-          updateSchemaVersion(feature.getVersion());
-          LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
+    try (Connection connection = scmFacade.getDataSource().getConnection()) {
+      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
+
+      for (ReconLayoutFeature feature : featuresToFinalize) {
+        try {
+          // Fetch only the FINALIZE action for the feature
+          Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
+          if (action.isPresent()) {
+            // Update the schema version in the database
+            updateSchemaVersion(feature.getVersion(), connection);
+
+            // Execute the upgrade action
+            action.get().execute(scmFacade);
+
+            // Commit the transaction only if both operations succeed
+            connection.commit();
+            LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
+          }
+        } catch (Exception e) {
+          // Rollback any pending changes for the current feature due to failure
+          connection.rollback();
+          currentMLV = determineMLV(); // Rollback the MLV to the original value
+          LOG.error("Failed to finalize feature {}. Rolling back changes.", feature.getVersion(), e);
+          throw e;
         }
-      } catch (Exception e) {
-        // Log the error to both logs and ReconContext
-        LOG.error("Failed to finalize feature {}: {}", feature.getVersion(), e.getMessage());
-        reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
-        reconContext.updateHealthStatus(new AtomicBoolean(false));
-        // Stop further upgrades as an error occurred
-        throw new RuntimeException("Recon failed to finalize layout feature. Startup halted.");
       }
+    } catch (Exception e) {
+      // Log the error to both logs and ReconContext
+      LOG.error("Failed to finalize layout features: {}", e.getMessage());
+      reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
     }
   }
+
 
   /**
    * Returns a list of ReconLayoutFeature objects that are registered for finalization.
@@ -122,10 +139,13 @@ public class ReconLayoutVersionManager {
 
   /**
    * Updates the Metadata Layout Version (MLV) in the database after finalizing a feature.
+   * This method uses the provided connection to ensure transactional consistency.
+   *
    * @param newVersion The new Metadata Layout Version (MLV) to set.
+   * @param connection The database connection to use for the update operation.
    */
-  private void updateSchemaVersion(int newVersion) throws SQLException {
-    schemaVersionTableManager.updateSchemaVersion(newVersion);
+  private void updateSchemaVersion(int newVersion, Connection connection) {
+    schemaVersionTableManager.updateSchemaVersion(newVersion, connection);
     this.currentMLV = newVersion;
     LOG.info("MLV updated to: " + newVersion);
   }

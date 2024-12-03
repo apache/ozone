@@ -61,7 +61,7 @@ public class GetKeyHandler extends KeyHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();

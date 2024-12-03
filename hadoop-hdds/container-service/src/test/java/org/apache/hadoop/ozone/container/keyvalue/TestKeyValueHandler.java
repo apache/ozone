@@ -68,6 +68,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -131,7 +132,13 @@ public class TestKeyValueHandler {
             .build();
 
     KeyValueContainer container = mock(KeyValueContainer.class);
-
+    KeyValueContainerData containerData = mock(KeyValueContainerData.class);
+    Mockito.when(container.getContainerData()).thenReturn(containerData);
+    Mockito.when(containerData.getReplicaIndex()).thenReturn(1);
+    ContainerProtos.ContainerCommandResponseProto responseProto = KeyValueHandler.dispatchRequest(handler,
+        createContainerRequest, container, null);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, responseProto.getResult());
+    Mockito.when(handler.getDatanodeId()).thenReturn(DATANODE_UUID);
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, null);
     verify(handler, times(0)).handleListBlock(

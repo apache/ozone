@@ -152,11 +152,11 @@ public final class ContainerTestUtils {
             .nextInt(256) + "." + random.nextInt(256);
 
     DatanodeDetails.Port containerPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 0);
+        DatanodeDetails.newStandalonePort(0);
     DatanodeDetails.Port ratisPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS, 0);
+        DatanodeDetails.newRatisPort(0);
     DatanodeDetails.Port restPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.REST, 0);
+        DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
@@ -345,7 +345,7 @@ public final class ContainerTestUtils {
   public static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+        dn.getRatisPort().getValue());
 
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),

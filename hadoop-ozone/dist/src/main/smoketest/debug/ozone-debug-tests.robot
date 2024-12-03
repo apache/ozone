@@ -49,3 +49,8 @@ Test ozone debug read-replicas
     FOR    ${replica}    IN RANGE    3
         Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
     END
+
+
+Test ozone debug version
+    ${output} =    Execute    ozone debug version
+                   Execute    echo '${output}' | jq -r '.' # validate JSON

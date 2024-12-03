@@ -99,4 +99,17 @@ public final class OMClientRequestUtils {
     }
     return false;
   }
+
+  public static boolean shouldLogClientRequestFailure(IOException exception) {
+    if (!(exception instanceof OMException)) {
+      return true;
+    }
+    OMException omException = (OMException) exception;
+    switch (omException.getResult()) {
+    case KEY_NOT_FOUND:
+      return false;
+    default:
+      return true;
+    }
+  }
 }

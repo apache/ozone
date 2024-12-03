@@ -126,4 +126,9 @@ public final class RatisReplicationConfig
   public String configFormat() {
     return toString();
   }
+
+  @Override
+  public int getMinimumNodes() {
+    return 1;
+  }
 }

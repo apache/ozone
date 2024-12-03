@@ -138,7 +138,6 @@ public final class ClusterStateResponse {
   /**
    * Builder for ClusterStateResponse.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private int pipelines;
     private int totalDatanodes;

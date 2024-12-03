@@ -69,7 +69,7 @@ public abstract class Handler implements Callable<Void> {
   }
 
   protected abstract void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException;
+      throws IOException;
 
   /**
    * Checks whether the current command should be executed or not.
@@ -102,7 +102,7 @@ public abstract class Handler implements Callable<Void> {
   }
 
   protected OzoneClient createClient(OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     return address.createClient(conf);
   }
 

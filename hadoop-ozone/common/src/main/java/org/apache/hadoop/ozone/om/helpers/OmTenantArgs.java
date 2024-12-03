@@ -77,7 +77,6 @@ public class OmTenantArgs {
   /**
    * Builder for OmTenantArgs.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private String tenantId;
     private String volumeName;

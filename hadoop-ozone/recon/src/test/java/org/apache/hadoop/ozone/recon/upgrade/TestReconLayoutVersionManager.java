@@ -21,27 +21,33 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.anyInt;
 
 
 /**
@@ -53,6 +59,9 @@ public class TestReconLayoutVersionManager {
   private ReconLayoutVersionManager layoutVersionManager;
   private MockedStatic<ReconLayoutFeature> mockedEnum;
   private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
+  private ReconStorageContainerManagerFacade scmFacadeMock;
+  private DataSource mockDataSource;
+  private Connection mockConnection;
 
   @BeforeEach
   public void setUp() throws SQLException {
@@ -79,6 +88,18 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
     layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+
+    // Common mocks for all tests
+    scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
+    mockDataSource = mock(DataSource.class);
+    mockConnection = mock(Connection.class);
+
+    when(scmFacadeMock.getDataSource()).thenReturn(mockDataSource);
+    when(mockDataSource.getConnection()).thenReturn(mockConnection);
+
+    doNothing().when(mockConnection).setAutoCommit(false);
+    doNothing().when(mockConnection).commit();
+    doNothing().when(mockConnection).rollback();
   }
 
   @AfterEach
@@ -102,16 +123,19 @@ public class TestReconLayoutVersionManager {
   }
 
   /**
-   * Tests the finalization of layout features and ensure that the updateSchemaVersion for
+   * Tests the finalization of layout features and ensures that the updateSchemaVersion for
    * the schemaVersionTable is triggered for each feature version.
    */
   @Test
   public void testFinalizeLayoutFeaturesWithMockedValues() throws SQLException {
-    layoutVersionManager.finalizeLayoutFeatures();
+    // Execute the method under test
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
     // Verify that schema versions are updated for our custom features
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2);
+    verify(schemaVersionTableManager, times(1))
+        .updateSchemaVersion(1, mockConnection);
+    verify(schemaVersionTableManager, times(1))
+        .updateSchemaVersion(2, mockConnection);
   }
 
   /**
@@ -136,9 +160,14 @@ public class TestReconLayoutVersionManager {
    */
   @Test
   public void testNoLayoutFeatures() throws SQLException {
+    // Ensure no layout features are present
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
-    layoutVersionManager.finalizeLayoutFeatures();
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+
+    // Execute the method under test
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+
+    // Verify that no schema version updates were attempted
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), any(Connection.class));
   }
 
   /**
@@ -156,7 +185,7 @@ public class TestReconLayoutVersionManager {
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
 
     // Simulate an exception being thrown during the upgrade action execution
-    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute();
+    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute(scmFacadeMock);
     when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
         .thenReturn(Optional.of(action1));
 
@@ -165,11 +194,54 @@ public class TestReconLayoutVersionManager {
 
     // Execute the layout feature finalization
     try {
-      layoutVersionManager.finalizeLayoutFeatures();
+      layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
     } catch (Exception e) {
+      // Exception is expected, so it's fine to catch and ignore it here
     }
-    // Verify that schema version update was never called due to the exception
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+
+    // Verify that metadata layout version MLV was not updated as the transaction was rolled back
+    assertEquals(0, layoutVersionManager.getCurrentMLV());
+
+    // Verify that a rollback was triggered
+    verify(mockConnection, times(1)).rollback();
+  }
+
+  /**
+   * Tests the scenario where the schema version update fails. Ensures that if the schema
+   * version update fails, the transaction is rolled back and the metadata layout version
+   * is not updated.
+   */
+  @Test
+  public void testUpdateSchemaFailure() throws Exception {
+    // Reset existing mocks and set up new features for this specific test
+    mockedEnum.reset();
+
+    // Mock ReconLayoutFeature instances
+    ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
+    when(feature1.getVersion()).thenReturn(1);
+    ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
+
+    // Simulate an exception being thrown during the schema version update
+    doThrow(new RuntimeException("Schema update failed")).when(schemaVersionTableManager).
+        updateSchemaVersion(1, mockConnection);
+    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+        .thenReturn(Optional.of(action1));
+
+    // Mock the static values method to return the custom feature
+    mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1});
+
+    // Execute the layout feature finalization
+    try {
+      layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    } catch (Exception e) {
+      // Exception is expected, so it's fine to catch and ignore it here
+    }
+
+    // Verify that metadata layout version MLV was not updated as the transaction was rolled back
+    assertEquals(0, layoutVersionManager.getCurrentMLV());
+
+    // Verify that the upgrade action was not committed and a rollback was triggered
+    verify(mockConnection, times(1)).rollback();
   }
 
   /**
@@ -204,13 +276,13 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature2, feature3, feature1});
 
     // Execute the layout feature finalization
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
     // Verify that the actions were executed in the correct order using InOrder
     InOrder inOrder = inOrder(action1, action2, action3);
-    inOrder.verify(action1).execute(); // Should be executed first
-    inOrder.verify(action2).execute(); // Should be executed second
-    inOrder.verify(action3).execute(); // Should be executed third
+    inOrder.verify(action1).execute(scmFacadeMock); // Should be executed first
+    inOrder.verify(action2).execute(scmFacadeMock); // Should be executed second
+    inOrder.verify(action3).execute(scmFacadeMock); // Should be executed third
   }
 
   /**
@@ -219,11 +291,16 @@ public class TestReconLayoutVersionManager {
    */
   @Test
   public void testNoUpgradeActionsNeeded() throws SQLException {
-    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
-    layoutVersionManager.finalizeLayoutFeatures();
+    // Mock the current schema version to the maximum layout version
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(0);
 
-    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt());
+    mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
+
+    // Execute the method under test
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+
+    // Verify that no schema version updates were attempted
+    verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), eq(mockConnection));
   }
 
   /**
@@ -234,10 +311,10 @@ public class TestReconLayoutVersionManager {
    */
   @Test
   public void testFinalizingNewFeatureWithoutReFinalizingPreviousFeatures() throws Exception {
-    // Step 1: Finalize the first two features.
+    // Step 1: Mock the schema version manager
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(0);
 
-    // Mock the first two features.
+    // Mock the first two features
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
@@ -253,13 +330,13 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
     // Finalize the first two features.
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
-    // Verify that the schema versions for the first two features were updated.
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1);
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2);
+    // Verify that the schema versions for the first two features were updated
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1, mockConnection);
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(2, mockConnection);
 
-    // Step 2: Introduce a new feature (Feature 3).
+    // Step 2: Introduce a new feature (Feature 3)
     ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
     when(feature3.getVersion()).thenReturn(3);
     ReconUpgradeAction action3 = mock(ReconUpgradeAction.class);
@@ -272,17 +349,17 @@ public class TestReconLayoutVersionManager {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
 
     // Finalize again, but only feature 3 should be finalized.
-    layoutVersionManager.finalizeLayoutFeatures();
+    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
 
-    // Verify that the schema version for feature 3 was updated.
-    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3);
+    // Verify that the schema version for feature 3 was updated
+    verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3, mockConnection);
 
     // Verify that action1 and action2 were not executed again.
-    verify(action1, times(1)).execute();  // Still should have been executed only once
-    verify(action2, times(1)).execute();  // Still should have been executed only once
+    verify(action1, times(1)).execute(scmFacadeMock);
+    verify(action2, times(1)).execute(scmFacadeMock);
 
     // Verify that the upgrade action for feature 3 was executed.
-    verify(action3, times(1)).execute();
+    verify(action3, times(1)).execute(scmFacadeMock);
   }
 
 }

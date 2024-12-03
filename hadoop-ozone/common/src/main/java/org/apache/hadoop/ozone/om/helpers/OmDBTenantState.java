@@ -168,7 +168,6 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   /**
    * Builder for OmDBTenantState.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantId;
     private String bucketNamespaceName;

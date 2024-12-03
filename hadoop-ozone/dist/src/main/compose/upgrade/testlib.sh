@@ -56,7 +56,7 @@ prepare_for_image() {
   if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
       prepare_for_runner_image
   else
-      prepare_for_binary_image "${image_version}-rocky"
+      prepare_for_binary_image "${image_version}"
   fi
 }
 

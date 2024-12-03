@@ -49,8 +49,8 @@ public class NamespaceSummaryResponse {
    *
    * @return Builder
    */
-  public static NamespaceSummaryResponse.Builder newBuilder() {
-    return new NamespaceSummaryResponse.Builder();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   public NamespaceSummaryResponse(Builder b) {
@@ -104,7 +104,6 @@ public class NamespaceSummaryResponse {
   /**
    * Builder for NamespaceSummaryResponse.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String path;
     private EntityType entityType;
@@ -119,30 +118,30 @@ public class NamespaceSummaryResponse {
       this.entityType = EntityType.ROOT;
     }
 
-    public NamespaceSummaryResponse.Builder setPath(String path) {
+    public Builder setPath(String path) {
       this.path = path;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setEntityType(
+    public Builder setEntityType(
         EntityType entityType) {
       this.entityType = entityType;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setCountStats(
+    public Builder setCountStats(
         CountStats countStats) {
       this.countStats = countStats;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setObjectDBInfo(
+    public Builder setObjectDBInfo(
         ObjectDBInfo objectDBInfo) {
       this.objectDBInfo = objectDBInfo;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setStatus(
+    public Builder setStatus(
         ResponseStatus status) {
       this.status = status;
       return this;

@@ -568,8 +568,7 @@ public class BucketEndpoint extends EndpointBase {
       if (grantReads == null && grantWrites == null && grantReadACP == null
           && grantWriteACP == null && grantFull == null) {
         S3BucketAcl putBucketAclRequest =
-            new PutBucketAclRequestUnmarshaller().readFrom(
-                null, null, null, null, null, body);
+            new PutBucketAclRequestUnmarshaller().readFrom(body);
         // Handle grants in body
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));

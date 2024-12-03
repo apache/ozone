@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -212,7 +213,7 @@ public class ObjectEndpoint extends EndpointBase {
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html for
    * more details.
    */
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @PUT
   public Response put(
       @PathParam("bucket") String bucketName,
@@ -220,6 +221,7 @@ public class ObjectEndpoint extends EndpointBase {
       @HeaderParam("Content-Length") long length,
       @QueryParam("partNumber")  int partNumber,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
+      @QueryParam("tagging") String taggingMarker,
       final InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
@@ -230,6 +232,11 @@ public class ObjectEndpoint extends EndpointBase {
     DigestInputStream digestInputStream = null;
     try {
       OzoneVolume volume = getVolume();
+      if (taggingMarker != null) {
+        s3GAction = S3GAction.PUT_OBJECT_TAGGING;
+        return putObjectTagging(volume, bucketName, keyPath, body);
+      }
+
       if (uploadID != null && !uploadID.equals("")) {
         if (headers.getHeaderString(COPY_SOURCE_HEADER) == null) {
           s3GAction = S3GAction.CREATE_MULTIPART_KEY;
@@ -336,7 +343,9 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditSuccess = false;
       auditWriteFailure(s3GAction, ex);
-      if (copyHeader != null) {
+      if (taggingMarker != null) {
+        getMetrics().updatePutObjectTaggingFailureStats(startNanos);
+      } else if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
       } else {
         getMetrics().updateCreateKeyFailureStats(startNanos);
@@ -360,7 +369,9 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditSuccess = false;
       auditWriteFailure(s3GAction, ex);
-      if (copyHeader != null) {
+      if (taggingMarker != null) {
+        getMetrics().updatePutObjectTaggingFailureStats(startNanos);
+      } else if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
       } else {
         getMetrics().updateCreateKeyFailureStats(startNanos);
@@ -390,7 +401,7 @@ public class ObjectEndpoint extends EndpointBase {
    * https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
    * for more details.
    */
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @GET
   public Response get(
       @PathParam("bucket") String bucketName,
@@ -398,12 +409,18 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("partNumber") int partNumber,
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
-      @QueryParam("part-number-marker") String partNumberMarker)
+      @QueryParam("part-number-marker") String partNumberMarker,
+      @QueryParam("tagging") String taggingMarker)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
+      if (taggingMarker != null) {
+        s3GAction = S3GAction.GET_OBJECT_TAGGING;
+        return getObjectTagging(bucketName, keyPath);
+      }
+
       if (uploadId != null) {
         // When we have uploadId, this is the request for list Parts.
         s3GAction = S3GAction.LIST_PARTS;
@@ -532,7 +549,9 @@ public class ObjectEndpoint extends EndpointBase {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
-      if (uploadId != null) {
+      if (taggingMarker != null) {
+        getMetrics().updateGetObjectTaggingFailureStats(startNanos);
+      } else if (uploadId != null) {
         getMetrics().updateListPartsFailureStats(startNanos);
       } else {
         getMetrics().updateGetKeyFailureStats(startNanos);
@@ -699,13 +718,19 @@ public class ObjectEndpoint extends EndpointBase {
   public Response delete(
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
-      @QueryParam("uploadId") @DefaultValue("") String uploadId) throws
+      @QueryParam("uploadId") @DefaultValue("") String uploadId,
+      @QueryParam("tagging") String taggingMarker) throws
       IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_KEY;
 
     try {
       OzoneVolume volume = getVolume();
+      if (taggingMarker != null) {
+        s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
+        return deleteObjectTagging(volume, bucketName, keyPath);
+      }
+
       if (uploadId != null && !uploadId.equals("")) {
         s3GAction = S3GAction.ABORT_MULTIPART_UPLOAD;
         return abortMultipartUpload(volume, bucketName, keyPath, uploadId);
@@ -732,13 +757,18 @@ public class ObjectEndpoint extends EndpointBase {
         // keys. Just return 204
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // When deleteObjectTagging operation is applied on FSO directory
+        throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
       } else {
         throw ex;
       }
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
-      if (uploadId != null && !uploadId.equals("")) {
+      if (taggingMarker != null) {
+        getMetrics().updateDeleteObjectTaggingFailureStats(startNanos);
+      } else if (uploadId != null && !uploadId.equals("")) {
         getMetrics().updateAbortMultipartUploadFailureStats(startNanos);
       } else {
         getMetrics().updateDeleteKeyFailureStats(startNanos);
@@ -1380,6 +1410,75 @@ public class ObjectEndpoint extends EndpointBase {
     return (copySourceIfModifiedSince <= lastModificationTime) &&
         (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
+
+  private Response putObjectTagging(OzoneVolume volume, String bucketName, String keyName, InputStream body)
+      throws IOException, OS3Exception {
+    long startNanos = Time.monotonicNowNanos();
+    S3Tagging tagging = null;
+    try {
+      tagging = new PutTaggingUnmarshaller().readFrom(body);
+      tagging.validate();
+    } catch (Exception ex) {
+      OS3Exception exception = S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, keyName);
+      exception.setErrorMessage(exception.getErrorMessage() + ". " + ex.getMessage());
+      throw exception;
+    }
+
+    Map<String, String> tags = validateAndGetTagging(
+        tagging.getTagSet().getTags(), // Nullity check was done in previous parsing step
+        Tag::getKey,
+        Tag::getValue
+    );
+
+    try {
+      volume.getBucket(bucketName).putObjectTagging(keyName, tags);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyName);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyName);
+      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, keyName);
+      } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // When putObjectTagging operation is applied on FSO directory
+        throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyName);
+      }
+      throw ex;
+    }
+    getMetrics().updatePutObjectTaggingSuccessStats(startNanos);
+    return Response.ok().build();
+  }
+
+  private Response getObjectTagging(String bucketName, String keyName) throws IOException {
+    long startNanos = Time.monotonicNowNanos();
+
+    OzoneVolume volume = getVolume();
+
+    Map<String, String> tagMap = volume.getBucket(bucketName).getObjectTagging(keyName);
+
+    getMetrics().updateGetObjectTaggingSuccessStats(startNanos);
+    return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
+  }
+
+  private Response deleteObjectTagging(OzoneVolume volume, String bucketName, String keyName)
+      throws IOException, OS3Exception {
+    long startNanos = Time.monotonicNowNanos();
+
+    try {
+      volume.getBucket(bucketName).deleteObjectTagging(keyName);
+    } catch (OMException ex) {
+      // Unlike normal key deletion that ignores the key not found exception
+      // DeleteObjectTagging should throw the exception if the key does not exist
+      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, keyName);
+      }
+      throw ex;
+    }
+
+    getMetrics().updateDeleteObjectTaggingSuccessStats(startNanos);
+    return Response.noContent().build();
+  }
+
 
   @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {

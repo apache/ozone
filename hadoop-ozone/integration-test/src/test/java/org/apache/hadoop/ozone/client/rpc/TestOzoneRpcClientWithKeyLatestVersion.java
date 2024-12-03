@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -151,5 +152,11 @@ class TestOzoneRpcClientWithKeyLatestVersion {
 
     List<?> versions = files.get(0).getKeyInfo().getKeyLocationVersions();
     assertEquals(expectedVersionCount, versions.size());
+
+    List<OzoneFileStatusLight> lightFiles = bucket.listStatusLight(keyName, false, "", 1);
+
+    assertNotNull(lightFiles);
+    assertEquals(1, lightFiles.size());
+
   }
 }

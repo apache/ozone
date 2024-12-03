@@ -16,6 +16,8 @@
 
 #checks:basic
 
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
@@ -39,11 +41,11 @@ find * \( \
     \) -print0 \
   | xargs -0 -n1 bats --formatter tap \
   | tee -a "${REPORT_DIR}/output.log"
+rc=$?
 
 grep '^\(not ok\|#\)' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 
 grep -c '^not ok' "${REPORT_FILE}" > "${REPORT_DIR}/failures"
 
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
+ERROR_PATTERN=""
+source "${DIR}/_post_process.sh"

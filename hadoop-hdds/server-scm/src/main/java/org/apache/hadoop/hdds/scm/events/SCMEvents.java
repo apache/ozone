@@ -65,6 +65,13 @@ public final class SCMEvents {
       "Node_Registration_Container_Report");
 
   /**
+   * Event generated on DataNode Registration Container Report.
+   */
+  public static final TypedEvent<NodeRegistrationContainerReport>
+      CONTAINER_REGISTRATION_REPORT = new TypedEvent<>(
+      NodeRegistrationContainerReport.class, "Container_Registration_Report");
+
+  /**
    * ContainerReports are sent out by Datanodes. This report is received by
    * SCMDatanodeHeartbeatDispatcher and Container_Report Event is generated.
    */

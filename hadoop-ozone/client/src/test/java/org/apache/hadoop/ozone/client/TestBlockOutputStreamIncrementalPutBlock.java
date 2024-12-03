@@ -74,7 +74,11 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     ((InMemoryConfiguration) config).setBoolean(
         OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     ((InMemoryConfiguration) config).setBoolean(
+        "ozone.client.hbase.enhancements.allowed", true);
+    ((InMemoryConfiguration) config).setBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    ((InMemoryConfiguration) config).setInt(
+        "ozone.client.bytes.per.checksum", 8192);
 
     RpcClient rpcClient = new RpcClient(config, null) {
 

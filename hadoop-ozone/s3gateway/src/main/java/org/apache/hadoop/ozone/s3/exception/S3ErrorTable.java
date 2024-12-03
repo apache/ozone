@@ -145,6 +145,10 @@ public final class S3ErrorTable {
   public static final OS3Exception NO_SUCH_TAG_SET = new OS3Exception(
       "NoSuchTagSet", "The specified tag does not exist.", HTTP_NOT_FOUND);
 
+  public static final OS3Exception MALFORMED_XML = new OS3Exception(
+      "MalformedXML", "The XML you provided was not well-formed or did not " +
+      "validate against our published schema", HTTP_BAD_REQUEST);
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }

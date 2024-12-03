@@ -215,9 +215,9 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return true;
     }
-    int port = dns.get(0).getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    int port = dns.get(0).getRatisPort().getValue();
     for (int i = 1; i < dns.size(); i++) {
-      if (dns.get(i).getPort(DatanodeDetails.Port.Name.RATIS).getValue()
+      if (dns.get(i).getRatisPort().getValue()
           != port) {
         return false;
       }

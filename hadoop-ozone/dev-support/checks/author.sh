@@ -16,6 +16,8 @@
 
 #checks:basic
 
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -23,10 +25,10 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/author"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-grep -r --include="*.java" "@author" . | tee "$REPORT_FILE"
-
-wc -l "$REPORT_FILE" | awk '{print $1}'> "$REPORT_DIR/failures"
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
+rc=0
+if grep -r --include="*.java" "@author" . | tee "$REPORT_FILE"; then
+  rc=1
 fi
+
+ERROR_PATTERN=""
+source "${DIR}/_post_process.sh"

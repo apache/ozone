@@ -16,7 +16,7 @@
 
 services:
   rm:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_TEST_IMAGE}
     hostname: rm
     dns_search: .
     volumes:
@@ -35,7 +35,7 @@ services:
     profiles:
       - hadoop
   nm:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_TEST_IMAGE}
     hostname: nm
     dns_search: .
     volumes:
@@ -54,7 +54,7 @@ services:
     profiles:
       - hadoop
   jhs:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_TEST_IMAGE}
     container_name: jhs
     hostname: jhs
     dns_search: .
