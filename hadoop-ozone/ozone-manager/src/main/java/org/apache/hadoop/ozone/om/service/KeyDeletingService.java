@@ -173,11 +173,17 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return queue;
   }
 
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    deletedKeySupplier.closeItr();
+  }
+
   /**
    * DeletedKeySupplier class.
    */
   public final class DeletedKeySupplier {
-    public TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+    private TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
         deleteKeyTableIterator;
 
     public synchronized Table.KeyValue<String, RepeatedOmKeyInfo> get()
