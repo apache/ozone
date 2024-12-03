@@ -28,6 +28,8 @@ ${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
 ${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
 ${UNHEALTHY_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers/unhealthy
 ${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
+${VOLUME}     vol1
+${BUCKET}     bucket1
 
 *** Keywords ***
 Check if Recon picks up container from OM
@@ -56,6 +58,21 @@ Check http return code
                             # All access should succeed without security.
                             Should contain      ${result}       200
                         END
+
+Check if the listKeys api responds OK
+    [Arguments]     ${volume}    ${bucket}
+    ${result} =     Curl    "${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000"
+    Should contain  ${result}   "OK"
+    Should contain  ${result}   "keys"
+    Should contain  ${result}   "${volume}"
+    Should contain  ${result}   "${bucket}"
+
+Curl
+    [Arguments]     ${url}
+    ${curl_command} =    Set Variable    curl -LSs ${url}
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Set Variable    ${curl_command}    curl --negotiate -u : -LSs ${url}
+    ${result} =     Execute     ${curl_command}
+    [Return]        ${result}
 
 *** Test Cases ***
 Check if Recon picks up OM data
@@ -136,3 +153,13 @@ Check normal api access
 
     kinit as non admin
     Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   200
+
+Check listKeys api works
+   kinit as ozone admin
+   # Create volume and bucket
+   Execute    ozone sh volume create ${VOLUME}
+   Execute    ozone sh bucket create ${VOLUME}/${BUCKET}
+   Freon OCKG    n=2    args=-s 10 -v ${VOLUME} -b ${BUCKET}
+
+   # Wait until Recon picks up the keys
+   Wait Until Keyword Succeeds     90sec      10sec        Check if the listKeys api responds OK   ${VOLUME}     ${BUCKET}
