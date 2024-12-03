@@ -662,7 +662,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 metrics.decrPendingContainerOpsMetrics(cmdType);
                 metrics.addContainerOpsLatency(
                     cmdType, System.currentTimeMillis() - requestTime);
-
+                semaphore.release();
               }
 
               @Override
@@ -679,11 +679,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 metrics.decrPendingContainerOpsMetrics(cmdType);
                 metrics.addContainerOpsLatency(
                     cmdType, System.currentTimeMillis() - requestTime);
+                semaphore.release();
               }
             });
     requestObserver.onNext(request);
     requestObserver.onCompleted();
-    semaphore.release();
     return new XceiverClientReply(future);
   }
 

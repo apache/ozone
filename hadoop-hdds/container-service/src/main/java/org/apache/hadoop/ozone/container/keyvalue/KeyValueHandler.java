@@ -1355,14 +1355,14 @@ public class KeyValueHandler extends Handler {
       DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
     ContainerCommandResponseProto responseProto = null;
-    try {
-      if (!request.hasReadBlock()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Malformed Read Block request. trace ID: {}",
-              request.getTraceID());
-        }
-        return malformedRequest(request);
+    if (!request.hasReadBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Block request. trace ID: {}",
+            request.getTraceID());
       }
+      return malformedRequest(request);
+    }
+    try {
       ReadBlockRequestProto readBlock = request.getReadBlock();
 
       BlockID blockID = BlockID.getFromProtobuf(

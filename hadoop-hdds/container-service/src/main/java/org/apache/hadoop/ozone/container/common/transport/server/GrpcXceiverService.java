@@ -125,7 +125,7 @@ public class GrpcXceiverService extends
       @Override
       public void onCompleted() {
         if (isClosed.compareAndSet(false, true)) {
-          LOG.info("ContainerCommand send completed");
+          LOG.debug("ContainerCommand send completed");
           responseObserver.onCompleted();
         }
       }

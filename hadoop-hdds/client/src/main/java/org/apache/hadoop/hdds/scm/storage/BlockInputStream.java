@@ -124,7 +124,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
       OzoneClientConfig config) throws IOException {
     this.blockInfo = blockInfo;
     this.blockID = blockInfo.getBlockID();
-    LOG.debug("Initializing BlockInputStream for block {}", blockID);
     this.length = blockInfo.getLength();
     setPipeline(pipeline);
     tokenRef.set(token);

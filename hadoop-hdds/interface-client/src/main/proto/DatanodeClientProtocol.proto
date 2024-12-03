@@ -77,6 +77,8 @@ package hadoop.hdds.datanode;
  *  18. CopyContainer - Copies a container from a remote machine.
  *
  *  19. FinalizeBlock - Finalize block request from client.
+ *
+ *  20. ReadBlock - Allows us to read a block.
  */
 
 enum Type {
