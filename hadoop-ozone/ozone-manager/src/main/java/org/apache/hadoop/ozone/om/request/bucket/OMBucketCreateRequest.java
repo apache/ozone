@@ -69,7 +69,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneAcl.LINK_BUCKET_DEFAULT_ACL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
@@ -331,11 +330,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (omBucketInfo.getAcls() != null) {
       // Add acls for bucket creator.
       acls.addAll(omBucketInfo.getAcls());
-    }
-
-    // Link bucket default acl
-    if (omBucketInfo.getSourceBucket() != null && omBucketInfo.getSourceVolume() != null) {
-      acls.add(LINK_BUCKET_DEFAULT_ACL);
     }
 
     // Add default acls from volume.

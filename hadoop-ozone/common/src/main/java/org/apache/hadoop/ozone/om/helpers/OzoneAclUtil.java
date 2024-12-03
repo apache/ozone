@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -45,6 +47,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
  * Helper class for ozone acls operations.
  */
 public final class OzoneAclUtil {
+  static final Logger LOG = LoggerFactory.getLogger(OzoneAclUtil.class);
 
   private OzoneAclUtil() {
   }
@@ -74,6 +77,7 @@ public final class OzoneAclUtil {
       listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupRights));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
+      LOG.warn("Failed to get primary group from user {}", ugi);
     }
     return listOfAcls;
   }
@@ -87,6 +91,7 @@ public final class OzoneAclUtil {
       listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupPrivilege));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
+      LOG.warn("Failed to get primary group from user {}", ugi);
     }
     return listOfAcls;
   }
