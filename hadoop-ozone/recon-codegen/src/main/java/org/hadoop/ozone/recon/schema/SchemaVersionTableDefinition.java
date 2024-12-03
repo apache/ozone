@@ -31,8 +31,6 @@ import java.sql.SQLException;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.COLUMN_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.jooq.impl.DSL.name;
-import static org.jooq.impl.DSL.table;
 
 /**
  * Class for managing the schema of the SchemaVersion table.
