@@ -19,23 +19,36 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.Interns;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.HashMap;
+
 /**
  * Metrics related to Block Deleting Service running in SCM.
  */
 @Metrics(name = "ScmBlockDeletingService Metrics", about = "Metrics related to "
     + "background block deleting service in SCM", context = "SCM")
-public final class ScmBlockDeletingServiceMetrics {
+public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   private static ScmBlockDeletingServiceMetrics instance;
   public static final String SOURCE_NAME =
       SCMBlockDeletingService.class.getSimpleName();
+  private final MetricsRegistry registry;
 
   /**
    * Given all commands are finished and no new coming deletes from OM.
@@ -86,7 +99,11 @@ public final class ScmBlockDeletingServiceMetrics {
   @Metric(about = "The number of dataNodes of delete transactions.")
   private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
+  private Map<UUID, DatanodeCommandCounts> numCommandsDatanode;
+
   private ScmBlockDeletingServiceMetrics() {
+    this.registry = new MetricsRegistry(SOURCE_NAME);
+    numCommandsDatanode = new HashMap<>();
   }
 
   public static ScmBlockDeletingServiceMetrics create() {
@@ -194,6 +211,108 @@ public final class ScmBlockDeletingServiceMetrics {
 
   public long getNumBlockDeletionTransactionDataNodes() {
     return numBlockDeletionTransactionDataNodes.value();
+  }
+
+  public Map<UUID, DatanodeCommandCounts> getNumCommandsDatanode() {
+    return numCommandsDatanode;
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector metricsCollector, boolean all) {
+    MetricsRecordBuilder builder = metricsCollector.addRecord(SOURCE_NAME);
+    numBlockDeletionCommandSent.snapshot(builder, all);
+    numBlockDeletionCommandSuccess.snapshot(builder, all);
+    numBlockDeletionCommandFailure.snapshot(builder, all);
+    numBlockDeletionTransactionSent.snapshot(builder, all);
+    numBlockDeletionTransactionSuccess.snapshot(builder, all);
+    numBlockDeletionTransactionFailure.snapshot(builder, all);
+    numBlockDeletionTransactionCompleted.snapshot(builder, all);
+    numBlockDeletionTransactionCreated.snapshot(builder, all);
+    numSkippedTransactions.snapshot(builder, all);
+    numProcessedTransactions.snapshot(builder, all);
+    numBlockDeletionTransactionDataNodes.snapshot(builder, all);
+
+    MetricsRecordBuilder recordBuilder = builder;
+    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
+          .add(new MetricsTag(Interns.info("datanode",
+              "Commands sent/received for the datanode"), e.getKey().toString()))
+          .addGauge(DatanodeCommandCounts.COMMANDS_SENT_TO_DN,
+              e.getValue().getCommandsSent())
+          .addGauge(DatanodeCommandCounts.COMMANDS_SUCCESSFUL_EXECUTION_BY_DN,
+              e.getValue().getCommandsSuccess())
+          .addGauge(DatanodeCommandCounts.COMMANDS_FAILED_EXECUTION_BY_DN,
+              e.getValue().getCommandsFailure());
+    }
+    recordBuilder.endRecord();
+  }
+
+  @Metrics(name = "DatanodeCommandCounts", about = "Metrics for deletion commands per Datanode", context = "datanode")
+  public static final class DatanodeCommandCounts {
+    @Metric(about = "The number of delete commands sent to a DN.")
+    private MutableGaugeLong commandsSent;
+    @Metric(about = "The number of delete commands successful for a DN.")
+    private MutableGaugeLong commandsSuccess;
+    @Metric(about = "The number of delete commands failed for a DN.")
+    private MutableGaugeLong commandsFailure;
+
+    private static final MetricsInfo COMMANDS_SENT_TO_DN = Interns.info(
+        "CommandsSent",
+        "Number of commands sent from SCM to the datanode for deletion");
+    private static final MetricsInfo COMMANDS_SUCCESSFUL_EXECUTION_BY_DN = Interns.info(
+        "CommandsSuccess",
+        "Number of commands sent from SCM to the datanode for deletion for which execution succeeded.");
+    private static final MetricsInfo COMMANDS_FAILED_EXECUTION_BY_DN = Interns.info(
+        "CommandsFailed",
+        "Number of commands sent from SCM to the datanode for deletion for which execution failed.");
+
+    public DatanodeCommandCounts() {
+      this.commandsSent.set(0);
+      this.commandsSuccess.set(0);
+      this.commandsFailure.set(0);
+    }
+
+    public void incrCommandsSent(long delta) {
+      this.commandsSent.incr(delta);
+    }
+
+    public void incrCommandsSuccess(long delta) {
+      this.commandsSuccess.incr(delta);
+    }
+
+    public void incrCommandsFailure(long delta) {
+      this.commandsFailure.incr(delta);
+    }
+
+    public long getCommandsSent() {
+      return commandsSent.value();
+    }
+
+    public long getCommandsSuccess() {
+      return commandsSuccess.value();
+    }
+
+    public long getCommandsFailure() {
+      return commandsFailure.value();
+    }
+
+    @Override
+    public String toString() {
+      return "Sent=" + commandsSent + ", Success=" + commandsSuccess + ", Failed=" + commandsFailure;
+    }
+  }
+
+  public void incrDNCommandsSent(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsSent(delta);
+  }
+  public void incrDNCommandsSuccess(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsSuccess(delta);
+  }
+  public void incrDNCommandsFailure(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsFailure(delta);
   }
 
   @Override
