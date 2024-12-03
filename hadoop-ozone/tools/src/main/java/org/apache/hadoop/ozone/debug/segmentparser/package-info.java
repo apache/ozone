@@ -15,8 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.segmentparser;
 
 /**
  * Command line utility for dump ratis log files.
  */
+package org.apache.hadoop.ozone.debug.segmentparser;

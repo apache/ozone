@@ -16,29 +16,26 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
-
-import java.util.concurrent.Callable;
+package org.apache.hadoop.ozone.repair.ldb;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-
+import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
+
+import java.util.concurrent.Callable;
 
 /**
- * Tool that parses rocksdb file.
+ * Ozone Repair CLI for RocksDB.
  */
-@CommandLine.Command(
-        name = "ldb",
-        description = "Parse rocksdb file content")
+@CommandLine.Command(name = "ldb",
+    description = "Operational tool to repair RocksDB table.")
 @MetaInfServices(SubcommandWithParent.class)
-public class RDBParser implements Callable<Void>, SubcommandWithParent {
+public class RDBRepair implements Callable<Void>, SubcommandWithParent {
 
-  @Spec
-  private CommandSpec spec;
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -49,18 +46,14 @@ public class RDBParser implements Callable<Void>, SubcommandWithParent {
     return dbPath;
   }
 
-  public void setDbPath(String dbPath) {
-    this.dbPath = dbPath;
+  @Override
+  public Void call() {
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 
   @Override
   public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
+    return OzoneRepair.class;
   }
 }

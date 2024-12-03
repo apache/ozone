@@ -16,44 +16,52 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.ldb;
 
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 /**
- * List all column Families/Tables in db.
+ * Tool that parses rocksdb file.
  */
 @CommandLine.Command(
-        name = "list_column_families",
-        aliases = "ls",
-        description = "list all column families in db."
-)
+        name = "ldb",
+        description = "Parse rocksdb file content")
 @MetaInfServices(SubcommandWithParent.class)
-public class ListTables implements Callable<Void>, SubcommandWithParent {
+public class RDBParser implements Callable<Void>, SubcommandWithParent {
 
-  @CommandLine.ParentCommand
-  private RDBParser parent;
+  @Spec
+  private CommandSpec spec;
 
-  @Override
-  public Void call() throws Exception {
-    List<byte[]> columnFamilies = RocksDatabase.listColumnFamiliesEmptyOptions(
-        parent.getDbPath());
-    for (byte[] b : columnFamilies) {
-      System.out.println(new String(b, StandardCharsets.UTF_8));
-    }
-    return null;
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Database File Path")
+  private String dbPath;
+
+  public String getDbPath() {
+    return dbPath;
+  }
+
+  public void setDbPath(String dbPath) {
+    this.dbPath = dbPath;
   }
 
   @Override
   public Class<?> getParentType() {
-    return RDBParser.class;
+    return OzoneDebug.class;
+  }
+
+  @Override
+  public Void call() throws Exception {
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 }

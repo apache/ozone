@@ -17,6 +17,6 @@
  */
 
 /**
- * Ozone Quota Repair tools.
+ * Command to debug chunk information.
  */
-package org.apache.hadoop.ozone.repair.quota;
+package org.apache.hadoop.ozone.debug.chunk;

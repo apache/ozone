@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.ldb;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -44,6 +44,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
+import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.utils.Filter;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
