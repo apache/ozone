@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc.read;
 
-import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -39,9 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * Tests {@link StreamBlockInput}.
+ * Tests {@link StreamBlockInputStream}.
  */
-public class TestStreamBlockInput {
+public class TestStreamBlockInputStream {
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
@@ -73,8 +73,8 @@ public class TestStreamBlockInput {
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      StreamBlockInput block0Stream =
-          (StreamBlockInput) keyInputStream.getPartStreams().get(0);
+      StreamBlockInputStream block0Stream =
+          (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
 
 
       // To read 1 byte of chunk data, ChunkInputStream should get one full
@@ -130,8 +130,8 @@ public class TestStreamBlockInput {
     bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
-      StreamBlockInput block0Stream =
-          (StreamBlockInput) keyInputStream.getPartStreams().get(0);
+      StreamBlockInputStream block0Stream =
+          (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
 
       readDataFromChunk(block0Stream, 0, 1);
       assertNotNull(block0Stream.getCachedBuffers());
@@ -152,8 +152,8 @@ public class TestStreamBlockInput {
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      StreamBlockInput block0Stream =
-          (StreamBlockInput) keyInputStream.getPartStreams().get(0);
+      StreamBlockInputStream block0Stream =
+          (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
 
       // Read checksum boundary - 1 bytes of data
       int readDataLen = BYTES_PER_CHECKSUM - 1;
@@ -201,18 +201,18 @@ public class TestStreamBlockInput {
     }
   }
 
-  private byte[] readDataFromChunk(StreamBlockInput streamBlockInput,
+  private byte[] readDataFromChunk(StreamBlockInputStream streamBlockInputStream,
                                    int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    streamBlockInput.seek(offset);
-    streamBlockInput.read(readData, 0, readDataLength);
+    streamBlockInputStream.seek(offset);
+    streamBlockInputStream.read(readData, 0, readDataLength);
     return readData;
   }
 
-  private byte[] readDataFromChunk(StreamBlockInput streamBlockInput,
+  private byte[] readDataFromChunk(StreamBlockInputStream streamBlockInputStream,
                                    int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    streamBlockInput.read(readData, 0, readDataLength);
+    streamBlockInputStream.read(readData, 0, readDataLength);
     return readData;
   }
 

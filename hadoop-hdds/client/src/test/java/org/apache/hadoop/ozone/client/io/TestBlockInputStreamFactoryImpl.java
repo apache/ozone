@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -73,7 +73,7 @@ public class TestBlockInputStreamFactoryImpl {
             blockInfo.getToken(), null, null,
             clientConfig);
     if (streamReadBlockEnabled) {
-      assertInstanceOf(StreamBlockInput.class, stream);
+      assertInstanceOf(StreamBlockInputStream.class, stream);
     } else {
       assertInstanceOf(BlockInputStream.class, stream);
     }

@@ -1350,7 +1350,7 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public ContainerCommandResponseProto streamDataReadOnly(
+  public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {

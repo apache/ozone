@@ -96,13 +96,13 @@ public interface ContainerDispatcher {
   }
 
   /**
-   * When reading data form client using stream, get StreamDataChannel.
+   * When reading data form client by streaming chunks.
    */
   default void streamDataReadOnly(
        ContainerCommandRequestProto msg,
        StreamObserver<ContainerCommandResponseProto> streamObserver,
        DispatcherContext dispatcherContext) {
     throw new UnsupportedOperationException(
-         "getStreamDataChannel not supported.");
+         "streamDataReadOnly not supported.");
   }
 }

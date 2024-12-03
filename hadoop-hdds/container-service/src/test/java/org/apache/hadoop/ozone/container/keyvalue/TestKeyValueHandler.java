@@ -522,11 +522,11 @@ public class TestKeyValueHandler {
       when(chunkManager.readChunk(any(), any(),
           any(), any()))
           .thenReturn(data);
-      testStreamDataReadOnly(0, 1, keyValueHandler, dispatcherContext,
+      testReadBlock(0, 1, keyValueHandler, dispatcherContext,
           streamObserver, container);
-      testStreamDataReadOnly(0, CHUNK_SIZE + 1, keyValueHandler, dispatcherContext,
+      testReadBlock(0, CHUNK_SIZE + 1, keyValueHandler, dispatcherContext,
           streamObserver, container);
-      testStreamDataReadOnly(CHUNK_SIZE / 2, 2 * CHUNK_SIZE, keyValueHandler, dispatcherContext,
+      testReadBlock(CHUNK_SIZE / 2, 2 * CHUNK_SIZE, keyValueHandler, dispatcherContext,
           streamObserver, container);
     }
   }
@@ -549,12 +549,12 @@ public class TestKeyValueHandler {
         .build();
   }
 
-  private static void testStreamDataReadOnly(
+  private static void testReadBlock(
       long offset, long length, KeyValueHandler keyValueHandler, DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver, KeyValueContainer container) {
     int responseCount = (int) (((offset + length - 1) / CHUNK_SIZE) + 1 - (offset / CHUNK_SIZE));
     ContainerCommandRequestProto requestProto = readBlockRequest(offset, length);
-    keyValueHandler.streamDataReadOnly(requestProto, container, dispatcherContext, streamObserver);
+    keyValueHandler.readBlock(requestProto, container, dispatcherContext, streamObserver);
     verify(streamObserver, times(responseCount)).onNext(any());
     clearInvocations(streamObserver);
   }

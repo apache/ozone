@@ -66,10 +66,10 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
  * container.
  */
-public class StreamBlockInput extends BlockExtendedInputStream
+public class StreamBlockInputStream extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
   private static final Logger LOG =
-      LoggerFactory.getLogger(StreamBlockInput.class);
+      LoggerFactory.getLogger(StreamBlockInputStream.class);
   private final BlockID blockID;
   private final long blockLength;
   private final AtomicReference<Pipeline> pipelineRef =
@@ -79,11 +79,11 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
 
-  private List<Long> bufferoffsets;
+  private List<Long> bufferOffsets;
   private int bufferIndex;
   private long blockPosition = -1;
   private List<ByteBuffer> buffers;
-  // Checks if the StreamBlockInput has already read data from the container.
+  // Checks if the StreamBlockInputStream has already read data from the container.
   private boolean allocated = false;
   private long bufferOffsetWrtBlockData;
   private long buffersSize;
@@ -95,14 +95,14 @@ public class StreamBlockInput extends BlockExtendedInputStream
   private int retries;
 
 
-  public StreamBlockInput(
+  public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
-    LOG.debug("Initializing StreamBlockInput for block {}", blockID);
+    LOG.debug("Initializing StreamBlockInputStream for block {}", blockID);
     this.blockLength = length;
     setPipeline(pipeline);
     tokenRef.set(token);
@@ -138,7 +138,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     if (buffersHaveData()) {
       // BufferOffset w.r.t to BlockData + BufferOffset w.r.t buffers +
       // Position of current Buffer
-      return bufferOffsetWrtBlockData + bufferoffsets.get(bufferIndex) +
+      return bufferOffsetWrtBlockData + bufferOffsets.get(bufferIndex) +
           buffers.get(bufferIndex).position();
     }
     if (allocated && !dataRemainingInBlock()) {
@@ -411,7 +411,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
       // Released buffers should not be considered when checking if position
       // is available
       return pos >= bufferOffsetWrtBlockData +
-          bufferoffsets.get(0) &&
+          bufferOffsets.get(0) &&
           pos < bufferOffsetWrtBlockData + buffersSize;
     }
     return false;
@@ -434,13 +434,13 @@ public class StreamBlockInput extends BlockExtendedInputStream
     // The bufferPosition is w.r.t the current buffers.
     // Adjust the bufferIndex and position to the seeked bufferPosition.
     if (bufferIndex >= buffers.size()) {
-      bufferIndex = Collections.binarySearch(bufferoffsets, bufferPosition);
-    } else if (bufferPosition < bufferoffsets.get(bufferIndex)) {
+      bufferIndex = Collections.binarySearch(bufferOffsets, bufferPosition);
+    } else if (bufferPosition < bufferOffsets.get(bufferIndex)) {
       bufferIndex = Collections.binarySearch(
-          bufferoffsets.subList(0, bufferIndex), bufferPosition);
-    } else if (bufferPosition >= bufferoffsets.get(bufferIndex) +
+          bufferOffsets.subList(0, bufferIndex), bufferPosition);
+    } else if (bufferPosition >= bufferOffsets.get(bufferIndex) +
         buffers.get(bufferIndex).capacity()) {
-      bufferIndex = Collections.binarySearch(bufferoffsets.subList(
+      bufferIndex = Collections.binarySearch(bufferOffsets.subList(
           bufferIndex + 1, buffers.size()), bufferPosition);
     }
     // bufferIndex is negative if bufferPosition isn't found in bufferOffsets
@@ -450,7 +450,7 @@ public class StreamBlockInput extends BlockExtendedInputStream
     }
 
     buffers.get(bufferIndex).position(
-        (int) (bufferPosition - bufferoffsets.get(bufferIndex)));
+        (int) (bufferPosition - bufferOffsets.get(bufferIndex)));
 
     // Reset buffers > bufferIndex to position 0. We do this to reset any
     // previous reads/ seeks which might have updated any buffer position.
@@ -497,9 +497,9 @@ public class StreamBlockInput extends BlockExtendedInputStream
     bufferOffsetWrtBlockData = readData(startByteIndex, len);
     long tempOffset = 0L;
     buffersSize = 0L;
-    bufferoffsets = new ArrayList<>(buffers.size());
+    bufferOffsets = new ArrayList<>(buffers.size());
     for (ByteBuffer buffer : buffers) {
-      bufferoffsets.add(tempOffset);
+      bufferOffsets.add(tempOffset);
       tempOffset += buffer.limit();
       buffersSize += buffer.limit();
 
@@ -598,13 +598,13 @@ public class StreamBlockInput extends BlockExtendedInputStream
       // buffers. This should be done so that getPos() can return the current
       // block position
       blockPosition = bufferOffsetWrtBlockData +
-          bufferoffsets.get(releaseUptoBufferIndex) +
+          bufferOffsets.get(releaseUptoBufferIndex) +
           buffers.get(releaseUptoBufferIndex).capacity();
       // Release all the buffers
       releaseBuffers();
     } else {
       buffers = buffers.subList(releaseUptoBufferIndex + 1, buffersLen);
-      bufferoffsets = bufferoffsets.subList(
+      bufferOffsets = bufferOffsets.subList(
           releaseUptoBufferIndex + 1, buffersLen);
       bufferIndex = 0;
     }
