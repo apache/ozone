@@ -69,7 +69,7 @@ public class ReconLayoutVersionManager {
    * Determines the Software Layout Version (SLV) based on the latest feature version.
    * @return The Software Layout Version (SLV).
    */
-  private int determineSLV() {
+  public static int determineSLV() {
     return Arrays.stream(ReconLayoutFeature.values())
         .mapToInt(ReconLayoutFeature::getVersion)
         .max()

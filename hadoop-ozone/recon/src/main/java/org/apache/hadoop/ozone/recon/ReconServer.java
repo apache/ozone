@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -51,11 +52,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
+import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
@@ -115,6 +118,8 @@ public class ReconServer extends GenericCli {
     ReconGuiceServletContextListener.setInjector(injector);
 
     reconStorage = injector.getInstance(ReconStorageConfig.class);
+    SchemaVersionTableDefinition reconVersionSchemaInstance =
+        injector.getInstance(SchemaVersionTableDefinition.class);
 
     LOG.info("Initializing Recon server...");
     try {
@@ -122,12 +127,17 @@ public class ReconServer extends GenericCli {
       try {
         if (reconStorage.getState() != INITIALIZED) {
           reconStorage.initialize();
+          // If the version information is not already set, this is the first time the version
+          // will be added, hence update it to the current code SLV
+          reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
         }
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
               "Initializing certificate.");
           initializeCertificateClient();
         }
+      } catch (SQLException se) {
+        LOG.error("Failed to set the MLV version, defaulting to -1");
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
