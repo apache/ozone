@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests {@link StreamBlockInputStream}.
@@ -57,6 +58,7 @@ public class TestStreamBlockInputStream {
         testBlockReadBuffers(bucket);
         testBufferRelease(bucket);
         testCloseReleasesBuffers(bucket);
+        testReadEmptyBlock(bucket);
       }
     }
   }
@@ -85,7 +87,7 @@ public class TestStreamBlockInputStream {
 
       // Read > checksum boundary of data from chunk0
       int readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
-      byte[] readData = readDataFromChunk(block0Stream, 0, readDataLen);
+      byte[] readData = readDataFromBlock(block0Stream, 0, readDataLen);
       bucket.validateData(inputData, 0, readData);
 
       // The first checksum boundary size of data was already existing in the
@@ -104,7 +106,7 @@ public class TestStreamBlockInputStream {
       // and the second buffer should have BYTES_PER_CHECKSUM capacity.
       readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
       int offset = 2 * BYTES_PER_CHECKSUM + 1;
-      readData = readDataFromChunk(block0Stream, offset, readDataLen);
+      readData = readDataFromBlock(block0Stream, offset, readDataLen);
       bucket.validateData(inputData, offset, readData);
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1,
           BYTES_PER_CHECKSUM);
@@ -113,7 +115,7 @@ public class TestStreamBlockInputStream {
       // Read the full chunk data -1 and verify that all chunk data is read into
       // buffers. We read CHUNK_SIZE - 1 as otherwise all the buffers will be
       // released once all chunk data is read.
-      readData = readDataFromChunk(block0Stream, 0, CHUNK_SIZE - 1);
+      readData = readDataFromBlock(block0Stream, 0, CHUNK_SIZE - 1);
       bucket.validateData(inputData, 0, readData);
       int expectedNumBuffers = CHUNK_SIZE / BYTES_PER_CHECKSUM;
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1, BYTES_PER_CHECKSUM);
@@ -133,7 +135,7 @@ public class TestStreamBlockInputStream {
       StreamBlockInputStream block0Stream =
           (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
 
-      readDataFromChunk(block0Stream, 0, 1);
+      readDataFromBlock(block0Stream, 0, 1);
       assertNotNull(block0Stream.getCachedBuffers());
 
       block0Stream.close();
@@ -157,7 +159,7 @@ public class TestStreamBlockInputStream {
 
       // Read checksum boundary - 1 bytes of data
       int readDataLen = BYTES_PER_CHECKSUM - 1;
-      byte[] readData = readDataFromChunk(block0Stream, 0, readDataLen);
+      byte[] readData = readDataFromBlock(block0Stream, 0, readDataLen);
       bucket.validateData(inputData, 0, readData);
 
       // There should be 1 byte of data remaining in the buffer which is not
@@ -168,14 +170,14 @@ public class TestStreamBlockInputStream {
 
       // Reading the last byte in the buffer should result in all the buffers
       // being released.
-      readData = readDataFromChunk(block0Stream, 1);
+      readData = readDataFromBlock(block0Stream, 1);
       bucket.validateData(inputData, readDataLen, readData);
       assertNull(block0Stream.getCachedBuffers(),
           "Chunk stream buffers not released after last byte is read");
 
       // Read more data to get the data till the next checksum boundary.
       readDataLen = BYTES_PER_CHECKSUM / 2;
-      readData = readDataFromChunk(block0Stream, readDataLen);
+      readData = readDataFromBlock(block0Stream, readDataLen);
       // There should be one buffer and the buffer should not be released as
       // there is data pending to be read from the buffer
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1,
@@ -188,7 +190,7 @@ public class TestStreamBlockInputStream {
       // checksum boundary).
       int position = (int) block0Stream.getPos();
       readDataLen = lastCachedBuffer.remaining() + BYTES_PER_CHECKSUM / 2;
-      readData = readDataFromChunk(block0Stream, readDataLen);
+      readData = readDataFromBlock(block0Stream, readDataLen);
       bucket.validateData(inputData, position, readData);
       // After reading the remaining data in the buffer, the buffer should be
       // released and next checksum size of data must be read into the buffers
@@ -201,7 +203,7 @@ public class TestStreamBlockInputStream {
     }
   }
 
-  private byte[] readDataFromChunk(StreamBlockInputStream streamBlockInputStream,
+  private byte[] readDataFromBlock(StreamBlockInputStream streamBlockInputStream,
                                    int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     streamBlockInputStream.seek(offset);
@@ -209,7 +211,7 @@ public class TestStreamBlockInputStream {
     return readData;
   }
 
-  private byte[] readDataFromChunk(StreamBlockInputStream streamBlockInputStream,
+  private byte[] readDataFromBlock(StreamBlockInputStream streamBlockInputStream,
                                    int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     streamBlockInputStream.read(readData, 0, readDataLength);
@@ -232,6 +234,22 @@ public class TestStreamBlockInputStream {
     for (int i = 0; i < buffers.length; i++) {
       assertEquals(expectedBufferCapacity, buffers[i].capacity(),
           "ChunkInputStream ByteBuffer capacity is wrong");
+    }
+  }
+
+  private void testReadEmptyBlock(TestBucket bucket) throws Exception {
+    String keyName = getNewKeyName();
+    int dataLength = 10;
+    bucket.writeRandomBytes(keyName, 0);
+
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+
+      byte[] readData = new byte[dataLength];
+      assertTrue(keyInputStream.getPartStreams().isEmpty());
+      keyInputStream.read(readData);
+      for (int i = 0; i < readData.length; i++) {
+        assertEquals(readData[i], (byte) 0);
+      }
     }
   }
 }
