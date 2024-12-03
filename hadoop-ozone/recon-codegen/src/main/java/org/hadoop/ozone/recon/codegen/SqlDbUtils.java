@@ -19,15 +19,19 @@
 package org.hadoop.ozone.recon.codegen;
 
 import static org.jooq.impl.DSL.count;
+import static org.jooq.impl.DSL.name;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.function.TriFunction;
+import org.jooq.Record;
+import org.jooq.Result;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
@@ -97,17 +101,15 @@ public final class SqlDbUtils {
         return true;
       };
 
-  public static final TriFunction<Connection, String, String, Boolean> COLUMN_EXISTS_CHECK =
+  public static final TriFunction<Connection, String, String, Boolean> CHECK_COLUMN_HAS_VALUE =
     (conn, tableName, columnName) -> {
       try {
-        DSL.using(conn).select(DSL.field(DSL.name(columnName)))
-          .from(DSL.table(DSL.name(tableName)))
-          .fetch();
+        return DSL.using(conn).select(DSL.field(DSL.name(columnName)))
+            .from(DSL.table(DSL.name(tableName)))
+            .fetch().isNotEmpty();
       } catch (DataAccessException ex) {
         LOG.debug(ex.getMessage());
         return false;
       }
-      LOG.info("Column: {} in Table: {} has value present", columnName, tableName);
-      return true;
     };
 }

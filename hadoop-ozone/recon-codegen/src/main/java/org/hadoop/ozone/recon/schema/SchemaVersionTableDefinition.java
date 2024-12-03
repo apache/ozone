@@ -29,8 +29,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.COLUMN_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.CHECK_COLUMN_HAS_VALUE;
 
 /**
  * Class for managing the schema of the SchemaVersion table.
@@ -69,12 +69,12 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
   }
 
   /**
-   * Insert the version of the MLV for the table if it doesn't already exist
+   * Insert the version of the MLV for the table if it doesn't already exist.
    * @param version The version value to be inserted
    * @throws SQLException If the insert operation failed
    */
   public void insertCurrentVersion(int version) throws SQLException {
-    if (!COLUMN_EXISTS_CHECK.apply(conn, SCHEMA_VERSION_TABLE_NAME, "version_number")) {
+    if (!CHECK_COLUMN_HAS_VALUE.apply(conn, SCHEMA_VERSION_TABLE_NAME, "version_number")) {
       dslContext.insertInto(DSL.table(DSL.name(SCHEMA_VERSION_TABLE_NAME)))
           .set(DSL.field(DSL.name("version_number")), version)
           .execute();

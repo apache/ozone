@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
-import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -118,8 +117,6 @@ public class ReconServer extends GenericCli {
     ReconGuiceServletContextListener.setInjector(injector);
 
     reconStorage = injector.getInstance(ReconStorageConfig.class);
-    SchemaVersionTableDefinition reconVersionSchemaInstance =
-        injector.getInstance(SchemaVersionTableDefinition.class);
 
     LOG.info("Initializing Recon server...");
     try {
@@ -130,7 +127,7 @@ public class ReconServer extends GenericCli {
         }
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
-            "Initializing certificate.");
+              "Initializing certificate.");
           initializeCertificateClient();
         }
       } catch (Exception e) {
@@ -151,6 +148,16 @@ public class ReconServer extends GenericCli {
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
+
+      SchemaVersionTableDefinition reconVersionSchemaInstance =
+        injector.getInstance(SchemaVersionTableDefinition.class);
+      try {
+        // If the version information is not already set, this is the first time the version
+        // will be added, hence update it to the current code SLV
+        reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
+      } catch (SQLException se) {
+        LOG.error("Failed to update version_number, defaulting to -1.");
+      }
 
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
@@ -173,13 +180,6 @@ public class ReconServer extends GenericCli {
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
           (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
 
-      try {
-        // If the version information is not already set, this is the first time the version
-        // will be added, hence update it to the current code SLV
-        reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
-      } catch (SQLException se) {
-        LOG.error("Failed to update version_number, defaulting to -1.");
-      }
       layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
