@@ -317,9 +317,9 @@ public class TestBlockDeletion {
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
-    LOG.info("tej1 : "+ " " + metrics.getNumBlockDeletionCommandSent() +" " + metrics.getNumBlockDeletionCommandSuccess()
-        + " " + metrics.getBNumBlockDeletionCommandFailure());
-    LOG.info("tej2 : "+ " " + metrics.getNumCommandsDatanode());
+    assertEquals(metrics.getNumBlockDeletionCommandSent(), metrics.getNumCommandsDatanodeSent());
+    assertEquals(metrics.getNumBlockDeletionCommandSuccess(), metrics.getNumCommandsDatanodeSuccess());
+    assertEquals(metrics.getBNumBlockDeletionCommandFailure(), metrics.getNumCommandsDatanodeFailed());
     assertThat(metrics.getNumBlockDeletionCommandSent())
         .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());

@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -215,6 +216,31 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   public Map<UUID, DatanodeCommandCounts> getNumCommandsDatanode() {
     return numCommandsDatanode;
+  }
+
+  @VisibleForTesting
+  public int getNumCommandsDatanodeSent() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsSent;
+    }
+    return sent;
+  }
+  @VisibleForTesting
+  public int getNumCommandsDatanodeSuccess() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsSuccess;
+    }
+    return sent;
+  }
+  @VisibleForTesting
+  public int getNumCommandsDatanodeFailed() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsFailure;
+    }
+    return sent;
   }
 
   @Override
