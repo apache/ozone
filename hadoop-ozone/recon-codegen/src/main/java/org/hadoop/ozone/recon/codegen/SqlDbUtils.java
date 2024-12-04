@@ -98,7 +98,7 @@ public final class SqlDbUtils {
       };
 
   /**
-   * Helper function to check if a column exists through JOOQ
+   * Helper function to check if a column exists through JOOQ.
    */
   public static final TriFunction<Connection, String, String, Boolean> COLUMN_EXISTS_CHECK =
       (conn, tableName, columnName) -> {

@@ -38,7 +38,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Test for Task Status Service.
@@ -92,7 +95,8 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    Map<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> mockedTaskCounts = new EnumMap<>(ReconTaskStatusCounter.ReconTasks.class);
+    Map<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> mockedTaskCounts =
+        new EnumMap<>(ReconTaskStatusCounter.ReconTasks.class);
 
     mockedTaskCounts.put(ReconTaskStatusCounter.ReconTasks.ContainerKeyMapperTask, Pair.of(1, 0));
     mockedTaskCounts.put(ReconTaskStatusCounter.ReconTasks.OmDeltaRequest, Pair.of(10, 2));

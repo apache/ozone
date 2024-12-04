@@ -26,14 +26,14 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
 import javax.inject.Inject;
-import javax.ws.rs.*;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_TYPE;
 
 /**
  * Endpoint for displaying the last successful run of each Recon Task.
@@ -47,7 +47,7 @@ public class TaskStatusService {
   private final ReconTaskStatusCounter taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
 
   /**
-   * Internal class to represent a list of all the tasks and their counts in Recon
+   * Internal class to represent a list of all the tasks and their counts in Recon.
    */
   static class ReconAllTasksCountResponse {
     // An array of all the tasks and their respective successes/failures
@@ -72,7 +72,7 @@ public class TaskStatusService {
 
   /**
    * Returns a list of tasks mapped using their task names to the number of
-   * successful runs and number of failed runs for the respective task
+   * successful runs and number of failed runs for the respective task.
    * @return {@link Response} in the format of:
    * <br>
    * <code>
@@ -92,9 +92,9 @@ public class TaskStatusService {
     List<ReconTaskStatusCountResponse> tasks = new ArrayList<>();
     for (Map.Entry<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> entry: tasksPairMap.entrySet()) {
       tasks.add(new ReconTaskStatusCountResponse(
-        entry.getKey().name(),
-        entry.getValue().getLeft(),
-        entry.getValue().getRight()
+          entry.getKey().name(),
+          entry.getValue().getLeft(),
+          entry.getValue().getRight()
       ));
     }
     return Response.ok(new ReconAllTasksCountResponse(tasks)).build();
