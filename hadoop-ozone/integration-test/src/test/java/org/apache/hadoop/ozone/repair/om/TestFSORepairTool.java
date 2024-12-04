@@ -104,6 +104,9 @@ public class TestFSORepairTool {
     if (cluster != null) {
       cluster.shutdown();
     }
+    if (client != null) {
+      client.close();
+    }
     IOUtils.closeQuietly(fs);
   }
 
