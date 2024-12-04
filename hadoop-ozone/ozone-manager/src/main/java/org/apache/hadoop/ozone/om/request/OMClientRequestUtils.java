@@ -114,6 +114,16 @@ public final class OMClientRequestUtils {
       return true;
     }
   }
+
+  public static void validateVolumeName(String volumeName) throws IOException {
+    if (StringUtils.isBlank(volumeName)) {
+      if (StringUtils.isBlank(volumeName)) {
+        throw new OMException("Invalid, volume name is empty",
+            OMException.ResultCodes.INVALID_VOLUME_NAME);
+      }
+    }
+  }
+
   public static void validateBucketName(String bucketName) throws IOException {
     if (StringUtils.isBlank(bucketName)) {
       throw new OMException("Invalid, Bucket name is empty",
@@ -123,9 +133,8 @@ public final class OMClientRequestUtils {
 
   public static void validateKeyName(String keyName) throws IOException {
     if (StringUtils.isBlank(keyName)) {
-      throw new OMException("Directory create failed. Cannot create " +
-          "directory at root of the filesystem",
-          OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
+      throw new OMException("Key name is empty",
+          OMException.ResultCodes.INVALID_KEY_NAME);
     }
   }
 }

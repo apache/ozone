@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -529,15 +530,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   )
   public static OMRequest blockCommitKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getCommitKeyRequest().hasKeyArgs()) {
-      KeyArgs keyArgs = req.getCommitKeyRequest().getKeyArgs();
+    KeyArgs keyArgs = req.getCommitKeyRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    BucketLayout bucketLayout = ctx.getBucketLayout(
+        keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
+
     return req;
   }
 
@@ -579,7 +580,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey
   )
-
   public static OMRequest disallowRecovery(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()

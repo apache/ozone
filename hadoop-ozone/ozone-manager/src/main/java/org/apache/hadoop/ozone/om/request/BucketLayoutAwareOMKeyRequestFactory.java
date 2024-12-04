@@ -234,15 +234,8 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
                                            OMMetadataManager omMetadataManager)
 
       throws IOException {
-    if (StringUtils.isBlank(volumeName)) {
-      throw new OMException("Invalid, volume name is empty",
-          OMException.ResultCodes.INVALID_VOLUME_NAME);
-    }
-
-    if (StringUtils.isBlank(bucketName)) {
-      throw new OMException("Invalid, Bucket name is empty",
-          OMException.ResultCodes.INVALID_BUCKET_NAME);
-    }
+    OMClientRequestUtils.validateVolumeName(volumeName);
+    OMClientRequestUtils.validateBucketName(bucketName);
 
     // Get the bucket layout of the bucket being accessed by this request.
     // While doing this we make sure we are resolving the real bucket in case of
