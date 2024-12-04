@@ -84,6 +84,7 @@ Check if Recon picks up OM data
     Execute    ozone sh bucket create recon/api --layout=LEGACY
     Freon OCKG    n=10    args=-s 1025 -v recon -b api
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
+    Wait Until Keyword Succeeds     90sec      10sec        Check if the listKeys api responds OK       recon   api
 
 Check if Recon picks up DN heartbeats
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/datanodes
@@ -153,13 +154,3 @@ Check normal api access
 
     kinit as non admin
     Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   200
-
-Check listKeys api works
-   kinit as ozone admin
-   # Create volume and bucket
-   Execute    ozone sh volume create ${VOLUME}
-   Execute    ozone sh bucket create ${VOLUME}/${BUCKET}
-   Freon OCKG    n=2    args=-s 10 -v ${VOLUME} -b ${BUCKET}
-
-   # Wait until Recon picks up the keys
-   Wait Until Keyword Succeeds     90sec      10sec        Check if the listKeys api responds OK   ${VOLUME}     ${BUCKET}
