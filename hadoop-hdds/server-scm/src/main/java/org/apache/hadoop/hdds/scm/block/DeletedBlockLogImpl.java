@@ -93,7 +93,7 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
-  private Long lastProcessedTransactionId;
+  private long lastProcessedTransactionId;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
