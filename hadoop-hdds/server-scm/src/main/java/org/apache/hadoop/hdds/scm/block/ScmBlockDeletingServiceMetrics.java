@@ -261,6 +261,9 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     recordBuilder.endRecord();
   }
 
+  /**
+   *  Class contains metrics related to the ScmBlockDeletingService for each datanode.
+   */
   public static final class DatanodeCommandCounts {
     private long commandsSent;
     private long commandsSuccess;
@@ -315,7 +318,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @VisibleForTesting
   public int getNumCommandsDatanodeSent() {
     int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
       sent += e.getValue().commandsSent;
     }
     return sent;
@@ -323,7 +326,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @VisibleForTesting
   public int getNumCommandsDatanodeSuccess() {
     int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
       sent += e.getValue().commandsSuccess;
     }
     return sent;
@@ -331,7 +334,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @VisibleForTesting
   public int getNumCommandsDatanodeFailed() {
     int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
       sent += e.getValue().commandsFailure;
     }
     return sent;
