@@ -1606,7 +1606,8 @@ public class RpcClient implements ClientProtocol {
             = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
             .setId(PipelineID.randomId()).build();
         long length = replicationConfig instanceof ECReplicationConfig
-                ? internalBlockLength(pipelineBefore.getReplicaIndex(dn), (ECReplicationConfig) replicationConfig, locationInfo.getLength())
+                ? internalBlockLength(pipelineBefore.getReplicaIndex(dn),
+                (ECReplicationConfig) replicationConfig, locationInfo.getLength())
                 : locationInfo.getLength();
         OmKeyLocationInfo dnKeyLocation = new OmKeyLocationInfo.Builder()
             .setBlockID(locationInfo.getBlockID())
@@ -1636,7 +1637,7 @@ public class RpcClient implements ClientProtocol {
             .setModificationTime(keyInfo.getModificationTime())
             .setReplicationConfig(replicationConfig instanceof ECReplicationConfig
                     ? RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)
-                    : keyInfo.getReplicationConfig()) // We don't want to create ECBlockInputStream when calling createInputStream
+                    : keyInfo.getReplicationConfig())
             .setFileEncryptionInfo(keyInfo.getFileEncryptionInfo())
             .setAcls(keyInfo.getAcls())
             .setObjectID(keyInfo.getObjectID())
