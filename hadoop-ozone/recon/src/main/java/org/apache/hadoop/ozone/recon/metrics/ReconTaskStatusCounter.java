@@ -44,7 +44,7 @@ public class ReconTaskStatusCounter {
   private final long timeoutDuration;
 
   /**
-   * {@link Enum} to store the various tasks that are run in Recon
+   * {@link Enum} to store the various tasks that are run in Recon.
    */
   public enum ReconTasks {
     ContainerHealthTask,
@@ -59,10 +59,10 @@ public class ReconTaskStatusCounter {
     ReconScmTask
   }
 
-  private static long initializationTime = 0L;
+  private long initializationTime = 0L;
 
   // Task name is mapped from the enum to a Pair of <count of successful runs, count of failed runs>
-  private static final Map<ReconTasks, Pair<Integer, Integer>> taskStatusCounter = new EnumMap<>(ReconTasks.class);
+  private static final Map<ReconTasks, Pair<Integer, Integer>> TASK_STATUS_COUNTER = new EnumMap<>(ReconTasks.class);
 
   public ReconTaskStatusCounter() {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -74,7 +74,7 @@ public class ReconTaskStatusCounter {
 
     initializationTime = System.currentTimeMillis();
     for (ReconTasks task: ReconTasks.values()) {
-      taskStatusCounter.put(task, Pair.of(0, 0));
+      TASK_STATUS_COUNTER.put(task, Pair.of(0, 0));
     }
   }
 
@@ -96,12 +96,12 @@ public class ReconTaskStatusCounter {
    * @param successful Whether the task was successful or not
    */
   public void updateCounter(String taskName, boolean successful) {
-    int successes = taskStatusCounter.get(ReconTasks.valueOf(taskName)).getLeft();
-    int failures = taskStatusCounter.get(ReconTasks.valueOf(taskName)).getRight();
+    int successes = TASK_STATUS_COUNTER.get(ReconTasks.valueOf(taskName)).getLeft();
+    int failures = TASK_STATUS_COUNTER.get(ReconTasks.valueOf(taskName)).getRight();
     if (successful) {
-      taskStatusCounter.put(ReconTasks.valueOf(taskName), Pair.of(successes + 1, failures));
+      TASK_STATUS_COUNTER.put(ReconTasks.valueOf(taskName), Pair.of(successes + 1, failures));
     } else {
-      taskStatusCounter.put(ReconTasks.valueOf(taskName), Pair.of(successes, failures + 1));
+      TASK_STATUS_COUNTER.put(ReconTasks.valueOf(taskName), Pair.of(successes, failures + 1));
     }
   }
 
@@ -128,7 +128,7 @@ public class ReconTaskStatusCounter {
       throws NullPointerException {
     checkCountDataExpiry();
     try {
-      return taskStatusCounter.get(ReconTasks.valueOf(taskName));
+      return TASK_STATUS_COUNTER.get(ReconTasks.valueOf(taskName));
     } catch (NullPointerException npe) {
       throw new NullPointerException("Couldn't find task with name " + taskName);
     }
@@ -136,6 +136,6 @@ public class ReconTaskStatusCounter {
 
   public Map<ReconTasks, Pair<Integer, Integer>> getTaskCounts() {
     checkCountDataExpiry();
-    return taskStatusCounter;
+    return TASK_STATUS_COUNTER;
   }
 }

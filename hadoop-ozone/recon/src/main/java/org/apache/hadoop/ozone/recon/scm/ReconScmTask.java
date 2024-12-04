@@ -34,7 +34,7 @@ public abstract class ReconScmTask {
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconTaskStatusCounter taskStatusCounter;
   private volatile boolean running;
-  private ReconTaskStatus reconTaskStatusRecord;
+  private volatile ReconTaskStatus reconTaskStatusRecord;
 
   protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
@@ -95,8 +95,10 @@ public abstract class ReconScmTask {
 
   protected void recordSingleRunCompletion() {
     taskStatusCounter.updateCounter(getTaskName(), true);
-    reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
-    reconTaskStatusRecord.setLastTaskRunStatus(1);
+    synchronized (this) {
+      reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
+      reconTaskStatusRecord.setLastTaskRunStatus(1);
+    }
     reconTaskStatusDao.update(reconTaskStatusRecord);
   }
 

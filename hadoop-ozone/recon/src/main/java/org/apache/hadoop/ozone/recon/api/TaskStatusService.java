@@ -52,9 +52,14 @@ public class TaskStatusService {
   static class ReconAllTasksCountResponse {
     // An array of all the tasks and their respective successes/failures
     @JsonProperty("tasks")
-    private List<ReconTaskStatusCountResponse> tasks;
+    private final List<ReconTaskStatusCountResponse> tasks;
+
     ReconAllTasksCountResponse(List<ReconTaskStatusCountResponse> tasks) {
       this.tasks = tasks;
+    }
+
+    public List<ReconTaskStatusCountResponse> getTasks() {
+      return tasks;
     }
   }
 
