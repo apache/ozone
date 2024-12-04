@@ -289,7 +289,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             metrics.incrNumKeysProcessed(keyBlocksList.size());
             metrics.incrNumKeysSentForPurge(delCount);
           }
-          taskCount.getAndDecrement();
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
@@ -305,6 +304,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
+      taskCount.getAndDecrement();
       isRunningOnAOS.set(false);
       synchronized (deletingService) {
         this.deletingService.notify();
