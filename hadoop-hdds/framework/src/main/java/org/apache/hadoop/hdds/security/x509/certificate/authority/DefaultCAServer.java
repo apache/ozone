@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIPro
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -203,9 +203,9 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private KeyPair getCAKeys() throws IOException {
-    KeyCodec keyCodec = new KeyCodec(config, componentName);
+    KeyStorage keyStorage = new KeyStorage(config, componentName);
     try {
-      return new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey());
+      return new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey());
     } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
       throw new IOException(e);
     }
@@ -473,9 +473,8 @@ public class DefaultCAServer implements CertificateServer {
       throws NoSuchProviderException, NoSuchAlgorithmException, IOException {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keys = keyGenerator.generateKey();
-    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-        componentName);
-    keyPEMWriter.writeKey(keys);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, componentName);
+    keyStorage.storeKey(keys);
     return keys;
   }
 
@@ -518,7 +517,7 @@ public class DefaultCAServer implements CertificateServer {
     Path extPrivateKeyPath = Paths.get(conf.getExternalRootCaPrivateKeyPath());
     String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
 
-    KeyCodec keyCodec = new KeyCodec(config, componentName);
+    KeyStorage keyStorage = new KeyStorage(config, componentName);
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
@@ -535,12 +534,12 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External private key path is not correct: " +
             extPrivateKeyPath);
       }
-      PrivateKey privateKey = keyCodec.readPrivateKey(extPrivateKeyParent,
+      PrivateKey privateKey = keyStorage.readPrivateKey(extPrivateKeyParent,
           extPrivateKeyFileName.toString());
       PublicKey publicKey;
       publicKey = readPublicKeyWithExternalData(
-          externalPublicKeyLocation, keyCodec, certificate);
-      keyCodec.writeKey(new KeyPair(publicKey, privateKey));
+          externalPublicKeyLocation, keyStorage, certificate);
+      keyStorage.storeKey(new KeyPair(publicKey, privateKey));
       certificateCodec.writeCertificate(certificate);
     } catch (IOException | CertificateException | NoSuchAlgorithmException |
              InvalidKeySpecException e) {
@@ -549,7 +548,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private PublicKey readPublicKeyWithExternalData(
-      String externalPublicKeyLocation, KeyCodec keyCodec, X509Certificate certificate
+      String externalPublicKeyLocation, KeyStorage keyStorage, X509Certificate certificate
   ) throws CertificateException, NoSuchAlgorithmException, InvalidKeySpecException, IOException {
     PublicKey publicKey;
     if (externalPublicKeyLocation.isEmpty()) {
@@ -561,7 +560,7 @@ public class DefaultCAServer implements CertificateServer {
       if (publicKeyPathFileName == null || publicKeyParent == null) {
         throw new IOException("Public key path incorrect: " + publicKeyParent);
       }
-      publicKey = keyCodec.readPublicKey(
+      publicKey = keyStorage.readPublicKey(
           publicKeyParent, publicKeyPathFileName.toString());
     }
     return publicKey;
