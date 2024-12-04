@@ -165,6 +165,10 @@ public final class MockedSCM {
     return startBalancerTaskAsync(new ContainerBalancer(scm), config, withDelay);
   }
 
+  public int getNodeCount() {
+    return cluster.getNodeCount();
+  }
+
   public void enableLegacyReplicationManager() {
     mockedReplicaManager.conf.setEnableLegacy(true);
   }

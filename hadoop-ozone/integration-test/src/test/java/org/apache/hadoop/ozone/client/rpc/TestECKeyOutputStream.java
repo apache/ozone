@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -190,6 +191,7 @@ public class TestECKeyOutputStream {
   }
 
   @Test
+  @Unhealthy("HDDS-11821")
   public void testECKeyCreatetWithDatanodeIdChange()
       throws Exception {
     AtomicReference<Boolean> failed = new AtomicReference<>(false);

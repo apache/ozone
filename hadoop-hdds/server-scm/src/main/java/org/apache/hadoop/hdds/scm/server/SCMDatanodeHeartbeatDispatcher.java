@@ -306,10 +306,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
       extends ReportFromDatanode<ContainerReportsProto>
       implements ContainerReport, IEventInfo {
     private long createTime = Time.monotonicNow();
+    // Used to identify whether container reporting is from a registration.
+    private boolean isRegister = false;
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
       super(datanodeDetails, report);
+    }
+
+    public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
+        ContainerReportsProto report, boolean isRegister) {
+      super(datanodeDetails, report);
+      this.isRegister = isRegister;
     }
 
     @Override
@@ -329,6 +337,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
     @Override
     public long getCreateTime() {
       return createTime;
+    }
+
+    public boolean isRegister() {
+      return isRegister;
     }
 
     @Override
