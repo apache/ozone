@@ -61,18 +61,12 @@ Check http return code
 
 Check if the listKeys api responds OK
     [Arguments]     ${volume}    ${bucket}
-    ${result} =     Curl    "${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000"
+    Run Keyword if     '${SECURITY_ENABLED}' == 'true'     Kinit as ozone admin
+    ${result} =        Execute         curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000
     Should contain  ${result}   "OK"
     Should contain  ${result}   "keys"
     Should contain  ${result}   "${volume}"
     Should contain  ${result}   "${bucket}"
-
-Curl
-    [Arguments]     ${url}
-    ${curl_command} =    Set Variable    curl -LSs ${url}
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Set Variable    ${curl_command}    curl --negotiate -u : -LSs ${url}
-    ${result} =     Execute     ${curl_command}
-    [Return]        ${result}
 
 *** Test Cases ***
 Check if Recon picks up OM data
