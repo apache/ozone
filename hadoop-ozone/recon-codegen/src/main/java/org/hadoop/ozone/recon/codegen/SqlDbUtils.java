@@ -27,6 +27,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.function.BiPredicate;
 
+import org.apache.commons.lang3.function.TriFunction;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
@@ -93,6 +94,22 @@ public final class SqlDbUtils {
           return false;
         }
         LOG.info("{} table already exists, skipping creation.", tableName);
+        return true;
+      };
+
+  /**
+   * Helper function to check if a column exists through JOOQ
+   */
+  public static final TriFunction<Connection, String, String, Boolean> COLUMN_EXISTS_CHECK =
+      (conn, tableName, columnName) -> {
+        try {
+          DSL.using(conn).select(DSL.field(DSL.name(columnName)))
+              .from(tableName).execute();
+        } catch (DataAccessException ex) {
+          LOG.debug(ex.getMessage());
+          return false;
+        }
+        LOG.info("Found column: {} in table: {}", columnName, tableName);
         return true;
       };
 }

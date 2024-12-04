@@ -12,6 +12,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.COLUMN_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 
@@ -29,10 +30,13 @@ public class ReconLastTaskStatusUpgradeAction implements ReconUpgradeAction {
         return;
       }
       DSLContext dslContext = DSL.using(conn);
-      // Add the new task_status column
-      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-          .addColumn("last_task_successful", SQLDataType.BIT)
-          .execute();
+
+      if (!COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "last_task_successful")) {
+        // Add the new task_status column if it is not already present in the table
+        dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
+            .addColumn("last_task_successful", SQLDataType.BIT)
+            .execute();
+      }
     } catch (SQLException se) {
       throw new SQLException("Failed to add last task success column to RECON_TASK_STATUS table");
     }

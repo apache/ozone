@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class ReconTaskStatusCounter {
+  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusCounter.class);
   private static ReconTaskStatusCounter instance;
   private final long timeoutDuration;
 
@@ -99,7 +100,7 @@ public class ReconTaskStatusCounter {
    * In case the count data TTL is reached, reinitialize the instance to reset the data, else do nothing
    */
   private void checkCountDataExpiry() {
-    if ((initializationTime - System.currentTimeMillis()) > timeoutDuration) {
+    if ((System.currentTimeMillis() - initializationTime) > timeoutDuration) {
       instance = new ReconTaskStatusCounter();
     }
   }
