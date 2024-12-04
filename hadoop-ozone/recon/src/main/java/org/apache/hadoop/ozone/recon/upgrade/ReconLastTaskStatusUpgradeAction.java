@@ -31,14 +31,18 @@ public class ReconLastTaskStatusUpgradeAction implements ReconUpgradeAction {
       }
       DSLContext dslContext = DSL.using(conn);
 
-      if (!COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "last_task_successful")) {
-        // Add the new task_status column if it is not already present in the table
+      if (!COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "last_task_run_status")
+          && !COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "current_task_run_status")) {
+        // Add the new columns if it is not already present in the table
         dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-            .addColumn("last_task_successful", SQLDataType.BIT)
+            .add(
+                DSL.field(DSL.name("last_task_successful"), SQLDataType.INTEGER),
+                DSL.field(DSL.name("current_task_run_status"), SQLDataType.INTEGER)
+            )
             .execute();
       }
     } catch (SQLException se) {
-      throw new SQLException("Failed to add last task success column to RECON_TASK_STATUS table");
+      throw new SQLException("Failed to add last_task_run_status and current_task_run_status to RECON_TASK_STATUS table");
     }
   }
 

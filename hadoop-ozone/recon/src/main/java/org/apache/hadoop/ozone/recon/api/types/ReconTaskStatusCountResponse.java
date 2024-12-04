@@ -7,7 +7,7 @@ import java.util.List;
 
 
 /**
- * Class to represent the API response structure of task status metrics
+ * Class to represent the API response structure of task status statistics.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ReconTaskStatusCountResponse {
@@ -18,15 +18,19 @@ public class ReconTaskStatusCountResponse {
 
   // The number of successes associated with the task
   @JsonProperty("successes")
-  private int successes;
+  private int successCount;
 
   // The number of failures associated with the task
   @JsonProperty("failures")
-  private int failures;
+  private int failureCount;
 
-  public ReconTaskStatusCountResponse(String taskName, int successes, int failures) {
+  public ReconTaskStatusCountResponse(String taskName, int successCount, int failureCount) {
     this.taskName = taskName;
-    this.successes = successes;
-    this.failures = failures;
+    this.successCount = successCount;
+    this.failureCount = failureCount;
   }
+
+  public String getTaskName() { return taskName; }
+  public long getSuccessCount() { return successCount; }
+  public long getFailureCount() { return failureCount; }
 }

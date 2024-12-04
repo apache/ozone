@@ -34,6 +34,7 @@ public abstract class ReconScmTask {
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconTaskStatusCounter taskStatusCounter;
   private volatile boolean running;
+  private ReconTaskStatus reconTaskStatusRecord;
 
   protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
@@ -43,8 +44,8 @@ public abstract class ReconScmTask {
   private void register() {
     String taskName = getTaskName();
     if (!reconTaskStatusDao.existsById(taskName)) {
-      ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L, null);
+      reconTaskStatusRecord = new ReconTaskStatus(
+          taskName, 0L, 0L, 0, 0);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
     }
@@ -62,6 +63,7 @@ public abstract class ReconScmTask {
       taskThread.setName(getTaskName());
       taskThread.setDaemon(true);
       taskThread.start();
+      reconTaskStatusRecord.setCurrentTaskRunStatus(1);
     } else {
       LOG.info("{} Thread is already running.", getTaskName());
     }
@@ -75,6 +77,7 @@ public abstract class ReconScmTask {
       LOG.info("Stopping {} Thread.", getTaskName());
       running = false;
       notifyAll();
+      reconTaskStatusRecord.setCurrentTaskRunStatus(0);
     } else {
       LOG.info("{} Thread is not running.", getTaskName());
     }
@@ -92,8 +95,9 @@ public abstract class ReconScmTask {
 
   protected void recordSingleRunCompletion() {
     taskStatusCounter.updateCounter(getTaskName(), true);
-    reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
-        System.currentTimeMillis(), 0L, true));
+    reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
+    reconTaskStatusRecord.setLastTaskRunStatus(1);
+    reconTaskStatusDao.update(reconTaskStatusRecord);
   }
 
   protected boolean canRun() {

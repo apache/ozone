@@ -1,9 +1,8 @@
 package org.apache.hadoop.ozone.recon.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT;
@@ -12,9 +11,18 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * This class contains definitions and implementation of Recon Task Status counters
+ * For each task we maintain a count of the successes and the failures.
+ * This count is stored for a configurable {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_STORAGE_DURATION}
+ * which defaults to 30 minutes.
+ * Each task is mapped to a {@link Pair} of <code>{no. of successful runs, no. of failed runs}</code>
+ */
 public class ReconTaskStatusCounter {
-  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusCounter.class);
+
+  // Stores an instance of this class to maintain state across calls
   private static ReconTaskStatusCounter instance;
+  // Stores the configurable timeout duration i.e. the TTL of the counts
   private final long timeoutDuration;
 
   public enum ReconTasks {
@@ -32,6 +40,7 @@ public class ReconTaskStatusCounter {
 
   static long initializationTime = 0L;
 
+  // Task name is mapped from the enum to a Pair of <count of successful runs, count of failed runs>
   static Map<ReconTasks, Pair<Integer, Integer>> taskStatusCounter= new EnumMap<>(ReconTasks.class);
 
   public ReconTaskStatusCounter() {
@@ -58,22 +67,6 @@ public class ReconTaskStatusCounter {
       instance = new ReconTaskStatusCounter();
     }
     return instance;
-  }
-
-  /**
-   * Update the counter's success/failure count based on the task class passed
-   * @param clazz An instance of {@link Class} of the task for which we want to update the counter
-   * @param successful Whether the task was successful or not
-   */
-  public void updateCounter(Class<?> clazz, boolean successful) {
-    int successes = taskStatusCounter.get(ReconTasks.valueOf(clazz.getName())).getLeft();
-    int failures = taskStatusCounter.get(ReconTasks.valueOf(clazz.getName())).getRight();
-    if (successful) {
-      taskStatusCounter.put(ReconTasks.valueOf(clazz.getName()), Pair.of(successes + 1, failures));
-    }
-    else {
-      taskStatusCounter.put(ReconTasks.valueOf(clazz.getName()), Pair.of(successes, failures + 1));
-    }
   }
 
   /**

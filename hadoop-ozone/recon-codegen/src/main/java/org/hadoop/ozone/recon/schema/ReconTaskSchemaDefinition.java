@@ -64,7 +64,8 @@ public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
         .column("task_name", SQLDataType.VARCHAR(766).nullable(false))
         .column("last_updated_timestamp", SQLDataType.BIGINT)
         .column("last_updated_seq_number", SQLDataType.BIGINT)
-        .column("last_task_successful", SQLDataType.BIT)
+        .column("last_task_run_status", SQLDataType.INTEGER)
+        .column("current_task_run_status", SQLDataType.INTEGER)
         .constraint(DSL.constraint("pk_task_name")
             .primaryKey("task_name"))
         .execute();

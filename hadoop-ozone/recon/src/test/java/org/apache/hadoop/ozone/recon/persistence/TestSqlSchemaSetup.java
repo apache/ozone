@@ -43,8 +43,8 @@ public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
    * @throws SQLException
    */
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testSchemaSetup(boolean isLastTaskSuccessful) throws SQLException {
+  @ValueSource(ints = {0, 1, -1})
+  public void testSchemaSetup(int lastTaskRunStatus) throws SQLException {
     assertNotNull(getInjector());
     assertNotNull(getConfiguration());
     assertNotNull(getDslContext());
@@ -53,7 +53,7 @@ public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
       assertNotNull(getDao(dao));
     });
     ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, isLastTaskSuccessful));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, lastTaskRunStatus, 0));
     assertEquals(1, dao.findAll().size());
   }
 }

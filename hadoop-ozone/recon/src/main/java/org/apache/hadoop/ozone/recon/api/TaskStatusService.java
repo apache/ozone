@@ -70,9 +70,24 @@ public class TaskStatusService {
     return Response.ok(resultSet).build();
   }
 
+  /**
+   * Returns a list of tasks mapped using their task names to the number of
+   * successful runs and number of failed runs for the respective task
+   * @return {@link Response} in the format of:
+   * <br>
+   * <code>
+   *   {
+   *    "tasks": [{
+   *      "taskName": <task-name>,
+   *      "successes": <count of successful runs>,
+   *      "failures": <count of failed runs>
+   *    }, {....}]
+   *   }
+   * </code>
+   */
   @GET
-  @Path("metrics")
-  public Response getTaskMetrics() {
+  @Path("stats")
+  public Response getTaskStatusStats() {
     Map<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> tasksPairMap = taskStatusCounter.getTaskCounts();
     List<ReconTaskStatusCountResponse> tasks = new ArrayList<>();
     for (Map.Entry<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> entry: tasksPairMap.entrySet()) {
@@ -83,23 +98,5 @@ public class TaskStatusService {
       ));
     }
     return Response.ok(new ReconAllTasksCountResponse(tasks)).build();
-  }
-
-  @GET
-  @Path("metrics/{taskName}")
-  public Response getTaskMetrics(
-    @PathParam("taskName") String taskName
-  ) {
-    try {
-      Pair<Integer, Integer> taskCounts = taskStatusCounter.getTaskStatusCounts(taskName);
-      ReconTaskStatusCountResponse taskStatusResponse = new ReconTaskStatusCountResponse(
-        taskName,
-        taskCounts.getLeft(),
-        taskCounts.getRight()
-      );
-      return Response.ok(taskStatusResponse).build();
-    } catch (NullPointerException npe) {
-      return Response.status(500, npe.getMessage()).build();
-    }
   }
 }
