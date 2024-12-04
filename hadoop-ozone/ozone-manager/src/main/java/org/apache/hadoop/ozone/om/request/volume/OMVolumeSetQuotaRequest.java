@@ -73,6 +73,19 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     String volume = setVolumePropertyRequest.getVolumeName();
+
+    // In production this will never happen, this request will be called only
+    // when we have quota in bytes is set in setVolumePropertyRequest.
+    if (!setVolumePropertyRequest.hasQuotaInBytes()
+        && !setVolumePropertyRequest.hasQuotaInNamespace()) {
+      /* Added this for the safer side if someone uses these API's directly
+       * in future.
+       * https://github.com/apache/hadoop/pull/884#discussion_r292679484
+       * */
+      throw new OMException("OMVolumeSetQuotaRequest must contains ",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
@@ -102,13 +115,6 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
-    if (!setVolumePropertyRequest.hasQuotaInBytes()
-        && !setVolumePropertyRequest.hasQuotaInNamespace()) {
-      omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
-          .setSuccess(false);
-      return new OMVolumeSetQuotaResponse(omResponse.build());
-    }
 
     String volume = setVolumePropertyRequest.getVolumeName();
     OMMetrics omMetrics = ozoneManager.getMetrics();

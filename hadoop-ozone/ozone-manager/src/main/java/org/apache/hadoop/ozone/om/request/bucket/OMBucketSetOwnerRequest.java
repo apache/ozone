@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateBucketArgsOwnerNameExists;
 
 /**
  * Handle set owner request for bucket.
@@ -64,9 +65,17 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    // check Acl
     final BucketArgs bucketArgs = getOmRequest()
         .getSetBucketPropertyRequest().getBucketArgs();
+
+    if (!bucketArgs.hasOwnerName()) {
+      throw new OMException(
+          "Bucket args must contain ownerName",
+          OMException.ResultCodes.INVALID_REQUEST
+      );
+    }
+
+    // check Acl
     final String volumeName = bucketArgs.getVolumeName();
     final String bucketName = bucketArgs.getBucketName();
     if (ozoneManager.getAclsEnabled()) {
@@ -96,12 +105,6 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
-    if (!setBucketPropertyRequest.getBucketArgs().hasOwnerName()) {
-      omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
-          .setSuccess(false);
-      return new OMBucketSetOwnerResponse(omResponse.build());
-    }
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OMMetrics omMetrics = ozoneManager.getMetrics();

@@ -57,7 +57,7 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
         getOmRequest().getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
-
+    resolveLink(ozoneManager);
     return getOmRequest().toBuilder().setSetAclRequest(setAclRequestBuilder)
         .setUserInfo(getUserInfo()).build();
   }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -53,6 +54,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Base class for Bucket acl request.
  */
 public abstract class OMKeyAclRequest extends OMClientRequest {
+  volatile String realVolume = null;
+  volatile String realBucket = null;
+  volatile String key = null;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(OMKeyAclRequest.class);
@@ -64,8 +68,19 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+    resolveLink(ozoneManager);
+    return omRequest;
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long trxnLogIndex = termIndex.getIndex();
+
+    String volume = Preconditions.checkNotNull(getRealVolume());
+    String bucket = Preconditions.checkNotNull(getRealBucket());
+    String key = Preconditions.checkNotNull(getKey());
 
     OmKeyInfo omKeyInfo = null;
 
@@ -75,26 +90,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
-    String key = null;
     boolean operationResult = false;
     Result result = null;
     try {
-      ObjectParser objectParser = new ObjectParser(getPath(),
-          ObjectType.KEY);
-      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
-      volume = resolvedBucket.realVolume();
-      bucket = resolvedBucket.realBucket();
-      key = objectParser.getKey();
-
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key);
-      }
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
               bucket));
@@ -161,6 +159,23 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+  public void resolveLink(OzoneManager ozoneManager) throws IOException {
+    ObjectParser objectParser = new ObjectParser(getPath(),
+        ObjectType.KEY);
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+    realVolume = resolvedBucket.realVolume();
+    realBucket = resolvedBucket.realBucket();
+    key = objectParser.getKey();
+
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+          realVolume, realBucket, key);
+    }
+  }
 
   public void initializeBucketLayout(OzoneManager ozoneManager) {
     OmBucketInfo buckInfo;
@@ -255,6 +270,18 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  public String getRealVolume() {
+    return realVolume;
+  }
+
+  public String getRealBucket() {
+    return realBucket;
+  }
+
+  public String getKey() {
+    return key;
   }
 }
 

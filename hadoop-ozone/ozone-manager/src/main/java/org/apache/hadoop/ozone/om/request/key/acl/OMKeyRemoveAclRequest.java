@@ -66,7 +66,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
         = getOmRequest().getRemoveAclRequest().toBuilder()
             .setModificationTime(modificationTime);
-
+    resolveLink(ozoneManager);
     return getOmRequest().toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder)
         .setUserInfo(getUserInfo())
@@ -172,20 +172,18 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   )
   public static OMRequest blockRemoveAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getRemoveAclRequest().hasObj()) {
-      OzoneObj obj =
-          OzoneObjInfo.fromProtobuf(req.getRemoveAclRequest().getObj());
-      String path = obj.getPath();
+    OzoneObj obj =
+        OzoneObjInfo.fromProtobuf(req.getRemoveAclRequest().getObj());
+    String path = obj.getPath();
 
-      ObjectParser objectParser = new ObjectParser(path,
-          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+    ObjectParser objectParser = new ObjectParser(path,
+        OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
 
-      String volume = objectParser.getVolume();
-      String bucket = objectParser.getBucket();
+    String volume = objectParser.getVolume();
+    String bucket = objectParser.getBucket();
 
-      BucketLayout bucketLayout = ctx.getBucketLayout(volume, bucket);
-      bucketLayout.validateSupportedOperation();
-    }
+    BucketLayout bucketLayout = ctx.getBucketLayout(volume, bucket);
+    bucketLayout.validateSupportedOperation();
     return req;
   }
 }
