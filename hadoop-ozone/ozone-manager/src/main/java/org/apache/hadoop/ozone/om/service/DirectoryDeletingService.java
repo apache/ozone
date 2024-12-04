@@ -215,6 +215,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.debug("Running DirectoryDeletingService");
         }
         isRunningOnAOS.set(true);
+        // rnCnt will be same for each thread to maintain same CallId.
         long rnCnt = getRunCount().incrementAndGet();
         long dirNum = 0L;
         long subDirNum = 0L;

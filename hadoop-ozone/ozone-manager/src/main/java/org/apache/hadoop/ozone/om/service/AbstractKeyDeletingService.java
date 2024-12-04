@@ -394,19 +394,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public long optimizeDirDeletesAndSubmitRequests(long remainNum, long dirNum,
-      long subDirNum, long subFileNum,
-      List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<PurgePathRequest> purgePathRequestList, String snapTableKey,
-      long startTime, int remainingBufLimit, KeyManager keyManager,
-      UUID expectedPreviousSnapshotId) {
-    return optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
-        subFileNum, allSubDirList, purgePathRequestList, snapTableKey,
-        startTime, remainingBufLimit, keyManager, expectedPreviousSnapshotId,
-        getRunCount().get());
-  }
-
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public long optimizeDirDeletesAndSubmitRequest(long remainNum,
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
