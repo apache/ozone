@@ -575,6 +575,9 @@ execute_debug_tests() {
   docker start "${container}"
 
   wait_for_datanode "${container}" HEALTHY 60
+  start_docker_env 9
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec6-3.robot
 }
 
 ## @description  Wait for datanode state

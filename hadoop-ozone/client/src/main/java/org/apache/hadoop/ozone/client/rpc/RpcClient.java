@@ -1586,7 +1586,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, true);
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
-
+    ReplicationConfig replicationConfig = keyInfo.getReplicationConfig();
     for (OmKeyLocationInfo locationInfo : keyLocationInfos) {
       Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
 
@@ -1599,9 +1599,12 @@ public class RpcClient implements ClientProtocol {
         Pipeline pipeline
             = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
             .setId(PipelineID.randomId()).build();
+        long length = replicationConfig instanceof ECReplicationConfig
+                ? internalBlockLength(pipelineBefore.getReplicaIndex(dn), (ECReplicationConfig) replicationConfig, locationInfo.getLength())
+                : locationInfo.getLength();
         OmKeyLocationInfo dnKeyLocation = new OmKeyLocationInfo.Builder()
             .setBlockID(locationInfo.getBlockID())
-            .setLength(locationInfo.getLength())
+            .setLength(length)
             .setOffset(locationInfo.getOffset())
             .setToken(locationInfo.getToken())
             .setPartNumber(locationInfo.getPartNumber())
@@ -1621,11 +1624,13 @@ public class RpcClient implements ClientProtocol {
             .setVolumeName(keyInfo.getVolumeName())
             .setBucketName(keyInfo.getBucketName())
             .setKeyName(keyInfo.getKeyName())
-            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions()) // configure the getKeyLocationVersions with a proper length of a block size
+            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions())
             .setDataSize(keyInfo.getDataSize())
             .setCreationTime(keyInfo.getCreationTime())
             .setModificationTime(keyInfo.getModificationTime())
-            .setReplicationConfig(keyInfo.getReplicationConfig())
+            .setReplicationConfig(replicationConfig instanceof ECReplicationConfig
+                    ? RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)
+                    : keyInfo.getReplicationConfig()) // We don't want to create ECBlockInputStream when calling createInputStream
             .setFileEncryptionInfo(keyInfo.getFileEncryptionInfo())
             .setAcls(keyInfo.getAcls())
             .setObjectID(keyInfo.getObjectID())
@@ -1637,10 +1642,6 @@ public class RpcClient implements ClientProtocol {
 
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
-        if (dnKeyInfo.getReplicationConfig() instanceof ECReplicationConfig) {
-          dnKeyInfo.setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
-        }
-        //
         blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
       }
 
@@ -1648,6 +1649,30 @@ public class RpcClient implements ClientProtocol {
     }
 
     return result;
+  }
+
+  // Helper method to calculate the internal block length of an EC-replicated key.
+  private long internalBlockLength(int index, ECReplicationConfig ecRepConfig, long blockLength) {
+    long ecChunkSize = (long) ecRepConfig.getEcChunkSize();
+    long stripeSize = ecChunkSize * ecRepConfig.getData();
+    long lastStripe = blockLength % stripeSize;
+    long blockSize = (blockLength - lastStripe) / ecRepConfig.getData();
+    long lastCell = lastStripe / ecChunkSize + 1;
+    long lastCellLength = lastStripe % ecChunkSize;
+    if (index > ecRepConfig.getData()) {
+      // Parity blocks and their size are driven by the size of the
+      // first block of the block group. All parity blocks have the same size
+      // as block_1.
+      index = 1;
+    }
+
+    if (index < lastCell) {
+      return blockSize + ecChunkSize;
+    } else if (index == lastCell) {
+      return blockSize + lastCellLength;
+    } else {
+      return blockSize;
+    }
   }
 
   @Override
