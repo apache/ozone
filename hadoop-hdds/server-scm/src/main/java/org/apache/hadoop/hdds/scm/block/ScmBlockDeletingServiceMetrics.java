@@ -170,6 +170,19 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     this.numBlockDeletionTransactionDataNodes.set(dataNodes);
   }
 
+  public void incrDNCommandsSent(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsSent(delta);
+  }
+  public void incrDNCommandsSuccess(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsSuccess(delta);
+  }
+  public void incrDNCommandsFailure(UUID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsFailure(delta);
+  }
+
   public long getNumBlockDeletionCommandSent() {
     return numBlockDeletionCommandSent.value();
   }
@@ -216,31 +229,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   public Map<UUID, DatanodeCommandCounts> getNumCommandsDatanode() {
     return numCommandsDatanode;
-  }
-
-  @VisibleForTesting
-  public int getNumCommandsDatanodeSent() {
-    int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsSent;
-    }
-    return sent;
-  }
-  @VisibleForTesting
-  public int getNumCommandsDatanodeSuccess() {
-    int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsSuccess;
-    }
-    return sent;
-  }
-  @VisibleForTesting
-  public int getNumCommandsDatanodeFailed() {
-    int sent = 0;
-    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsFailure;
-    }
-    return sent;
   }
 
   @Override
@@ -324,17 +312,29 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
   }
 
-  public void incrDNCommandsSent(UUID id, long delta) {
-    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
-        .incrCommandsSent(delta);
+  @VisibleForTesting
+  public int getNumCommandsDatanodeSent() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsSent;
+    }
+    return sent;
   }
-  public void incrDNCommandsSuccess(UUID id, long delta) {
-    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
-        .incrCommandsSuccess(delta);
+  @VisibleForTesting
+  public int getNumCommandsDatanodeSuccess() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsSuccess;
+    }
+    return sent;
   }
-  public void incrDNCommandsFailure(UUID id, long delta) {
-    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
-        .incrCommandsFailure(delta);
+  @VisibleForTesting
+  public int getNumCommandsDatanodeFailed() {
+    int sent = 0;
+    for(Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+      sent += e.getValue().commandsFailure;
+    }
+    return sent;
   }
 
   @Override
