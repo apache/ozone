@@ -110,7 +110,7 @@ public class TestContainerMetrics {
     runTestClientServer(pipeline -> CONF
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                    .getStandalonePort().getValue()),
         pipeline -> new XceiverClientGrpc(pipeline, CONF),
         (dn, volumeSet) -> new XceiverServerGrpc(dn, CONF,
             createDispatcher(dn, volumeSet), null), (dn, p) -> {
@@ -237,7 +237,7 @@ public class TestContainerMetrics {
   private XceiverServerSpi newXceiverServerRatis(DatanodeDetails dn, MutableVolumeSet volumeSet)
       throws IOException {
     CONF.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+        dn.getRatisPort().getValue());
     final String dir = testDir.resolve(dn.getUuidString()).toString();
     CONF.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,

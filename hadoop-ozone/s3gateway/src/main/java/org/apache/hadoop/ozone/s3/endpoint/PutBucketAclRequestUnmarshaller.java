@@ -17,71 +17,16 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.xml.sax.InputSource;
-import org.xml.sax.XMLReader;
-
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.Provider;
-import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.UnmarshallerHandler;
-import javax.xml.parsers.SAXParserFactory;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
-
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read PutBucketAclRequest wo namespace.
  */
 @Provider
-public class PutBucketAclRequestUnmarshaller
-    implements MessageBodyReader<S3BucketAcl> {
-
-  private final JAXBContext context;
-  private final SAXParserFactory saxParserFactory;
+public class PutBucketAclRequestUnmarshaller extends MessageUnmarshaller<S3BucketAcl> {
 
   public PutBucketAclRequestUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(S3BucketAcl.class);
-      saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-    } catch (Exception ex) {
-      throw new AssertionError("Can not instantiate " +
-          "PutBucketAclRequest parser", ex);
-    }
-  }
-  @Override
-  public boolean isReadable(Class<?> aClass, Type type,
-      Annotation[] annotations, MediaType mediaType) {
-    return type.equals(S3BucketAcl.class);
+    super(S3BucketAcl.class);
   }
 
-  @Override
-  public S3BucketAcl readFrom(
-      Class<S3BucketAcl> aClass, Type type,
-      Annotation[] annotations, MediaType mediaType,
-      MultivaluedMap<String, String> multivaluedMap,
-      InputStream inputStream) throws IOException, WebApplicationException {
-    try {
-      XMLReader xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-      UnmarshallerHandler unmarshallerHandler =
-          context.createUnmarshaller().getUnmarshallerHandler();
-      XmlNamespaceFilter filter =
-          new XmlNamespaceFilter(S3_XML_NAMESPACE);
-      filter.setContentHandler(unmarshallerHandler);
-      filter.setParent(xmlReader);
-      filter.parse(new InputSource(inputStream));
-      return (S3BucketAcl)(unmarshallerHandler.getResult());
-    } catch (Exception e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
-    }
-  }
 }

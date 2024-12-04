@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.checksum.ChecksumHelperFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -244,6 +245,11 @@ public final class OzoneClientUtils {
   public static boolean isKeyErasureCode(OmKeyInfo keyInfo) {
     return keyInfo.getReplicationConfig().getReplicationType() ==
             HddsProtos.ReplicationType.EC;
+  }
+
+  public static boolean isKeyErasureCode(BasicOmKeyInfo keyInfo) {
+    return keyInfo.getReplicationConfig().getReplicationType() ==
+        HddsProtos.ReplicationType.EC;
   }
 
   public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {

@@ -115,7 +115,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = parent.getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = new ContainerSet(null, 1000, true);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

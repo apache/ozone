@@ -272,6 +272,7 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11849")
   void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {

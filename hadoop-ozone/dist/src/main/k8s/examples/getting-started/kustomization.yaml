@@ -24,7 +24,13 @@ resources:
 - s3g-statefulset.yaml
 - scm-service.yaml
 - scm-statefulset.yaml
+- httpfs-service.yaml
+- httpfs-statefulset.yaml
+- recon-service.yaml
+- recon-statefulset.yaml
 - datanode-public-service.yaml
 - om-public-service.yaml
 - s3g-public-service.yaml
 - scm-public-service.yaml
+- httpfs-public-service.yaml
+- recon-public-service.yaml
