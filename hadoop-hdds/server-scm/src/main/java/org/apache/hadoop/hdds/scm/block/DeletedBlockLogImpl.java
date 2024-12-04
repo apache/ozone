@@ -93,6 +93,7 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
+  private Long lastProcessedTransactionId;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -115,6 +116,7 @@ public class DeletedBlockLogImpl
     this.scmContext = scm.getScmContext();
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.metrics = metrics;
+    this.lastProcessedTransactionId = -1L;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
@@ -341,9 +343,13 @@ public class DeletedBlockLogImpl
           scmCommandTimeoutMs);
       DatanodeDeletedBlockTransactions transactions =
           new DatanodeDeletedBlockTransactions();
+      long firstProcessedTransactionKey = -1;
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
+        if (lastProcessedTransactionId != -1) {
+          iter.seek(lastProcessedTransactionId);
+        }
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
         Map<UUID, Map<Long, CmdStatus>> commandStatus =
@@ -360,6 +366,12 @@ public class DeletedBlockLogImpl
             transactions.getBlocksDeleted() < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
+          if (firstProcessedTransactionKey == keyValue.getKey()) {
+            break;
+          }
+          if (firstProcessedTransactionKey == -1) {
+            firstProcessedTransactionKey = keyValue.getKey();
+          }
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             // HDDS-7126. When container is under replicated, it is possible
@@ -386,6 +398,25 @@ public class DeletedBlockLogImpl
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
+          if (!iter.hasNext()) {
+            try (TableIterator<Long,
+                ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> tmpIter =
+                deletedBlockLogStateManager.getReadOnlyIterator()) {
+              if (tmpIter.hasNext()) {
+                keyValue = tmpIter.next();
+                if (keyValue.getKey() != firstProcessedTransactionKey) {
+                  iter.seek(keyValue.getKey());
+                } else {
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (iter.hasNext()) {
+          lastProcessedTransactionId = iter.next().getKey();
+        } else {
+          lastProcessedTransactionId = -1L;
         }
         if (!txIDs.isEmpty()) {
           deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
