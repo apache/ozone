@@ -236,7 +236,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
           .add(new MetricsTag(Interns.info("datanode",
-              "Commands sent/received for the datanode"), e.getKey().toString()))
+              "Datanode host for deletion commands"), e.getKey().toString()))
           .addGauge(DatanodeCommandCounts.COMMANDS_SENT_TO_DN,
               e.getValue().getCommandsSent())
           .addGauge(DatanodeCommandCounts.COMMANDS_SUCCESSFUL_EXECUTION_BY_DN,
@@ -247,14 +247,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     recordBuilder.endRecord();
   }
 
-  @Metrics(name = "DatanodeCommandCounts", about = "Metrics for deletion commands per Datanode", context = "datanode")
   public static final class DatanodeCommandCounts {
-    @Metric(about = "The number of delete commands sent to a DN.")
-    private MutableGaugeLong commandsSent;
-    @Metric(about = "The number of delete commands successful for a DN.")
-    private MutableGaugeLong commandsSuccess;
-    @Metric(about = "The number of delete commands failed for a DN.")
-    private MutableGaugeLong commandsFailure;
+    private long commandsSent;
+    private long commandsSuccess;
+    private long commandsFailure;
 
     private static final MetricsInfo COMMANDS_SENT_TO_DN = Interns.info(
         "CommandsSent",
@@ -267,33 +263,33 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         "Number of commands sent from SCM to the datanode for deletion for which execution failed.");
 
     public DatanodeCommandCounts() {
-      this.commandsSent.set(0);
-      this.commandsSuccess.set(0);
-      this.commandsFailure.set(0);
+      this.commandsSent = 0;
+      this.commandsSuccess = 0;
+      this.commandsFailure = 0;
     }
 
     public void incrCommandsSent(long delta) {
-      this.commandsSent.incr(delta);
+      this.commandsSent += delta;
     }
 
     public void incrCommandsSuccess(long delta) {
-      this.commandsSuccess.incr(delta);
+      this.commandsSuccess += delta;
     }
 
     public void incrCommandsFailure(long delta) {
-      this.commandsFailure.incr(delta);
+      this.commandsFailure += delta;
     }
 
     public long getCommandsSent() {
-      return commandsSent.value();
+      return commandsSent;
     }
 
     public long getCommandsSuccess() {
-      return commandsSuccess.value();
+      return commandsSuccess;
     }
 
     public long getCommandsFailure() {
-      return commandsFailure.value();
+      return commandsFailure;
     }
 
     @Override
@@ -333,7 +329,9 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append("numBlockDeletionTransactionSuccess = "
             + numBlockDeletionTransactionSuccess.value()).append("\t")
         .append("numBlockDeletionTransactionFailure = "
-            + numBlockDeletionTransactionFailure.value());
+            + numBlockDeletionTransactionFailure.value()).append("\t")
+        .append("numDeletionCommandsPerDatanode = "
+            + numCommandsDatanode);
     return buffer.toString();
   }
 }
