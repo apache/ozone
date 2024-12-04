@@ -69,7 +69,7 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
           resultSet.getInt("DATA_TYPE")));
     }
 
-    assertEquals(3, actualPairs.size());
+    assertEquals(5, actualPairs.size());
     assertEquals(expectedPairs, actualPairs);
   }
 

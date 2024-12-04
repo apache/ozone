@@ -61,8 +61,7 @@ public class TestReconWithDifferentSqlDBs {
    */
   @ParameterizedTest
   @MethodSource("parametersSource")
-  @ValueSource(ints = {0, 1, -1})
-  public void testSchemaSetup(Provider<DataSourceConfiguration> provider, int lastTaskRunStatus)
+  public void testSchemaSetup(Provider<DataSourceConfiguration> provider)
       throws SQLException, IOException {
     AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
     reconSqlDB.createReconSchemaForTest(temporaryFolder);
@@ -74,7 +73,7 @@ public class TestReconWithDifferentSqlDBs {
       assertNotNull(reconSqlDB.getDao(dao));
     });
     ReconTaskStatusDao dao = reconSqlDB.getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, lastTaskRunStatus, 0));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, 1, 0));
     assertEquals(1, dao.findAll().size());
 
     int numRows = reconSqlDB.getDslContext().

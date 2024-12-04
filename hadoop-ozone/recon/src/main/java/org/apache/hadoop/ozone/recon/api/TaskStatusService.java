@@ -83,9 +83,9 @@ public class TaskStatusService {
    * <code>
    *   {
    *    "tasks": [{
-   *      "taskName": <task-name>,
-   *      "successes": <count of successful runs>,
-   *      "failures": <count of failed runs>
+   *      "taskName": task name,
+   *      "successes": count of successful runs,
+   *      "failures": count of failed runs
    *    }, {....}]
    *   }
    * </code>
