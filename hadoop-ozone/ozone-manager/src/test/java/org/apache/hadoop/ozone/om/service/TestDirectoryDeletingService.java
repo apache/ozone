@@ -158,7 +158,7 @@ public class TestDirectoryDeletingService {
         (DirectoryDeletingService) keyManager.getDirDeletingService();
     GenericTestUtils.waitFor(
         () -> dirDeletingService.getMovedFilesCount() >= 1000
-            && dirDeletingService.getMovedFilesCount() < 2000,
+            && dirDeletingService.getMovedFilesCount() <= 2000,
         500, 60000);
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThanOrEqualTo(1);
   }

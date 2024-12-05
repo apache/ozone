@@ -279,49 +279,36 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     map.get(volumeBucketPair).add(objectKey);
   }
 
-  protected void submitPurgePaths(List<List<PurgePathRequest>> purgeDirRequests,
+  protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
                                   UUID expectedPreviousSnapshotId) {
-    boolean omRequestSent = false;
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
+        OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
-    for (List<PurgePathRequest> requests: purgeDirRequests) {
-      if (requests.isEmpty()) {
-        continue;
-      }
-      omRequestSent = true;
-      OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
-          OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
-
-      if (snapTableKey != null) {
-        purgeDirRequest.setSnapshotTableKey(snapTableKey);
-      }
-      OzoneManagerProtocolProtos.NullableUUID.Builder
-          expectedPreviousSnapshotNullableUUID = OzoneManagerProtocolProtos.NullableUUID.newBuilder();
-      if (expectedPreviousSnapshotId != null) {
-        expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
-      }
-      purgeDirRequest.setExpectedPreviousSnapshotID(
-          expectedPreviousSnapshotNullableUUID.build());
-
-      purgeDirRequest.addAllDeletedPath(requests);
-
-      OzoneManagerProtocolProtos.OMRequest omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
-              .setPurgeDirectoriesRequest(purgeDirRequest)
-              .setClientId(clientId.toString())
-              .build();
-
-      // Submit Purge paths request to OM
-      try {
-        OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId,
-            runCount.getAndIncrement());
-      } catch (ServiceException e) {
-        LOG.error("PurgePaths request failed. Will retry at next run.", e);
-      }
+    if (snapTableKey != null) {
+      purgeDirRequest.setSnapshotTableKey(snapTableKey);
     }
-    if (omRequestSent) {
-      ozoneManager.getMetrics().incNumSuccessfulIterationsDirDeletingService();
+    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
+        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+    purgeDirRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
+
+    purgeDirRequest.addAllDeletedPath(requests);
+
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+            .setPurgeDirectoriesRequest(purgeDirRequest)
+            .setClientId(clientId.toString())
+            .build();
+
+    // Submit Purge paths request to OM
+    try {
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+    } catch (ServiceException e) {
+      LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
   }
 
@@ -355,7 +342,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return purgePathsRequest.build();
   }
 
-  protected List<List<PurgePathRequest>> prepareDeleteDirRequest(
+  protected PurgePathRequest prepareDeleteDirRequest(
       long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
       List<Pair<String, OmKeyInfo>> subDirList,
       KeyManager keyManager, long remainingBufLimit) throws IOException {
@@ -364,108 +351,96 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.debug("Pending deleted dir name: {}",
           pendingDeletedDirInfo.getKeyName());
     }
+
     final String[] keys = delDirName.split(OM_KEY_PREFIX);
     final long volumeId = Long.parseLong(keys[1]);
     final long bucketId = Long.parseLong(keys[2]);
 
-    List<PurgePathRequest> currentPurgePathRequestBatch = new ArrayList<>();
-    List<List<PurgePathRequest>> purgeRequestBatches = new ArrayList<>();
-    String nextSubdir = null;
-    String nextSubfile = null;
-    long consumedSize = 0;
+    // step-1: get all sub directories under the deletedDir
+    DeleteKeysResult deleteDirsResult =
+        keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+    List<OmKeyInfo> subDirs = deleteDirsResult.getKeysToDelete();
+    remainNum = remainNum - subDirs.size();
+    remainingBufLimit -= deleteDirsResult.getConsumedSize();
 
-    do {
-      // step-1: get all sub directories under the deletedDir
-      DeleteKeysResult deleteSubDirsResult =
-          keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
-              pendingDeletedDirInfo, remainNum, remainingBufLimit - consumedSize, nextSubdir);
-      nextSubdir = deleteSubDirsResult.getNextKey();
-      List<OmKeyInfo> subDirs =
-          deleteSubDirsResult.getKeysToDelete();
-      OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
-      remainNum = remainNum - subDirs.size();
-      for (OmKeyInfo dirInfo : subDirs) {
-        String ozoneDbKey =
-            omMetadataManager.getOzonePathKey(volumeId, bucketId, dirInfo.getParentObjectID(), dirInfo.getFileName());
-        String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(dirInfo.getObjectID(),
-            ozoneDbKey);
-        subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
-        LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
+    OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
+    for (OmKeyInfo dirInfo : subDirs) {
+      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+          bucketId, dirInfo.getParentObjectID(), dirInfo.getFileName());
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          dirInfo.getObjectID(), ozoneDbKey);
+      subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
+      LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
+    }
+
+    // step-2: get all sub files under the deletedDir
+    DeleteKeysResult deleteFilesResult =
+        keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+    List<OmKeyInfo> subFiles = deleteFilesResult.getKeysToDelete();
+    remainNum = remainNum - subFiles.size();
+    remainingBufLimit-=deleteFilesResult.getConsumedSize();
+
+    if (LOG.isDebugEnabled()) {
+      for (OmKeyInfo fileInfo : subFiles) {
+        LOG.debug("Moved sub file name: {}", fileInfo.getKeyName());
       }
+    }
 
-      consumedSize += deleteSubDirsResult.getConsumedSize();
-
-      // step-2: get all sub files under the deletedDir
-      DeleteKeysResult deleteFilesResult =
-          keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
-              pendingDeletedDirInfo, remainNum, remainingBufLimit - consumedSize, nextSubfile);
-      List<OmKeyInfo> subFiles = deleteFilesResult.getKeysToDelete();
-      nextSubfile = deleteFilesResult.getNextKey();
-      remainNum = remainNum - subFiles.size();
-      consumedSize += deleteFilesResult.getConsumedSize();
-
-      if (LOG.isDebugEnabled()) {
-        for (OmKeyInfo fileInfo : subFiles) {
-          LOG.debug("Moved sub file name: {}", fileInfo.getKeyName());
-        }
-      }
-
-      // step-3: Since there is a boundary condition of 'numEntries' in
-      // each batch, check whether the sub paths count reached batch size
-      // limit. If count reached limit then there can be some more child
-      // paths to be visited and will keep the parent deleted directory
-      // for one more pass.
-      String purgeDeletedDir = (remainNum > 0) ? delDirName : null;
-      PurgePathRequest purgePathRequest =
-          wrapPurgeRequest(volumeId, bucketId, purgeDeletedDir, subFiles,
-              subDirs);
-      currentPurgePathRequestBatch.add(purgePathRequest);
-      if (remainingBufLimit - consumedSize <= 0) {
-        purgeRequestBatches.add(currentPurgePathRequestBatch);
-        currentPurgePathRequestBatch = new ArrayList<>();
-        consumedSize = 0;
-      }
-    } while (remainNum > 0 && (nextSubfile != null || nextSubdir != null));
-    purgeRequestBatches.add(currentPurgePathRequestBatch);
-    return purgeRequestBatches;
+    // step-3: Since there is a boundary condition of 'numEntries' in
+    // each batch, check whether the sub paths count reached batch size
+    // limit. If count reached limit then there can be some more child
+    // paths to be visited and will keep the parent deleted directory
+    // for one more pass.
+    String purgeDeletedDir = (remainNum > 0 && remainingBufLimit > 0) ? delDirName :  null;
+    return wrapPurgeRequest(volumeId, bucketId,
+        purgeDeletedDir, subFiles, subDirs);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public long optimizeDirDeletesAndSubmitRequest(long remainNum,
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<List<PurgePathRequest>> purgePathRequestBatches,
+      List<PurgePathRequest> currentPurgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit, KeyManager keyManager,
-      UUID expectedPreviousSnapshotId) {
+      long remainingBufLimit, long maxBufLimit, KeyManager keyManager,
+      UUID expectedPreviousSnapshotId,
+      List<List<PurgePathRequest>> purgeRequestListBatches) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
+    int consumedSize = 0;
     while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
       try {
-        Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt);
-        List<List<PurgePathRequest>> purgeRequestBatches =
-            prepareDeleteDirRequest(remainNum, stringOmKeyInfoPair.getValue(),
-                stringOmKeyInfoPair.getKey(), allSubDirList, keyManager,
-                remainingBufLimit);
-        for (List<PurgePathRequest> purgeRequests : purgeRequestBatches) {
-          purgePathRequestBatches.add(purgeRequests);
-          // reduce remain count for self, sub-files, and sub-directories
-          remainNum = remainNum - 1;
-          for (PurgePathRequest request : purgeRequests) {
-            remainNum = remainNum - request.getDeletedSubFilesCount();
-            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-            // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null && !request.getDeletedDir().isEmpty()) {
-              subdirDelNum++;
-            }
-            subDirNum += request.getMarkDeletedSubDirsCount();
-            subFileNum += request.getDeletedSubFilesCount();
-            subDirRecursiveCnt++;
-          }
+        Pair<String, OmKeyInfo> stringOmKeyInfoPair
+            = allSubDirList.get(subDirRecursiveCnt);
+        PurgePathRequest request = prepareDeleteDirRequest(
+            remainNum, stringOmKeyInfoPair.getValue(),
+            stringOmKeyInfoPair.getKey(), allSubDirList,
+            keyManager, remainingBufLimit);
+        consumedSize += request.getSerializedSize();
+        remainingBufLimit -= request.getSerializedSize();
+        currentPurgePathRequestList.add(request);
+        if (remainingBufLimit <= 0){
+          remainingBufLimit = maxBufLimit;
+          purgeRequestListBatches.add(currentPurgePathRequestList);
+          currentPurgePathRequestList = new ArrayList<>();
         }
+        // reduce remain count for self, sub-files, and sub-directories
+        remainNum = remainNum - 1;
+        remainNum = remainNum - request.getDeletedSubFilesCount();
+        remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+        // Count up the purgeDeletedDir, subDirs and subFiles
+        if (request.getDeletedDir() != null
+            && !request.getDeletedDir().isEmpty()) {
+          subdirDelNum++;
+        }
+        subDirNum += request.getMarkDeletedSubDirsCount();
+        subFileNum += request.getDeletedSubFilesCount();
+        subDirRecursiveCnt++;
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files " +
             "background task. Will retry at next run for subset.", e);
@@ -473,7 +448,23 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    submitPurgePaths(purgePathRequestBatches, snapTableKey, expectedPreviousSnapshotId);
+    if (!purgeRequestListBatches.contains(currentPurgePathRequestList)){
+      purgeRequestListBatches.add(currentPurgePathRequestList);
+    }
+
+
+    // tracking for metrics
+    boolean purgeRequestSent = false;
+    for (List<PurgePathRequest> purgePathRequestBatch : purgeRequestListBatches){
+      if (!purgePathRequestBatch.isEmpty()) {
+        submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId);
+        purgeRequestSent = true;
+        runCount.getAndIncrement();
+      }
+    }
+    if (purgeRequestSent){
+      ozoneManager.getMetrics().incNumSuccessfulIterationsDirDeletingService();
+    }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);

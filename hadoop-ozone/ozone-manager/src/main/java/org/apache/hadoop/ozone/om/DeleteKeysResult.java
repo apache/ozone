@@ -28,22 +28,16 @@ import java.util.List;
 public class DeleteKeysResult {
 
   private List<OmKeyInfo> keysToDelete;
-  private String nextKey;
   private long consumedSize;
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, String nextKey,
+  public DeleteKeysResult(List<OmKeyInfo> keysToDelete,
       long consumedSize) {
     this.keysToDelete = keysToDelete;
-    this.nextKey = nextKey;
     this.consumedSize = consumedSize;
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
     return keysToDelete;
-  }
-
-  public String getNextKey() {
-    return nextKey;
   }
 
   public long getConsumedSize() {

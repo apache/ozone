@@ -1462,14 +1462,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     ecBucketCreateFailsTotal.incr();
   }
 
-  public void incNumSuccessfulIterationsDirDeletingService() {
-    numSuccessfulIterationsDirDeletingService.incr();
-  }
-
-  public long getNumSuccessfulIterationsDirDeletingService() {
-    return numSuccessfulIterationsDirDeletingService.value();
-  }
-
   public void incNumRecoverLease() {
     numKeyOps.incr();
     numFSOps.incr();
@@ -1478,6 +1470,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumRecoverLeaseFails() {
     numRecoverLeaseFails.incr();
+  }
+
+  public void incNumSuccessfulIterationsDirDeletingService() {
+    numSuccessfulIterationsDirDeletingService.incr();
+  }
+
+  public long getNumSuccessfulIterationsDirDeletingService() {
+    return numSuccessfulIterationsDirDeletingService.value();
   }
 
   public void unRegister() {

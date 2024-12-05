@@ -270,7 +270,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries, long remainingBufLimit, String seekDir) throws IOException;
+      OmKeyInfo parentInfo, long numEntries, long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
@@ -281,7 +281,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries, long remainingBufLimit, String seekFile)
+      long bucketId, OmKeyInfo parentInfo, long numEntries, long remainingBufLimit)
           throws IOException;
 
   /**

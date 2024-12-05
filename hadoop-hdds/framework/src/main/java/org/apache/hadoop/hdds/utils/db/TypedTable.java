@@ -584,6 +584,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   }
 
+
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
       TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
     return new RawIterator<CodecBuffer>(i) {
