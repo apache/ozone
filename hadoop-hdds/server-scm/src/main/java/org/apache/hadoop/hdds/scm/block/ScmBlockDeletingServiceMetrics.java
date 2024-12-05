@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -37,7 +36,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Metrics related to Block Deleting Service running in SCM.
@@ -104,7 +103,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   private ScmBlockDeletingServiceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
-    numCommandsDatanode = new HashMap<>();
+    numCommandsDatanode = new ConcurrentHashMap<>();
   }
 
   public static ScmBlockDeletingServiceMetrics create() {
@@ -315,27 +314,24 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
   }
 
-  @VisibleForTesting
-  public int getNumCommandsDatanodeSent() {
-    int sent = 0;
-    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsSent;
+  public long getNumCommandsDatanodeSent() {
+    long sent = 0;
+    for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
+      sent += v.commandsSent;
     }
     return sent;
   }
-  @VisibleForTesting
-  public int getNumCommandsDatanodeSuccess() {
-    int sent = 0;
-    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsSuccess;
+  public long getNumCommandsDatanodeSuccess() {
+    long sent = 0;
+    for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
+      sent += v.commandsSuccess;
     }
     return sent;
   }
-  @VisibleForTesting
-  public int getNumCommandsDatanodeFailed() {
-    int sent = 0;
-    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
-      sent += e.getValue().commandsFailure;
+  public long getNumCommandsDatanodeFailed() {
+    long sent = 0;
+    for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
+      sent += v.commandsFailure;
     }
     return sent;
   }
