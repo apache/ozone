@@ -157,6 +157,7 @@ public class ReconServer extends GenericCli {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
+
       // Handle Recon Schema Versioning
       ReconSchemaVersionTableManager versionTableManager =
           injector.getInstance(ReconSchemaVersionTableManager.class);

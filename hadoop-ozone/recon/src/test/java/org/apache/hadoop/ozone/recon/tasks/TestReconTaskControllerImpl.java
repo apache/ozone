@@ -50,12 +50,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     super();
   }
 
-  @BeforeAll
-  public static void mockTaskStatusCounter() {
-    ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    doNothing().when(taskStatusCounter).updateCounter(anyString(), anyBoolean());
-  }
-
   @BeforeEach
   public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();

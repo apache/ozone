@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.jooq.DSLContext;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.slf4j.Logger;
@@ -36,17 +37,18 @@ import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK
 
 
 /**
- * Handles the upgrade for {@link org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition}
- * in case of missing <code>last_task_successful</code> and <code>current_task_run_status</code> columns.
+ * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
+ * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
+ * {@link org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition} in case it is missing .
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_COLUMN_ADDITION,
+@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS,
     type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
-public class ReconLastTaskStatusUpgradeAction implements ReconUpgradeAction {
+public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
-  public static final Logger LOG = LoggerFactory.getLogger(ReconLastTaskStatusUpgradeAction.class);
+  public static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
 
   @Override
-  public void execute(ReconStorageContainerManagerFacade scmFacade) throws SQLException {
+  public void execute(ReconStorageContainerManagerFacade scmFacade) throws DataAccessException {
     DataSource dataSource = scmFacade.getDataSource();
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
@@ -54,19 +56,20 @@ public class ReconLastTaskStatusUpgradeAction implements ReconUpgradeAction {
       }
       DSLContext dslContext = DSL.using(conn);
 
+      // This is a workaround as currently the upgrade action runs even for a fresh install
+      // TODO: Remove the check once HDDS-11846 is fixed
       if (!COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "last_task_run_status")
           && !COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "current_task_run_status")) {
         // Add the new columns if it is not already present in the table
         dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
             .add(
-                DSL.field(DSL.name("last_task_successful"), SQLDataType.INTEGER),
+                DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER),
                 DSL.field(DSL.name("current_task_run_status"), SQLDataType.INTEGER)
             )
             .execute();
       }
     } catch (SQLException se) {
-      throw new SQLException(
-          "Failed to add last_task_run_status and current_task_run_status to RECON_TASK_STATUS table");
+      LOG.error("Error while upgrading Recon Task Status table. Message: {}", se.getMessage());
     }
   }
 

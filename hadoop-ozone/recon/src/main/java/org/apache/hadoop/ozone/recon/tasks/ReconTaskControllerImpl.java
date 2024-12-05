@@ -194,7 +194,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           taskStatusCounter.updateCounter(taskName, false);
         } else {
           //store the timestamp for the task
-          reconTaskStatusRecord.setLastTaskRunStatus(1);
+          reconTaskStatusRecord.setLastTaskRunStatus(0);
           taskStatusCounter.updateCounter(taskName, true);
         }
         reconTaskStatusRecord.setCurrentTaskRunStatus(0);
@@ -267,13 +267,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft());
         taskStatusCounter.updateCounter(taskName, false);
-        LOG.info("Task Name: {}, Counts: {}", taskName, taskStatusCounter.getTaskStatusCounts(taskName));
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), 1);
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), -1);
       } else {
         taskFailureCounter.get(taskName).set(0);
         taskStatusCounter.updateCounter(taskName, true);
-        LOG.info("Task Name: {}, Counts: {}", taskName, taskStatusCounter.getTaskStatusCounts(taskName));
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), -1);
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), 0);
       }
     }
     return failedTasks;
