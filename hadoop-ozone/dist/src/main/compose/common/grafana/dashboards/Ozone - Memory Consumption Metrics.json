@@ -1997,7 +1997,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "jvm_metrics_cpu_jvm_load{instance=\"om:9874\"}",
+          "expr": "jvm_metrics_cpu_jvm_load{instance=~\\\".+9874|.+9876\\\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
