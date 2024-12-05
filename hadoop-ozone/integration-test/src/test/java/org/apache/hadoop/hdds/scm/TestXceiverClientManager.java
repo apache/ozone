@@ -99,6 +99,9 @@ public class TestXceiverClientManager {
       XceiverClientSpi client1 = clientManager
           .acquireClient(container1.getPipeline());
       assertEquals(1, client1.getRefcount());
+      // although allowShortCircuit true when calling acquireClientForReadData,
+      // XceiverClientGrpc client will be allocated since short-circuit is by default disabled.
+      assertThat(client1 instanceof XceiverClientGrpc);
 
       ContainerWithPipeline container2 = storageContainerLocationClient
           .allocateContainer(
@@ -108,6 +111,7 @@ public class TestXceiverClientManager {
       XceiverClientSpi client2 = clientManager
           .acquireClient(container2.getPipeline());
       assertEquals(1, client2.getRefcount());
+      assertThat(client2 instanceof XceiverClientGrpc);
 
       XceiverClientSpi client3 = clientManager
           .acquireClient(container1.getPipeline());
@@ -264,7 +268,7 @@ public class TestXceiverClientManager {
       clientManager.releaseClient(client1, true);
       assertEquals(0, client1.getRefcount());
       assertNotNull(cache.getIfPresent(
-          container1.getContainerInfo().getPipelineID().getId().toString()
+          container1.getContainerInfo().getPipelineID().getId().toString() + "-"
               + container1.getContainerInfo().getReplicationType()));
 
       // cleanup

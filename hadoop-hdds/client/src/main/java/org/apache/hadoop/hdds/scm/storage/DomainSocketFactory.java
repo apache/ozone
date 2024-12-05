@@ -26,7 +26,6 @@ import org.apache.hadoop.net.unix.DomainSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Timer;
@@ -36,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  *  A factory to help create DomainSocket.
  */
-public final class DomainSocketFactory implements Closeable {
+public final class DomainSocketFactory {
   private static final Logger LOG = LoggerFactory.getLogger(
       DomainSocketFactory.class);
 
@@ -138,14 +137,14 @@ public final class DomainSocketFactory implements Closeable {
   private DomainSocketFactory(ConfigurationSource conf) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     boolean shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
+    domainSocketPath = conf.get(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
+        OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH_DEFAULT);
     PathInfo pathInfo;
     long startTime = System.nanoTime();
     if (!shortCircuitEnabled) {
       LOG.info(FEATURE + " is disabled.");
       pathInfo = PathInfo.NOT_CONFIGURED;
     } else {
-      domainSocketPath = conf.get(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-          OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH_DEFAULT);
       if (domainSocketPath.isEmpty()) {
         throw new IllegalArgumentException(FEATURE + " is enabled but "
             + OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH + " is not set.");
@@ -263,10 +262,16 @@ public final class DomainSocketFactory implements Closeable {
     return pathExpireMills;
   }
 
-  @Override
-  public void close() {
-    if (timer != null) {
-      timer.cancel();
+  public Timer getTimer() {
+    return timer;
+  }
+
+  public static synchronized void close() {
+    if (instance != null) {
+      if (instance.getTimer() != null) {
+        instance.getTimer().cancel();
+      }
+      DomainSocketFactory.instance = null;
     }
   }
 }

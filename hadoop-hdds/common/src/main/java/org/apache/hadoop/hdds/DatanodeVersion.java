@@ -34,6 +34,8 @@ public enum DatanodeVersion implements ComponentVersion {
   COMBINED_PUTBLOCK_WRITECHUNK_RPC(2, "WriteChunk can optionally support " +
           "a PutBlock request"),
 
+  SHORT_CIRCUIT_READS(3, "Version with short-circuit read support."),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

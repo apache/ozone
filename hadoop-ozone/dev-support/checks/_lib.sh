@@ -161,10 +161,10 @@ download_hadoop_aws() {
   if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
     mkdir -p "${dir}"
     if [[ ! -f "${dir}.tar.gz" ]]; then
-      local url="https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+      local url="https://github.com/ChenSammi/hadoop/archive/refs/tags/release-${HADOOP_VERSION}-RC0.tar.gz"
       echo "Downloading Hadoop from ${url}"
       curl -LSs --fail -o "${dir}.tar.gz" "$url" || return 1
     fi
-    tar -x -z -C "${dir}" --strip-components=3 -f "${dir}.tar.gz" --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws' || return 1
+    tar -x -z -C "${dir}" --strip-components=3 -f "${dir}.tar.gz" --wildcards 'hadoop-*/hadoop-tools/hadoop-aws' || return 1
   fi
 }

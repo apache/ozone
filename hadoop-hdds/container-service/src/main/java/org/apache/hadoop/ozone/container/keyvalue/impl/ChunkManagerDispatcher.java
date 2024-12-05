@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.annotation.Nonnull;
+
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
@@ -142,6 +144,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
     // will be updated while deleting the block from the DB
 
     selectHandler(container).deleteChunks(container, blockData);
+  }
+
+  @Override
+  public FileInputStream getShortCircuitFd(Container container, BlockID blockID)
+      throws StorageContainerException {
+    return selectHandler(container).getShortCircuitFd(container, blockID);
   }
 
   @Override

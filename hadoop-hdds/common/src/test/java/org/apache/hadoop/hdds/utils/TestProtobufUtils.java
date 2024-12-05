@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -26,6 +28,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.util.ProtobufUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.util.ProtobufUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test-cases for {@link ProtobufUtils}.
@@ -45,5 +48,38 @@ public class TestProtobufUtils {
     HddsProtos.UUID protobuf = toProtobuf(original);
     UUID deserialized = fromProtobuf(protobuf);
     assertEquals(original, deserialized);
+  }
+
+  @Test
+  public void testContainerCommandRequestProtoConversion() throws InvalidProtocolBufferException {
+    long containerID = 1L;
+    long localBlockID = 2L;
+    long bcsid = 3L;
+    String datanodeID = UUID.randomUUID().toString();
+    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
+        ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerID)
+            .setLocalID(localBlockID)
+            .setBlockCommitSequenceId(bcsid);
+    ContainerProtos.GetBlockRequestProto.Builder readBlockRequest =
+        ContainerProtos.GetBlockRequestProto.newBuilder().setBlockID(blkIDBuilder.build());
+
+    ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.GetBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(datanodeID)
+            .setGetBlock(readBlockRequest.build());
+
+    ContainerProtos.ContainerCommandRequestProto request = builder.build();
+    byte[] requestInBytes = request.toByteArray();
+
+    request = ContainerProtos.ContainerCommandRequestProto.parseFrom(requestInBytes);
+    assertTrue(request.hasGetBlock());
+    assertEquals(ContainerProtos.Type.GetBlock, request.getCmdType());
+    assertEquals(containerID, request.getContainerID());
+    assertEquals(datanodeID, request.getDatanodeUuid());
+    assertEquals(localBlockID, request.getGetBlock().getBlockID().getLocalID());
+    assertEquals(containerID, request.getGetBlock().getBlockID().getContainerID());
+    assertEquals(bcsid, request.getGetBlock().getBlockID().getBlockCommitSequenceId());
   }
 }

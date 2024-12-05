@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
@@ -45,6 +47,8 @@ public final class RatisReplicationConfig
   private static final RatisReplicationConfig RATIS_THREE_CONFIG =
       new RatisReplicationConfig(THREE);
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RatisReplicationConfig.class);
   /**
    * Get an instance of Ratis Replication Config with the requested factor.
    * The same static instance will be returned for all requests for the same
