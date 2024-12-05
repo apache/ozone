@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -86,6 +87,8 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private final OzoneConfiguration conf;
 
+  private final ReconTaskStatusCounter taskStatusCounter;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
@@ -104,6 +107,7 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerManager = containerManager;
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    this.taskStatusCounter = getTaskStatusCounterInstance();
   }
 
   @Override
@@ -145,7 +149,12 @@ public class ContainerHealthTask extends ReconScmTask {
           Time.monotonicNow() - start, existingCount);
 
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      taskStatusCounter.updateCounter(ContainerHealthTask.class.getName(), true);
       processedContainers.clear();
+    } catch (Exception e) {
+      // For any exception that is thrown we know the container health check has failed,
+      // increment the failure count for the task
+      taskStatusCounter.updateCounter(getTaskName(), false);
     } finally {
       lock.writeLock().unlock();
     }

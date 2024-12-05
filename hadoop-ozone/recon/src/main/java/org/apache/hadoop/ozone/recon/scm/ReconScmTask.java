@@ -24,6 +24,8 @@ import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+
 /**
  * Any background task that keeps SCM's metadata up to date.
  */
@@ -32,13 +34,13 @@ public abstract class ReconScmTask {
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
   private Thread taskThread;
   private ReconTaskStatusDao reconTaskStatusDao;
-  private ReconTaskStatusCounter taskStatusCounter;
   private volatile boolean running;
   private volatile ReconTaskStatus reconTaskStatusRecord;
+  @Inject
+  private ReconTaskStatusCounter taskStatusCounter;
 
   protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
   }
 
   private void register() {
@@ -94,7 +96,6 @@ public abstract class ReconScmTask {
   }
 
   protected void recordSingleRunCompletion() {
-    taskStatusCounter.updateCounter(getTaskName(), true);
     synchronized (this) {
       reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
       reconTaskStatusRecord.setLastTaskRunStatus(1);
@@ -108,6 +109,10 @@ public abstract class ReconScmTask {
 
   public String getTaskName() {
     return getClass().getSimpleName();
+  }
+
+  public ReconTaskStatusCounter getTaskStatusCounterInstance() {
+    return taskStatusCounter;
   }
 
   protected abstract void run();

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -122,7 +123,8 @@ public class TestTriggerDBSyncEndpoint {
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock));
+            ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock),
+            new ReconTaskStatusCounter());
     ozoneManagerServiceProvider.start();
 
     reconTestInjector =

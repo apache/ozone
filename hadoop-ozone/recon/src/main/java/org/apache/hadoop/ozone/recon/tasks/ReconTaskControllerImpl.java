@@ -61,18 +61,19 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
   private ReconTaskStatusDao reconTaskStatusDao;
-  private ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusCounter taskStatusCounter;
   private final Map<String, ReconTaskStatus> taskStatusMap = new HashMap<>();
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
                                  ReconTaskStatusDao reconTaskStatusDao,
-                                 Set<ReconOmTask> tasks) {
+                                 Set<ReconOmTask> tasks,
+                                 ReconTaskStatusCounter taskStatusCounter) {
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.reconTaskStatusDao = reconTaskStatusDao;
-    taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
+    this.taskStatusCounter = taskStatusCounter;
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }

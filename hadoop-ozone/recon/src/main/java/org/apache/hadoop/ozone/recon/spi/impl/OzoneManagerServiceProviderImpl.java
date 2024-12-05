@@ -154,7 +154,8 @@ public class OzoneManagerServiceProviderImpl
       ReconTaskController reconTaskController,
       ReconUtils reconUtils,
       OzoneManagerProtocol ozoneManagerClient,
-      ReconContext reconContext) {
+      ReconContext reconContext,
+      ReconTaskStatusCounter reconTaskStatusCounter) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_TIMEOUT,
@@ -230,8 +231,8 @@ public class OzoneManagerServiceProviderImpl
     this.reconContext = reconContext;
     this.reconSyncTaskStatus = new ReconTaskStatus(
         null,
-        0L, 0L, 0, 0);
-    this.taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
+        0L, getCurrentOMDBSequenceNumber(), 0, 0);
+    this.taskStatusCounter = reconTaskStatusCounter;
   }
 
   public void registerOMDBTasks() {

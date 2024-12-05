@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
  * Each task is mapped to a {@link Pair} of <code>{no. of successful runs, no. of failed runs}</code>
  */
 public class ReconTaskStatusCounter {
-
   // Stores an instance of this class to maintain state across calls
   private static ReconTaskStatusCounter instance;
   // Stores the configurable timeout duration i.e. the TTL of the counts
@@ -55,20 +54,7 @@ public class ReconTaskStatusCounter {
       OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
       TimeUnit.MILLISECONDS
     );
-
     initializationTime = System.currentTimeMillis();
-  }
-
-  /**
-   * Get an instance of <code>this</code> {@link ReconTaskStatusCounter} in order to persist state
-   * of the task counters between multiple modules/packages.
-   * @return an instance of current {@link ReconTaskStatusCounter}
-   */
-  public static ReconTaskStatusCounter getCurrentInstance() {
-    if (null == instance) {
-      instance = new ReconTaskStatusCounter();
-    }
-    return instance;
   }
 
   /**
@@ -77,7 +63,6 @@ public class ReconTaskStatusCounter {
    * @param successful Whether the task was successful or not
    */
   public void updateCounter(String taskName, boolean successful) {
-
     TASK_STATUS_COUNTER.putIfAbsent(taskName, Pair.of(0, 0));
     int successes = TASK_STATUS_COUNTER.get(taskName).getLeft();
     int failures = TASK_STATUS_COUNTER.get(taskName).getRight();
@@ -98,7 +83,8 @@ public class ReconTaskStatusCounter {
    */
   private void checkCountDataExpiry() {
     if ((System.currentTimeMillis() - initializationTime) > timeoutDuration) {
-      instance = new ReconTaskStatusCounter();
+      TASK_STATUS_COUNTER.clear();
+      initializationTime = System.currentTimeMillis();
     }
   }
 

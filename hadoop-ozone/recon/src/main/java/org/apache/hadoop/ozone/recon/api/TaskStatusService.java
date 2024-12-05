@@ -44,7 +44,8 @@ public class TaskStatusService {
 
   @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
-  private final ReconTaskStatusCounter taskStatusCounter = ReconTaskStatusCounter.getCurrentInstance();
+  @Inject
+  private ReconTaskStatusCounter taskStatusCounter;
 
   /**
    * Internal class to represent a list of all the tasks and their counts in Recon.
@@ -93,11 +94,11 @@ public class TaskStatusService {
   @GET
   @Path("stats")
   public Response getTaskStatusStats() {
-    Map<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> tasksPairMap = taskStatusCounter.getTaskCounts();
+    Map<String, Pair<Integer, Integer>> tasksPairMap = taskStatusCounter.getTaskCounts();
     List<ReconTaskStatusCountResponse> tasks = new ArrayList<>();
-    for (Map.Entry<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> entry: tasksPairMap.entrySet()) {
+    for (Map.Entry<String, Pair<Integer, Integer>> entry: tasksPairMap.entrySet()) {
       tasks.add(new ReconTaskStatusCountResponse(
-          entry.getKey().name(),
+          entry.getKey(),
           entry.getValue().getLeft(),
           entry.getValue().getRight()
       ));

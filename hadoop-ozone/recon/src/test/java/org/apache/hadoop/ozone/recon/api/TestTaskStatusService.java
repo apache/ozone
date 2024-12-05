@@ -38,10 +38,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
 
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Test for Task Status Service.
@@ -95,21 +92,23 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    Map<ReconTaskStatusCounter.ReconTasks, Pair<Integer, Integer>> mockedTaskCounts =
-        new EnumMap<>(ReconTaskStatusCounter.ReconTasks.class);
+    Map<String, Pair<Integer, Integer>> mockedTaskCounts =
+        new HashMap<>();
+    String taskName = "DummyTask_" + System.currentTimeMillis();
+    String taskWithFailureCountName = "FailedDummyTask_" + System.currentTimeMillis();
 
-    mockedTaskCounts.put(ReconTaskStatusCounter.ReconTasks.ContainerKeyMapperTask, Pair.of(1, 0));
-    mockedTaskCounts.put(ReconTaskStatusCounter.ReconTasks.OmDeltaRequest, Pair.of(10, 2));
+    mockedTaskCounts.put(taskName, Pair.of(1, 0));
+    mockedTaskCounts.put(taskWithFailureCountName, Pair.of(10, 2));
     when(taskStatusCounter.getTaskCounts()).thenReturn(mockedTaskCounts);
 
     Response response = taskStatusService.getTaskStatusStats();
     List<ReconTaskStatusCountResponse> tasks = (List<ReconTaskStatusCountResponse>) response.getEntity();
     assertEquals(tasks.size(), mockedTaskCounts.size());
-    assertEquals(tasks.get(0).getTaskName(), ReconTaskStatusCounter.ReconTasks.ContainerKeyMapperTask.name());
+    assertEquals(tasks.get(0).getTaskName(), taskName);
     assertEquals(tasks.get(0).getSuccessCount(), 1);
     assertEquals(tasks.get(0).getFailureCount(), 0);
 
-    assertEquals(tasks.get(1).getTaskName(), ReconTaskStatusCounter.ReconTasks.OmDeltaRequest.name());
+    assertEquals(tasks.get(1).getTaskName(), taskWithFailureCountName);
     assertEquals(tasks.get(1).getSuccessCount(), 10);
     assertEquals(tasks.get(0).getFailureCount(), 2);
   }

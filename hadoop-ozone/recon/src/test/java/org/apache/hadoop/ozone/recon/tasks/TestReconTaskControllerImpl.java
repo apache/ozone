@@ -55,7 +55,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,
-        reconTaskStatusDao, new HashSet<>());
+        reconTaskStatusDao, new HashSet<>(), new ReconTaskStatusCounter());
     reconTaskController.start();
   }
 
