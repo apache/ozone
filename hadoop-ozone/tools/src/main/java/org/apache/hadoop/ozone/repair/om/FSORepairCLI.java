@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
@@ -32,11 +30,7 @@ import java.util.concurrent.Callable;
     description = "Identify and repair a disconnected FSO tree, and mark unreachable entries for deletion. " +
         "OM should be stopped while this tool is run."
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
-
-  @CommandLine.ParentCommand
-  private OMRepair parent;
+public class FSORepairCLI implements Callable<Void> {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -80,10 +74,5 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
     }
 
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OMRepair.class;
   }
 }

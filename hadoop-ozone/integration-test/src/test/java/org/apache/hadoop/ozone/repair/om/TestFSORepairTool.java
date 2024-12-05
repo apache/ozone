@@ -112,8 +112,7 @@ public class TestFSORepairTool {
 
   @Test
   public void testConnectedTreeOneBucket() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
@@ -147,8 +146,7 @@ public class TestFSORepairTool {
 
   @Test
   public void testReportedDataSize() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     FSORepairTool.Report report1 = buildDisconnectedTree("vol1", "bucket1", 10);
@@ -175,8 +173,7 @@ public class TestFSORepairTool {
    */
   @Test
   public void testVolumeAndBucketFilter() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     FSORepairTool.Report report1 = buildDisconnectedTree("vol1", "bucket1", 10);
@@ -246,8 +243,7 @@ public class TestFSORepairTool {
 
   @Test
   public void testMultipleBucketsAndVolumes() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
@@ -274,8 +270,7 @@ public class TestFSORepairTool {
    */
   @Test
   public void testDeleteOverwrite() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     // Create files and dirs under dir1. To make sure they are added to the
@@ -310,8 +305,7 @@ public class TestFSORepairTool {
 
   @Test
   public void testEmptyFileTrees() throws Exception {
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     FSORepairTool.Report emptyReport = buildEmptyTree();
@@ -376,8 +370,7 @@ public class TestFSORepairTool {
     legacyStream.write(new byte[]{1, 1, 1});
     legacyStream.close();
 
-    CommandLine cmd = new CommandLine(new OzoneRepair()).addSubcommand(new CommandLine(new OMRepair())
-            .addSubcommand(new FSORepairCLI()));
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     // Add an FSO bucket with data.

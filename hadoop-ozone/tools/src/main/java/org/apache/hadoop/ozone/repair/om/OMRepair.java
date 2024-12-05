@@ -30,15 +30,15 @@ import java.util.concurrent.Callable;
  * Ozone Repair CLI for OM.
  */
 @CommandLine.Command(name = "om",
-        description = "Operational tool to repair OM.")
+    subcommands = {
+        FSORepairCLI.class,
+    },
+    description = "Operational tool to repair OM.")
 @MetaInfServices(SubcommandWithParent.class)
 public class OMRepair implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.ParentCommand
-  private OzoneRepair parent;
 
   @Override
   public Void call() {
