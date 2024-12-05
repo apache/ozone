@@ -89,7 +89,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -563,9 +562,9 @@ public class TestDirectoryDeletingServiceWithFSO {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
       return i.callRealMethod();
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(),anyLong(), Mockito.any(), any(),
-        anyList());
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
+        anyLong(), anyLong(), anyList(), anyList(), eq(null), anyLong(),
+        anyLong(), anyLong(), Mockito.any(), any(), anyList());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);

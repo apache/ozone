@@ -380,7 +380,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             pendingDeletedDirInfo, remainNum, remainingBufLimit);
     List<OmKeyInfo> subFiles = deleteFilesResult.getKeysToDelete();
     remainNum = remainNum - subFiles.size();
-    remainingBufLimit-=deleteFilesResult.getConsumedSize();
+    remainingBufLimit -= deleteFilesResult.getConsumedSize();
 
     if (LOG.isDebugEnabled()) {
       for (OmKeyInfo fileInfo : subFiles) {
@@ -424,7 +424,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         consumedSize += request.getSerializedSize();
         remainingBufLimit -= request.getSerializedSize();
         currentPurgePathRequestList.add(request);
-        if (remainingBufLimit <= 0){
+        if (remainingBufLimit <= 0) {
           remainingBufLimit = maxBufLimit;
           purgeRequestListBatches.add(currentPurgePathRequestList);
           currentPurgePathRequestList = new ArrayList<>();
@@ -448,21 +448,21 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    if (!purgeRequestListBatches.contains(currentPurgePathRequestList)){
+    if (!purgeRequestListBatches.contains(currentPurgePathRequestList)) {
       purgeRequestListBatches.add(currentPurgePathRequestList);
     }
 
 
     // tracking for metrics
     boolean purgeRequestSent = false;
-    for (List<PurgePathRequest> purgePathRequestBatch : purgeRequestListBatches){
+    for (List<PurgePathRequest> purgePathRequestBatch : purgeRequestListBatches) {
       if (!purgePathRequestBatch.isEmpty()) {
         submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId);
         purgeRequestSent = true;
         runCount.getAndIncrement();
       }
     }
-    if (purgeRequestSent){
+    if (purgeRequestSent) {
       ozoneManager.getMetrics().incNumSuccessfulIterationsDirDeletingService();
     }
 
