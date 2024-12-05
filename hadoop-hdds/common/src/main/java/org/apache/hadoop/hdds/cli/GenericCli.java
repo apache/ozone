@@ -56,10 +56,10 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   public GenericCli(Class<?> type) {
-    this(CommandLine.defaultFactory(), type);
+    this(type, CommandLine.defaultFactory());
   }
 
-  public GenericCli(CommandLine.IFactory factory, Class<?> type) {
+  public GenericCli(Class<?> type, CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);

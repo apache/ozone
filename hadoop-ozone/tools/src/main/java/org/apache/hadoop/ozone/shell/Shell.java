@@ -62,7 +62,7 @@ public abstract class Shell extends GenericCli {
   }
 
   public Shell(Class<?> type) {
-    super(new PicocliCommandsFactory(), type);
+    super(type, new PicocliCommandsFactory());
   }
 
   public String name() {
