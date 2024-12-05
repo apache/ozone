@@ -19,7 +19,7 @@
  * permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.repair.ldb;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;

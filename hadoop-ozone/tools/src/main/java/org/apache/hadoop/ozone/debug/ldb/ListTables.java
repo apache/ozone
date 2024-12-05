@@ -16,43 +16,44 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.debug.ldb;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
-import java.util.concurrent.Callable;
-
 /**
- * Ozone Repair CLI for RocksDB.
+ * List all column Families/Tables in db.
  */
-@CommandLine.Command(name = "ldb",
-    description = "Operational tool to repair RocksDB table.")
+@CommandLine.Command(
+        name = "list_column_families",
+        aliases = "ls",
+        description = "list all column families in db."
+)
 @MetaInfServices(SubcommandWithParent.class)
-public class RDBRepair implements Callable<Void>, SubcommandWithParent {
+public class ListTables implements Callable<Void>, SubcommandWithParent {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Database File Path")
-  private String dbPath;
-
-  public String getDbPath() {
-    return dbPath;
-  }
+  @CommandLine.ParentCommand
+  private RDBParser parent;
 
   @Override
-  public Void call() {
-    GenericCli.missingSubcommand(spec);
+  public Void call() throws Exception {
+    List<byte[]> columnFamilies = RocksDatabase.listColumnFamiliesEmptyOptions(
+        parent.getDbPath());
+    for (byte[] b : columnFamilies) {
+      System.out.println(new String(b, StandardCharsets.UTF_8));
+    }
     return null;
   }
 
   @Override
   public Class<?> getParentType() {
-    return OzoneRepair.class;
+    return RDBParser.class;
   }
 }

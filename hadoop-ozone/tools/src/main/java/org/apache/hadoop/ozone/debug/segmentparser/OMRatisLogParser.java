@@ -16,29 +16,30 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.segmentparser;
+package org.apache.hadoop.ozone.debug.segmentparser;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
 /**
- * Command line utility to parse and dump a SCM ratis segment file.
+ * Command line utility to parse and dump a OM ratis segment file.
  */
 @CommandLine.Command(
-    name = "scm",
-    description = "dump scm ratis segment file",
+    name = "om",
+    description = "dump om ratis segment file",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class SCMRatisLogParser extends BaseLogParser implements Callable<Void> {
+public class OMRatisLogParser extends BaseLogParser implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    System.out.println("Dumping SCM Ratis Log");
+    System.out.println("Dumping OM Ratis Log");
 
-    parseRatisLogs(SCMRatisRequest::smProtoToString);
+    parseRatisLogs(OMRatisHelper::smProtoToString);
     return null;
   }
 }
+
