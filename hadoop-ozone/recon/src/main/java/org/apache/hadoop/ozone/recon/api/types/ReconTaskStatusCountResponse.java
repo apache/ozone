@@ -39,10 +39,16 @@ public class ReconTaskStatusCountResponse {
   @JsonProperty("failures")
   private int failureCount;
 
-  public ReconTaskStatusCountResponse(String taskName, int successCount, int failureCount) {
+  // The timestamp at which the counters were last reset
+  @JsonProperty("initializedAt")
+  private long counterStartTime;
+
+  public ReconTaskStatusCountResponse(
+      String taskName, int successCount, int failureCount, long counterStartTime) {
     this.taskName = taskName;
     this.successCount = successCount;
     this.failureCount = failureCount;
+    this.counterStartTime = counterStartTime;
   }
 
   public String getTaskName() {
@@ -55,5 +61,9 @@ public class ReconTaskStatusCountResponse {
 
   public long getFailureCount() {
     return failureCount;
+  }
+
+  public long getCounterStartTime() {
+    return counterStartTime;
   }
 }

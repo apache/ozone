@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.metrics;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT;
@@ -42,10 +43,8 @@ public class ReconTaskStatusCounter {
   // Stores the configurable timeout duration i.e. the TTL of the counts
   private final long timeoutDuration;
 
-  private long initializationTime = 0L;
-
   // Task name is mapped from the enum to a Pair of <count of successful runs, count of failed runs>
-  private static final Map<String, Pair<Integer, Integer>> TASK_STATUS_COUNTER = new HashMap<>();
+  private static final Map<String, ReconTaskStatusStat> TASK_STATUS_COUNTER = new HashMap<>();
 
   public ReconTaskStatusCounter() {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -54,24 +53,6 @@ public class ReconTaskStatusCounter {
       OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
       TimeUnit.MILLISECONDS
     );
-    initializationTime = System.currentTimeMillis();
-  }
-
-  /**
-   * Update the counter's success/failure count based on the task name passed.
-   * @param taskName The task name for which we want to update the counter
-   * @param successful Whether the task was successful or not
-   */
-  public void updateCounter(String taskName, boolean successful) {
-    TASK_STATUS_COUNTER.putIfAbsent(taskName, Pair.of(0, 0));
-    int successes = TASK_STATUS_COUNTER.get(taskName).getLeft();
-    int failures = TASK_STATUS_COUNTER.get(taskName).getRight();
-
-    if (successful) {
-      TASK_STATUS_COUNTER.put(taskName, Pair.of(successes + 1, failures));
-    } else {
-      TASK_STATUS_COUNTER.put(taskName, Pair.of(successes, failures + 1));
-    }
   }
 
   /**
@@ -81,15 +62,34 @@ public class ReconTaskStatusCounter {
    * Default duration/TTL of the counter is 30 minutes
    * In case the count data TTL is reached, reinitialize the instance to reset the data, else do nothing
    */
-  private void checkCountDataExpiry() {
-    if ((System.currentTimeMillis() - initializationTime) > timeoutDuration) {
-      TASK_STATUS_COUNTER.clear();
-      initializationTime = System.currentTimeMillis();
+  private void checkCountDataExpiry(String taskName) {
+    ReconTaskStatusStat taskStat = TASK_STATUS_COUNTER.get(taskName);
+    //Since initially the task list is empty, each task will get initialized at different times
+    if ((System.currentTimeMillis() - taskStat.getInitializationTime()) > timeoutDuration) {
+      // If the task stat TTL is expired, we want to reset the associated counters
+      taskStat.reset();
+      // Update the map with the initial state for the task stats
+      TASK_STATUS_COUNTER.put(taskName, taskStat);
     }
   }
 
-  public Map<String, Pair<Integer, Integer>> getTaskCounts() {
-    checkCountDataExpiry();
+  /**
+   * Update the counter's success/failure count based on the task name passed.
+   * @param taskName The task name for which we want to update the counter
+   * @param successful Whether the task was successful or not
+   */
+  public void updateCounter(String taskName, boolean successful) {
+    TASK_STATUS_COUNTER.putIfAbsent(taskName, new ReconTaskStatusStat());
+    checkCountDataExpiry(taskName);
+
+    if (successful) {
+      TASK_STATUS_COUNTER.get(taskName).incrementSuccess();
+    } else {
+      TASK_STATUS_COUNTER.get(taskName).incrementFailure();
+    }
+  }
+
+  public Map<String, ReconTaskStatusStat> getTaskCounts() {
     return TASK_STATUS_COUNTER;
   }
 }

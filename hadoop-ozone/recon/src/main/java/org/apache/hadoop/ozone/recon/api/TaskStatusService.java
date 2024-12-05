@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusCountResponse;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -86,7 +87,8 @@ public class TaskStatusService {
    *    "tasks": [{
    *      "taskName": task name,
    *      "successes": count of successful runs,
-   *      "failures": count of failed runs
+   *      "failures": count of failed runs,
+   *      "startedAt": time at which the counters were initialized
    *    }, {....}]
    *   }
    * </code>
@@ -94,13 +96,14 @@ public class TaskStatusService {
   @GET
   @Path("stats")
   public Response getTaskStatusStats() {
-    Map<String, Pair<Integer, Integer>> tasksPairMap = taskStatusCounter.getTaskCounts();
+    Map<String, ReconTaskStatusStat> tasksPairMap = taskStatusCounter.getTaskCounts();
     List<ReconTaskStatusCountResponse> tasks = new ArrayList<>();
-    for (Map.Entry<String, Pair<Integer, Integer>> entry: tasksPairMap.entrySet()) {
+    for (Map.Entry<String, ReconTaskStatusStat> entry: tasksPairMap.entrySet()) {
       tasks.add(new ReconTaskStatusCountResponse(
           entry.getKey(),
-          entry.getValue().getLeft(),
-          entry.getValue().getRight()
+          entry.getValue().getSuccessCount(),
+          entry.getValue().getFailureCount(),
+          entry.getValue().getInitializationTime()
       ));
     }
     return Response.ok(new ReconAllTasksCountResponse(tasks)).build();

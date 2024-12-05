@@ -27,6 +27,7 @@ import com.google.inject.Injector;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusCountResponse;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -95,13 +96,13 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    Map<String, Pair<Integer, Integer>> mockedTaskCounts =
+    Map<String, ReconTaskStatusStat> mockedTaskCounts =
         new HashMap<>();
     String taskName = "DummyTask_" + System.currentTimeMillis();
     String taskWithFailureCountName = "FailedDummyTask_" + System.currentTimeMillis();
 
-    mockedTaskCounts.put(taskName, Pair.of(1, 0));
-    mockedTaskCounts.put(taskWithFailureCountName, Pair.of(10, 2));
+    mockedTaskCounts.put(taskName, new ReconTaskStatusStat(1, 0));
+    mockedTaskCounts.put(taskWithFailureCountName, new ReconTaskStatusStat(10, 2));
     when(taskStatusCounter.getTaskCounts()).thenReturn(mockedTaskCounts);
 
     Response response = taskStatusService.getTaskStatusStats();
