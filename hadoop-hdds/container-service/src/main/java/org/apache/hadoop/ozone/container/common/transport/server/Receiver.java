@@ -296,7 +296,7 @@ final class Receiver implements Runnable {
     return type == ContainerProtos.Type.GetBlock || type == ContainerProtos.Type.Echo;
   }
 
-  class TaskEntry {
+  static class TaskEntry {
     private ContainerCommandRequestProto request;
     private ContainerCommandResponseProto response;
     private FileInputStream fis;

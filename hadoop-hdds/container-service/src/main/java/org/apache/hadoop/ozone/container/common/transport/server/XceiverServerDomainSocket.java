@@ -229,7 +229,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         LOG.info("XceiverServerDomainSocket is closed", ace);
       } catch (IOException ie) {
         // usually when the xceiver count limit is hit.
-        LOG.warn("Got an exception. Peer {}", peer.toString(), ie);
+        LOG.warn("Got an exception. Peer {}", peer, ie);
         IOUtils.closeQuietly(peer);
       } catch (OutOfMemoryError ie) {
         IOUtils.closeQuietly(peer);

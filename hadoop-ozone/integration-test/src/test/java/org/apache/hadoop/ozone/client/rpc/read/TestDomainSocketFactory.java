@@ -26,6 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -46,7 +47,7 @@ public class TestDomainSocketFactory {
     clientConfig.setShortCircuit(true);
     clientConfig.setShortCircuitReadDisableInterval(1);
     conf.setFromObject(clientConfig);
-    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,  new File(dir, "ozone-socket").getAbsolutePath());
+    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
 
     // create DomainSocketFactory
     DomainSocketFactory domainSocketFactory = DomainSocketFactory.getInstance(conf);

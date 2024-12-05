@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerDomainSocket;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -158,21 +160,22 @@ public class TestXceiverServerDomainSocket {
     } finally {
       factory.close();
     }
+  }
 
-    // an existing domain path, the existing regular file will be overwritten and turned into a socket file,
-    // so configure an existing domain path is disallowed.
+  @Test
+  public void testExistingDomainPath() {
+    // an existing domain path, the existing file is override and changed from a normal file to a socket file
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
-    File file = new File(dir, "ozone-socket");
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     try {
+      File file = new File(dir, "ozone-socket");
       assertTrue(file.createNewFile());
-      DomainSocketFactory.getInstance(conf);
-      fail("an existing domain path is not allowed.");
+      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
+          conf, null, readExecutors, metrics, factory);
     } catch (Throwable e) {
-      e.printStackTrace();
-      assertTrue(e instanceof IllegalArgumentException);
-      assertTrue(e.getMessage().contains("an existing file"));
+      fail("an existing domain path is supported by not recommended.");
     } finally {
-      file.delete();
+      factory.close();
     }
   }
 
@@ -347,12 +350,7 @@ public class TestXceiverServerDomainSocket {
       assertEquals(1, containerMetrics.getContainerLocalOpsMetrics(ContainerProtos.Type.GetBlock));
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(sock);
       server.stop();
     }
   }
@@ -372,12 +370,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(e.getMessage().contains("connect(2) error: No such file or directory"));
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(sock);
     }
   }
 
@@ -392,29 +385,28 @@ public class TestXceiverServerDomainSocket {
     XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
+    DataOutputStream outputStream = null;
+    DataInputStream inputStream = null;
     try {
       sock = factory.createSocket(readTimeout, writeTimeout, localhost);
       assertTrue(sock.isOpen());
       // send request
-      final DataOutputStream  outputStream = new DataOutputStream(sock.getOutputStream());
+      outputStream = new DataOutputStream(sock.getOutputStream());
       outputStream.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
       outputStream.writeShort(GetBlock.getNumber());
       getBlockRequest().writeDelimitedTo(outputStream);
       outputStream.flush();
 
-      final DataInputStream inputStream = new DataInputStream(sock.getInputStream());
+      inputStream = new DataInputStream(sock.getInputStream());
       inputStream.readShort();
     } catch (IOException e) {
       assertTrue(e instanceof SocketTimeoutException);
       assertTrue(e.getMessage().contains("read(2) error: Resource temporarily unavailable"));
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(outputStream);
+      IOUtils.closeQuietly(inputStream);
+      IOUtils.closeQuietly(sock);
       server.stop();
     }
   }
@@ -445,12 +437,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(e.getMessage().contains("write(2) error: Broken pipe"));
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(sock);
       server.stop();
     }
   }
@@ -458,6 +445,9 @@ public class TestXceiverServerDomainSocket {
   @Test
   public void testMaxXceiverCount() throws IOException, InterruptedException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DatanodeConfiguration datanodeConfiguration = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfiguration.setNumReadThreadPerVolume(2);
+    conf.setFromObject(datanodeConfiguration);
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
@@ -466,20 +456,21 @@ public class TestXceiverServerDomainSocket {
         GenericTestUtils.LogCapturer.captureLogs(XceiverServerDomainSocket.LOG);
     try {
       server.start();
-      // test max allowed xceiver count(default 10 * 5)
-      int count = 51;
+      // test max allowed xceiver count(2 * 5)
+      int count = 11;
       for (int i = 1; i <= count; i++) {
         DomainSocket sock = factory.createSocket(readTimeout, writeTimeout, localhost);
         list.add(sock);
       }
 
-      logCapturer.getOutput().contains("Xceiver count exceeds the limit" + (count - 1));
+      Thread.sleep(2000);
+      assertTrue(logCapturer.getOutput().contains("Xceiver count exceeds the limit " + (count - 1)));
       DomainSocket lastSock = list.get(list.size() - 1);
       // although remote peer is already closed due to limit exhausted, sock.isOpen() is still true.
       // Only when client read/write socket stream, there will be exception or -1 returned.
       assertTrue(lastSock.isOpen());
 
-      // write to first 50 sockets should be OK
+      // write to first 10 sockets should be OK
       for (int i = 0; i < count - 2; i++) {
         DomainSocket sock = list.get(i);
         assertTrue(sock.isOpen());
@@ -489,7 +480,6 @@ public class TestXceiverServerDomainSocket {
         assertFalse(sock.isOpen());
       }
 
-      Thread.sleep(5000);
       // read a broken pipe will return -1
       int data = lastSock.getInputStream().read();
       assertEquals(-1, data);
@@ -522,24 +512,21 @@ public class TestXceiverServerDomainSocket {
     XceiverServerDomainSocket server = new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
         conf, null, readExecutors, metrics, factory);
     DomainSocket sock = null;
+    DataOutputStream outputStream = null;
     String data = "hello world";
     try {
       server.start();
       sock = factory.createSocket(readTimeout, writeTimeout, localhost);
-      final DataOutputStream outputStream = new DataOutputStream(sock.getOutputStream());
-      outputStream.write(data.getBytes());
+      outputStream = new DataOutputStream(sock.getOutputStream());
+      outputStream.write(data.getBytes(StandardCharsets.UTF_8));
       outputStream.flush();
       sock.getInputStream().read();
     } catch (IOException e) {
       assertTrue(e instanceof EOFException);
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(outputStream);
+      IOUtils.closeQuietly(sock);
       server.stop();
     }
   }
@@ -573,12 +560,7 @@ public class TestXceiverServerDomainSocket {
       assertTrue(responseProto.getResult() == ContainerProtos.Result.UNSUPPORTED_REQUEST);
     } finally {
       factory.close();
-      if (sock != null) {
-        try {
-          sock.close();
-        } catch (IOException e) {
-        }
-      }
+      IOUtils.closeQuietly(sock);
       server.stop();
     }
   }

@@ -426,7 +426,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     // fall back to acquire GRPC client
     if (xceiverClientFactory != null && xceiverClientGrpc == null) {
       try {
-        xceiverClientGrpc = xceiverClientFactory.acquireClientForReadData(pipeline, false);
+        xceiverClientGrpc = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
         LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
