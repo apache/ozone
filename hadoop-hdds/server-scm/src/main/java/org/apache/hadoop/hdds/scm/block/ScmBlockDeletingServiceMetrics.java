@@ -99,7 +99,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of dataNodes of delete transactions.")
   private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
-  private Map<UUID, DatanodeCommandCounts> numCommandsDatanode;
+  private final Map<UUID, DatanodeCommandCounts> numCommandsDatanode;
 
   private ScmBlockDeletingServiceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
