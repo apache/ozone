@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,9 @@ public class TestBucketLayoutWithOlderClient {
                             OzoneManagerProtocolProtos.StorageTypeProto.DISK)
                             .build())
                     .build()).build();
+    createBucketReq = createBucketReq.toBuilder()
+        .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName(UserGroupInformation.getCurrentUser().getShortUserName()).build()).build();
 
     OzoneManagerProtocolProtos.OMResponse
         omResponse = cluster.getOzoneManager().getOmServerProtocol()

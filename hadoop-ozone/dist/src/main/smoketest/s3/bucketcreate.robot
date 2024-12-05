@@ -42,7 +42,7 @@ Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
                         Should contain          ${result}           InvalidBucketName
 
-Create new bucket and check no group ACL
+Create new bucket and check default group ACL
     [tags]    aws-skip
     ${bucket} =         Create bucket
     ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
@@ -51,7 +51,8 @@ Create new bucket and check no group ACL
         ${json} =           Evaluate    json.loads('''${acl}''')    json
         # make sure this check is for group acl
         Should contain      ${json}[1][type]       GROUP
-        Should contain      ${json}[1][aclList]    NONE
+        Should contain      ${json}[1][aclList]    READ
+        Should contain      ${json}[1][aclList]    LIST
     END
 
 Test buckets named like web endpoints

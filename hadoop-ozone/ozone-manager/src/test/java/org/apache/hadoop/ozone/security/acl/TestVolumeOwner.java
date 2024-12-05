@@ -142,11 +142,9 @@ public class TestVolumeOwner {
                   UserGroupInformation.getCurrentUser().getShortUserName())
               .setDataSize(0);
           if (k == 0) {
-            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(
-                testUgi.getUserName(), testUgi.getGroupNames(), ALL, ALL));
+            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(testUgi, ALL, ALL));
           } else {
-            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(
-                testUgi.getUserName(), testUgi.getGroupNames(), NONE, NONE));
+            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(testUgi, NONE, NONE));
           }
           OmKeyArgs keyArgs = keyArgsBuilder.build();
           OpenKeySession keySession = writeClient.createFile(keyArgs, true,
