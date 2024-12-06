@@ -106,7 +106,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numCommandsDatanode = new ConcurrentHashMap<>();
   }
 
-  public static ScmBlockDeletingServiceMetrics create() {
+  public static synchronized ScmBlockDeletingServiceMetrics create() {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "SCMBlockDeletingService",
