@@ -98,6 +98,14 @@ test_cross_compatibility() {
 
   for client_version in "$@"; do
     for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
+
+      # do not test old-only scenario
+      if [[ "${cluster_version}" != "${current_version}" ]] \
+        && [[ "${client_version}" != "${current_version}" ]] \
+        && [[ "${data_version}" != "${current_version}" ]]; then
+        continue
+      fi
+
       client _read ${data_version}
     done
   done
