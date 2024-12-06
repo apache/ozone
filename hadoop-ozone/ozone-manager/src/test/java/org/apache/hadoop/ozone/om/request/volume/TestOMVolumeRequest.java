@@ -81,6 +81,7 @@ public class TestOMVolumeRequest {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
   }
 
   @AfterEach

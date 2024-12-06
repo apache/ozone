@@ -106,7 +106,7 @@ public class DBScanner implements Callable<Void> {
   @CommandLine.Option(names = {"--with-keys"},
       description = "Print a JSON object of key->value pairs (default)"
           + " instead of a JSON array of only values.",
-      defaultValue = "true")
+      defaultValue = "true", fallbackValue = "true")
   private boolean withKey;
 
   @CommandLine.Option(names = {"--length", "--limit", "-l"},
