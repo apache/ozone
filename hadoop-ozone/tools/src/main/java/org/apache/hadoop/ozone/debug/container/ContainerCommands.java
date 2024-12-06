@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.debug.container;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -81,8 +81,8 @@ import java.util.stream.Stream;
         ExportSubcommand.class,
         InspectSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class ContainerCommands implements Callable<Void>, DebugSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerCommands.class);
@@ -101,11 +101,6 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   OzoneConfiguration getOzoneConf() {

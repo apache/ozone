@@ -27,9 +27,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -41,8 +39,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class QuotaTrigger implements Callable<Void>, SubcommandWithParent  {
+public class QuotaTrigger implements Callable<Void>  {
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
 
@@ -90,11 +87,6 @@ public class QuotaTrigger implements Callable<Void>, SubcommandWithParent  {
 
   protected QuotaRepair getParent() {
     return parent;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return QuotaRepair.class;
   }
 
 }

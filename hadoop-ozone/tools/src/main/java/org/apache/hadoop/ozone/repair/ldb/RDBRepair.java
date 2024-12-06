@@ -19,8 +19,7 @@
 package org.apache.hadoop.ozone.repair.ldb;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.ozone.repair.OzoneRepair;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -30,9 +29,13 @@ import java.util.concurrent.Callable;
  * Ozone Repair CLI for RocksDB.
  */
 @CommandLine.Command(name = "ldb",
+    subcommands = {
+        SnapshotRepair.class,
+        TransactionInfoRepair.class,
+    },
     description = "Operational tool to repair RocksDB table.")
-@MetaInfServices(SubcommandWithParent.class)
-public class RDBRepair implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(RepairSubcommand.class)
+public class RDBRepair implements Callable<Void>, RepairSubcommand {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -50,10 +53,5 @@ public class RDBRepair implements Callable<Void>, SubcommandWithParent {
   public Void call() {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneRepair.class;
   }
 }
