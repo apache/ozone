@@ -415,7 +415,7 @@ public final class TestDelegationToken {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGenerator.generateKey();
     KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
-    keyStorage.storeKey(keyPair, true);
+    keyStorage.storeKeyPair(keyPair);
   }
 
   private void setupOm(OzoneConfiguration config) throws Exception {

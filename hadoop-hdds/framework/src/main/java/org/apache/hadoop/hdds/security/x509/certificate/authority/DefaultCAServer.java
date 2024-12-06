@@ -45,11 +45,9 @@ import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -115,7 +113,6 @@ public class DefaultCAServer implements CertificateServer {
   private final String clusterID;
   private final String scmID;
   private String componentName;
-  private Path caKeysPath;
   private Path caRootX509Path;
   private SecurityConfig config;
   /**
@@ -157,7 +154,6 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public void init(SecurityConfig securityConfig, CAType type)
       throws IOException {
-    caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
     this.approver = new DefaultApprover(profile, this.config);
@@ -202,13 +198,9 @@ public class DefaultCAServer implements CertificateServer {
     return store.getCertificateByID(new BigInteger(certSerialId));
   }
 
-  private KeyPair getCAKeys() throws IOException {
+  private PrivateKey getPrivateKey() throws IOException {
     KeyStorage keyStorage = new KeyStorage(config, componentName);
-    try {
-      return new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey());
-    } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
-      throw new IOException(e);
-    }
+    return keyStorage.readPrivateKey();
   }
 
   @Override
@@ -268,7 +260,7 @@ public class DefaultCAServer implements CertificateServer {
     try {
       Preconditions.checkState(!Strings.isNullOrEmpty(certSerialId));
       xcert = approver.sign(config,
-          getCAKeys().getPrivate(),
+          getPrivateKey(),
           getCACertificate(),
           Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
           Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
@@ -359,12 +351,20 @@ public class DefaultCAServer implements CertificateServer {
    * @return True if the key files exist.
    */
   private boolean checkIfKeysExist() {
-    if (!Files.exists(caKeysPath)) {
+    KeyStorage storage = null;
+    try {
+      storage = new KeyStorage(config, componentName);
+      storage.readKeyPair();
+    } catch (IOException e) {
+      if (storage != null && config.useExternalCACertificate(componentName)) {
+        try {
+          storage.readPrivateKey();
+          return true;
+        } catch (IOException ignored) { }
+      }
       return false;
     }
-
-    return Files.exists(Paths.get(caKeysPath.toString(),
-        this.config.getPrivateKeyFileName()));
+    return true;
   }
 
   /**
@@ -406,14 +406,18 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case MISSING_CERTIFICATE:
-      consumer = (arg) -> {
-        LOG.error("We found the keys, but the root certificate for this " +
-            "CertificateServer is missing. Please restart SCM after locating " +
-            "the " +
-            "Certificates.");
-        LOG.error("Exiting due to unrecoverable CertificateServer error.");
-        throw new IllegalStateException("Missing Root Certs, cannot continue.");
-      };
+      if (config.useExternalCACertificate(componentName) && type == CAType.ROOT) {
+        consumer = this::initRootCa;
+      } else {
+        consumer = (arg) -> {
+          LOG.error("We found the keys, but the root certificate for this " +
+              "CertificateServer is missing. Please restart SCM after locating " +
+              "the " +
+              "Certificates.");
+          LOG.error("Exiting due to unrecoverable CertificateServer error.");
+          throw new IllegalStateException("Missing Root Certs, cannot continue.");
+        };
+      }
       break;
     case INITIALIZE:
       if (type == CAType.ROOT) {
@@ -438,7 +442,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private void initRootCa(SecurityConfig securityConfig) {
-    if (isExternalCaSpecified(securityConfig)) {
+    if (securityConfig.useExternalCACertificate(componentName)) {
       initWithExternalRootCa(securityConfig);
     } else {
       try {
@@ -455,11 +459,6 @@ public class DefaultCAServer implements CertificateServer {
     }
   }
 
-  private boolean isExternalCaSpecified(SecurityConfig conf) {
-    return !conf.getExternalRootCaCert().isEmpty() &&
-        !conf.getExternalRootCaPrivateKeyPath().isEmpty();
-  }
-
   /**
    * Generates a KeyPair for the Certificate.
    *
@@ -474,7 +473,7 @@ public class DefaultCAServer implements CertificateServer {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keys = keyGenerator.generateKey();
     KeyStorage keyStorage = new KeyStorage(securityConfig, componentName);
-    keyStorage.storeKey(keys);
+    keyStorage.storeKeyPair(keys);
     return keys;
   }
 
@@ -512,15 +511,10 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private void initWithExternalRootCa(SecurityConfig conf) {
-    String externalRootCaLocation = conf.getExternalRootCaCert();
-    Path extCertPath = Paths.get(externalRootCaLocation);
-    Path extPrivateKeyPath = Paths.get(conf.getExternalRootCaPrivateKeyPath());
-    String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
+    Path extCertPath = Paths.get(conf.getExternalRootCaCert());
 
-    KeyStorage keyStorage = new KeyStorage(config, componentName);
-    CertificateCodec certificateCodec =
-        new CertificateCodec(config, componentName);
     try {
+      CertificateCodec certificateCodec = new CertificateCodec(config, componentName);
       Path extCertParent = extCertPath.getParent();
       Path extCertName = extCertPath.getFileName();
       if (extCertParent == null || extCertName == null) {
@@ -528,42 +522,11 @@ public class DefaultCAServer implements CertificateServer {
             extCertPath);
       }
       X509Certificate certificate = certificateCodec.getTargetCert(extCertParent, extCertName.toString());
-      Path extPrivateKeyParent = extPrivateKeyPath.getParent();
-      Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
-      if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
-        throw new IOException("External private key path is not correct: " +
-            extPrivateKeyPath);
-      }
-      PrivateKey privateKey = keyStorage.readPrivateKey(extPrivateKeyParent,
-          extPrivateKeyFileName.toString());
-      PublicKey publicKey;
-      publicKey = readPublicKeyWithExternalData(
-          externalPublicKeyLocation, keyStorage, certificate);
-      keyStorage.storeKey(new KeyPair(publicKey, privateKey));
+
       certificateCodec.writeCertificate(certificate);
-    } catch (IOException | CertificateException | NoSuchAlgorithmException |
-             InvalidKeySpecException e) {
+    } catch (IOException | CertificateException  e) {
       LOG.error("External root CA certificate initialization failed", e);
     }
-  }
-
-  private PublicKey readPublicKeyWithExternalData(
-      String externalPublicKeyLocation, KeyStorage keyStorage, X509Certificate certificate
-  ) throws CertificateException, NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-    PublicKey publicKey;
-    if (externalPublicKeyLocation.isEmpty()) {
-      publicKey = certificate.getPublicKey();
-    } else {
-      Path publicKeyPath = Paths.get(externalPublicKeyLocation);
-      Path publicKeyPathFileName = publicKeyPath.getFileName();
-      Path publicKeyParent = publicKeyPath.getParent();
-      if (publicKeyPathFileName == null || publicKeyParent == null) {
-        throw new IOException("Public key path incorrect: " + publicKeyParent);
-      }
-      publicKey = keyStorage.readPublicKey(
-          publicKeyParent, publicKeyPathFileName.toString());
-    }
-    return publicKey;
   }
 
   /**

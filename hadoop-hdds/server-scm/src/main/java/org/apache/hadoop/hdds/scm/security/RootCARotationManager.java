@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
@@ -562,14 +561,13 @@ public class RootCARotationManager extends StatefulService {
           }
 
           // Generate key
-          Path keyDir = securityConfig.getKeyLocation(progressComponent);
-          KeyStorage keyStorage = new KeyStorage(securityConfig, keyDir);
+          KeyStorage keyStorage = new KeyStorage(securityConfig, progressComponent);
           KeyPair newKeyPair = null;
           try {
             HDDSKeyGenerator keyGenerator =
                 new HDDSKeyGenerator(securityConfig);
             newKeyPair = keyGenerator.generateKey();
-            keyStorage.storeKey(newKeyPair);
+            keyStorage.storeKeyPair(newKeyPair);
             LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
                 "scm key generated.", rootCACertId);
           } catch (Exception e) {

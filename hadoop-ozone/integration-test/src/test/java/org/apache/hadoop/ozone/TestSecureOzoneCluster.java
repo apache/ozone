@@ -645,7 +645,7 @@ final class TestSecureOzoneCluster {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
     KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
-    keyStorage.storeKey(keyPair, true);
+    keyStorage.storeKeyPair(keyPair);
   }
 
   /**
@@ -963,8 +963,7 @@ final class TestSecureOzoneCluster {
     final int certificateLifetime = 20; // seconds
     KeyStorage keyStorage = new KeyStorage(securityConfig, "om");
     X509Certificate cert = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey()),
-        null, Duration.ofSeconds(certificateLifetime));
+        keyStorage.readKeyPair(), null, Duration.ofSeconds(certificateLifetime));
     String certId = cert.getSerialNumber().toString();
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
@@ -1043,11 +1042,9 @@ final class TestSecureOzoneCluster {
 
     // save first cert
     final int certificateLifetime = 20; // seconds
-    KeyStorage keyStorage =
-        new KeyStorage(securityConfig, "om");
+    KeyStorage keyStorage = new KeyStorage(securityConfig, "om");
     X509Certificate certHolder = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey()),
-        null, Duration.ofSeconds(certificateLifetime));
+        keyStorage.readKeyPair(), null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
     omStorage.setOmCertSerialId(certId);

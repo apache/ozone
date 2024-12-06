@@ -61,6 +61,7 @@ import org.slf4j.Logger;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
@@ -153,7 +154,7 @@ public class TestDefaultCertificateClient {
   private KeyPair generateKeyPairFiles() throws Exception {
     cleanupOldKeyPair();
     KeyPair keyPair = keyGenerator.generateKey();
-    dnKeyStorage.storeKey(keyPair);
+    dnKeyStorage.storeKeyPair(keyPair);
     return keyPair;
   }
 
@@ -511,8 +512,8 @@ public class TestDefaultCertificateClient {
     Files.createDirectories(newKeyDir.toPath());
     Files.createDirectories(newCertDir.toPath());
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    KeyStorage newKeyStorage = new KeyStorage(dnSecurityConfig, newKeyDir.toPath());
-    newKeyStorage.storeKey(keyPair);
+    KeyStorage newKeyStorage = new KeyStorage(dnSecurityConfig, DN_COMPONENT, HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX);
+    newKeyStorage.storeKeyPair(keyPair);
 
     X509Certificate cert = KeyStoreTestUtil.generateCertificate(
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
