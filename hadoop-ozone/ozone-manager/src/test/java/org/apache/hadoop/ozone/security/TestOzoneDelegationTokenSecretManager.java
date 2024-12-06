@@ -59,7 +59,6 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,6 +74,7 @@ import static org.mockito.Mockito.when;
 
 import org.slf4j.event.Level;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -132,14 +132,6 @@ public class TestOzoneDelegationTokenSecretManager {
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
-    // When ratis is enabled, tokens are not updated to the store directly by
-    // OzoneDelegationTokenSecretManager. Tokens are updated via Ratis
-    // through the DoubleBuffer. Hence, to test
-    // OzoneDelegationTokenSecretManager, we should disable OM Ratis.
-    // TODO: Once HA and non-HA code paths are merged in
-    //  OzoneDelegationTokenSecretManager, this test should be updated to
-    //  test both ratis enabled and disabled case.
-    config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
       assertTrue(newFolder.mkdirs());
@@ -268,11 +260,13 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
+  @Unhealthy("HDDS-11869")
   public void testReloadAndRenewToken() throws Exception {
     testRenewTokenSuccessHelper(true);
   }
 
   @Test
+  @Unhealthy("HDDS-11869")
   public void testRenewTokenSuccess() throws Exception {
     testRenewTokenSuccessHelper(false);
   }
@@ -281,6 +275,7 @@ public class TestOzoneDelegationTokenSecretManager {
    * Tests failure for mismatch in renewer.
    */
   @Test
+  @Unhealthy("HDDS-11869")
   public void testRenewTokenFailure() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
@@ -348,6 +343,7 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
+  @Unhealthy("HDDS-11869")
   public void testCancelTokenSuccess() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);

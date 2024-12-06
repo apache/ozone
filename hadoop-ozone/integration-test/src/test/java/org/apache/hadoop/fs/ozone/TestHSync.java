@@ -103,6 +103,7 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -1321,6 +1322,7 @@ public class TestHSync {
   }
 
   @Test
+  @Unhealthy("HDDS-11870")
   public void testHSyncKeyOverwriteNormalKey() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
@@ -1392,6 +1394,7 @@ public class TestHSync {
   }
 
   @Test
+  @Unhealthy("HDDS-11870")
   public void testHSyncKeyOverwriteHSyncKey() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
