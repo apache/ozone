@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -78,6 +79,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
+  private final AtomicLong callIdCount;
   private final AtomicBoolean suspended;
 
   public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
@@ -113,6 +115,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     this.submittedOpenKeyCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.callIdCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
   }
 
@@ -244,6 +247,7 @@ public class OpenKeyCleanupService extends BackgroundService {
           .setCmdType(Type.CommitKey)
           .setCommitKeyRequest(request)
           .setClientId(clientId.toString())
+          .setVersion(ClientVersion.CURRENT_VERSION)
           .build();
     }
 
@@ -265,7 +269,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     private OMResponse submitRequest(OMRequest omRequest) {
       try {
-        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callIdCount.incrementAndGet());
       } catch (ServiceException e) {
         LOG.error("Open key " + omRequest.getCmdType()
             + " request failed. Will retry at next run.", e);
