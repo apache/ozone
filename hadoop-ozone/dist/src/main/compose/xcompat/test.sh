@@ -32,16 +32,17 @@ source "${COMPOSE_DIR}/../testlib.sh"
 export SECURITY_ENABLED=true
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
-old_client() {
-  OZONE_DIR=/opt/ozone
-  container=${client}
-  "$@"
-}
+echo 'Compatibility Test' > "${TEST_DATA_DIR}"/small
 
-new_client() {
-  OZONE_DIR=/opt/hadoop
-  container=new_client
-  client_version=${current_version}
+client() {
+  if [[ "${client_version}" == "${current_version}" ]]; then
+    OZONE_DIR=/opt/hadoop
+    container=new_client
+  else
+    OZONE_DIR=/opt/ozone
+    container="old_client_${client_version//./_}"
+  fi
+
   "$@"
 }
 
@@ -60,7 +61,7 @@ _write() {
   execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" \
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
-    -v SUFFIX:${client_version} \
+    -v TEST_DATA_DIR:/testdata \
     compatibility/write.robot
 }
 
@@ -71,87 +72,46 @@ _read() {
     -v CLIENT_VERSION:${client_version} \
     -v CLUSTER_VERSION:${cluster_version} \
     -v DATA_VERSION:${data_version} \
-    -v SUFFIX:${data_version} \
+    -v TEST_DATA_DIR:/testdata \
     compatibility/read.robot
 }
 
 test_cross_compatibility() {
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
-  OZONE_KEEP_RESULTS=true start_docker_env
+  OZONE_KEEP_RESULTS=true start_docker_env 5
 
   execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
   _init
 
-  new_client _write
-  new_client _read ${current_version}
+  # first write with client matching cluster version
+  client_version="${cluster_version}" client _write
 
   for client_version in "$@"; do
-    client="old_client_${client_version//./_}"
+    # skip write, since already done
+    if [[ "${client_version}" == "${cluster_version}" ]]; then
+      continue
+    fi
+    client _write
+  done
 
-    old_client _write
-    old_client _read ${client_version}
-
-    old_client _read ${current_version}
-    new_client _read ${client_version}
+  for client_version in "$@"; do
+    for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
+      client _read ${data_version}
+    done
   done
 
   KEEP_RUNNING=false stop_docker_env
 }
 
-test_ec_cross_compatibility() {
-  echo "Running Erasure Coded storage backward compatibility tests."
-  # local cluster_versions_with_ec="1.3.0 1.4.0 ${current_version}"
-  local cluster_versions_with_ec="${current_version}" # until HDDS-11334
-  # TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
-  local non_ec_client_versions="1.1.0 1.2.1"
-
-  for cluster_version in ${cluster_versions_with_ec}; do
-    export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
-    OZONE_KEEP_RESULTS=true start_docker_env 5
-
-    echo -n "Generating data locally...   "
-    dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3 >/dev/null 2>&1
-    echo "done"
-    echo -n "Copy data into client containers...   "
-    for container in $(docker ps --format '{{.Names}}' | grep client); do
-      docker cp /tmp/1mb ${container}:/tmp/1mb
-      docker cp /tmp/2mb ${container}:/tmp/2mb
-      docker cp /tmp/3mb ${container}:/tmp/3mb
-    done
-    echo "done"
-    rm -f /tmp/1mb /tmp/2mb /tmp/3mb
-
-
-    local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
-    OZONE_DIR=/opt/hadoop
-    new_client _kinit
-    execute_robot_test new_client --include setup-ec-data -N "xcompat-cluster-${cluster_version}-setup-data" -v prefix:"${prefix}" ec/backward-compat.robot
-     OZONE_DIR=/opt/ozone
-
-    for client_version in ${non_ec_client_versions}; do
-      client="old_client_${client_version//./_}"
-      unset OUTPUT_PATH
-      container="${client}" _kinit
-      execute_robot_test "${client}" --include test-ec-compat -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${cluster_version}" -v prefix:"${prefix}" ec/backward-compat.robot
-    done
-
-    KEEP_RUNNING=false stop_docker_env
-  done
-}
-
 create_results_dir
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions}
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
 
 # old cluster with clients: same version and current version
 for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
+  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
 done
-
-test_ec_cross_compatibility
