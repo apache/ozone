@@ -126,7 +126,7 @@ public class TestECBlockOutputStreamEntry {
         .setIpAddress(ip)
         .setHostName(hostName)
         .addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, port))
+            DatanodeDetails.newStandalonePort(port))
         .build();
   }
 }

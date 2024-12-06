@@ -122,7 +122,7 @@ public final class KeyEntityInfoProtoWrapper {
   }
 
   @JsonProperty("isKey")
-  public boolean isKey() {
+  public boolean getIsKey() {
     return keyInfoProto.getIsFile();
   }
 

@@ -182,7 +182,6 @@ public final class DatanodeMetadata {
   /**
    * Builder for DatanodeMetadata.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String hostname;
     private String uuid;
@@ -206,78 +205,78 @@ public final class DatanodeMetadata {
       this.leaderCount = 0;
     }
 
-    public Builder withHostname(String hostname) {
+    public Builder setHostname(String hostname) {
       this.hostname = hostname;
       return this;
     }
 
-    public Builder withState(NodeState state) {
+    public Builder setState(NodeState state) {
       this.state = state;
       return this;
     }
 
-    public Builder withOperationalState(NodeOperationalState opState) {
-      this.opState = opState;
+    public Builder setOperationalState(NodeOperationalState operationalState) {
+      this.opState = operationalState;
       return this;
     }
 
-    public Builder withLastHeartbeat(long lastHeartbeat) {
+    public Builder setLastHeartbeat(long lastHeartbeat) {
       this.lastHeartbeat = lastHeartbeat;
       return this;
     }
 
-    public Builder withDatanodeStorageReport(DatanodeStorageReport 
+    public Builder setDatanodeStorageReport(DatanodeStorageReport 
                                                  datanodeStorageReport) {
       this.datanodeStorageReport = datanodeStorageReport;
       return this;
     }
 
-    public Builder withPipelines(List<DatanodePipeline> pipelines) {
+    public Builder setPipelines(List<DatanodePipeline> pipelines) {
       this.pipelines = pipelines;
       return this;
     }
 
-    public Builder withContainers(int containers) {
+    public Builder setContainers(int containers) {
       this.containers = containers;
       return this;
     }
 
-    public Builder withOpenContainers(int openContainers) {
+    public Builder setOpenContainers(int openContainers) {
       this.openContainers = openContainers;
       return this;
     }
 
-    public Builder withLeaderCount(int leaderCount) {
+    public Builder setLeaderCount(int leaderCount) {
       this.leaderCount = leaderCount;
       return this;
     }
 
-    public Builder withUUid(String uuid) {
+    public Builder setUuid(String uuid) {
       this.uuid = uuid;
       return this;
     }
 
-    public Builder withVersion(String version) {
+    public Builder setVersion(String version) {
       this.version = version;
       return this;
     }
 
-    public Builder withSetupTime(long setupTime) {
+    public Builder setSetupTime(long setupTime) {
       this.setupTime = setupTime;
       return this;
     }
 
-    public Builder withRevision(String revision) {
+    public Builder setRevision(String revision) {
       this.revision = revision;
       return this;
     }
 
-    public Builder withLayoutVersion(int layoutVersion) {
+    public Builder setLayoutVersion(int layoutVersion) {
       this.layoutVersion = layoutVersion;
       return this;
     }
 
-    public Builder withNetworkLocation(String networkLocation) {
+    public Builder setNetworkLocation(String networkLocation) {
       this.networkLocation = networkLocation;
       return this;
     }

@@ -332,6 +332,17 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   @VisibleForTesting
+  public double getCurrentECContainerThreshold() {
+    return ((ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE))
+        .getCurrentECContainerThreshold();
+  }
+
+  @VisibleForTesting
+  public ContainerSafeModeRule getContainerSafeModeRule() {
+    return (ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE);
+  }
+
+  @VisibleForTesting
   public HealthyPipelineSafeModeRule getHealthyPipelineSafeModeRule() {
     return (HealthyPipelineSafeModeRule)
         exitRules.get(HEALTHY_PIPELINE_EXIT_RULE);
