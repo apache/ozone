@@ -63,6 +63,7 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -661,7 +662,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 future.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(cmdType);
                 metrics.addContainerOpsLatency(
-                    cmdType, System.currentTimeMillis() - requestTime);
+                    cmdType, Time.monotonicNow() - requestTime);
                 semaphore.release();
               }
 

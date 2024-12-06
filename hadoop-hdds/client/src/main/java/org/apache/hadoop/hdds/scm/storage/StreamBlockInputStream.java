@@ -433,16 +433,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private void adjustBufferPosition(long bufferPosition) {
     // The bufferPosition is w.r.t the current buffers.
     // Adjust the bufferIndex and position to the seeked bufferPosition.
-    if (bufferIndex >= buffers.size()) {
-      bufferIndex = Collections.binarySearch(bufferOffsets, bufferPosition);
-    } else if (bufferPosition < bufferOffsets.get(bufferIndex)) {
-      bufferIndex = Collections.binarySearch(
-          bufferOffsets.subList(0, bufferIndex), bufferPosition);
-    } else if (bufferPosition >= bufferOffsets.get(bufferIndex) +
-        buffers.get(bufferIndex).capacity()) {
-      bufferIndex = Collections.binarySearch(bufferOffsets.subList(
-          bufferIndex + 1, buffers.size()), bufferPosition);
-    }
+    bufferIndex = Collections.binarySearch(bufferOffsets, bufferPosition);
     // bufferIndex is negative if bufferPosition isn't found in bufferOffsets
     // count (bufferIndex = -bufferIndex - 2) to get bufferPosition is between which offsets.
     if (bufferIndex < 0) {

@@ -17,9 +17,13 @@
 
 package org.apache.hadoop.ozone.client.rpc.read;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
@@ -49,10 +53,15 @@ public class TestStreamBlockInputStream {
    */
   @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(layout, true)) {
+    try (MiniOzoneCluster cluster = newCluster(layout)) {
       cluster.waitForClusterToBeReady();
 
-      try (OzoneClient client = cluster.newClient()) {
+      OzoneConfiguration conf = cluster.getConf();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setStreamReadBlock(true);
+      OzoneConfiguration copy = new OzoneConfiguration(conf);
+      copy.setFromObject(clientConfig);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         TestBucket bucket = TestBucket.newBuilder(client).build();
 
         testBlockReadBuffers(bucket);
