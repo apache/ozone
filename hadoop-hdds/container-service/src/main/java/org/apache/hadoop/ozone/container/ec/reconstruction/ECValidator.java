@@ -15,6 +15,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,12 +29,14 @@ public class ECValidator {
   private final int parityCount;
   private long blockLength;
   private final ECReplicationConfig ecReplicationConfig;
+  private int ecChunkSize;
 
   ECValidator(OzoneClientConfig config, ECReplicationConfig ecReplConfig) {
     // We fetch the configuration value beforehand to avoid re-fetching on every validation call
     isValidationEnabled = config.getEcReconstructionValidation();
     ecReplicationConfig = ecReplConfig;
     parityCount = ecReplConfig.getParity();
+    ecChunkSize = ecReplConfig.getEcChunkSize();
   }
 
   public void setReconstructionIndexes(Collection<Integer> reconstructionIndexes) {
@@ -44,24 +47,58 @@ public class ECValidator {
     this.blockLength = blockLength;
   }
 
-  private void validateChecksumInStripe(ContainerProtos.ChecksumData checksumData,
-                                           ByteString stripeChecksum, int chunkIndex)
+  /**
+   * Validate the expected checksum data for a chunk with the corresponding checksum in original stripe checksum
+   * Note: The stripe checksum is a combination of all the checksums of all the chunks in the stripe
+   * @param recreatedChunkChecksum Stores the {@link ContainerProtos.ChecksumData} of the recreated chunk to verify
+   * @param stripeChecksum         Stores the {@link ByteBuffer} of stripe checksum
+   * @param chunkIndex             Stores the index of the recreated chunk we are comparing
+   * @param checksumSize           Stores the length of the stripe checksum
+   * @throws OzoneChecksumException If there is a mismatch in the recreated chunk vs stripe checksum, or if there is any
+   *                                internal error while performing {@link ByteBuffer} operations
+   */
+  private void validateChecksumInStripe(ContainerProtos.ChecksumData recreatedChunkChecksum,
+                                        ByteBuffer stripeChecksum, int chunkIndex, int checksumSize)
     throws OzoneChecksumException {
 
-    // If we have say 100 bytes per checksum, in the stripe the first 100 bytes should
-    // correspond to the fist chunk checksum, next 100 should be the second chunk checksum
-    // and so on. So the checksum should range from (numOfBytes * index of chunk) to ((numOfBytes * index of chunk) + numOfBytes)
-    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    int bytesPerChecksum = recreatedChunkChecksum.getBytesPerChecksum();
+    int parityLength = (int) (Math.ceil((double)ecChunkSize / bytesPerChecksum) * 4L * parityCount);
+    // Ignore the parity bits
+    stripeChecksum.limit(checksumSize - parityLength);
 
-    int checksumIdxStart = (bytesPerChecksum * chunkIndex);
-    ByteString expectedChecksum = stripeChecksum.substring(checksumIdxStart,
-      (checksumIdxStart + bytesPerChecksum));
-    if (!checksumData.getChecksums(0).equals(expectedChecksum)) {
-      throw new OzoneChecksumException(String.format("Mismatch in checksum for recreated data: %s and existing stripe checksum: %s",
-        checksumData.getChecksums(0), expectedChecksum));
+    // If we have a 100 bytes per checksum, and a chunk of size 1000 bytes, it means there are total 10 checksums
+    // for each chunk that is present. So the 1st chunk will have 10 checksums together to form a single chunk checksum.
+    // For each chunk we will have:
+    //    Checksum of length = (chunkIdx * numOfChecksumPerChunk)
+    //    Number of Checksums per Chunk = (chunkSize / bytesPerChecksum)
+    // So the checksum should start from (numOfBytesPerChecksum * (chunkIdx * numOfChecksumPerChunk)
+
+    int checksumIdxStart = (ecChunkSize * chunkIndex);
+
+    stripeChecksum.position(checksumIdxStart);
+    ByteBuffer chunkChecksum = recreatedChunkChecksum.getChecksums(0).asReadOnlyByteBuffer();
+    while (chunkChecksum.hasRemaining()) {
+      try {
+        int recreatedChunkChecksumByte = chunkChecksum.getInt();
+        int expectedStripeChecksumByte = stripeChecksum.getInt();
+        if (recreatedChunkChecksumByte != expectedStripeChecksumByte) {
+          throw new OzoneChecksumException(
+              String.format("Mismatch in checksum for recreated data: %s and existing stripe checksum: %s",
+                  recreatedChunkChecksumByte, expectedStripeChecksumByte));
+        }
+      } catch (BufferUnderflowException bue) {
+        throw new OzoneChecksumException(
+            String.format("No more data to fetch from the stripe checksum at position: %s",
+                stripeChecksum.position()));
+      }
     }
   }
 
+  /**
+   * Get the block from the BlockData which contains the checksum information
+   * @param blockDataGroup An array of {@link BlockData} which contains all the blocks in a Datanode
+   * @return The block which contains the checksum information
+   */
   private BlockData getChecksumBlockData(BlockData[] blockDataGroup) {
     BlockData checksumBlockData = null;
     // Reverse traversal as all parity bits will have checksumBytes
@@ -101,10 +138,11 @@ public class ECValidator {
       }
       List<ContainerProtos.ChunkInfo> checksumBlockChunks = checksumBlockData.getChunks();
 
-      for (int i = 0; i < recreatedChunks.size(); i++) {
+      for (int chunkIdx = 0; chunkIdx < recreatedChunks.size(); chunkIdx++) {
+        ByteString stripeChecksum = checksumBlockChunks.get(chunkIdx).getStripeChecksum();
         validateChecksumInStripe(
-          recreatedChunks.get(i).getChecksumData(),
-          checksumBlockChunks.get(i).getStripeChecksum(), i
+            recreatedChunks.get(chunkIdx).getChecksumData(),
+            stripeChecksum.asReadOnlyByteBuffer(), stripeChecksum.size(), chunkIdx
         );
       }
     } else {
