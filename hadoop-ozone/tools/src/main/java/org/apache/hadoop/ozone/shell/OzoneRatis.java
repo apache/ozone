@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.shell.cli.sh.RatisShell;
@@ -30,7 +31,7 @@ import picocli.CommandLine;
         description = "Shell for running Ratis commands",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)
-public class OzoneRatis extends Shell {
+public class OzoneRatis extends GenericCli {
 
   public OzoneRatis() {
     super(OzoneRatis.class);
