@@ -301,7 +301,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.23.0</jline.version> <!-- should match version via picocli-shell-jline3 -->
+    <jline.version>3.27.1</jline.version> <!-- should match version via picocli-shell-jline3 -->
 
     <spring.version>5.3.39</spring.version>
     <jooq.version>3.11.10</jooq.version>
