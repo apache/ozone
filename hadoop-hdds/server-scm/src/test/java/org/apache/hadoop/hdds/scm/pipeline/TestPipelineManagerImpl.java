@@ -64,6 +64,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -358,7 +359,8 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       SCMSafeModeManager scmSafeModeManager =
-          new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
+          new SCMSafeModeManager(conf, new ArrayList<>(),
+              Mockito.mock(ContainerManager.class), pipelineManager,
               new EventQueue(), serviceManager, scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
@@ -469,7 +471,7 @@ public class TestPipelineManagerImpl {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            null, pipelineManager, new EventQueue(),
+            Mockito.mock(ContainerManager.class), pipelineManager, new EventQueue(),
             serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
