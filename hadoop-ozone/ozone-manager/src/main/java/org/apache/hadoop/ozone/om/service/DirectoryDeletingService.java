@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -85,6 +86,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
+  private DeletingServiceMetrics metrics;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -102,6 +104,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
+    this.metrics = ozoneManager.getDeletionMetrics();
   }
 
   private boolean shouldRun() {
