@@ -658,12 +658,13 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public PendingKeysDeletion getPendingDeletionKeys(final int count)
+  public PendingKeysDeletion getPendingDeletionKeys(final int count,
+      final String startKey)
       throws IOException {
     OmMetadataManagerImpl omMetadataManager =
         (OmMetadataManagerImpl) metadataManager;
-    return omMetadataManager
-        .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
+    return omMetadataManager.getPendingDeletionKeys(count, startKey,
+        ozoneManager.getOmSnapshotManager());
   }
 
   private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
