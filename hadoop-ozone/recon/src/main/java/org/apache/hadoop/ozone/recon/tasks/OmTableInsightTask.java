@@ -281,7 +281,7 @@ public class OmTableInsightTask implements ReconOmTask {
           using(sqlConfiguration).fetchValue(select(currentTimestamp()));
       GlobalStats record = globalStatsDao.fetchOneByKey(entry.getKey());
       GlobalStats newRecord
-          = new GlobalStats(entry.getKey(), entry.getValue(), now);
+          = new GlobalStats(entry.getKey(), entry.getValue(), now.toLocalDateTime());
 
       // Insert a new record for key if it does not exist
       if (record == null) {
