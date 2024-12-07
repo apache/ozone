@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.tag.Flaky;
 
 import static org.apache.hadoop.hdds.scm.client.HddsClientUtils.checkForException;
 import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.BLOCK_SIZE;
@@ -51,8 +50,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,12 +69,12 @@ class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
 
-  @BeforeEach
+  @BeforeAll
   void init() throws Exception {
     cluster = createCluster();
   }
 
-  @AfterEach
+  @AfterAll
   void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -187,7 +186,6 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  @Flaky("HDDS-6113")
   void testWatchForCommitDatanodeFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -267,6 +265,7 @@ class TestBlockOutputStreamWithFailures {
       // Written the same data twice
       byte[] bytes = ArrayUtils.addAll(data1, data1);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
     }
   }
 
@@ -367,6 +366,8 @@ class TestBlockOutputStreamWithFailures {
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(0, keyOutputStream.getLocationInfoList().size());
       validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(0), false);
+      cluster.restartHddsDatanode(pipeline.getNodes().get(1), true);
     }
   }
 
@@ -579,7 +580,6 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  @Flaky("HDDS-6113")
   void testDatanodeFailureWithSingleNode(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
