@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
+import org.apache.hadoop.hdds.cli.AbstractMixin;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -32,7 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
  * Common options for specifying replication config: specialized for
  * Ozone Shell and Freon commands.
  */
-public abstract class ReplicationOptions {
+public abstract class ReplicationOptions extends AbstractMixin {
 
   protected static final String REPLICATION_DESCRIPTION =
       "Replication definition. Valid values are replication"

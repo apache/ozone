@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.shell.volume;
 
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine.Command;
@@ -50,7 +48,7 @@ import picocli.CommandLine.ParentCommand;
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class VolumeCommands implements GenericParentCommand, Callable<Void> {
+public class VolumeCommands implements Callable<Void> {
 
   @ParentCommand
   private Shell shell;
@@ -59,15 +57,5 @@ public class VolumeCommands implements GenericParentCommand, Callable<Void> {
   public Void call() throws Exception {
     throw new MissingSubcommandException(
         this.shell.getCmd().getSubcommands().get("volume"));
-  }
-
-  @Override
-  public boolean isVerbose() {
-    return shell.isVerbose();
-  }
-
-  @Override
-  public OzoneConfiguration createOzoneConfiguration() {
-    return shell.createOzoneConfiguration();
   }
 }

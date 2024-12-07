@@ -22,13 +22,11 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.shell.ReplicationOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Spec;
 
 import java.util.Optional;
-
-import static picocli.CommandLine.Spec.Target.MIXEE;
 
 /**
  * Options for specifying replication config for Freon.
@@ -38,9 +36,6 @@ public class FreonReplicationOptions extends ReplicationOptions {
   private static final String FACTOR_OPT = "--factor";
 
   private ReplicationFactor factor;
-
-  @Spec(MIXEE)
-  private CommandSpec spec;
 
   @Option(names = { "-F", FACTOR_OPT },
       description = "[deprecated] Replication factor (ONE, THREE)",
@@ -70,10 +65,13 @@ public class FreonReplicationOptions extends ReplicationOptions {
    */
   @Override
   public Optional<ReplicationConfig> fromParams(ConfigurationSource conf) {
-    if (spec != null && spec.commandLine().getParseResult() != null &&
-            spec.commandLine().getParseResult().hasMatchedOption(FACTOR_OPT)) {
-      return Optional.of(ReplicationConfig.fromTypeAndFactor(
-          ReplicationType.RATIS, factor));
+    CommandSpec spec = spec();
+    if (spec != null) {
+      CommandLine.ParseResult parseResult = spec.commandLine().getParseResult();
+      if (parseResult != null && parseResult.hasMatchedOption(FACTOR_OPT)) {
+        return Optional.of(ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS, factor));
+      }
     }
 
     return super.fromParams(conf);
