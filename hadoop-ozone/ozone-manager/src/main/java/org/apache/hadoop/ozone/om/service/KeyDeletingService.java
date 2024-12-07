@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Preconditions;
@@ -99,13 +100,22 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
 
+  public DeletedKeySupplier getDeletedKeySupplier() {
+    return deletedKeySupplier;
+  }
+
+  private final DeletedKeySupplier deletedKeySupplier;
+  private AtomicInteger taskCount = new AtomicInteger(0);
+  private final int keyDeletingCorePoolSize;
+
+  @SuppressWarnings("parameternumber")
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
       long serviceTimeout, ConfigurationSource conf,
-      boolean deepCleanSnapshots) {
+      boolean deepCleanSnapshots, int keyDeletingCorePoolSize) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
-        TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
+        TimeUnit.MILLISECONDS, keyDeletingCorePoolSize,
         serviceTimeout, ozoneManager, scmClient);
     this.manager = manager;
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
@@ -121,6 +131,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)manager.getMetadataManager()).getSnapshotChainManager();
+    deletedKeySupplier = new DeletedKeySupplier();
+    taskCount.set(0);
+    this.keyDeletingCorePoolSize = keyDeletingCorePoolSize;
   }
 
   /**
@@ -140,8 +153,55 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask(this));
+    if (taskCount.get() > 0) {
+      LOG.info("{} Key deleting task(s) already in progress.",
+          taskCount.get());
+      return queue;
+    }
+    try {
+      deletedKeySupplier.reInitItr();
+    } catch (IOException ex) {
+      LOG.error("Unable to get the iterator.", ex);
+    }
+    taskCount.set(keyDeletingCorePoolSize);
+    for (int i = 0; i < keyDeletingCorePoolSize; i++) {
+      queue.add(new KeyDeletingTask(this));
+    }
     return queue;
+  }
+
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    deletedKeySupplier.closeItr();
+  }
+
+  /**
+   * DeletedKeySupplier class.
+   */
+  public final class DeletedKeySupplier {
+    private TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        deleteKeyTableIterator;
+
+    public synchronized Table.KeyValue<String, RepeatedOmKeyInfo> get()
+        throws IOException {
+      if (deleteKeyTableIterator.hasNext()) {
+        return deleteKeyTableIterator.next();
+      }
+      return null;
+    }
+
+    public synchronized void closeItr() {
+      IOUtils.closeQuietly(deleteKeyTableIterator);
+      deleteKeyTableIterator = null;
+    }
+
+    public synchronized void reInitItr() throws IOException {
+      closeItr();
+      deleteKeyTableIterator =
+          manager.getMetadataManager().getDeletedTable().iterator();
+
+    }
   }
 
   private boolean shouldRun() {
@@ -214,13 +274,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           // snapshotId since AOS could process multiple buckets in one iteration.
           UUID expectedPreviousSnapshotId = snapshotChainManager.getLatestGlobalSnapshotId();
           PendingKeysDeletion pendingKeysDeletion = manager
-              .getPendingDeletionKeys(getKeyLimitPerTask());
+              .getPendingDeletionKeys(getKeyLimitPerTask(), deletedKeySupplier);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
               .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
+                pendingKeysDeletion.getKeysToModify(), null,
+                expectedPreviousSnapshotId, run);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {
@@ -230,7 +291,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         try {
           if (deepCleanSnapshots && delCount < keyLimitPerTask) {
-            processSnapshotDeepClean(delCount);
+            processSnapshotDeepClean(delCount, run);
           }
         } catch (Exception e) {
           LOG.error("Error while running deep clean on snapshots. Will " +
@@ -238,6 +299,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
+      taskCount.getAndDecrement();
       isRunningOnAOS.set(false);
       synchronized (deletingService) {
         this.deletingService.notify();
@@ -248,7 +310,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     @SuppressWarnings("checkstyle:MethodLength")
-    private void processSnapshotDeepClean(int delCount)
+    private void processSnapshotDeepClean(int delCount, long run)
         throws IOException {
       OmSnapshotManager omSnapshotManager =
           getOzoneManager().getOmSnapshotManager();
@@ -446,7 +508,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               if (!keysToPurge.isEmpty()) {
                 processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
                     keysToModify, currSnapInfo.getTableKey(),
-                    Optional.ofNullable(previousSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null));
+                    Optional.ofNullable(previousSnapshot)
+                        .map(SnapshotInfo::getSnapshotId).orElse(null), run);
               }
             } finally {
               IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);
