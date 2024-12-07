@@ -587,6 +587,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
+  @Flaky("HDDS-11855")
   public void checkIterationResultException(@Nonnull MockedSCM mockedSCM)
       throws NodeNotFoundException, ContainerNotFoundException, TimeoutException, ContainerReplicaNotFoundException {
     int nodeCount = mockedSCM.getNodeCount();

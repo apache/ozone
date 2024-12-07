@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.debug;
 import com.google.common.collect.ImmutableSortedMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.DatanodeVersion;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -40,13 +40,8 @@ import java.util.concurrent.Callable;
         "get a cross-component view of versions.  The goal of this command is to help quickly get a glance of the " +
         "latest features supported by Ozone on the current node."
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class VersionDebug implements Callable<Void>, SubcommandWithParent {
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
+@MetaInfServices(DebugSubcommand.class)
+public class VersionDebug implements Callable<Void>, DebugSubcommand {
 
   @Override
   public Void call() throws IOException {

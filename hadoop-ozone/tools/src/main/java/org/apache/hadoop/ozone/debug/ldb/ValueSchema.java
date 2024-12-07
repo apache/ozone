@@ -18,14 +18,12 @@
 
 package org.apache.hadoop.ozone.debug.ldb;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
-import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -53,8 +51,7 @@ import java.util.stream.Collectors;
     name = "value-schema",
     description = "Schema of value in metadataTable"
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class ValueSchema implements Callable<Void>, SubcommandWithParent {
+public class ValueSchema implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -171,11 +168,6 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
 
   private static PrintWriter out() {
     return spec.commandLine().getOut();
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBParser.class;
   }
 
   private static String removeTrailingSlashIfNeeded(String dbPath) {
