@@ -52,6 +52,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -128,7 +130,7 @@ public class TestReconInsightsForDeletedDirectories {
   }
 
   @AfterEach
-  public void cleanup() {
+  public void cleanup() throws IOException {
     assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
@@ -421,24 +423,31 @@ public class TestReconInsightsForDeletedDirectories {
     OMMetadataManager metadataManager =
         cluster.getOzoneManager().getMetadataManager();
 
-    try (TableIterator<?, ?> it = metadataManager.getDeletedDirTable()
-        .iterator()) {
-      removeAllFromDB(it);
+    Table<String, OmKeyInfo> deletedDirTable =
+        metadataManager.getDeletedDirTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = deletedDirTable.iterator()) {
+      removeAllFromDB(it, deletedDirTable);
     }
-    try (TableIterator<?, ?> it = metadataManager.getFileTable().iterator()) {
-      removeAllFromDB(it);
+    Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = fileTable.iterator()) {
+      removeAllFromDB(it, fileTable);
     }
-    try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
-        .iterator()) {
-      removeAllFromDB(it);
+    Table<String, OmDirectoryInfo> directoryTable =
+        metadataManager.getDirectoryTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = directoryTable.iterator()) {
+      removeAllFromDB(it, directoryTable);
     }
   }
 
-  private static void removeAllFromDB(TableIterator<?, ?> iterator)
-      throws IOException {
+  private static void removeAllFromDB(
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator,
+      Table<String, ?> table) throws IOException {
+    List<String> keysToDelete = new ArrayList<>();
     while (iterator.hasNext()) {
-      iterator.next();
-      iterator.removeFromDB();
+      keysToDelete.add(iterator.next().getKey());
+    }
+    for (String keyToDelete : keysToDelete) {
+      table.delete(keyToDelete);
     }
   }
 

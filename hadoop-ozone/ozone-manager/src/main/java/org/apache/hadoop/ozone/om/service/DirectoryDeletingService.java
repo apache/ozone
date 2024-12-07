@@ -82,7 +82,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   // Number of items(dirs/files) to be batched in an iteration.
   private final long pathLimitPerTask;
-  private final int ratisByteLimit;
+  private int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
 
@@ -132,6 +132,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     suspended.set(false);
   }
 
+  public void setRatisByteLimit(int ratisByteLimit) {
+    this.ratisByteLimit = ratisByteLimit;
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -163,8 +167,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subDirNum = 0L;
         long subFileNum = 0L;
         long remainNum = pathLimitPerTask;
-        int consumedSize = 0;
-        List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
+        long remainingBufLimit = ratisByteLimit;
+        List<List<PurgePathRequest>> purgeRequestListBatches = new ArrayList<>();
+        List<PurgePathRequest> currentPurgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
 
@@ -188,27 +193,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               continue;
             }
 
-            PurgePathRequest request = prepareDeleteDirRequest(
-                remainNum, pendingDeletedDirInfo.getValue(),
+            PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+                pendingDeletedDirInfo.getValue(),
                 pendingDeletedDirInfo.getKey(), allSubDirList,
-                getOzoneManager().getKeyManager());
-            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                request.getSerializedSize())) {
-              if (purgePathRequestList.size() != 0) {
-                // if message buffer reaches max limit, avoid sending further
-                remainNum = 0;
-                break;
-              }
-              // if directory itself is having a lot of keys / files,
-              // reduce capacity to minimum level
-              remainNum = MIN_ERR_LIMIT_PER_TASK;
-              request = prepareDeleteDirRequest(
-                  remainNum, pendingDeletedDirInfo.getValue(),
-                  pendingDeletedDirInfo.getKey(), allSubDirList,
-                  getOzoneManager().getKeyManager());
+                getOzoneManager().getKeyManager(), remainingBufLimit);
+            remainingBufLimit -= request.getSerializedSize();
+            currentPurgePathRequestList.add(request);
+            if (remainingBufLimit <= 0) {
+              remainingBufLimit = ratisByteLimit;
+              purgeRequestListBatches.add(currentPurgePathRequestList);
+              currentPurgePathRequestList = new ArrayList<>();
             }
-            consumedSize += request.getSerializedSize();
-            purgePathRequestList.add(request);
             // reduce remain count for self, sub-files, and sub-directories
             remainNum = remainNum - 1;
             remainNum = remainNum - request.getDeletedSubFilesCount();
@@ -224,9 +219,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, purgePathRequestList, null, startTime,
-              ratisByteLimit - consumedSize,
-              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId);
+              allSubDirList, currentPurgePathRequestList, null, startTime,
+              remainingBufLimit, ratisByteLimit,
+              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId, purgeRequestListBatches);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
