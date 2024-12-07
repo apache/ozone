@@ -352,6 +352,12 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public Map<String, String> getNodeContainersReplicationMetrics(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return null;
+  }
+
+  @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     return null;
   }

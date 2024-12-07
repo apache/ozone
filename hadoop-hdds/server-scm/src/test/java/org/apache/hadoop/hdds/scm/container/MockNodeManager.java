@@ -873,6 +873,12 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  public Map<String, String> getNodeContainersReplicationMetrics(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return null;
+  }
+
+  @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     List<DatanodeDetails> results = new LinkedList<>();
     Set<String> uuids = dnsToUuidMap.get(address);

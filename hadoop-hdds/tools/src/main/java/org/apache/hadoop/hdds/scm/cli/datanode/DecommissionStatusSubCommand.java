@@ -107,6 +107,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
         datanodeMap.put("datanodeDetails", datanode);
         datanodeMap.put("metrics", getCounts(datanode, jsonNode, numDecomNodes));
         datanodeMap.put("containers", getContainers(scmClient, datanode));
+        datanodeMap.put("containersReplicationMetrics", node.getContainerReplicationMetricsList().stream()
+            .collect(Collectors.toMap(HddsProtos.KeyValue::getKey, HddsProtos.KeyValue::getValue)));
         decommissioningNodesDetails.add(datanodeMap);
       }
       System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(decommissioningNodesDetails));
@@ -120,6 +122,10 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       printCounts(datanode, jsonNode, numDecomNodes);
       Map<String, List<ContainerID>> containers = scmClient.getContainersOnDecomNode(datanode);
       System.out.println(containers);
+      System.out.println("ContainersReplicationMetrics:");
+      for (HddsProtos.KeyValue keyValue: node.getContainerReplicationMetricsList()) {
+        System.out.println(keyValue.getKey() + ": " + keyValue.getValue());
+      }
     }
   }
 
