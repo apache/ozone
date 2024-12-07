@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.debug.segmentparser;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 
@@ -39,9 +38,5 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 @MetaInfServices(DebugSubcommand.class)
-public class RatisLogParser extends GenericCli implements DebugSubcommand {
-
-  public static void main(String[] args) {
-    new RatisLogParser().run(args);
-  }
+public class RatisLogParser implements DebugSubcommand {
 }
