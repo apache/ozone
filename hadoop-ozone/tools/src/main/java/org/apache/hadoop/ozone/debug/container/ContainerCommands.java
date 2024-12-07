@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.debug.container;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -48,9 +47,7 @@ import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
-import picocli.CommandLine.Spec;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +60,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 
 /**
@@ -82,7 +78,7 @@ import java.util.stream.Stream;
         InspectSubcommand.class
     })
 @MetaInfServices(DebugSubcommand.class)
-public class ContainerCommands implements Callable<Void>, DebugSubcommand {
+public class ContainerCommands implements DebugSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerCommands.class);
@@ -90,18 +86,9 @@ public class ContainerCommands implements Callable<Void>, DebugSubcommand {
   @ParentCommand
   private OzoneDebug parent;
 
-  @Spec
-  private CommandSpec spec;
-
   private MutableVolumeSet volumeSet;
 
   private ContainerController controller;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 
   OzoneConfiguration getOzoneConf() {
     return parent.getOzoneConf();
