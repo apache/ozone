@@ -51,11 +51,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
+import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
@@ -147,6 +149,16 @@ public class ReconServer extends GenericCli {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
+      SchemaVersionTableDefinition reconVersionSchemaInstance =
+          injector.getInstance(SchemaVersionTableDefinition.class);
+      try {
+        // If the version information is not already set, this is the first time the version
+        // will be added, hence update it to the current code SLV
+        reconVersionSchemaInstance.insertCurrentVersion(ReconLayoutVersionManager.determineSLV());
+      } catch (SQLException se) {
+        LOG.error("Failed to update version_number, defaulting to -1.");
+      }
+
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
@@ -167,6 +179,7 @@ public class ReconServer extends GenericCli {
       // Run the upgrade framework to finalize layout features if needed
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
           (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+
       layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
