@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
@@ -1554,23 +1555,26 @@ public class RpcClient implements ClientProtocol {
     OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, true);
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
-
+    ReplicationConfig replicationConfig = keyInfo.getReplicationConfig();
     for (OmKeyLocationInfo locationInfo : keyLocationInfos) {
       Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
 
 
       Pipeline pipelineBefore = locationInfo.getPipeline();
       List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
-
       for (DatanodeDetails dn : datanodes) {
         List<DatanodeDetails> nodes = new ArrayList<>();
         nodes.add(dn);
         Pipeline pipeline
             = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
             .setId(PipelineID.randomId()).build();
+        long length = replicationConfig instanceof ECReplicationConfig
+                ? internalBlockLength(pipelineBefore.getReplicaIndex(dn),
+                (ECReplicationConfig) replicationConfig, locationInfo.getLength())
+                : locationInfo.getLength();
         OmKeyLocationInfo dnKeyLocation = new OmKeyLocationInfo.Builder()
             .setBlockID(locationInfo.getBlockID())
-            .setLength(locationInfo.getLength())
+            .setLength(length)
             .setOffset(locationInfo.getOffset())
             .setToken(locationInfo.getToken())
             .setPartNumber(locationInfo.getPartNumber())
@@ -1594,7 +1598,9 @@ public class RpcClient implements ClientProtocol {
             .setDataSize(keyInfo.getDataSize())
             .setCreationTime(keyInfo.getCreationTime())
             .setModificationTime(keyInfo.getModificationTime())
-            .setReplicationConfig(keyInfo.getReplicationConfig())
+            .setReplicationConfig(replicationConfig instanceof ECReplicationConfig
+                    ? RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)
+                    : keyInfo.getReplicationConfig())
             .setFileEncryptionInfo(keyInfo.getFileEncryptionInfo())
             .setAcls(keyInfo.getAcls())
             .setObjectID(keyInfo.getObjectID())
@@ -1603,9 +1609,9 @@ public class RpcClient implements ClientProtocol {
             .setFileChecksum(keyInfo.getFileChecksum())
             .setOwnerName(keyInfo.getOwnerName())
             .build();
+
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
-
         blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
       }
 
@@ -1613,6 +1619,30 @@ public class RpcClient implements ClientProtocol {
     }
 
     return result;
+  }
+
+  // Helper method to calculate the internal block length of an EC-replicated key.
+  private long internalBlockLength(int index, ECReplicationConfig ecRepConfig, long blockLength) {
+    long ecChunkSize = (long) ecRepConfig.getEcChunkSize();
+    long stripeSize = ecChunkSize * ecRepConfig.getData();
+    long lastStripe = blockLength % stripeSize;
+    long blockSize = (blockLength - lastStripe) / ecRepConfig.getData();
+    long lastCell = lastStripe / ecChunkSize + 1;
+    long lastCellLength = lastStripe % ecChunkSize;
+    if (index > ecRepConfig.getData()) {
+      // Parity blocks and their size are driven by the size of the
+      // first block of the block group. All parity blocks have the same size
+      // as block_1.
+      index = 1;
+    }
+
+    if (index < lastCell) {
+      return blockSize + ecChunkSize;
+    } else if (index == lastCell) {
+      return blockSize + lastCellLength;
+    } else {
+      return blockSize;
+    }
   }
 
   @Override
