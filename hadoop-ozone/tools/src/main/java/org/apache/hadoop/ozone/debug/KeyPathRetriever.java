@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -59,8 +59,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 @CommandLine.Command(
     name = "retrieve-key-fullpath",
     description = "retrieve full key path with matching criteria")
-@MetaInfServices(SubcommandWithParent.class)
-public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class KeyPathRetriever implements Callable<Void>, DebugSubcommand {
   private static final String DIRTREEDBNAME = "omdirtree.db";
   private static final DBColumnFamilyDefinition<Long, String> DIRTREE_COLUMN_FAMILY
       = new DBColumnFamilyDefinition<>("dirTreeTable", LongCodec.get(), StringCodec.get());
@@ -85,11 +85,6 @@ public class KeyPathRetriever implements Callable<Void>, SubcommandWithParent {
 
   private DBStore dirTreeDbStore = null;
   private Table<Long, String> dirTreeTable = null;
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
 
   public void setDirTreeTable(Table<Long, String> table) {
     this.dirTreeTable = table;
