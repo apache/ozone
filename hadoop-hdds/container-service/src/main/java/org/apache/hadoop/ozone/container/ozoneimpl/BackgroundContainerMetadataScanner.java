@@ -79,13 +79,13 @@ public class BackgroundContainerMetadataScanner extends
     if (!result.isHealthy()) {
       LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
           containerID, result.getException());
-      metrics.incNumUnHealthyContainers();
+      incNumUnHealthyEachIteration();
       controller.markContainerUnhealthy(containerID, result);
     }
 
     // Do not update the scan timestamp after the scan since this was just a
     // metadata scan, not a full data scan.
-    metrics.incNumContainersScanned();
+    incNumContainersScannedEachIteration();
   }
 
   @Override
