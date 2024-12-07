@@ -19,8 +19,7 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.ozone.repair.OzoneRepair;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -34,8 +33,8 @@ import java.util.concurrent.Callable;
         FSORepairCLI.class,
     },
     description = "Operational tool to repair OM.")
-@MetaInfServices(SubcommandWithParent.class)
-public class OMRepair implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(RepairSubcommand.class)
+public class OMRepair implements Callable<Void>, RepairSubcommand {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -44,10 +43,5 @@ public class OMRepair implements Callable<Void>, SubcommandWithParent {
   public Void call() {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneRepair.class;
   }
 }
