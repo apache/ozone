@@ -392,14 +392,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Metadata constructor for checkpoints.
+   * Metadata constructor for checkpoints and readonly db.
    *
    * @param conf - Ozone conf.
-   * @param dir - Checkpoint parent directory.
-   * @param name - Checkpoint directory name.
+   * @param dir - parent directory.
+   * @param name - directory name.
    * @throws IOException
    */
-  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+  public OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
