@@ -210,7 +210,7 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
-        if: ${{ !contains('author,bats,docs', matrix.check) }}
+        if: ${{ !contains('author,bats', matrix.check) }}
       - name: Setup java
         uses: actions/setup-java@v4
         with:
@@ -284,6 +284,15 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -358,6 +367,15 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -400,6 +418,15 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
