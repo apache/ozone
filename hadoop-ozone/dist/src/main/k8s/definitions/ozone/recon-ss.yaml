@@ -13,24 +13,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-resources:
-- config-configmap.yaml
-- datanode-service.yaml
-- datanode-statefulset.yaml
-- httpfs-service.yaml
-- httpfs-statefulset.yaml
-- om-service.yaml
-- om-statefulset.yaml
-- recon-service.yaml
-- recon-statefulset.yaml
-- s3g-service.yaml
-- s3g-statefulset.yaml
-- scm-service.yaml
-- scm-statefulset.yaml
-- datanode-public-service.yaml
-- httpfs-public-service.yaml
-- om-public-service.yaml
-- recon-public-service.yaml
-- s3g-public-service.yaml
-- scm-public-service.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: recon
+  labels:
+    app.kubernetes.io/component: ozone
+spec:
+  selector:
+    matchLabels:
+      app: ozone
+      component: recon
+  serviceName: recon
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ozone
+        component: recon
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9888"
+        prometheus.io/path: "/prom"
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: recon
+        image: "@docker.image@"
+        args: ["ozone","recon"]
+        env:
+        - name: WAITFOR
+          value: scm-0.scm:9876
+        livenessProbe:
+          tcpSocket:
+            port: 9891
+          initialDelaySeconds: 30
+      volumes: []
