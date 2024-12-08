@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -104,6 +105,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(OzoneManagerServiceProviderImpl.class).in(Singleton.class);
     bind(ReconUtils.class).in(Singleton.class);
     bind(ReconContext.class).in(Singleton.class);
+    bind(ReconTaskStatusCounter.class).in(Singleton.class);
     // Persistence - inject configuration provider
     install(new JooqPersistenceModule(
         getProvider(DataSourceConfiguration.class)));

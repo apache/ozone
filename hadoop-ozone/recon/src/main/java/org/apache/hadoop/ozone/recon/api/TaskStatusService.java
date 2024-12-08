@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusCountResponse;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
@@ -27,7 +32,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Endpoint for displaying the last successful run of each Recon Task.
@@ -38,6 +45,25 @@ public class TaskStatusService {
 
   @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
+  @Inject
+  private ReconTaskStatusCounter taskStatusCounter;
+
+  /**
+   * Internal class to represent a list of all the tasks and their counts in Recon.
+   */
+  static class ReconAllTasksCountResponse {
+    // An array of all the tasks and their respective successes/failures
+    @JsonProperty("tasks")
+    private final List<ReconTaskStatusCountResponse> tasks;
+
+    ReconAllTasksCountResponse(List<ReconTaskStatusCountResponse> tasks) {
+      this.tasks = tasks;
+    }
+
+    public List<ReconTaskStatusCountResponse> getTasks() {
+      return tasks;
+    }
+  }
 
   /**
    * Return the list of Recon Tasks and the last successful timestamp and
@@ -49,5 +75,37 @@ public class TaskStatusService {
   public Response getTaskTimes() {
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
+  }
+
+  /**
+   * Returns a list of tasks mapped using their task names to the number of
+   * successful runs and number of failed runs for the respective task.
+   * @return {@link Response} in the format of:
+   * <br>
+   * <code>
+   *   {
+   *    "tasks": [{
+   *      "taskName": task name,
+   *      "successes": count of successful runs,
+   *      "failures": count of failed runs,
+   *      "startedAt": time at which the counters were initialized
+   *    }, {....}]
+   *   }
+   * </code>
+   */
+  @GET
+  @Path("stats")
+  public Response getTaskStatusStats() {
+    Map<String, ReconTaskStatusStat> tasksPairMap = taskStatusCounter.getTaskCounts();
+    List<ReconTaskStatusCountResponse> tasks = new ArrayList<>();
+    for (Map.Entry<String, ReconTaskStatusStat> entry: tasksPairMap.entrySet()) {
+      tasks.add(new ReconTaskStatusCountResponse(
+          entry.getKey(),
+          entry.getValue().getSuccessCount(),
+          entry.getValue().getFailureCount(),
+          entry.getValue().getInitializationTime()
+      ));
+    }
+    return Response.ok(new ReconAllTasksCountResponse(tasks)).build();
   }
 }
