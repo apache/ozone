@@ -33,19 +33,18 @@ import picocli.CommandLine;
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneAdmin extends GenericCli {
+public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
 
   private OzoneConfiguration ozoneConf;
 
   private UserGroupInformation user;
 
   public OzoneAdmin() {
-    super(OzoneAdmin.class);
+    super();
   }
 
   @VisibleForTesting
   public OzoneAdmin(OzoneConfiguration conf) {
-    super(OzoneAdmin.class);
     ozoneConf = conf;
   }
 
@@ -78,5 +77,10 @@ public class OzoneAdmin extends GenericCli {
     String spanName = "ozone admin " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));
+  }
+
+  @Override
+  public Class<? extends AdminSubcommand> subcommandType() {
+    return AdminSubcommand.class;
   }
 }

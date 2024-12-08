@@ -279,16 +279,16 @@
   </property>
   <property>
     <name>hdds.ratis.snapshot.threshold</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
       taken.
     </description>
   </property>
   <property>
     <name>hdds.container.ratis.statemachine.max.pending.apply-transactions</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Maximum number of pending apply transactions in a data
       pipeline. The default value is kept same as default snapshot threshold
       hdds.ratis.snapshot.threshold.

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -170,6 +171,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
 
+    private RaftPeerId leaderId = RaftPeerId.valueOf(UUID.randomUUID().toString());
+
     @Override
     public void start() {
     }
@@ -282,6 +285,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     @Override
     public GrpcTlsConfig getGrpcTlsConfig() {
       return null;
+    }
+
+    @Override
+    public RaftPeerId getLeaderId() {
+      return leaderId;
     }
   }
 }
