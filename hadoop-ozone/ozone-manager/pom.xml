@@ -29,6 +29,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
+    <classpath.skip>false</classpath.skip>
   </properties>
 
   <dependencies>
@@ -474,12 +475,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
+        <groupId>dev.aspectj</groupId>
         <artifactId>aspectj-maven-plugin</artifactId>
         <version>${aspectj-plugin.version}</version>
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
+          <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
         </configuration>
         <executions>
           <execution>

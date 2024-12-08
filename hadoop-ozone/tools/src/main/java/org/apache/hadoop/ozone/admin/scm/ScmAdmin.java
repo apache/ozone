@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Subcommand for admin operations related to SCM.
@@ -43,28 +40,13 @@ import picocli.CommandLine.Spec;
         DecommissionScmSubcommand.class,
         RotateKeySubCommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ScmAdmin extends GenericCli implements SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class ScmAdmin implements AdminSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
-  @Spec
-  private CommandSpec spec;
-
   public OzoneAdmin getParent() {
     return parent;
   }
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
-  }
-
 }

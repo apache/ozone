@@ -281,8 +281,9 @@ const DELETED_TAB_COLUMNS = [
 const PENDINGDIR_TAB_COLUMNS = [
   {
     title: 'Directory Name',
-    dataIndex: 'path',
-    key: 'path'
+    dataIndex: 'key',
+    isSearchable: true,
+    key: 'key'
   },
   {
     title: 'In state since',
@@ -294,9 +295,8 @@ const PENDINGDIR_TAB_COLUMNS = [
   },
   {
     title: 'Path',
-    dataIndex: 'key',
-    key: 'key',
-    isSearchable: true,
+    dataIndex: 'path',
+    key: 'path',
     width: '450px'
   },
   {

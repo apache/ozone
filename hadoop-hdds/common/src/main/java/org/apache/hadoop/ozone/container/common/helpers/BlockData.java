@@ -39,7 +39,8 @@ public class BlockData {
   private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
       Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
       BlockData::getFromProtoBuf,
-      BlockData::getProtoBufMessage);
+      BlockData::getProtoBufMessage,
+      BlockData.class);
 
   public static Codec<BlockData> getCodec() {
     return CODEC;
@@ -253,7 +254,7 @@ public class BlockData {
         size = singleChunk.getLen();
       } else {
         chunkList = chunks;
-        size = chunks.parallelStream()
+        size = chunks.stream()
             .mapToLong(ContainerProtos.ChunkInfo::getLen)
             .sum();
       }

@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.Signature;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -35,6 +34,8 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
@@ -50,6 +51,8 @@ import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
@@ -64,11 +67,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.slf4j.event.Level;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +93,7 @@ public class TestOzoneDelegationTokenSecretManager {
   private OzoneDelegationTokenSecretManager secretManager;
   private SecurityConfig securityConfig;
   private OMCertificateClient certificateClient;
+  private SecretKeyClient secretKeyClient;
   private long expiryTime;
   private Text serviceRpcAdd;
   private OzoneConfiguration conf;
@@ -102,6 +109,7 @@ public class TestOzoneDelegationTokenSecretManager {
     securityConfig = new SecurityConfig(conf);
     certificateClient = setupCertificateClient();
     certificateClient.init();
+    secretKeyClient = new SecretKeyTestClient();
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
     serviceRpcAdd = new Text("localhost");
     final Map<String, S3SecretValue> s3Secrets = new HashMap<>();
@@ -112,6 +120,9 @@ public class TestOzoneDelegationTokenSecretManager {
     om = mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf, om);
     when(om.getMetadataManager()).thenReturn(metadataManager);
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(versionManager.isAllowed(any(LayoutFeature.class))).thenReturn(true);
+    when(om.getVersionManager()).thenReturn(versionManager);
     s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(new S3SecretStoreMap(s3Secrets),
             mock(S3SecretCache.class)),
@@ -368,12 +379,28 @@ public class TestOzoneDelegationTokenSecretManager {
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
+    id.setMaxDate(Time.now() + 60 * 60 * 24);
+    id.setOwner(new Text("test"));
+    id.setSecretKeyId(secretKeyClient.getCurrentSecretKey().getId().toString());
+    assertTrue(secretManager.verifySignature(id, secretKeyClient.getCurrentSecretKey().sign(id.getBytes())));
+  }
+
+  @Test
+  public void testVerifyAsymmetricSignatureSuccess() throws Exception {
+    GenericTestUtils.setLogLevel(OzoneDelegationTokenSecretManager.LOG, Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneDelegationTokenSecretManager.LOG);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+    secretManager.start(certificateClient);
+    OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     id.setOmCertSerialId(certificateClient.getCertificate()
         .getSerialNumber().toString());
     id.setMaxDate(Time.now() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
-    assertTrue(secretManager.verifySignature(id,
-        certificateClient.signData(id.getBytes())));
+    assertTrue(secretManager.verifySignature(id, certificateClient.signData(id.getBytes())));
+    assertTrue(logCapturer.getOutput().contains("Verify an asymmetric key signed Token"));
+    logCapturer.stopCapturing();
   }
 
   @Test
@@ -461,12 +488,9 @@ public class TestOzoneDelegationTokenSecretManager {
    * Validate hash using public key of KeyPair.
    */
   private void validateHash(byte[] hash, byte[] identifier) throws Exception {
-    Signature rsaSignature =
-        Signature.getInstance(securityConfig.getSignatureAlgo(),
-            securityConfig.getProvider());
-    rsaSignature.initVerify(certificateClient.getPublicKey());
-    rsaSignature.update(identifier);
-    assertTrue(rsaSignature.verify(hash));
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.readProtoBuf(identifier);
+    ManagedSecretKey verifyKey = secretKeyClient.getSecretKey(UUID.fromString(ozoneTokenIdentifier.getSecretKeyId()));
+    verifyKey.isValidSignature(identifier, hash);
   }
 
   /**
@@ -485,6 +509,7 @@ public class TestOzoneDelegationTokenSecretManager {
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certificateClient)
         .setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)
+        .setSecretKeyClient(secretKeyClient)
         .build();
   }
 }

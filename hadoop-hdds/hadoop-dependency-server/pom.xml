@@ -52,10 +52,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>snappy-java</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>hadoop-shaded-guava</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.apache.curator</groupId>
           <artifactId>*</artifactId>
         </exclusion>
@@ -149,10 +145,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-guava</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
     </dependency>
@@ -170,10 +162,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>hadoop-shaded-guava</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
