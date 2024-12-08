@@ -29,7 +29,7 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
-  TEST_JAVA_VERSION: 17 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   OZONE_IMAGE: ghcr.io/apache/ozone
