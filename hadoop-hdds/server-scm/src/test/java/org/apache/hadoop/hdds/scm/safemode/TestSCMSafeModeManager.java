@@ -226,8 +226,8 @@ public class TestSCMSafeModeManager {
   @ParameterizedTest
   @CsvSource(value = {"100,0.9,false", "0.9,200,false", "0.9,0.1,true"})
   public void testHealthyPipelinePercentWithIncorrectValue(double healthyPercent,
-                                                           double oneReplicaPercent,
-                                                           boolean overrideScmSafeModeThresholdPct) throws Exception {
+      double oneReplicaPercent,
+      boolean overrideScmSafeModeThresholdPct) throws Exception {
     OzoneConfiguration conf = createConf(healthyPercent, oneReplicaPercent);
     if (overrideScmSafeModeThresholdPct) {
       conf.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT, -1.0);
