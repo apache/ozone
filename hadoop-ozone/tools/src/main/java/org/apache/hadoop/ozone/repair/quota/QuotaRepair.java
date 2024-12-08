@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -45,9 +45,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
  * Ozone Repair CLI for quota.
  */
 @CommandLine.Command(name = "quota",
+    subcommands = {
+        QuotaStatus.class,
+        QuotaTrigger.class,
+    },
     description = "Operational tool to repair quota in OM DB.")
-@MetaInfServices(SubcommandWithParent.class)
-public class QuotaRepair implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(RepairSubcommand.class)
+public class QuotaRepair implements Callable<Void>, RepairSubcommand {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -112,10 +116,5 @@ public class QuotaRepair implements Callable<Void>, SubcommandWithParent {
 
   protected OzoneRepair getParent() {
     return parent;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneRepair.class;
   }
 }

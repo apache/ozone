@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import java.nio.file.Path;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -53,8 +53,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 @CommandLine.Command(
     name = "prefix",
     description = "Parse prefix contents")
-@MetaInfServices(SubcommandWithParent.class)
-public class PrefixParser implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class PrefixParser implements Callable<Void>, DebugSubcommand {
 
   /**
    * Types to represent the level or path component type.
@@ -99,11 +99,6 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   @Override

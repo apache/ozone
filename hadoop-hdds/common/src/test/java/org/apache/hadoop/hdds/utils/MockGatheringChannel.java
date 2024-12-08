@@ -59,7 +59,21 @@ public class MockGatheringChannel implements GatheringByteChannel {
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    return delegate.write(src);
+    // If src has more than 1 byte left, simulate partial write by adjusting limit.
+    // Remaining 1 byte should be written on next call.
+    // This helps verify that the caller ensures buffer is written fully.
+    final int adjustment = 1;
+    final boolean limitWrite = src.remaining() > adjustment;
+    if (limitWrite) {
+      src.limit(src.limit() - adjustment);
+    }
+    try {
+      return delegate.write(src);
+    } finally {
+      if (limitWrite) {
+        src.limit(src.limit() + adjustment);
+      }
+    }
   }
 
   @Override

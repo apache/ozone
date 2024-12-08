@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -55,6 +59,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 
@@ -160,6 +165,18 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
         volumeList = addVolumeToOwnerList(volumeList, volume, owner,
             ozoneManager.getMaxUserVolumeCount(), transactionLogIndex);
+
+        // Add default ACL for volume
+        List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
+            ozoneManager.getConfiguration());
+        // ACLs from VolumeArgs
+        if (omVolumeArgs.getAcls() != null) {
+          listOfAcls.addAll(omVolumeArgs.getAcls());
+        }
+        // Remove the duplicates
+        listOfAcls = listOfAcls.stream().distinct().collect(Collectors.toList());
+        omVolumeArgs.setAcls(listOfAcls);
+
         createVolume(omMetadataManager, omVolumeArgs, volumeList, dbVolumeKey,
             dbUserKey, transactionLogIndex);
 

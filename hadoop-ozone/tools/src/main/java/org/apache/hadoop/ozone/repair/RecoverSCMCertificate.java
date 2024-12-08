@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -67,8 +67,8 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
 @CommandLine.Command(
     name = "cert-recover",
     description = "Recover Deleted SCM Certificate from RocksDB")
-@MetaInfServices(SubcommandWithParent.class)
-public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(RepairSubcommand.class)
+public class RecoverSCMCertificate implements Callable<Void>, RepairSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -80,11 +80,6 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneRepair.class;
-  }
 
   private PrintWriter err() {
     return spec.commandLine().getErr();

@@ -263,7 +263,7 @@ public class TestPermissionCheck {
     objectEndpoint.setOzoneConfiguration(conf);
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "bucketName", "keyPath", 1024, 0, null, null,
+        "bucketName", "keyPath", 1024, 0, null, null, null,
         new ByteArrayInputStream(new byte[]{})));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
@@ -324,7 +324,7 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         objectEndpoint.put("bucketName", "keyPath", 0, 1,
-            null, "", tagInput));
+            null, "", null, tagInput));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
 
     e = assertThrows(OS3Exception.class, () ->

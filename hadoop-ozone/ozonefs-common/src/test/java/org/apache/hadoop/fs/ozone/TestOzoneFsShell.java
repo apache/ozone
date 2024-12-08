@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
 
@@ -32,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
 
-
 /**
  * Tests the behavior of OzoneFsShell.
  */
@@ -40,7 +38,7 @@ public class TestOzoneFsShell {
 
   // tests command handler for FsShell bound to OzoneDelete class
   @Test
-  public void testOzoneFsShellRegisterDeleteCmd() throws IOException {
+  public void testOzoneFsShellRegisterDeleteCmd() throws Exception {
     final String rmCmdName = "rm";
     final String rmCmd = "-" + rmCmdName;
     final String arg = "arg1";
@@ -52,16 +50,17 @@ public class TestOzoneFsShell {
     System.setErr(bytesPrintStream);
     try {
       ToolRunner.run(shell, argv);
-    } catch (Exception e) {
-    } finally {
+
       // test command bindings for "rm" command handled by OzoneDelete class
       CommandFactory factory = shell.getCommandFactory();
+      assertNotNull(factory);
       assertEquals(1, Arrays.stream(factory.getNames())
           .filter(c -> c.equals(rmCmd)).count());
       Command instance = factory.getInstance(rmCmd);
       assertNotNull(instance);
       assertEquals(OzoneFsDelete.Rm.class, instance.getClass());
       assertEquals(rmCmdName, instance.getCommandName());
+    } finally {
       shell.close();
       System.setErr(oldErr);
     }

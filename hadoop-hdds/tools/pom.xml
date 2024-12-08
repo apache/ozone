@@ -180,19 +180,19 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <annotationProcessorPaths>
             <path>
-              <groupId>org.apache.ozone</groupId>
-              <artifactId>hdds-config</artifactId>
-              <version>${hdds.version}</version>
-            </path>
-            <path>
               <groupId>org.kohsuke.metainf-services</groupId>
               <artifactId>metainf-services</artifactId>
               <version>${metainf-services.version}</version>
             </path>
+            <path>
+              <groupId>info.picocli</groupId>
+              <artifactId>picocli-codegen</artifactId>
+              <version>${picocli.version}</version>
+            </path>
           </annotationProcessorPaths>
           <annotationProcessors>
-            <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
             <annotationProcessor>org.kohsuke.metainf_services.AnnotationProcessorImpl</annotationProcessor>
+            <annotationProcessor>picocli.codegen.aot.graalvm.processor.NativeImageConfigGeneratorProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>
       </plugin>
@@ -207,8 +207,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <restrictImports>
                   <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
                   <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
+                    <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
+                    <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                   </bannedImports>
                 </restrictImports>
               </rules>

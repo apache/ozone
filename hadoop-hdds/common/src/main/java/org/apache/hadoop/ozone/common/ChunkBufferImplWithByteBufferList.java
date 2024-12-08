@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -246,9 +248,12 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    long bytes = channel.write(buffers.toArray(new ByteBuffer[0]));
+    long written = 0;
+    for (ByteBuffer buf : buffers) {
+      written += BufferUtils.writeFully(channel, buf);
+    }
     findCurrent();
-    return bytes;
+    return written;
   }
 
   @Override

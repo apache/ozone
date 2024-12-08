@@ -16,10 +16,10 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.ldb;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import picocli.CommandLine;
@@ -37,7 +37,7 @@ import java.util.concurrent.Callable;
         name = "drop_column_family",
         description = "drop column family in db."
 )
-public class DropTable implements Callable<Void>, SubcommandWithParent {
+public class DropTable implements Callable<Void> {
 
   @CommandLine.Option(names = {"--column-family", "--column_family"},
       description = "Table name")
@@ -72,10 +72,5 @@ public class DropTable implements Callable<Void>, SubcommandWithParent {
       }
     }
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBParser.class;
   }
 }

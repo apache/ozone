@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.chunk;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

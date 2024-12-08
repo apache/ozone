@@ -16,18 +16,15 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.om;
+package org.apache.hadoop.ozone.repair.ldb;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.repair.RDBRepair;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
-import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -55,8 +52,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
     name = "snapshot",
     description = "CLI to update global and path previous snapshot for a snapshot in case snapshot chain is corrupted."
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
+public class SnapshotRepair implements Callable<Void> {
 
   protected static final Logger LOG = LoggerFactory.getLogger(SnapshotRepair.class);
 
@@ -177,10 +173,5 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       }
     }
     return snapshotIdSet;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBRepair.class;
   }
 }

@@ -381,7 +381,6 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public UserGroupInformation createUGI() throws AuthenticationException {
-
     if (userGroupInformation != null) {
       return userGroupInformation;
     }
@@ -411,6 +410,11 @@ public abstract class OMClientRequest implements RequestAuditor {
       throw new OMException(e, UNAUTHORIZED);
     }
     return ugi;
+  }
+
+  @VisibleForTesting
+  public void setUGI(UserGroupInformation ugi) {
+    this.userGroupInformation = ugi;
   }
 
   /**

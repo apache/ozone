@@ -3270,6 +3270,12 @@
                 "name": "exclusiveReplicatedSize",
                 "type": "uint64",
                 "optional": true
+              },
+              {
+                "id": 19,
+                "name": "deepCleanedDeletedDir",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -4137,6 +4143,12 @@
                 "name": "ecReplicationConfig",
                 "type": "hadoop.hdds.ECReplicationConfig",
                 "optional": true
+              },
+              {
+                "id": 8,
+                "name": "eTag",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -4688,6 +4700,29 @@
             ]
           },
           {
+            "name": "DeleteKeyError",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "errorCode",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "DeleteKeysResponse",
             "fields": [
               {
@@ -4701,6 +4736,12 @@
                 "name": "status",
                 "type": "bool",
                 "optional": true
+              },
+              {
+                "id": 3,
+                "name": "errors",
+                "type": "DeleteKeyError",
+                "is_repeated": true
               }
             ]
           },
@@ -5636,6 +5677,12 @@
                 "name": "partName",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 2,
+                "name": "eTag",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -5699,6 +5746,12 @@
                 "name": "partName",
                 "type": "string",
                 "required": true
+              },
+              {
+                "id": 3,
+                "name": "eTag",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -5965,6 +6018,12 @@
                 "name": "size",
                 "type": "uint64",
                 "required": true
+              },
+              {
+                "id": 5,
+                "name": "eTag",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -6671,7 +6730,13 @@
                 "id": 2,
                 "name": "updatedSnapshotDBKey",
                 "type": "string",
-                "is_repeated": true
+                "is_repeated": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -6682,6 +6747,36 @@
                 "id": 1,
                 "name": "snapshotProperty",
                 "type": "SnapshotProperty",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "name": "snapshotKey",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "snapshotSize",
+                "type": "SnapshotSize",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "deepCleanedDeletedDir",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "deepCleanedDeletedKey",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -6693,16 +6788,51 @@
                 "id": 1,
                 "name": "snapshotKey",
                 "type": "string",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 2,
                 "name": "exclusiveSize",
                 "type": "uint64",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 3,
+                "name": "exclusiveReplicatedSize",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "SnapshotSize",
+            "fields": [
+              {
+                "id": 1,
+                "name": "exclusiveSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
                 "name": "exclusiveReplicatedSize",
                 "type": "uint64",
                 "optional": true

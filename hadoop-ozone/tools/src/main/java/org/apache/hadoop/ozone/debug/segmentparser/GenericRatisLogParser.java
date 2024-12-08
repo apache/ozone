@@ -15,29 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.debug.segmentparser;
 
-package org.apache.hadoop.ozone.debug;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import picocli.CommandLine;
+
+import java.util.concurrent.Callable;
+
 /**
- * Class that gives datanode details on which the chunk is present.
+ * Command line utility to parse and dump any generic ratis segment file.
  */
-public class ChunkDataNodeDetails {
-  private String ipAddress;
-  private String hostName;
-
-  public ChunkDataNodeDetails(String ipAddress, String hostName) {
-    this.ipAddress = ipAddress;
-    this.hostName = hostName;
-  }
+@CommandLine.Command(
+    name = "generic",
+    description = "dump generic ratis segment file",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class)
+public class GenericRatisLogParser extends BaseLogParser
+    implements Callable<Void> {
+  @CommandLine.ParentCommand
+  private RatisLogParser logParser;
 
   @Override
-    public String toString() {
-    return "{"
-            + "ipAddress='"
-            + ipAddress
-            + '\''
-            + ", hostName='"
-            + hostName
-            + '\''
-            + '}';
+  public Void call() throws Exception {
+    parseRatisLogs(null);
+    return null;
   }
 }

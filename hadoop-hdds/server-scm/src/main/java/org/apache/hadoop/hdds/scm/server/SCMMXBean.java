@@ -84,4 +84,11 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getRatisLogDirectory();
 
   String getRocksDbDirectory();
+
+  /**
+   * Gets the SCM hostname.
+   *
+   * @return the SCM hostname for the datanode.
+   */
+  String getHostname();
 }

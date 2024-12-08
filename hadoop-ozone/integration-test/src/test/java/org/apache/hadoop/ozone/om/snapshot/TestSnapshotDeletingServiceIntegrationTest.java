@@ -601,6 +601,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   @Test
   @Order(4)
+  @Flaky("HDDS-11847")
   public void testParallelExcecutionOfKeyDeletionAndSnapshotDeletion() throws Exception {
     AtomicBoolean keyDeletionWaitStarted = new AtomicBoolean(false);
     AtomicBoolean dirDeletionWaitStarted = new AtomicBoolean(false);

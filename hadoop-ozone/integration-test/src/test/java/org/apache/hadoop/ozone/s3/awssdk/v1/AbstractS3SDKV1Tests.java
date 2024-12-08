@@ -50,6 +50,7 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -373,6 +374,50 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("d41d8cd98f00b204e9800998ecf8427e", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectACL() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    String originalObjectETag = putObjectResult.getETag();
+    assertTrue(s3Client.doesObjectExist(bucketName, keyName));
+
+    AccessControlList aclList = new AccessControlList();
+    Owner owner = new Owner("owner", "owner");
+    aclList.withOwner(owner);
+    Grantee grantee = new CanonicalGrantee("testGrantee");
+    aclList.grantPermission(grantee, Permission.Read);
+
+    SetObjectAclRequest setObjectAclRequest = new SetObjectAclRequest(bucketName, keyName, aclList);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setObjectAcl(setObjectAclRequest));
+    assertEquals("NotImplemented", ase.getErrorCode());
+    assertEquals(501, ase.getStatusCode());
+    assertEquals(ErrorType.Service, ase.getErrorType());
+
+    // Ensure that the object content remains unchanged
+    ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(originalObjectETag, updatedObjectMetadata.getETag());
+    S3Object updatedObject = s3Client.getObject(bucketName, keyName);
+
+    try (S3ObjectInputStream s3is = updatedObject.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
   }
 
   @Test

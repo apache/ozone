@@ -101,6 +101,8 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong putObjectTaggingFailure;
   private @Metric MutableCounterLong deleteObjectTaggingSuccess;
   private @Metric MutableCounterLong deleteObjectTaggingFailure;
+  private @Metric MutableCounterLong putObjectAclSuccess;
+  private @Metric MutableCounterLong putObjectAclFailure;
 
   // S3 Gateway Latency Metrics
   // BucketEndpoint
@@ -270,6 +272,14 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   @Metric(about = "Latency for failing to delete object tagging of a key in nanoseconds")
   private PerformanceMetrics deleteObjectTaggingFailureLatencyNs;
 
+  @Metric(about = "Latency for successfully setting an S3 object ACL " +
+      "in nanoseconds")
+  private PerformanceMetrics putObjectAclSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to set an S3 object ACL " +
+      "in nanoseconds")
+  private PerformanceMetrics putObjectAclFailureLatencyNs;
+
   private final Map<String, PerformanceMetrics> performanceMetrics;
 
   /**
@@ -411,6 +421,8 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     deleteObjectTaggingSuccessLatencyNs.snapshot(recordBuilder, true);
     deleteObjectTaggingFailure.snapshot(recordBuilder, true);
     deleteObjectTaggingFailureLatencyNs.snapshot(recordBuilder, true);
+    putObjectAclSuccess.snapshot(recordBuilder, true);
+    putObjectAclFailure.snapshot(recordBuilder, true);
   }
 
   // INC and UPDATE
@@ -660,6 +672,16 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   public void updateDeleteObjectTaggingFailureStats(long startNanos) {
     this.deleteObjectTaggingFailure.incr();
     this.deleteObjectTaggingFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updatePutObjectAclSuccessStats(long startNanos) {
+    this.putObjectAclSuccess.incr();
+    this.putObjectAclSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updatePutObjectAclFailureStats(long startNanos) {
+    this.putObjectAclFailure.incr();
+    this.putObjectAclFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
   // GET

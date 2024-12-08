@@ -16,12 +16,12 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.ldb;
 
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -33,9 +33,15 @@ import picocli.CommandLine.Spec;
  */
 @CommandLine.Command(
         name = "ldb",
+        subcommands = {
+            DBScanner.class,
+            DropTable.class,
+            ListTables.class,
+            ValueSchema.class,
+        },
         description = "Parse rocksdb file content")
-@MetaInfServices(SubcommandWithParent.class)
-public class RDBParser implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class RDBParser implements Callable<Void>, DebugSubcommand {
 
   @Spec
   private CommandSpec spec;
@@ -51,11 +57,6 @@ public class RDBParser implements Callable<Void>, SubcommandWithParent {
 
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   @Override

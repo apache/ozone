@@ -332,6 +332,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private Clock systemClock;
   private DNSToSwitchMapping dnsToSwitchMapping;
 
+  private String scmHostName;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -456,6 +458,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
+    scmHostName = HddsUtils.getHostName(conf);
 
     registerMXBean();
     registerMetricsSource(this);
@@ -2221,6 +2224,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getRocksDbDirectory() {
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
+  }
+
+  @Override
+  public String getHostname() {
+    return scmHostName;
   }
 
   public Collection<String> getScmAdminUsernames() {

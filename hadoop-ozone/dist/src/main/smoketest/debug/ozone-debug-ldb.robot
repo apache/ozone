@@ -55,6 +55,16 @@ Test ozone debug ldb scan
                         Should contain          ${output}       testfile1
                         Should contain          ${output}       testfile2
                         Should contain          ${output}       testfile3
+    # test key is included with --with-keys
+    ${output1} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+    ${output2} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+    ${output3} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys=true | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+                        Should contain          ${output1}      testfile1
+                        Should Be Equal         ${output1}      ${output2}
+                        Should Be Equal         ${output1}      ${output3}
+    # test key is ommitted with --with-keys set to false
+    ${output} =         Execute and Ignore Error                ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys=false | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+                        Should contain          ${output}       Cannot index array with string
     # test startkey option
     ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --startkey="/cli-debug-volume/cli-debug-bucket/testfile2"
                         Should not contain      ${output}       testfile1

@@ -1652,9 +1652,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(omKeyArgs.getKeyName())
         .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .setOwnerName(omKeyArgs.getOwner())
-        .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
         .addAllTags(KeyValueUtil.toProtobuf(omKeyArgs.getTags()));
+
+    if (omKeyArgs.getAcls() != null) {
+      keyArgs.addAllAcls(omKeyArgs.getAcls().stream().map(a ->
+          OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+    }
 
     setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 
@@ -1726,10 +1729,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
         .setKeyName(omKeyArgs.getKeyName())
-        .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
         .setOwnerName(omKeyArgs.getOwner())
         .setMultipartUploadID(omKeyArgs.getMultipartUploadID());
+    if (omKeyArgs.getAcls() != null) {
+      keyArgs.addAllAcls(omKeyArgs.getAcls().stream().map(a ->
+          OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+    }
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
@@ -2125,16 +2130,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void createDirectory(OmKeyArgs args) throws IOException {
-    KeyArgs keyArgs = KeyArgs.newBuilder()
+    KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
-        .addAllAcls(args.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
-        .setOwnerName(args.getOwner())
-        .build();
+        .setOwnerName(args.getOwner());
+    if (args.getAcls() != null) {
+      keyArgsBuilder.addAllAcls(args.getAcls().stream().map(a ->
+          OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+    }
     CreateDirectoryRequest request = CreateDirectoryRequest.newBuilder()
-        .setKeyArgs(keyArgs)
+        .setKeyArgs(keyArgsBuilder.build())
         .build();
 
     OMRequest omRequest = createOMRequest(Type.CreateDirectory)
@@ -2296,9 +2302,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
-        .addAllAcls(args.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
         .setOwnerName(args.getOwner());
+    if (args.getAcls() != null) {
+      keyArgsBuilder.addAllAcls(args.getAcls().stream().map(a ->
+          OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+    }
     if (args.getReplicationConfig() != null) {
       if (args.getReplicationConfig() instanceof ECReplicationConfig) {
         keyArgsBuilder.setEcReplicationConfig(

@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.repair;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
@@ -34,7 +36,7 @@ import java.util.Scanner;
     description = "Operational tool to repair Ozone",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneRepair extends GenericCli {
+public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
 
   public static final String WARNING_SYS_USER_MESSAGE =
       "ATTENTION: Running as user %s. Make sure this is the same user used to run the Ozone process." +
@@ -91,4 +93,8 @@ public class OzoneRepair extends GenericCli {
     return (new Scanner(System.in, StandardCharsets.UTF_8.name())).nextLine().trim();
   }
 
+  @Override
+  public Class<?> subcommandType() {
+    return RepairSubcommand.class;
+  }
 }
