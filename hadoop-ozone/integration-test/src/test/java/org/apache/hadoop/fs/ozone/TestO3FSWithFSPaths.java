@@ -23,6 +23,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestO3FSWithFSPaths extends AbstractOzoneFileSystemTest {
   TestO3FSWithFSPaths() {
-    super(true, false, BucketLayout.LEGACY);
+    super(true, BucketLayout.LEGACY);
   }
 }
