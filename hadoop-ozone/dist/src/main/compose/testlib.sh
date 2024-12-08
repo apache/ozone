@@ -30,7 +30,28 @@ fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
 
+: ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
+
+# create temp directory for test data; only once, even if testlib.sh is sourced again
+if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+  chmod go+rx "${TEST_DATA_DIR}"
+  _compose_delete_test_data() {
+    rm -frv "${TEST_DATA_DIR}"
+  }
+
+  trap _compose_cleanup EXIT HUP INT TERM
+fi
+
+_compose_cleanup() {
+  if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
+    stop_docker_env || true
+  fi
+  if [[ "$(type -t _compose_delete_test_data || true)" == "function" ]]; then
+    _compose_delete_test_data
+  fi
+}
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
@@ -140,13 +161,13 @@ start_docker_env(){
 
   docker-compose --ansi never down --remove-orphans
 
-  trap stop_docker_env EXIT HUP INT TERM
-
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
   fi
 
+  OZONE_COMPOSE_RUNNING=true
+  trap _compose_cleanup EXIT HUP INT TERM
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
@@ -184,11 +205,11 @@ execute_robot_test(){
   local output_name=$(get_output_name)
 
   # find unique filename
-  declare -i i=0
-  OUTPUT_FILE="robot-${output_name}1.xml"
-  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let ++i
-    OUTPUT_FILE="robot-${output_name}${i}.xml"
+  for ((i=1; i<1000; i++)); do
+    OUTPUT_FILE="robot-${output_name}$(printf "%03d" ${i}).xml"
+    if [[ ! -f $RESULT_DIR/$OUTPUT_FILE ]]; then
+      break;
+    fi
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
@@ -368,6 +389,7 @@ stop_docker_env(){
     for i in $(seq 1 $down_repeats)
     do
       if docker-compose --ansi never --profile "*" down --remove-orphans; then
+        OZONE_COMPOSE_RUNNING=false
         return
       fi
       if [[ ${i} -eq 1 ]]; then

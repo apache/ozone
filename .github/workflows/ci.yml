@@ -160,7 +160,7 @@ jobs:
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
       java-version: 8 # HDDS-10150
-      needs-maven-cache: ${{ !contains('author,bats,docs', matrix.check) }}
+      needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
       ratis-args: ${{ inputs.ratis_args }}
       script: ${{ matrix.check }}
       sha: ${{ needs.build-info.outputs.sha }}
@@ -196,6 +196,7 @@ jobs:
     secrets: inherit
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-maven-cache: true
       needs-ozone-binary-tarball: true
       script: dependency
       sha: ${{ needs.build-info.outputs.sha }}
@@ -245,6 +246,7 @@ jobs:
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
+      needs-maven-cache: true
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
@@ -269,6 +271,7 @@ jobs:
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
+      needs-maven-cache: true
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes

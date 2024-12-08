@@ -111,7 +111,7 @@ public abstract class Handler implements Callable<Void> {
     if (!enabled) {
       err().printf("Error: '%s' operation works only when security is " +
           "enabled. To enable security set ozone.security.enabled to " +
-          "true.%n", spec.qualifiedName());
+          "true.%n", spec.qualifiedName().trim());
     }
     return enabled;
   }
