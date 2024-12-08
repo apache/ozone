@@ -286,7 +286,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    *
    * When considering inflight operations, it is assumed any operation will
    * fail. However, to consider the worst case and avoid data loss, we always
-   * assume a delete will succeed and and add will fail. In this way, we will
+   * assume a delete will succeed and add will fail. In this way, we will
    * avoid scheduling too many deletes which could result in dataloss.
    *
    * Decisions around over-replication are made only on healthy replicas,
@@ -320,7 +320,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * For under replicated containers we do consider inflight add and delete to
    * avoid scheduling more adds than needed. There is additional logic around
    * containers with maintenance replica to ensure minHealthyForMaintenance
-   * replia are maintained.
+   * replica are maintained.
    *
    * @return Delta of replicas needed. Negative indicates over replication and
    *         containers should be removed. Positive indicates over replication
@@ -621,7 +621,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * considering inflight add and deletes.
    * @return zero if perfectly replicated, a negative value for over replication
    *         and a positive value for under replication. The magnitude of the
-   *         return value indicates how many replias the container is over or
+   *         return value indicates how many replies the container is over or
    *         under replicated by.
    */
   private int redundancyDelta(boolean includePendingDelete,
@@ -650,7 +650,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   /**
    * How many more replicas can be lost before the container is
-   * unreadable, assuming any infligh deletes will complete. For containers
+   * unreadable, assuming any inflight deletes will complete. For containers
    * which are under-replicated due to decommission
    * or maintenance only, the remaining redundancy will include those
    * decommissioning or maintenance replicas, as they are technically still

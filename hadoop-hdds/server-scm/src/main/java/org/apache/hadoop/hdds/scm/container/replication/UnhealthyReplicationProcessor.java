@@ -92,7 +92,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     List<HealthResult> failedOnes = new LinkedList<>();
     // Getting the limit requires iterating over all nodes registered in
     // NodeManager and counting the healthy ones. This is somewhat expensive
-    // so we get get the count once per iteration as it should not change too
+    // so we get the count once per iteration as it should not change too
     // often.
     long inflightLimit = replicationManager.getReplicationInFlightLimit();
     while (true) {
