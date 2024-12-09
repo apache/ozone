@@ -336,6 +336,14 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     KEY getKey() throws IOException;
 
     VALUE getValue() throws IOException;
+
+    default byte[] getRawKey() throws IOException {
+      return null;
+    }
+
+    default byte[] getRawValue() throws IOException {
+      return null;
+    }
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
@@ -348,6 +356,53 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       @Override
       public V getValue() {
         return value;
+      }
+
+      @Override
+      public String toString() {
+        return "(key=" + key + ", value=" + value + ")";
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (!(obj instanceof KeyValue)) {
+          return false;
+        }
+        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
+        try {
+          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(getKey(), getValue());
+      }
+    };
+  }
+
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, byte[] rawKey, byte[] rawValue) {
+    return new KeyValue<K, V>() {
+      @Override
+      public K getKey() {
+        return key;
+      }
+
+      @Override
+      public V getValue() {
+        return value;
+      }
+
+      @Override
+      public byte[] getRawKey() throws IOException {
+        return rawKey;
+      }
+
+      @Override
+      public byte[] getRawValue() throws IOException {
+        return rawValue;
       }
 
       @Override
