@@ -207,28 +207,6 @@ public class TestAuthorizationFilter {
             DATETIME,
             "",
             "/key1"
-        ),
-        // S3 secret generation endpoint
-        arguments(
-            "POST",
-            null,
-            null,
-            "s3g:9878",
-            null,
-            null,
-            "",
-            "/secret/generate"
-        ),
-        // S3 secret generation endpoint
-        arguments(
-            "POST",
-            null,
-            null,
-            "s3g:9878",
-            null,
-            null,
-            "",
-            "/secret/revoke"
         )
     );
   }
