@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -89,6 +90,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -287,6 +290,11 @@ public class LegacyReplicationManager {
    */
   private final MoveScheduler moveScheduler;
 
+  /**
+   * Executor in charge of scanning the inflight moves for notifyStatusChanged.
+   */
+  private final ExecutorService inflightMoveScannerExecutor;
+
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -333,6 +341,11 @@ public class LegacyReplicationManager {
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setRatisServer(scmhaManager.getRatisServer())
         .setMoveTable(moveTable).build();
+
+    inflightMoveScannerExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(scmContext.threadNamePrefix() + "InflightMoveScannerExecutor-%d")
+            .build());
   }
 
 
@@ -1898,7 +1911,7 @@ public class LegacyReplicationManager {
   protected void notifyStatusChanged() {
     //now, as the current scm is leader and it`s state is up-to-date,
     //we need to take some action about replicated inflight move options.
-    onLeaderReadyAndOutOfSafeMode();
+    inflightMoveScannerExecutor.submit(this::handleInflightMoves);
   }
 
   private InflightMap getInflightMap(InflightType type) {
@@ -2107,9 +2120,9 @@ public class LegacyReplicationManager {
   /**
   * when scm become LeaderReady and out of safe mode, some actions
   * should be taken. for now , it is only used for handle replicated
-  * infligtht move.
+  * inflight move.
   */
-  private void onLeaderReadyAndOutOfSafeMode() {
+  private void handleInflightMoves() {
     List<HddsProtos.ContainerID> needToRemove = new LinkedList<>();
     moveScheduler.getInflightMove().forEach((k, v) -> {
       Set<ContainerReplica> replicas;
@@ -2123,31 +2136,35 @@ public class LegacyReplicationManager {
             "while processing replicated move", k);
         return;
       }
-      boolean isSrcExist = replicas.stream()
-          .anyMatch(r -> r.getDatanodeDetails().equals(v.getSrc()));
-      boolean isTgtExist = replicas.stream()
-          .anyMatch(r -> r.getDatanodeDetails().equals(v.getTgt()));
+      // synchronize on the containerInfo object to prevent race condition
+      // with the main replication manager thread
+      synchronized (cif) {
+        boolean isSrcExist = replicas.stream()
+            .anyMatch(r -> r.getDatanodeDetails().equals(v.getSrc()));
+        boolean isTgtExist = replicas.stream()
+            .anyMatch(r -> r.getDatanodeDetails().equals(v.getTgt()));
 
-      if (isSrcExist) {
-        if (isTgtExist) {
-          //the former scm leader may or may not send the deletion command
-          //before reelection.here, we just try to send the command again.
-          try {
-            deleteSrcDnForMove(cif, replicas);
-          } catch (Exception ex) {
-            LOG.error("Exception while cleaning up excess replicas.", ex);
+        if (isSrcExist) {
+          if (isTgtExist) {
+            //the former scm leader may or may not send the deletion command
+            //before reelection.here, we just try to send the command again.
+            try {
+              deleteSrcDnForMove(cif, replicas);
+            } catch (Exception ex) {
+              LOG.error("Exception while cleaning up excess replicas.", ex);
+            }
+          } else {
+            // resending replication command is ok , no matter whether there is an
+            // on-going replication
+            sendReplicateCommand(cif, v.getTgt(),
+                Collections.singletonList(v.getSrc()));
           }
         } else {
-          // resenting replication command is ok , no matter whether there is an
-          // on-going replication
-          sendReplicateCommand(cif, v.getTgt(),
-              Collections.singletonList(v.getSrc()));
+          // if container does not exist in src datanode, no matter it exists
+          // in target datanode, we can not take more actions to this option,
+          // so just remove it through ratis
+          needToRemove.add(k.getProtobuf());
         }
-      } else {
-        // if container does not exist in src datanode, no matter it exists
-        // in target datanode, we can not take more actions to this option,
-        // so just remove it through ratis
-        needToRemove.add(k.getProtobuf());
       }
     });
 
