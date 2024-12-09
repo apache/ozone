@@ -23,7 +23,7 @@ summary: Introduction to Ozone Datanode Short Circuit Local Read Feature
   limitations under the License.
 -->
 
-Current in Ozone, client reads data over GRPC from Datanode. When the client asks the DataNode to read a file, the DataNode reads that file off of the disk and sends the data to the client over GRPC connection.
+By default, client reads data over GRPC from the Datanode. When the client asks the Datanode to read a file, the DataNode reads that file off of the disk and sends the data to the client over a GRPC connection.
 
 This “short-circuit” local read feature will bypass the DataNode, allowing the client to read the file from local disk directly when the client is co-located with the data on the same server.
 
@@ -33,13 +33,12 @@ Short-circuit local read can provide a substantial performance boost to many app
 
 Short-circuit local reads make use of a UNIX domain socket. This is a special path in the filesystem that allows the client and the DataNodes to communicate.
 
-The Hadoop native library "libhadoop.so" provides the support to use the Unix domain socket. Please refer to Native Libraries ("https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/NativeLibraries.html") for details of this library.
+The Hadoop native library `libhadoop.so` provides support to for Unix domain sockets. Please refer to Hadoop's [Native Libraries Guide](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/NativeLibraries.html) for details.
 
-Before enabling short-circuit local reads, you must have a proper libhadoop.so, and make sure it's under the directory where Java can find and load it through "System.loadLibrary()" call.
+The Hadoop version used in Ozone is defined by `hadoop.version` in pom.xml. Before enabling short-circuit local reads, find the `libhadoop.so` from the corresponding version Hadoop release package, put it under one of the directories specified by Java `java.library.path` property. The default value of `java.library.path` depends on the OS and Java version. For example, on Linux with OpenJDK 8 it is `/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib`.
 
-The paths that Java will search for libraries are specified by the "java.library.path" property. The default value of "java.library.path" depends on the OS and Java version. For example, on Linux with OpenJDK 8 it is `/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib`.
+The `ozone checknative` command can be used to detect whether `libhadoop.so` can be found and loaded successfully by Ozone service.
 
-Command "ozone checknative" can be used to detect whether libhadoop.so can be loaded successfully by Ozone service. 
 
 ## Configuration
 
@@ -63,14 +62,14 @@ It makes use of a UNIX domain socket, a special path in the filesystem. You will
 </property>
 ```
 
-The DataNode needs to be able to create this path. On the other hand, it should not be possible for any user except the Ozone user(user who launches Ozone service) or root to create this path. For this reason, paths under /var/run or /var/lib are often used， just like the current default value "/var/lib/ozone_dn_socket".
+The DataNode needs to be able to create this path. On the other hand, it should not be possible for any user except the Ozone user(user who launches Ozone service) or root to create this path. For this reason, paths under `/var/run` or `/var/lib` are often used， just like the current default value `/var/lib/ozone_dn_socket`.
 
-If you configure the "ozone.domain.socket.path" to other value, for example "/dir1/dir2/ozone_dn_socket", please make sure that both dir1 and dir2 are exiting directories, and there is no ozone_dn_socket under dir2. ozone_dn_socket will be created by Ozone Datanode later during Datanode start.
+If you configure the `ozone.domain.socket.path` to another value, for example `/dir1/dir2/ozone_dn_socket`, please make sure that both `dir1` and `dir2` are exiting directories, but the file `ozone_dn_socket` does not exist under `dir2`. `ozone_dn_socket` will be created by Ozone Datanode later during its startup.
 
 ### Security Consideration
 
-To ensure data security and integrity, Ozone will follow the rule as Hadoop ("https://cwiki.apache.org/confluence/display/HADOOP2/SocketPathSecurity") on "ozone.domain.socket.path" path permission check. 
-It will fail the "ozone.domain.socket.path" verification and disable the feature if the filesystem permissions of the specified path are inadequate. 
+To ensure data security and integrity, Ozone will follow the same rules as Hadoop to check permission on the `ozone.domain.socket.path` path as documented in [Socket Path Security](https://wiki.apache.org/hadoop/SocketPathSecurity).
+It will fail the `ozone.domain.socket.path` verification and disable the feature if the filesystem permissions of the specified path are inadequate.
 The verification failure message carries detail instruction about how to fix the problem. Following is an example, 
 
-"The path component: '/etc/hadoop' in '/etc/hadoop/ozone_dn_socket' has permissions 0777 uid 0 and gid 0. It is not protected because it is world-writable. This might help: 'chmod o-w /etc/hadoop'. For more information: https://wiki.apache.org/hadoop/SocketPathSecurity"
+`The path component: '/etc/hadoop' in '/etc/hadoop/ozone_dn_socket' has permissions 0777 uid 0 and gid 0. It is not protected because it is world-writable. This might help: 'chmod o-w /etc/hadoop'. For more information: https://wiki.apache.org/hadoop/SocketPathSecurity`

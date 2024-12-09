@@ -22,7 +22,7 @@ status: implemented
 
 # Abstract
 
-This “short-circuit” local read feature bypassing the DataNode, allows the client to read the file from local disk directly when the client is co-located with the data on the same server.
+This “short-circuit” local read feature bypassing the Datanode, allows the client to read the file from local disk directly when the client is co-located with the data on the same server.
   
 # Link
 
