@@ -22,10 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -36,8 +33,7 @@ import picocli.CommandLine;
         aliases = "ls",
         description = "list all column families in db."
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class ListTables implements Callable<Void>, SubcommandWithParent {
+public class ListTables implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -50,10 +46,5 @@ public class ListTables implements Callable<Void>, SubcommandWithParent {
       System.out.println(new String(b, StandardCharsets.UTF_8));
     }
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBParser.class;
   }
 }
