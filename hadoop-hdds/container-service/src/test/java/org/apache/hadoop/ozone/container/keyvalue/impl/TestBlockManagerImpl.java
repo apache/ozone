@@ -395,7 +395,6 @@ public class TestBlockManagerImpl {
     // verify that the four chunks are full
     BlockData getBlockData = blockManager.getBlock(keyValueContainer,
         new BlockID(containerID, blockNo));
-    assertEquals(chunkLimit * 4, getBlockData.getSize());
     assertEquals(2, getBlockData.getBlockCommitSequenceId());
     List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
     assertEquals(4, chunkInfos.size());
@@ -403,5 +402,7 @@ public class TestBlockManagerImpl {
       assertEquals(chunkLimit, chunkInfos.get(i).getLen());
       assertEquals(chunkLimit * i, chunkInfos.get(i).getOffset());
     }
+    assertEquals(chunkLimit * 4, getBlockData.getSize());
+
   }
 }
