@@ -141,7 +141,7 @@ class TestContainerBalancerStatusInfo {
     configuration.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "1");
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, configuration, true);
     // Delay in finishing the first iteration
-    LambdaTestUtils.await(1100, 50, () -> task.getCurrentIterationsStatistic().size() == 1);
+    LambdaTestUtils.await(1100, 1, () -> task.getCurrentIterationsStatistic().size() == 1);
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(1, iterationsStatic.size());
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(0);
@@ -167,21 +167,6 @@ class TestContainerBalancerStatusInfo {
     assertEquals(2, iterationsStatic.size());
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(1);
     assertCurrentIterationStatisticWhileBalancingInProgress(currentIteration);
-  }
-
-
-  private static void verifyUnstartedIteration(ContainerBalancerTaskIterationStatusInfo iterationsStatic) {
-    assertEquals(0, iterationsStatic.getIterationNumber());
-    assertEquals(-1, iterationsStatic.getIterationDuration());
-    assertNull(iterationsStatic.getIterationResult());
-    assertEquals(0, iterationsStatic.getContainerMovesScheduled());
-    assertEquals(0, iterationsStatic.getContainerMovesCompleted());
-    assertEquals(0, iterationsStatic.getContainerMovesFailed());
-    assertEquals(0, iterationsStatic.getContainerMovesTimeout());
-    assertEquals(0, iterationsStatic.getSizeScheduledForMove());
-    assertEquals(0, iterationsStatic.getDataSizeMoved());
-    assertTrue(iterationsStatic.getSizeEnteringNodes().isEmpty());
-    assertTrue(iterationsStatic.getSizeLeavingNodes().isEmpty());
   }
 
   private static void assertCurrentIterationStatisticWhileBalancingInProgress(
