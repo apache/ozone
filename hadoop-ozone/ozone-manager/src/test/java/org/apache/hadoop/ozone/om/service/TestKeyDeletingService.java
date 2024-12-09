@@ -203,8 +203,9 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList())
-          .isEmpty();
+      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE,
+              keyDeletingService.getDeletedKeySupplier())
+          .getKeyBlocksList()).isEmpty();
     }
 
     @Test
@@ -232,8 +233,9 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 10000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList())
-          .isEmpty();
+      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE,
+              keyDeletingService.getDeletedKeySupplier())
+          .getKeyBlocksList()).isEmpty();
 
       // The 1st version of the key has 1 block and the 2nd version has 2
       // blocks. Hence, the ScmBlockClient should have received at least 3
@@ -274,8 +276,9 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 10000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList())
-          .isEmpty();
+      assertThat(keyManager.getPendingDeletionKeys(Integer.MAX_VALUE,
+              keyDeletingService.getDeletedKeySupplier())
+          .getKeyBlocksList()).isEmpty();
 
       // deletedTable should have deleted key of the snapshot bucket
       assertFalse(metadataManager.getDeletedTable().isEmpty());
@@ -331,7 +334,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         return omSnapshotManager;
       });
       KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, km, 10000,
-          100000, conf, false);
+          100000, conf, false, 1);
       service.shutdown();
       final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
       final long initialDeletedCount = metadataManager.countRowsInTable(deletedTable);
@@ -381,7 +384,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
-      }).when(km).getPendingDeletionKeys(anyInt());
+      }).when(km).getPendingDeletionKeys(anyInt(), keyDeletingService.getDeletedKeySupplier());
       service.runPeriodicalTaskNow();
       service.runPeriodicalTaskNow();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
@@ -882,8 +885,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private int countKeysPendingDeletion() {
     try {
-      final int count = keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
-          .getKeyBlocksList().size();
+      final int count = keyManager.getPendingDeletionKeys(Integer.MAX_VALUE,
+          keyDeletingService.getDeletedKeySupplier()).getKeyBlocksList().size();
       LOG.debug("KeyManager keys pending deletion: {}", count);
       return count;
     } catch (IOException e) {
@@ -893,7 +896,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private long countBlocksPendingDeletion() {
     try {
-      return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+      return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE, keyDeletingService.getDeletedKeySupplier())
           .getKeyBlocksList()
           .stream()
           .map(BlockGroup::getBlockIDList)
