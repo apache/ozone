@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -39,8 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -49,12 +46,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 
 /**
  * Monitor thread which watches for nodes to be decommissioned, recommissioned
  * or placed into maintenance. Newly added nodes are queued in pendingNodes
- * and recommissoned nodes are queued in cancelled nodes. On each monitor
+ * and recommissioned nodes are queued in cancelled nodes. On each monitor
  * 'tick', the cancelled nodes are processed and removed from the monitor.
  * Then any pending nodes are added to the trackedNodes set, where they stay
  * until decommission or maintenance has ended.
@@ -88,50 +87,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
-
-  /**
-   * Inner class for snapshot of Datanode ContainerState in
-   * Decommissioning and Maintenance mode workflow.
-   */
-  public static final class TrackedNode {
-
-    private DatanodeDetails datanodeDetails;
-    private long startTime = 0L;
-    private Map<String, List<ContainerID>> containersReplicatedOnNode = new ConcurrentHashMap<>();
-
-    public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
-      this.datanodeDetails = datanodeDetails;
-      this.startTime = startTime;
-    }
-
-    @Override
-    public int hashCode() {
-      return datanodeDetails.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      return obj instanceof TrackedNode &&
-          datanodeDetails.equals(((TrackedNode) obj).datanodeDetails);
-    }
-
-    public DatanodeDetails getDatanodeDetails() {
-      return datanodeDetails;
-    }
-
-    public long getStartTime() {
-      return startTime;
-    }
-
-    public Map<String, List<ContainerID>> getContainersReplicatedOnNode() {
-      return containersReplicatedOnNode;
-    }
-
-    public void setContainersReplicatedOnNode(List<ContainerID> underReplicated, List<ContainerID> unClosed) {
-      this.containersReplicatedOnNode.put("UnderReplicated", Collections.unmodifiableList(underReplicated));
-      this.containersReplicatedOnNode.put("UnClosed", Collections.unmodifiableList(unClosed));
-    }
-  }
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;
 
@@ -407,37 +362,70 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private boolean checkContainersReplicatedOnNode(TrackedNode dn)
       throws NodeNotFoundException {
-    int sufficientlyReplicated = 0;
-    int deleting = 0;
-    int underReplicated = 0;
-    int unclosed = 0;
-    List<ContainerID> underReplicatedIDs = new ArrayList<>();
-    List<ContainerID> unClosedIDs = new ArrayList<>();
-    Set<ContainerID> containers =
-        nodeManager.getContainers(dn.getDatanodeDetails());
-    for (ContainerID cid : containers) {
+    TrackedNodeContainers tnc =
+        new TrackedNodeContainers(containerDetailsLoggingLimit);
+    DatanodeDetails details = dn.getDatanodeDetails();
+    Set<ContainerID> containers = nodeManager.getContainers(details);
+
+    handleCheckContainersReplicatedOnNode(details, containers, tnc);
+
+    LOG.info("Dn {} has {} sufficientlyReplicated, {} deleting, " +
+        "{} underReplicated and {} unclosed containers", dn,
+        tnc.getSufficientlyReplicated(),
+        tnc.getDeleting(),
+        tnc.getUnderReplicated(),
+        tnc.getUnclosed());
+
+    this.containerStateByHost.put(details.getHostName(),
+        new ContainerStateInWorkflow(details.getHostName(),
+        tnc.getSufficientlyReplicated(),
+        tnc.getUnderReplicated(),
+        tnc.getUnclosed(),
+        0L, dn.getStartTime()));
+
+    this.sufficientlyReplicatedContainers += tnc.getSufficientlyReplicated();
+    this.underReplicatedContainers += tnc.getUnderReplicated();
+    this.unClosedContainers += tnc.getUnclosed();
+    dn.setContainersReplicatedOnNode(tnc);
+    return tnc.getUnderReplicated() == 0 && tnc.getUnclosed() == 0;
+  }
+
+  /**
+   * This method checks the replication status of Containers on a specific DataNode.
+   *
+   * It iterates over the provided list of containers, verifies whether the replication
+   * meets the expected criteria, and writes the check results into the provided
+   * TrackedNodeContainers object.
+   *
+   * @param details Detailed Information of DataNode.
+   * @param containers List of Containers in the DataNode.
+   * @param tnc TrackedNodeContainers
+   * Track the List of Containers in the DataNode and Store Detailed Information.
+   */
+  private void handleCheckContainersReplicatedOnNode(DatanodeDetails details,
+      Set<ContainerID> containers, TrackedNodeContainers tnc) {
+
+    for (ContainerID cid :  containers) {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
 
         // If a container is deleted or deleting, and we have a replica on this
         // datanode, just ignore it. It should not block decommission.
-        HddsProtos.LifeCycleState containerState
-            = replicaSet.getContainer().getState();
-        if (containerState == HddsProtos.LifeCycleState.DELETED
-            || containerState == HddsProtos.LifeCycleState.DELETING) {
-          deleting++;
+        HddsProtos.LifeCycleState containerState = replicaSet.getContainer().getState();
+        if (containerState == DELETED || containerState == DELETING) {
+          tnc.incrDeleting();
           continue;
         }
 
+        // If the container is unhealthy, we need to add it to the unClosed list.
         boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
         if (!isHealthy) {
-          unClosedIDs.add(cid);
-          if (unclosed < containerDetailsLoggingLimit
-              || LOG.isDebugEnabled()) {
-            LOG.info("Unclosed Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+          tnc.addUnClosedIDs(cid);
+          if (tnc.isLogUnClosedContainers() || LOG.isDebugEnabled()) {
+            LOG.info("Unclosed Container {}, ReplicaSet {}, ReplicaDetails {}.",
+                cid, replicaSet, tnc.replicaDetails(replicaSet));
           }
-          unclosed++;
           continue;
         }
 
@@ -445,53 +433,38 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         // state, except for any which are unhealthy. As the container is closed, we can check
         // if it is sufficiently replicated using replicationManager, but this only works if the
         // legacy RM is not enabled.
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable.legacy", false);
         boolean replicatedOK;
         if (legacyEnabled) {
-          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn.getDatanodeDetails(), nodeManager);
+          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(details, nodeManager);
         } else {
           ReplicationManagerReport report = new ReplicationManagerReport();
           replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
           replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
         }
+
         if (replicatedOK) {
-          sufficientlyReplicated++;
+          tnc.incrSufficientlyReplicated();
         } else {
-          underReplicatedIDs.add(cid);
-          if (underReplicated < containerDetailsLoggingLimit || LOG.isDebugEnabled()) {
-            LOG.info("Under Replicated Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+          tnc.addUnderReplicated(cid);
+          if (tnc.isLogUnderReplicatedContainers() || LOG.isDebugEnabled()) {
+            LOG.info("Under Replicated Container {}, ReplicaSet {},  ReplicaDetails {}.",
+                cid, replicaSet, tnc.replicaDetails(replicaSet));
           }
-          underReplicated++;
         }
       } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid,
-            dn.getDatanodeDetails());
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager.",
+            cid, details);
       }
     }
-    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
-            "underReplicated and {} unclosed containers",
-        dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
-    containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
-        new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
-            sufficientlyReplicated,
-            underReplicated,
-            unclosed,
-            0L, dn.getStartTime()));
-    sufficientlyReplicatedContainers += sufficientlyReplicated;
-    underReplicatedContainers += underReplicated;
-    unClosedContainers += unclosed;
-    if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
-        unClosedIDs.size() < 10000) {
-      LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
-              "containers", dn, underReplicated,
-          underReplicatedIDs.stream().map(
-              Object::toString).collect(Collectors.joining(", ")),
-          unclosed, unClosedIDs.stream().map(
-              Object::toString).collect(Collectors.joining(", ")));
+
+    // If the logging conditions are met, detailed information will be printed as a detailed log.
+    if (LOG.isDebugEnabled() ||
+        (tnc.isLogUnderReplicatedContainers() && tnc.isLogUnClosedContainers())) {
+      LOG.debug("DN {} has {} underReplicated [{}] and {} unclosed [{}] containers",
+          details.getHostName(), tnc.getUnderReplicated(), tnc.getFormatUnderReplicatedIDs(),
+          tnc.getUnclosed(), tnc.getFormatUnClosedIDs());
     }
-    dn.setContainersReplicatedOnNode(underReplicatedIDs, unClosedIDs);
-    return underReplicated == 0 && unclosed == 0;
   }
 
   @Override
@@ -504,16 +477,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       }
     }
     return new HashMap<>();
-  }
-
-  private String replicaDetails(Collection<ContainerReplica> replicas) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("Replicas{");
-    sb.append(replicas.stream()
-        .map(Object::toString)
-        .collect(Collectors.joining(",")));
-    sb.append("}");
-    return sb.toString();
   }
 
   private void completeDecommission(DatanodeDetails dn)
