@@ -47,11 +47,12 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This class tests HealthyPipelineSafeMode rule.
@@ -71,8 +72,8 @@ public class TestHealthyPipelineSafeModeRule {
 
     OzoneConfiguration config = new OzoneConfiguration();
     MockNodeManager nodeManager = new MockNodeManager(true, 0);
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
@@ -125,8 +126,8 @@ public class TestHealthyPipelineSafeModeRule {
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
     MockNodeManager nodeManager = new MockNodeManager(true, 12);
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
@@ -221,8 +222,8 @@ public class TestHealthyPipelineSafeModeRule {
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
     MockNodeManager nodeManager = new MockNodeManager(true, 12);
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(

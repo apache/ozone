@@ -101,7 +101,7 @@ public final class SafeModeRuleFactory {
 
   }
 
-  public static SafeModeRuleFactory getInstance() {
+  public static synchronized SafeModeRuleFactory getInstance() {
     if (instance != null) {
       return instance;
     }

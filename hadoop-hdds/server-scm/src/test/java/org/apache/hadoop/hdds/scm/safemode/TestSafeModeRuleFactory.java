@@ -22,13 +22,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class TestSafeModeRuleFactory {
 
@@ -54,7 +55,7 @@ class TestSafeModeRuleFactory {
     // as the rules are hardcoded in SafeModeRuleFactory.
 
     // This will be fixed once we load rules using annotation.
-    Assertions.assertEquals(4, factory.getSafeModeRules().size(),
+    assertEquals(4, factory.getSafeModeRules().size(),
         "The total safemode rules count doesn't match");
 
   }
@@ -68,17 +69,17 @@ class TestSafeModeRuleFactory {
     // as the rules are hardcoded in SafeModeRuleFactory.
 
     // This will be fixed once we load rules using annotation.
-    Assertions.assertEquals(1, factory.getPreCheckRules().size(),
+    assertEquals(1, factory.getPreCheckRules().size(),
         "The total safemode rules count doesn't match");
 
   }
 
   private void initializeSafeModeRuleFactory() {
-    final SCMSafeModeManager safeModeManager = Mockito.mock(SCMSafeModeManager.class);
-    Mockito.when(safeModeManager.getSafeModeMetrics()).thenReturn(Mockito.mock(SafeModeMetrics.class));
+    final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
     SafeModeRuleFactory.initialize(new OzoneConfiguration(),
-        SCMContext.emptyContext(), new EventQueue(), safeModeManager, Mockito.mock(
-            PipelineManager.class), Mockito.mock(ContainerManager.class));
+        SCMContext.emptyContext(), new EventQueue(), safeModeManager, mock(
+            PipelineManager.class), mock(ContainerManager.class));
   }
 
 }

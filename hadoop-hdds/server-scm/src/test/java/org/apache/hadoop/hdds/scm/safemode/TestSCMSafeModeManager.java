@@ -73,7 +73,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,6 +81,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /** Test class for SCMSafeModeManager.
  */
@@ -133,8 +133,8 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
       container.setNumberOfKeys(10);
     }
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, containerManager, null, queue,
         serviceManager, scmContext);
@@ -172,8 +172,8 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
       container.setNumberOfKeys(10);
     }
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, containerManager, null, queue,
         serviceManager, scmContext);
@@ -241,8 +241,8 @@ public class TestSCMSafeModeManager {
         scmContext,
         serviceManager,
         Clock.system(ZoneOffset.UTC));
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> new SCMSafeModeManager(conf, containers, containerManager,
             pipelineManager, queue, serviceManager, scmContext));
@@ -307,8 +307,8 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
     }
 
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containers, containerManager, pipelineManager, queue, serviceManager,
@@ -444,8 +444,8 @@ public class TestSCMSafeModeManager {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containers, containerManager, pipelineManager, queue, serviceManager,
         scmContext);
@@ -485,8 +485,8 @@ public class TestSCMSafeModeManager {
       container.setNumberOfKeys(0);
     }
 
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, containerManager, null, queue, serviceManager, scmContext);
@@ -585,8 +585,8 @@ public class TestSCMSafeModeManager {
   private void testSafeModeDataNodes(int numOfDns) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, numOfDns);
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containers, containerManager, null, queue,
         serviceManager, scmContext);
@@ -698,8 +698,8 @@ public class TestSCMSafeModeManager {
 
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
-      ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-      Mockito.when(containerManager.getContainers()).thenReturn(containers);
+      ContainerManager containerManager = mock(ContainerManager.class);
+      when(containerManager.getContainers()).thenReturn(containers);
 
       scmSafeModeManager = new SCMSafeModeManager(
           config, containers, containerManager, pipelineManager, queue, serviceManager,
@@ -753,8 +753,8 @@ public class TestSCMSafeModeManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
-    ContainerManager containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainers()).thenReturn(containers);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, containerManager, pipelineManager, queue, serviceManager,
