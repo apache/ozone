@@ -584,7 +584,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
     this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.blockPrefetchFactor = conf.getInt(OZONE_OM_PREFETCH_BLOCKS_FACTOR, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
+    this.blockPrefetchFactor = conf.getInt(OZONE_OM_PREFETCH_BLOCKS_FACTOR, OZONE_OM_PREFETCH_BLOCKS_FACTOR_DEFAULT);
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
