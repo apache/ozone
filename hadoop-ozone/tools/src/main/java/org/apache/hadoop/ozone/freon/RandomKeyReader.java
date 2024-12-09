@@ -3,6 +3,7 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import kotlin.Pair;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -24,7 +25,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @CommandLine.Command(name = "random-key-reader",
         aliases = "rkr",
         description = "Read keys from random volume/buckets",
-        mixinStandardHelpOptions = true)
+        versionProvider = HddsVersionProvider.class,
+        mixinStandardHelpOptions = true,
+        showDefaultValues = true)
 public class RandomKeyReader extends BaseFreonGenerator
         implements Callable<Void> {
   @CommandLine.Option(
@@ -37,6 +40,7 @@ public class RandomKeyReader extends BaseFreonGenerator
   private Timer timer;
   private AtomicInteger readKeyCount = new AtomicInteger();
 
+  @Override
   public Void call() throws Exception {
     init();
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
