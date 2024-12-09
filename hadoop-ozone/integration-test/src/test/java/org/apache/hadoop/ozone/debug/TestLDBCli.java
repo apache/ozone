@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.debug.ldb.DBScanner;
 import org.apache.hadoop.ozone.debug.ldb.RDBParser;
-import org.apache.hadoop.ozone.debug.ldb.ValueSchema;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import jakarta.annotation.Nonnull;
@@ -103,8 +102,6 @@ public class TestLDBCli {
     pstderr = new PrintWriter(stderr);
 
     cmd = new CommandLine(new RDBParser())
-        .addSubcommand(new DBScanner())
-        .addSubcommand(new ValueSchema())
         .setOut(pstdout)
         .setErr(pstderr);
 

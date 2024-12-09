@@ -27,7 +27,7 @@ import java.util.HashSet;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -61,9 +61,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 @Command(name = "chunkinfo",
         description = "returns chunk location"
                 + " information about an existing key")
-@MetaInfServices(SubcommandWithParent.class)
+@MetaInfServices(DebugSubcommand.class)
 public class ChunkKeyHandler extends KeyHandler implements
-    SubcommandWithParent {
+    DebugSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneDebug parent;
@@ -201,10 +201,4 @@ public class ChunkKeyHandler extends KeyHandler implements
     return pipeline.getReplicaIndex(dn) >
         ((ECReplicationConfig) pipeline.getReplicationConfig()).getData();
   }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
-
 }

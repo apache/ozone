@@ -277,7 +277,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <exec-maven-plugin.version>3.5.0</exec-maven-plugin.version>
-    <license-maven-plugin.version>2.4.0</license-maven-plugin.version>
+    <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-M1</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
@@ -301,6 +301,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
+    <jline.version>3.23.0</jline.version> <!-- should match version via picocli-shell-jline3 -->
 
     <spring.version>5.3.39</spring.version>
     <jooq.version>3.11.10</jooq.version>
@@ -322,6 +323,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli-shell-jline3</artifactId>
+        <version>${picocli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jline</groupId>
+        <artifactId>jline</artifactId>
+        <version>${jline.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.derby</groupId>
@@ -1963,7 +1974,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <execution>
                 <phase>package</phase>
                 <goals>
-                  <goal>makeAggregateBom</goal>
+                  <goal>makeBom</goal>
                 </goals>
               </execution>
             </executions>
