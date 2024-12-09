@@ -27,7 +27,7 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "fso-tree",
-    description = "Identify and repair a disconnected FSO tree, and mark unreachable entries for deletion. " +
+    description = "Identify and repair a disconnected FSO tree by marking unreferenced entries for deletion. " +
         "OM should be stopped while this tool is run."
 )
 public class FSORepairCLI implements Callable<Void> {
@@ -39,7 +39,7 @@ public class FSORepairCLI implements Callable<Void> {
 
   @CommandLine.Option(names = {"-r", "--repair"},
         defaultValue = "false",
-        description = "Run in repair mode to move unreachable files and directories to deleted tables.")
+        description = "Run in repair mode to move unreferenced files and directories to deleted tables.")
   private boolean repair;
 
   @CommandLine.Option(names = {"-v", "--volume"},
