@@ -47,8 +47,8 @@ on:
 
       needs-maven-cache:
         type: boolean
-        description: "Whether to restore Maven cache before run (default: no)"
-        default: false
+        description: "Whether to restore Maven cache before run (default: yes)"
+        default: true
         required: false
 
       needs-npm-cache:
