@@ -78,6 +78,29 @@ public final class BlockDeletingServiceMetrics {
       " to container lock wait timeout.")
   private MutableGaugeLong totalLockTimeoutTransactionCount;
 
+  // Iteration specific metrics.
+  @Metric("Start time of last iteration of BlockDeletingService")
+  private MutableGaugeLong startTimeOfLastIteration;
+
+  @Metric("Total time taken by the last iteration of BlockDeletingService")
+  private MutableGaugeLong durationOfLastIteration;
+
+  @Metric(about = "Total number of blocks chosen to be deleted in latest iteration.")
+  private MutableGaugeLong blockChosenCountInLastIteration;
+
+  @Metric(about = "Total number of containers chosen to be deleted in the latest iteration.")
+  private MutableGaugeLong containerChosenCountInLastIteration;
+
+  @Metric(about = "Total number of successful delete blocks in latest iteration.")
+  private MutableGaugeLong successCountInLastIteration;
+
+  @Metric(about = "The total bytes for blocks successfully deleted in the latest iteration.")
+  private MutableGaugeLong successBytesInLastIteration;
+
+  @Metric(about = "The number of failed delete blocks in the latest iteration.")
+  private MutableGaugeLong failureCountInLastIteration;
+
+
   private BlockDeletingServiceMetrics() {
   }
 
@@ -108,8 +131,8 @@ public final class BlockDeletingServiceMetrics {
     this.successBytes.incr(bytes);
   }
 
-  public void incrFailureCount() {
-    this.failureCount.incr();
+  public void incrFailureCount(long delta) {
+    this.failureCount.incr(delta);
   }
 
   public void incrReceivedTransactionCount(long count) {
@@ -182,6 +205,44 @@ public final class BlockDeletingServiceMetrics {
 
   public long getTotalLockTimeoutTransactionCount() {
     return totalLockTimeoutTransactionCount.value();
+  }
+
+  public void setStartTimeOfLastIteration(long startTimeOfLastIteration) {
+    this.startTimeOfLastIteration.set(startTimeOfLastIteration);
+  }
+
+  public void setDurationOfLastIteration(long durationOfLastIteration) {
+    this.durationOfLastIteration.set(durationOfLastIteration);
+  }
+
+  public void setBlockChosenCountInLastIteration(
+      long blockChosenCountInLastIteration) {
+    this.blockChosenCountInLastIteration.set(blockChosenCountInLastIteration);
+  }
+
+  public void setContainerChosenCountInLastIteration(
+      long containerChosenCountInLastIteration) {
+    this.containerChosenCountInLastIteration.set(containerChosenCountInLastIteration);
+  }
+
+  public void setSuccessCountInLastIteration(long delta) {
+    this.successCountInLastIteration.set(delta);
+  }
+
+  public void setSuccessBytesInLastIteration(long delta) {
+    this.successBytesInLastIteration.set(delta);
+  }
+
+  public void setFailureCountInLastIteration(long delta) {
+    this.failureCountInLastIteration.set(delta);
+  }
+
+  public long getBlockChosenCountInLastIteration() {
+    return blockChosenCountInLastIteration.value();
+  }
+
+  public long getContainerChosenCountInLastIteration() {
+    return containerChosenCountInLastIteration.value();
   }
 
   @Override
