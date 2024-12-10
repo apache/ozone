@@ -228,10 +228,11 @@ public class OpenKeyCleanupService extends BackgroundService {
         });
       }
 
+      long duration = Time.monotonicNow() - startTime;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of expired open keys submitted for deletion: {},"
                 + " for commit: {}, elapsed time: {}ms",
-            numOpenKeys, numHsyncKeys, Time.monotonicNow() - startTime);
+            numOpenKeys, numHsyncKeys, duration);
       }
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
