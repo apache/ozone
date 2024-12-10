@@ -900,9 +900,8 @@ public class TestDatanodeAdminMonitor {
    * the monitor.
    * @return DatanodeAdminNodeDetails for the first tracked node found.
    */
-  private DatanodeAdminMonitorImpl.TrackedNode getFirstTrackedNode() {
+  private TrackedNode getFirstTrackedNode() {
     return
-        monitor.getTrackedNodes().toArray(new
-            DatanodeAdminMonitorImpl.TrackedNode[0])[0];
+        monitor.getTrackedNodes().toArray(new TrackedNode[0])[0];
   }
 }
