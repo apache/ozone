@@ -604,9 +604,11 @@ public class TestBlockDeletingService {
       assertEquals(2,
           deletingServiceMetrics.getTotalBlockChosenCount()
               - totalBlockChosenCount);
+      assertEquals(2, deletingServiceMetrics.getBlockChosenCountInLastIteration());
       assertEquals(1,
           deletingServiceMetrics.getTotalContainerChosenCount()
               - totalContainerChosenCount);
+      assertEquals(1, deletingServiceMetrics.getContainerChosenCountInLastIteration());
       // The value of the getTotalPendingBlockCount Metrics is obtained
       // before the deletion is processing
       // So the Pending Block count will be 3
@@ -633,9 +635,11 @@ public class TestBlockDeletingService {
       assertEquals(3,
           deletingServiceMetrics.getTotalBlockChosenCount()
               - totalBlockChosenCount);
+      assertEquals(1, deletingServiceMetrics.getBlockChosenCountInLastIteration());
       assertEquals(2,
           deletingServiceMetrics.getTotalContainerChosenCount()
               - totalContainerChosenCount);
+      assertEquals(1, deletingServiceMetrics.getContainerChosenCountInLastIteration());
 
       // check if blockData get deleted
       assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());

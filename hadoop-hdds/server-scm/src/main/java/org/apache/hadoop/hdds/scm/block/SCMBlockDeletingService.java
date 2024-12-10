@@ -175,6 +175,8 @@ public class SCMBlockDeletingService extends BackgroundService
           }
 
           Set<Long> processedTxIDs = new HashSet<>();
+          long commandsSent = 0;
+          long totalTransactionsSent = 0;
           for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
             UUID dnId = entry.getKey();
@@ -192,6 +194,8 @@ public class SCMBlockDeletingService extends BackgroundService
                   new CommandForDatanode<>(dnId, command));
               metrics.incrBlockDeletionCommandSent();
               metrics.incrBlockDeletionTransactionSent(dnTXs.size());
+              commandsSent++;
+              totalTransactionsSent = totalTransactionsSent + dnTXs.size();
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
                     "Added delete block command for datanode {} in the queue,"
@@ -202,12 +206,17 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
+          long totalTime = Time.monotonicNow() - startTime;
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes / {} totalnodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
               included.size(),
-              Time.monotonicNow() - startTime);
+              totalTime);
+          metrics.setStartTimeOfLastIteration(startTime);
+          metrics.setDurationOfLastIteration(totalTime);
+          metrics.setNumBlockDeletionCommandSentInLastIteration(commandsSent);
+          metrics.setNumBlockDeletionTransactionSentInLastIteration(totalTransactionsSent);
           deletedBlockLog.incrementCount(new ArrayList<>(processedTxIDs));
         } catch (NotLeaderException nle) {
           LOG.warn("Skip current run, since not leader any more.", nle);
