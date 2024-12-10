@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -58,7 +59,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -514,39 +514,6 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   */
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-                                    String startKeyName, String keyPrefix,
-                                    int maxKeys)
-      throws IOException;
-
-  /**
-   * Recover trash allows the user to recover keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   * @throws IOException
-   */
-  boolean recoverTrash(String volumeName, String bucketName, String keyName,
-      String destinationBucket) throws IOException;
-
-  /**
    * Get OzoneKey.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
@@ -857,6 +824,13 @@ public interface ClientProtocol {
    * @throws IOException
    */
   TenantStateList listTenant() throws IOException;
+
+  /**
+   * Get server default values for a number of configuration params.
+   * @return Default configuration from the server.
+   * @throws IOException
+   */
+  OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
    * Get KMS client provider.
@@ -1337,4 +1311,38 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void recoverKey(OmKeyArgs args, long clientID) throws IOException;
+
+  /**
+   * Gets the tags for an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return tags for the specified key.
+   * @throws IOException
+   */
+  Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Sets the tags to an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  void putObjectTagging(String volumeName, String bucketName, String keyName,
+                        Map<String, String> tags) throws IOException;
+
+
+  /**
+   * Removes all the tags from the specified key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @throws IOException
+   */
+  void deleteObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
 }

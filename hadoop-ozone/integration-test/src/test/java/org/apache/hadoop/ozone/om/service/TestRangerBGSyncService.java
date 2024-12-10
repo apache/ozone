@@ -65,7 +65,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
@@ -80,6 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
@@ -105,6 +105,8 @@ public class TestRangerBGSyncService {
 
   @TempDir
   private Path folder;
+  @TempDir
+  private String path;
 
   private MultiTenantAccessController accessController;
   private OMRangerBGSyncService bgSync;
@@ -180,8 +182,6 @@ public class TestRangerBGSyncService {
     // Run as alice, so that Server.getRemoteUser() won't return null.
     mockRemoteUser(ugiAlice);
 
-    String omID = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omID);
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
 
@@ -233,7 +233,7 @@ public class TestRangerBGSyncService {
         ozoneManager.getMetadataManager().getMetaTable().put(
             OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
-      }).when(omRatisServer).submitRequest(any(), any());
+      }).when(omRatisServer).submitRequest(any(), any(), anyLong());
     } catch (ServiceException e) {
       throw new RuntimeException(e);
     }

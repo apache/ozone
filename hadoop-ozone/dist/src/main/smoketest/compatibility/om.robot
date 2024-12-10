@@ -25,3 +25,8 @@ Picks up command line options
     ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDFS_OM_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}
+
+Rejects Atomic Key Rewrite
+    Execute           ozone freon ockg -n1 -t1 -p rewrite
+    ${output} =       Execute and check rc    ozone sh key rewrite -t EC -r rs-3-2-1024k /vol1/bucket1/rewrite/0    255
+    Should Contain    ${output}    Feature disabled: ATOMIC_REWRITE_KEY

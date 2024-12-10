@@ -141,7 +141,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)
     for (OmKeyLocationInfo subKeyInfo : version.getLocationList(openVersion)) {
-      addKeyLocationInfo(subKeyInfo);
+      addKeyLocationInfo(subKeyInfo, false);
     }
   }
 
@@ -154,7 +154,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    *                   key to be written.
    * @return a BlockOutputStreamEntry instance that handles how data is written.
    */
-  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
     return
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
@@ -168,12 +168,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
             .setExecutorServiceSupplier(executorServiceSupplier)
+            .setForRetry(forRetry)
             .build();
   }
 
-  private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+  private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    streamEntries.add(createStreamEntry(subKeyInfo));
+    streamEntries.add(createStreamEntry(subKeyInfo, forRetry));
   }
 
   /**
@@ -295,13 +296,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    *
    * @throws IOException
    */
-  private void allocateNewBlock() throws IOException {
+  private void allocateNewBlock(boolean forRetry) throws IOException {
     if (!excludeList.isEmpty()) {
       LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
-    addKeyLocationInfo(subKeyInfo);
+    addKeyLocationInfo(subKeyInfo, forRetry);
   }
 
   /**
@@ -379,7 +380,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * @return the new current open stream to write to
    * @throws IOException if the block allocation failed.
    */
-  synchronized BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
+  synchronized BlockOutputStreamEntry allocateBlockIfNeeded(boolean forRetry) throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
       // a stream entry gets closed either by :
@@ -391,7 +392,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      allocateNewBlock();
+      allocateNewBlock(forRetry);
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.

@@ -45,7 +45,6 @@ public interface RequestAuditor {
    * @param auditMap
    * @param throwable
    * @param userInfo
-   * @return
    */
   OMAuditLogger.Builder buildAuditMessage(
       AuditAction op, Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);

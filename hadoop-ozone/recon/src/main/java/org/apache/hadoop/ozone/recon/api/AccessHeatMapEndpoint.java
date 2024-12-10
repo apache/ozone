@@ -65,13 +65,14 @@ public class AccessHeatMapEndpoint {
    * with volume, buckets under that volume,
    * then directories, subdirectories and paths
    * under that bucket.
-   * E.g. -------->>
+   * <pre>
+   * E.g. --------&gt;&gt;
    * vol1                           vol2
    * - bucket1                      - bucket2
    * - dir1/dir2/key1               - dir4/dir1/key1
    * - dir1/dir2/key2               - dir4/dir5/key2
    * - dir1/dir3/key1               - dir5/dir3/key1
-   *
+   * </pre>
    * @return {@link Response}
    */
   @GET

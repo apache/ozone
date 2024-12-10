@@ -16,18 +16,13 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.net.URI;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,17 +30,25 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Data generator tool test hsync/write synchronization performance.
+ * This tool simulates the way HBase writes transaction logs (WAL) to a file in Ozone:
+ *  - Transactions are written to the file's OutputStream by a single thread, each transaction is numbered by an
+ *  increasing counter. Every transaction can be serialized to the OutputStream via multiple write calls.
+ *  - Multiple threads checks and sync (hsync) the OutputStream to make it persistent.
  *
  * Example usage:
  *
- * To generate 1000 hsync calls with 10 threads on a single file:
- *    ozone freon hsync-generator -t 10 --bytes-per-write=1024 -n 1000
+ * To simulate hlog that generates 1M hsync calls with 5 threads:
  *
- * To generate 1000 hsync calls with 10 threads on 3 files simultaneously:
- *
- *    ozone freon hsync-generator -t 10 --bytes-per-write=1024 --number-of-files=3 -n 1000
+ *    ozone freon hsync-generator -t 5 --writes-per-transaction=32 --bytes-per-write=8 -n 1000000
  *
  */
 @Command(name = "hg",
@@ -67,25 +70,25 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
 
   @Option(names = {"--bytes-per-write"},
       description = "Size of each write",
-      defaultValue = "1024")
+      defaultValue = "8")
   private int writeSize;
 
-  @Option(names = {"--number-of-files"},
-      description = "Number of files to run test.",
-      defaultValue = "1")
-  private int numberOfFiles;
+  @Option(names = {"--writes-per-transaction"},
+      description = "Size of each write",
+      defaultValue = "32")
+  private int writesPerTransaction;
 
   private Timer timer;
 
   private OzoneConfiguration configuration;
-  private FileSystem[] fileSystems;
-  private FSDataOutputStream[] outputStreams;
-  private Path[] files;
-  private AtomicInteger[] callsPerFile;
+  private FSDataOutputStream outputStream;
+  private byte[] data;
+  private final BlockingQueue<Integer> writtenTransactions = new ArrayBlockingQueue<>(10_000);
+  private final AtomicInteger lastSyncedTransaction = new AtomicInteger();
 
   public HsyncGenerator() {
   }
-  private byte[] data;
+
 
   @VisibleForTesting
   HsyncGenerator(OzoneConfiguration ozoneConfiguration) {
@@ -101,54 +104,68 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     }
     URI uri = URI.create(rootPath);
 
-    fileSystems = new FileSystem[numberOfFiles];
-    outputStreams = new FSDataOutputStream[numberOfFiles];
-    files = new Path[numberOfFiles];
-    callsPerFile = new AtomicInteger[numberOfFiles];
-    for (int i = 0; i < numberOfFiles; i++) {
-      FileSystem fileSystem = FileSystem.get(uri, configuration);
-      Path file = new Path(rootPath + "/" + generateObjectName(i));
-      fileSystem.mkdirs(file.getParent());
-      outputStreams[i] = fileSystem.create(file);
-      fileSystems[i] = fileSystem;
-      files[i] = file;
-      callsPerFile[i] = new AtomicInteger();
+    FileSystem fileSystem = FileSystem.get(uri, configuration);
+    Path file = new Path(rootPath + "/" + generateObjectName(0));
+    fileSystem.mkdirs(file.getParent());
+    outputStream = fileSystem.create(file);
 
-      LOG.info("Created file for testing: {}", file);
-    }
+    LOG.info("Created file for testing: {}", file);
 
     timer = getMetrics().timer("hsync-generator");
     data = PayloadUtils.generatePayload(writeSize);
 
+    startTransactionWriter();
+
     try {
       runTests(this::sendHsync);
     } finally {
-      for (FSDataOutputStream outputStream : outputStreams) {
-        outputStream.close();
-      }
-      for (FileSystem fs : fileSystems) {
-        fs.close();
-      }
+      outputStream.close();
+      fileSystem.close();
     }
-
-    StringBuilder distributionReport = new StringBuilder();
-    for (int i = 0; i < numberOfFiles; i++) {
-      distributionReport.append("\t").append(files[i]).append(": ").append(callsPerFile[i]).append("\n");
-    }
-
-    LOG.info("Hsync generator finished, calls distribution: \n {}", distributionReport);
 
     return null;
   }
 
+  private void startTransactionWriter() {
+    Thread transactionWriter = new Thread(this::generateTransactions);
+    transactionWriter.setDaemon(true);
+    transactionWriter.start();
+  }
+
+  private void generateTransactions() {
+    int transaction = 0;
+    while (true) {
+      for (int i = 0; i < writesPerTransaction; i++) {
+        try {
+          if (writeSize > 1) {
+            outputStream.write(data);
+          } else {
+            outputStream.write(i);
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      try {
+        writtenTransactions.put(transaction++);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
   private void sendHsync(long counter) throws Exception {
     timer.time(() -> {
-      int i = ((int) counter) % numberOfFiles;
-      FSDataOutputStream outputStream = outputStreams[i];
-      outputStream.write(data);
-      outputStream.hsync();
-      callsPerFile[i].incrementAndGet();
-      return null;
+      while (true) {
+        int transaction = writtenTransactions.take();
+        int lastSynced = lastSyncedTransaction.get();
+        if (transaction > lastSynced) {
+          outputStream.hsync();
+          lastSyncedTransaction.compareAndSet(lastSynced, transaction);
+          return null;
+        }
+      }
     });
   }
 }

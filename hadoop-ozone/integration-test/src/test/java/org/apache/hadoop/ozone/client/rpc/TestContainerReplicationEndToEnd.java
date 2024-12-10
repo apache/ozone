@@ -49,7 +49,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -80,7 +79,6 @@ public class TestContainerReplicationEndToEnd {
   private static ObjectStore objectStore;
   private static String volumeName;
   private static String bucketName;
-  private static String path;
   private static XceiverClientManager xceiverClientManager;
   private static long containerReportInterval;
 
@@ -92,10 +90,7 @@ public class TestContainerReplicationEndToEnd {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
+
     containerReportInterval = 2000;
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,

@@ -214,7 +214,7 @@ public class OFSPath {
   }
 
   /**
-   * Get the volume & bucket or mount name (non-key path).
+   * Get the volume and bucket or mount name (non-key path).
    * @return String of path excluding key in bucket.
    */
   // Prepend a delimiter at beginning. e.g. /vol1/buc1
@@ -299,6 +299,19 @@ public class OFSPath {
       }
     }
     return false;
+  }
+
+  /**
+   * If the path is a snapshot path get the snapshot name from the key name.
+   */
+  public String getSnapshotName() {
+    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (!bucketName.isEmpty() && !volumeName.isEmpty()) {
+        String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
+        return keyNames.length > 1 ? keyNames[1] : null;
+      }
+    }
+    return null;
   }
 
   /**

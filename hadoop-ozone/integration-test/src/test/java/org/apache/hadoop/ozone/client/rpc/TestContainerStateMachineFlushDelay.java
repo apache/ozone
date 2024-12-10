@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +71,6 @@ public class TestContainerStateMachineFlushDelay {
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
-  private String path;
   private int chunkSize;
   private int flushSize;
   private int maxFlushSize;
@@ -91,10 +89,6 @@ public class TestContainerStateMachineFlushDelay {
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
     keyString = UUID.randomUUID().toString();
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFlushDelay.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);

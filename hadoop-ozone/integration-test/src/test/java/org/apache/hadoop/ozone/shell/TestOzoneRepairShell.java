@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.debug.DBScanner;
-import org.apache.hadoop.ozone.debug.RDBParser;
+import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.repair.RDBRepair;
-import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
+import org.apache.hadoop.ozone.repair.OzoneRepair;
+import org.apache.hadoop.ozone.repair.ldb.RDBRepair;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -83,7 +84,7 @@ public class TestOzoneRepairShell {
 
   @Test
   public void testUpdateTransactionInfoTable() throws Exception {
-    CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair());
+    CommandLine cmd = new CommandLine(new RDBRepair());
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     cluster.getOzoneManager().stop();
@@ -114,7 +115,7 @@ public class TestOzoneRepairShell {
   }
 
   private String scanTransactionInfoTable(String dbPath) throws Exception {
-    CommandLine cmdDBScanner = new CommandLine(new RDBParser()).addSubcommand(new DBScanner());
+    CommandLine cmdDBScanner = new CommandLine(new RDBParser());
     String[] argsDBScanner =
         new String[] {"--db=" + dbPath, "scan", "--column_family", "transactionInfoTable"};
     cmdDBScanner.execute(argsDBScanner);
@@ -130,4 +131,27 @@ public class TestOzoneRepairShell {
     throw new IllegalStateException("Failed to scan and find raft's highest term and index from TransactionInfo table");
   }
 
+  @Test
+  public void testQuotaRepair() throws Exception {
+    CommandLine cmd = new OzoneRepair().getCmd();
+
+    String[] args = new String[] {"quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
+    int exitCode = cmd.execute(args);
+    assertEquals(0, exitCode, err::toString);
+    args = new String[] {"quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
+    exitCode = cmd.execute(args);
+    assertEquals(0, exitCode);
+    GenericTestUtils.waitFor(() -> {
+      out.reset();
+      // verify quota trigger is completed having non-zero lastRunFinishedTime
+      String[] targs = new String[]{"quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)};
+      cmd.execute(targs);
+      try {
+        return !out.toString(DEFAULT_ENCODING).contains("\"lastRunFinishedTime\":\"\"");
+      } catch (Exception ex) {
+        // do nothing
+      }
+      return false;
+    }, 1000, 10000);
+  }
 }

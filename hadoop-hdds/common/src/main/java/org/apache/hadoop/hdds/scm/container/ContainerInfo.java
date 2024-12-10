@@ -46,7 +46,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private static final Codec<ContainerInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(HddsProtos.ContainerInfoProto.getDefaultInstance()),
       ContainerInfo::fromProtobuf,
-      ContainerInfo::getProtobuf);
+      ContainerInfo::getProtobuf,
+      ContainerInfo.class);
 
   public static Codec<ContainerInfo> getCodec() {
     return CODEC;

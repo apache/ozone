@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.debug;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -74,11 +74,8 @@ import static java.util.Comparator.comparing;
 @CommandLine.Command(name = "find-missing-padding",
     aliases = { "fmp" },
     description = "List all keys with any missing padding, optionally limited to a volume/bucket/key URI.")
-@MetaInfServices(SubcommandWithParent.class)
-public class FindMissingPadding extends Handler implements SubcommandWithParent {
-
-  @CommandLine.ParentCommand
-  private OzoneDebug parent;
+@MetaInfServices(DebugSubcommand.class)
+public class FindMissingPadding extends Handler implements DebugSubcommand {
 
   @CommandLine.Mixin
   private ScmOption scmOption;
@@ -98,11 +95,6 @@ public class FindMissingPadding extends Handler implements SubcommandWithParent 
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress(uri);
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   @Override

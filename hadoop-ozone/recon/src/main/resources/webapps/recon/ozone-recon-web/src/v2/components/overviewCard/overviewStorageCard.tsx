@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useMemo } from 'react';
+import React, { HTMLAttributes, useMemo } from 'react';
 import filesize from 'filesize';
 import { Card, Row, Col, Table, Tag } from 'antd';
 
@@ -224,7 +224,10 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
                 usage: <Tag key='pre-allocated' color='red'>Container Pre-allocated</Tag>,
                 size: size(storageReport.committed)
               }
-            ]} />
+            ]}
+            onRow={(record) => ({
+              'data-testid': `capacity-${record.key}`
+            }) as HTMLAttributes<HTMLElement>} />
         </Col>
       </Row>
     </Card>

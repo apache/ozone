@@ -137,6 +137,7 @@ public class TestKeyValueContainer {
     CodecBuffer.enableLeakDetection();
 
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFile(true);
     dc.setAutoCompactionSmallSstFileNum(100);
     dc.setRocksdbDeleteObsoleteFilesPeriod(5000);
     CONF.setFromObject(dc);
@@ -688,7 +689,7 @@ public class TestKeyValueContainer {
 
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
-      long defaultCacheSize = 64 * OzoneConsts.MB;
+      long defaultCacheSize = OzoneConsts.GB;
       long cacheSize = Long.parseLong(store
           .getProperty("rocksdb.block-cache-capacity"));
       assertEquals(defaultCacheSize, cacheSize);
@@ -896,7 +897,7 @@ public class TestKeyValueContainer {
               CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      hddsVolume.check(true);
+      hddsVolume.compactDb();
       // Sleep a while to wait for compaction to complete
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =

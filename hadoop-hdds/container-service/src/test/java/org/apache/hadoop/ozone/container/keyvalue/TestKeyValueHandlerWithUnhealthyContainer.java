@@ -35,12 +35,14 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.UUID;
@@ -71,6 +73,9 @@ import static org.mockito.Mockito.when;
 public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
+
+  @TempDir
+  private File tempDir;
 
   private IncrementalReportSender<Container> mockIcrSender;
 
@@ -119,8 +124,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
           handler.handleGetBlock(
               getDummyCommandRequestProto(clientVersion, ContainerProtos.Type.GetBlock, rid),
               container);
-      assertEquals((replicaIndex > 0 && rid != replicaIndex && clientVersion.toProtoValue() >=
-              ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue()) ?
+      assertEquals((replicaIndex > 0 && rid != 0 && rid != replicaIndex) ?
               ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
           response.getResult());
     }
@@ -162,8 +166,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       ContainerProtos.ContainerCommandResponseProto response =
           handler.handleReadChunk(getDummyCommandRequestProto(clientVersion, ContainerProtos.Type.ReadChunk, rid),
               container, null);
-      assertEquals((replicaIndex > 0 && rid != replicaIndex &&
-              clientVersion.toProtoValue() >= ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue()) ?
+      assertEquals((replicaIndex > 0 && rid != 0 && rid != replicaIndex) ?
               ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
           response.getResult());
     }
@@ -220,6 +223,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     KeyValueContainerData mockContainerData = mock(KeyValueContainerData.class);
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
+    when(mockContainerData.getMetadataPath()).thenReturn(tempDir.getAbsolutePath());
     KeyValueContainer container = new KeyValueContainer(
         mockContainerData, new OzoneConfiguration());
 

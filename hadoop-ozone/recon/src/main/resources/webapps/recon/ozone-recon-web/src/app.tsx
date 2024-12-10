@@ -16,18 +16,23 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { Suspense } from 'react';
 
 import { Switch as AntDSwitch, Layout } from 'antd';
 import NavBar from './components/navBar/navBar';
+import NavBarV2 from '@/v2/components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
+import BreadcrumbsV2 from '@/v2/components/breadcrumbs/breadcrumbs';
 import { HashRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { routes } from '@/routes';
 import { routesV2 } from '@/v2/routes-v2';
 import { MakeRouteWithSubRoutes } from '@/makeRouteWithSubRoutes';
 import classNames from 'classnames';
 
+import Loader from '@/v2/components/loader/loader';
+
 import './app.less';
+import NotFound from '@/v2/pages/notFound/notFound';
 
 const {
   Header, Content, Footer
@@ -35,7 +40,7 @@ const {
 
 interface IAppState {
   collapsed: boolean;
-  enableNewUI: boolean;
+  enableOldUI: boolean;
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
@@ -43,7 +48,7 @@ class App extends React.Component<Record<string, object>, IAppState> {
     super(props);
     this.state = {
       collapsed: false,
-      enableNewUI: false
+      enableOldUI: false
     };
   }
 
@@ -52,42 +57,54 @@ class App extends React.Component<Record<string, object>, IAppState> {
   };
 
   render() {
-    const { collapsed, enableNewUI } = this.state;
+    const { collapsed, enableOldUI } = this.state;
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
 
     return (
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
-          <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
+          {
+            (enableOldUI)
+              ? <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
+              : <NavBarV2 collapsed={collapsed} onCollapse={this.onCollapse} />
+          }
           <Layout className={layoutClass}>
             <Header>
-              <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'space-between' }}>
-                <Breadcrumbs />
-                <AntDSwitch
-                  disabled={true}
-                  checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
-                  onChange={(checked: boolean) => {
-                    this.setState({
-                      enableNewUI: checked
-                    });
-                  }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {(enableOldUI) ? <Breadcrumbs /> : <BreadcrumbsV2 />}
+                <span>
+                  <span style={{ marginRight: '8px', color: '#515151'}}>Switch to</span>
+                  <AntDSwitch
+                    unCheckedChildren={<div style={{ paddingRight: '2px' }}>Old UI</div>}
+                    checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                    onChange={(checked: boolean) => {
+                      this.setState({
+                        enableOldUI: checked
+                      });
+                    }} />
+                </span>
               </div>
             </Header>
-            <Content style={(enableNewUI) ? {} : { margin: '0 16px 0', overflow: 'initial' }}>
-              <Switch>
-                <Route exact path='/'>
-                  <Redirect to='/Overview' />
-                </Route>
-                {(enableNewUI)
-                  ? routesV2.map(
-                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                  )
-                  : routes.map(
-                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                  )
-                }
-              </Switch>
+            <Content style={(enableOldUI) ? { margin: '0 16px 0', overflow: 'initial' } : {}}>
+              <Suspense fallback={<Loader />}>
+                <Switch>
+                  <Route exact path='/'>
+                    <Redirect to='/Overview' />
+                  </Route>
+                  {(enableOldUI)
+                    ? routes.map(
+                      (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
+                    )
+                    : routesV2.map(
+                      (route, index) => {
+                        return <MakeRouteWithSubRoutes key={index} {...route} />
+                      }
+                    )
+                  }
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
             </Content>
             <Footer style={{ textAlign: 'center' }} />
           </Layout>

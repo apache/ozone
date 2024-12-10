@@ -88,7 +88,7 @@ public class AbstractReconContainerManagerTest {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMHADBTransactionBufferStub(store));
     sequenceIdGen = new SequenceIdGenerator(

@@ -340,6 +340,7 @@ public class TestVolumeSetDiskChecks {
     conSet.handleVolumeFailures(stateContext);
     // ContainerID1 should be removed belonging to failed volume
     assertNull(conSet.getContainer(containerID1));
+    assertTrue(conSet.getMissingContainerSet().contains(containerID1));
     // ContainerID should exist belonging to normal volume
     assertNotNull(conSet.getContainer(containerID));
     expectedReportCount.put(

@@ -86,7 +86,7 @@ public final class MockedSCM {
     }
   }
 
-  private void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
+  void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
     ozoneCfg.setFromObject(balancerConfig);
     try {
       doMock(balancerConfig, ozoneCfg);
@@ -140,6 +140,10 @@ public final class MockedSCM {
   public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
     init(config, new OzoneConfiguration());
     return startBalancerTask(new ContainerBalancer(scm), config);
+  }
+
+  public int getNodeCount() {
+    return cluster.getNodeCount();
   }
 
   public void enableLegacyReplicationManager() {

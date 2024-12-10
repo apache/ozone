@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.TotalRunTimeMs;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.QueueWaitingTaskCount;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.InvocationCount;
+import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.AvgRunTimeMs;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.ThreadPoolActivePoolSize;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.ThreadPoolMaxPoolSize;
 import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.CommandReceivedCount;
@@ -46,6 +47,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
   enum CommandMetricsMetricsInfo implements MetricsInfo {
     Command("The type of the SCM command"),
     TotalRunTimeMs("The total runtime of the command handler in milliseconds"),
+    AvgRunTimeMs("Average run time of the command handler in milliseconds"),
     QueueWaitingTaskCount("The number of queued tasks waiting for execution"),
     InvocationCount("The number of times the command handler has been invoked"),
     ThreadPoolActivePoolSize("The number of active threads in the thread pool"),
@@ -108,6 +110,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
               commandHandler.getCommandType().name());
 
       builder.addGauge(TotalRunTimeMs, commandHandler.getTotalRunTime());
+      builder.addGauge(AvgRunTimeMs, commandHandler.getAverageRunTime());
       builder.addGauge(QueueWaitingTaskCount, commandHandler.getQueuedCount());
       builder.addGauge(InvocationCount, commandHandler.getInvocationCount());
       int activePoolSize = commandHandler.getThreadPoolActivePoolSize();

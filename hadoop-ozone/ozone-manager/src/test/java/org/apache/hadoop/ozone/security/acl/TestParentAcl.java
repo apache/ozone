@@ -344,8 +344,7 @@ public class TestParentAcl {
             HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         // here we give test ugi full access
-        .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
-            testUgi.getGroupNames(), ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(testUgi, ALL, ALL))
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 

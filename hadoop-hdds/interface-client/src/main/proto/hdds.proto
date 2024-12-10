@@ -61,7 +61,7 @@ message ExtendedDatanodeDetailsProto {
     optional string version = 2;
     optional int64 setupTime = 3;
     optional string revision = 4;
-    optional string buildDate = 5;
+    optional string buildDate = 5; // unused, reserved for compatibility
 }
 
 message MoveDataNodePairProto {
@@ -191,6 +191,7 @@ message DatanodeUsageInfoProto {
     optional int64 containerCount = 5;
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
+    optional int64 pipelineCount = 8;
 }
 
 /**
@@ -256,6 +257,7 @@ message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
     repeated string peerRoles = 3;
+    optional bool scmRatisEnabled = 4;
 }
 
 message AddScmRequestProto {

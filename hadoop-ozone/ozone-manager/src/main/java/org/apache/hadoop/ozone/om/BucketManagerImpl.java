@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * BucketManager uses MetadataDB to store bucket level information.
  * Keys used in BucketManager for storing data into MetadataDB
  * for BucketInfo:
- * {volume/bucket} -> bucketInfo
+ * {volume/bucket} -&gt; bucketInfo
  */
 public class BucketManagerImpl implements BucketManager {
   private static final Logger LOG =
