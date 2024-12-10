@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -106,6 +107,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -1240,5 +1243,35 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder -> builder.setGetMetricsRequest(request)).getGetMetricsResponse();
     String metricsJsonStr = response.getMetricsJson();
     return metricsJsonStr;
+  }
+
+  @Override
+  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
+      String hostName, int pageSize, int currentPage) throws IOException {
+
+    // Prepare parameters.
+    GetVolumeInfosRequestProto.Builder requestBuilder =
+        GetVolumeInfosRequestProto.newBuilder();
+    
+    if (StringUtils.isNotBlank(displayMode)) {
+      requestBuilder.setDisplayMode(displayMode);
+    }
+
+    if (StringUtils.isNotBlank(uuid)) {
+      requestBuilder.setUuid(uuid);
+    }
+
+    if (StringUtils.isNotBlank(hostName)) {
+      requestBuilder.setHostName(hostName);
+    }
+
+    requestBuilder.setCurrentPage(currentPage);
+    requestBuilder.setPageSize(pageSize);
+
+    // Submit request.
+    GetVolumeInfosResponseProto response = submitRequest(Type.GetVolumeFailureInfos,
+        builder -> builder.setGetVolumeInfosRequest(requestBuilder.build())).
+        getGetVolumeInfosResponse();
+    return response;
   }
 }
