@@ -354,6 +354,7 @@ Apache License 2.0
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
+   io.r2dbc:r2dbc-spi
    joda-time:joda-time
    jakarta.inject:jakarta.inject-api
    jakarta.validation:jakarta.validation-api
@@ -469,6 +470,12 @@ Public Domain
 =====================
 
    aopalliance:aopalliance
+
+
+CC0
+=====================
+
+   org.reactivestreams:reactive-streams
 
 
 BSD 3-Clause

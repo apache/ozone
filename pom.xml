@@ -322,8 +322,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.23.0</jline.version> <!-- should match version via picocli-shell-jline3 -->
 
-    <spring.version>5.3.39</spring.version>
-    <jooq.version>3.11.10</jooq.version>
+    <spring.version>6.2.0</spring.version>
+    <jooq.version>3.19.15</jooq.version>
 
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>

@@ -24,6 +24,7 @@
   <artifactId>ozone-reconcodegen</artifactId>
   <name>Apache Ozone Recon CodeGen</name>
   <properties>
+    <javac.version>17</javac.version>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
   </properties>
 
