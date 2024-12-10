@@ -100,7 +100,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
-      int numSubDirDeleted = 0, numSubFilesDeleted = 0, numDirsDeleted = 0;
+      int numSubDirMoved = 0, numSubFilesMoved = 0, numDirsDeleted = 0;
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -114,7 +114,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
-          numSubDirDeleted++;
+          numSubDirMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -157,7 +157,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
 
           omMetrics.decNumKeys();
-          numSubFilesDeleted++;
+          numSubFilesMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -177,8 +177,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           numDirsDeleted++;
         }
       }
-      deletingServiceMetrics.incrNumSubDirectoriesPurged(numSubDirDeleted);
-      deletingServiceMetrics.incrNumSubFilesPurged(numSubFilesDeleted);
+      deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
+      deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
 
       if (fromSnapshotInfo != null) {

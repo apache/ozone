@@ -70,12 +70,12 @@ public final class DeletingServiceMetrics {
     numDirsSentForPurge.incr(dirDel);
   }
 
-  public void incrNumSubDirsSentForPurge(long dirMove) {
-    numSubDirsSentForPurge.incr(dirMove);
+  public void incrNumSubDirsSentForPurge(long delta) {
+    numSubDirsSentForPurge.incr(delta);
   }
 
-  public void incrNumSubFilesSentForPurge(long filesMove) {
-    numSubFilesSentForPurge.incr(filesMove);
+  public void incrNumSubFilesSentForPurge(long delta) {
+    numSubFilesSentForPurge.incr(delta);
   }
 
   public void incrementDirectoryDeletionTotalMetrics(long dirDel, long dirMove, long filesMove) {
@@ -105,19 +105,19 @@ public final class DeletingServiceMetrics {
    */
   @Metric("Total no. of directories purged")
   private MutableGaugeLong numDirsPurged;
-  @Metric("Total no. of subFiles purged")
-  private MutableGaugeLong numSubFilesPurged;
-  @Metric("Total no. of subDirectories purged")
-  private MutableGaugeLong numSubDirsPurged;
+  @Metric("Total no. of subFiles moved to deletedTable")
+  private MutableGaugeLong numSubFilesMovedToDeletedTable;
+  @Metric("Total no. of subDirectories moved to deletedDirTable")
+  private MutableGaugeLong numSubDirsMovedToDeletedDirTable;
 
   public void incrNumDirPurged(long dirPurged) {
     this.numDirsPurged.incr(dirPurged);
   }
-  public void incrNumSubFilesPurged(long subKeysPurged) {
-    this.numSubFilesPurged.incr(subKeysPurged);
+  public void incrNumSubFilesMoved(long subKeys) {
+    this.numSubFilesMovedToDeletedTable.incr(subKeys);
   }
-  public void incrNumSubDirectoriesPurged(long subDirectoriesPurged) {
-    this.numSubDirsPurged.incr(subDirectoriesPurged);
+  public void incrNumSubDirectoriesMoved(long subDirectories) {
+    this.numSubDirsMovedToDeletedDirTable.incr(subDirectories);
   }
 
   /*
