@@ -24,6 +24,8 @@ import com.google.inject.Singleton;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -37,9 +39,12 @@ import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 @Singleton
 public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaVersionTableDefinition.class);
+
   public static final String SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DataSource dataSource;
   private DSLContext dslContext;
+  private int latestSLV;
 
   @Inject
   public SchemaVersionTableDefinition(DataSource dataSource) {
@@ -48,11 +53,24 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   @Override
   public void initializeSchema() throws SQLException {
-    Connection conn = dataSource.getConnection();
-    dslContext = DSL.using(conn);
+    try (Connection conn = dataSource.getConnection()) {
+      dslContext = DSL.using(conn);
 
-    if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
-      createSchemaVersionTable();
+      if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
+        // If the RECON_SCHEMA_VERSION table does not exist, check for other tables
+        boolean isFreshInstall = checkForFreshInstall(conn);
+
+        // Create the RECON_SCHEMA_VERSION table
+        createSchemaVersionTable();
+
+        if (isFreshInstall) {
+          // Fresh install: Set the SLV to the latest version
+          insertInitialSLV(conn, latestSLV);
+        } else {
+          // Upgrade scenario: Set the SLV to -1 to trigger all upgrade actions
+          insertInitialSLV(conn, -1);
+        }
+      }
     }
   }
 
@@ -66,4 +84,37 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
+  /**
+   * Inserts the initial SLV into the Schema Version table.
+   * @param conn The database connection.
+   * @param slv The initial SLV value.
+   */
+  private void insertInitialSLV(Connection conn, int slv) throws SQLException {
+    dslContext = DSL.using(conn);
+    dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
+        .columns(DSL.field("version_number"), DSL.field("applied_on"))
+        .values(slv, DSL.currentTimestamp())
+        .execute();
+    LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
+  }
+
+  /**
+   * Determines if this is a fresh install by checking the presence of key tables.
+   * @param conn The database connection.
+   * @return True if this is a fresh install, false otherwise.
+   */
+  private boolean checkForFreshInstall(Connection conn) throws SQLException {
+    // Check for presence of key Recon tables (e.g., UNHEALTHY_CONTAINERS, RECON_TASK_STATUS, etc.)
+    return !TABLE_EXISTS_CHECK.test(conn, "UNHEALTHY_CONTAINERS") &&
+        !TABLE_EXISTS_CHECK.test(conn, "RECON_TASK_STATUS") &&
+        !TABLE_EXISTS_CHECK.test(conn, "CONTAINER_COUNT_BY_SIZE");
+  }
+
+  /**
+     * Set the latest SLV.
+     * @param slv The latest Software Layout Version.
+     */
+    public void setLatestSLV(int slv) {
+      this.latestSLV = slv;
+    }
 }
