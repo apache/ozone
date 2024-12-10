@@ -306,7 +306,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected boolean includeS3G = false;
 
     protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
-    protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
+    protected int dnCurrentVersion = DatanodeVersion.STREAM_BLOCK_SUPPORT.toProtoValue();
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
