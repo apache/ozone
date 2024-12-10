@@ -161,7 +161,7 @@ download_hadoop_aws() {
   if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
     mkdir -p "${dir}"
     if [[ ! -f "${dir}.tar.gz" ]]; then
-      local url="https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+      local url="https://www.apache.org/dyn/closer.lua?action=download&filename=hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
       echo "Downloading Hadoop from ${url}"
       curl -LSs --fail -o "${dir}.tar.gz" "$url" || return 1
     fi
