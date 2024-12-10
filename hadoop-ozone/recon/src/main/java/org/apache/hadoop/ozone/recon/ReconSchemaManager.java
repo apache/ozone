@@ -19,7 +19,8 @@
 package org.apache.hadoop.ozone.recon;
 
 import java.sql.SQLException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 
 /**
  * Class used to create Recon SQL tables.
@@ -87,9 +89,6 @@ public class ReconSchemaManager {
    * @return The latest SLV.
    */
   private int calculateLatestSLV() {
-    return Arrays.stream(ReconLayoutFeature.values())
-        .mapToInt(ReconLayoutFeature::getVersion)
-        .max()
-        .orElse(0);
+    return ReconLayoutFeature.determineSLV();
   }
 }
