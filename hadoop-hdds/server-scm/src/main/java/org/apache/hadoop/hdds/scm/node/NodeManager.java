@@ -384,6 +384,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   };
 
   /**
+   * Given datanode details, returns the node containers replication metrics.
+   * @param datanodeDetails {@link DatanodeDetails} datanode details
+   * @return Map of container replication metrics for the given datanode {@link Map}
+   */
+  Map<String, String> getNodeContainersReplicationMetrics(DatanodeDetails datanodeDetails) throws NodeNotFoundException;
+
+  /**
    * Given datanode address(Ipaddress or hostname), returns a list of
    * DatanodeDetails for the datanodes running at that address.
    *
