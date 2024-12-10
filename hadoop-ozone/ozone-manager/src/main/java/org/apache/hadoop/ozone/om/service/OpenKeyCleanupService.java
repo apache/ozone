@@ -79,7 +79,7 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
-  private final AtomicLong callIdCount;
+  private final AtomicLong callId;
   private final AtomicBoolean suspended;
 
   public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
@@ -115,7 +115,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     this.submittedOpenKeyCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
-    this.callIdCount = new AtomicLong(0);
+    this.callId = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
   }
 
@@ -269,7 +269,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     private OMResponse submitRequest(OMRequest omRequest) {
       try {
-        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callIdCount.incrementAndGet());
+        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
       } catch (ServiceException e) {
         LOG.error("Open key " + omRequest.getCmdType()
             + " request failed. Will retry at next run.", e);

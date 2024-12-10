@@ -504,34 +504,32 @@ public class TestHSync {
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final Path key1 = new Path("hsync-key");
-    final Path key2 = new Path("hsync-key1");
+    final Path key2 = new Path("key2");
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      // Create key1
+      // Create key1 with hsync
       try (FSDataOutputStream os = fs.create(key1, true)) {
         os.write(1);
         os.hsync();
-        // Create key2
+        // Create key2 without hsync
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
-          os1.hsync();
           // There should be 2 key in openFileTable
           assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
-          assertThat(2 == getKeyInfo(BUCKET_LAYOUT).size());
+          // One key will be in fileTable as hsynced
+          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
-          GenericTestUtils.waitFor(() -> 0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
-
-          // Verify entry from openKey gets committed eventually
+          // Verify hsync openKey gets committed eventually
+          // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
               0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
-          // Verify key is still present
-          assertThat(2 == getKeyInfo(BUCKET_LAYOUT).size());
+          // Verify only one key is still present in fileTable
+          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
-          assertTrue(fs.delete(key2, false));
           waitForEmptyDeletedTable();
         } catch (OMException ex) {
           assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
