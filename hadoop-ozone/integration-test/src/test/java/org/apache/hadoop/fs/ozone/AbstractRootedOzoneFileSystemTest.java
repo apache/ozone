@@ -157,11 +157,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private OzoneClient client;
 
   AbstractRootedOzoneFileSystemTest(BucketLayout bucketLayout, boolean setDefaultFs,
-      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+      boolean isAclEnabled, boolean noFlush) {
     // Initialize the cluster before EACH set of parameters
     this.bucketLayout = bucketLayout;
     enabledFileSystemPaths = setDefaultFs;
-    omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
     useOnlyCache = noFlush;
     isBucketFSOptimized = bucketLayout.isFileSystemOptimized();
@@ -202,7 +201,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   }
 
   private final boolean enabledFileSystemPaths;
-  private final boolean omRatisEnabled;
   private final boolean isBucketFSOptimized;
   private final boolean enableAcl;
 
@@ -236,7 +234,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
@@ -284,7 +281,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
 
     if (useOnlyCache) {
-      cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(omRatisEnabled);
+      cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(true);
     }
   }
 
