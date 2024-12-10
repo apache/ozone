@@ -331,6 +331,9 @@ public class TestDeleteBlocksCommandHandler {
         assertEquals(cmdStatus.getProtoBufMessage().getBlockDeletionAck().getResultsCount(), 0);
       }
     }
+    blockDeleteMetrics = handler.getBlockDeleteMetrics();
+    assertEquals(5, blockDeleteMetrics.getTotalCommandsReceived());
+    assertEquals(2, blockDeleteMetrics.getTotalCommandsDiscarded());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -367,6 +370,7 @@ public class TestDeleteBlocksCommandHandler {
     assertTrue(results3.get(0).getSuccess());
     assertEquals(0,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
+    assertEquals(1, blockDeleteMetrics.getTotalTransactionsDiscarded());
     // Duplicate cmd content will not be persisted.
     assertEquals(2,
         ((KeyValueContainerData) container.getContainerData()).getNumPendingDeletionBlocks());

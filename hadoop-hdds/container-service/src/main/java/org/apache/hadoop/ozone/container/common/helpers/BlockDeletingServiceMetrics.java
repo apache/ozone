@@ -46,6 +46,9 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of failed delete blocks.")
   private MutableCounterLong failureCount;
 
+  @Metric(about = "The number of delete block transaction processed.")
+  private MutableCounterLong processedTransactionCount;
+
   @Metric(about = "The number of out of order delete block transaction.")
   private MutableCounterLong outOfOrderDeleteBlockTransactionCount;
 
@@ -55,8 +58,7 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of DeleteBlockTransaction received")
   private MutableCounterLong receivedTransactionCount;
 
-  @Metric(about = "The total number of DeleteBlockTransaction" +
-      " that is a retry Transaction")
+  @Metric(about = "The total number of DeleteBlockTransaction that is a retry Transaction")
   private MutableCounterLong receivedRetryTransactionCount;
 
   @Metric(about = "The total number of Container received to be processed")
@@ -74,9 +76,19 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of Container chosen to be deleted.")
   private MutableGaugeLong totalContainerChosenCount;
 
-  @Metric(about = "The total number of transactions which failed due" +
-      " to container lock wait timeout.")
+  @Metric(about = "The total number of transactions which failed due to container lock wait timeout.")
   private MutableGaugeLong totalLockTimeoutTransactionCount;
+
+  @Metric(about = "The total number of deletion commands received.")
+  private MutableGaugeLong totalCommandsReceived;
+
+  @Metric(about = "The total number of deletion commands that were discarded " +
+      "due to the queue being full.")
+  private MutableGaugeLong totalCommandsDiscarded;
+
+  @Metric(about = "The total number of deletion transactions that were discarded " +
+      "due to the transaction being a duplicate.")
+  private MutableGaugeLong totalTransactionsDiscarded;
 
   private BlockDeletingServiceMetrics() {
   }
@@ -110,6 +122,10 @@ public final class BlockDeletingServiceMetrics {
 
   public void incrFailureCount() {
     this.failureCount.incr();
+  }
+
+  public void incrProcessedTransactionCount(long count) {
+    processedTransactionCount.incr(count);
   }
 
   public void incrReceivedTransactionCount(long count) {
@@ -148,6 +164,18 @@ public final class BlockDeletingServiceMetrics {
     totalLockTimeoutTransactionCount.incr();
   }
 
+  public void incrTotalCommandsReceived(long delta) {
+    this.totalCommandsReceived.incr(delta);
+  }
+
+  public void incrTotalCommandsDiscarded(long delta) {
+    this.totalCommandsDiscarded.incr(delta);
+  }
+
+  public void incrTotalTransactionsDiscarded(long delta) {
+    this.totalTransactionsDiscarded.incr(delta);
+  }
+
   public long getSuccessCount() {
     return successCount.value();
   }
@@ -184,6 +212,26 @@ public final class BlockDeletingServiceMetrics {
     return totalLockTimeoutTransactionCount.value();
   }
 
+  public long getProcessedTransactionCount() {
+    return processedTransactionCount.value();
+  }
+
+  public long getReceivedTransactionCount() {
+    return receivedTransactionCount.value();
+  }
+
+  public long getTotalCommandsReceived() {
+    return totalCommandsReceived.value();
+  }
+
+  public long getTotalCommandsDiscarded() {
+    return totalCommandsDiscarded.value();
+  }
+
+  public long getTotalTransactionsDiscarded() {
+    return totalTransactionsDiscarded.value();
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
@@ -202,6 +250,8 @@ public final class BlockDeletingServiceMetrics {
             + receivedTransactionCount.value()).append("\t")
         .append("receivedRetryTransactionCount = "
             + receivedRetryTransactionCount.value()).append("\t")
+        .append("processedTransactionCount = "
+            + processedTransactionCount.value()).append("\t")
         .append("receivedContainerCount = "
             + receivedContainerCount.value()).append("\t")
         .append("receivedBlockCount = "
@@ -209,7 +259,13 @@ public final class BlockDeletingServiceMetrics {
         .append("markedBlockCount = "
             + markedBlockCount.value()).append("\t")
         .append("totalLockTimeoutTransactionCount = "
-            + totalLockTimeoutTransactionCount.value()).append("\t");
+            + totalLockTimeoutTransactionCount.value()).append("\t")
+        .append("totalCommandsReceived = "
+            + totalCommandsReceived.value()).append("\t")
+        .append("totalCommandsDiscarded = "
+            + totalCommandsDiscarded.value()).append("\t")
+        .append("totalTransactionsDiscarded = "
+            + totalTransactionsDiscarded.value()).append("\t");
     return buffer.toString();
   }
 }
