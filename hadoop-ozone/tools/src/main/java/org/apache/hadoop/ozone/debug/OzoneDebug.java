@@ -18,13 +18,11 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
 /**
@@ -36,33 +34,7 @@ import picocli.CommandLine;
         mixinStandardHelpOptions = true)
 public class OzoneDebug extends GenericCli implements ExtensibleParentCommand {
 
-  private OzoneConfiguration ozoneConf;
-
-  public OzoneDebug() {
-    super(OzoneDebug.class);
-  }
-
-  @VisibleForTesting
-  public OzoneDebug(OzoneConfiguration configuration) {
-    super(OzoneDebug.class);
-    this.ozoneConf = configuration;
-  }
-
-  public OzoneConfiguration getOzoneConf() {
-    if (ozoneConf == null) {
-      ozoneConf = createOzoneConfiguration();
-    }
-    return ozoneConf;
-  }
-
-  /**
-     * Main for the Ozone Debug shell Command handling.
-     *
-     * @param argv - System Args Strings[]
-     * @throws Exception
-     */
-  public static void main(String[] argv) throws Exception {
-
+  public static void main(String[] argv) {
     new OzoneDebug().run(argv);
   }
 

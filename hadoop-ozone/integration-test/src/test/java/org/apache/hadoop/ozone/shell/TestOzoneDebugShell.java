@@ -83,6 +83,7 @@ public class TestOzoneDebugShell {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
+  private static OzoneDebug ozoneDebugShell;
 
   private static OzoneConfiguration conf = null;
 
@@ -100,7 +101,8 @@ public class TestOzoneDebugShell {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneDebugShell = new OzoneDebug();
+    conf = ozoneDebugShell.getOzoneConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
@@ -206,7 +208,6 @@ public class TestOzoneDebugShell {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
 
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = ozoneDebugShell.execute(args);
     return exitCode;
   }
@@ -218,7 +219,6 @@ public class TestOzoneDebugShell {
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = 1;
     try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
         .SystemOutCapturer()) {
