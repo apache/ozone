@@ -1592,17 +1592,22 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @throws IOException
    */
   public PendingKeysDeletion getPendingDeletionKeys(final int keyCount,
-                             OmSnapshotManager omSnapshotManager)
+      final String startKey, OmSnapshotManager omSnapshotManager)
       throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+    String lastKey = "";
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              keyIter = getDeletedTable().iterator()) {
+      if (!Strings.isNullOrEmpty(startKey)) {
+        keyIter.seek(startKey);
+      }
       int currentCount = 0;
       while (keyIter.hasNext() && currentCount < keyCount) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
+          lastKey = kv.getKey();
           List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Get volume name and bucket name
           String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
@@ -1723,7 +1728,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(keyBlocksList, keysToModify, lastKey);
   }
 
   private boolean versionExistsInPreviousSnapshot(OmKeyInfo omKeyInfo,
