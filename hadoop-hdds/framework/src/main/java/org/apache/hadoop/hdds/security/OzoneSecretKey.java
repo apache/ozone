@@ -31,7 +31,6 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
 
@@ -71,8 +70,16 @@ public class OzoneSecretKey implements Writable {
     this.securityConfig = new SecurityConfig(new OzoneConfiguration());
     this.keyId = keyId;
     this.expiryDate = expiryDate;
-    this.privateKey = SecurityUtil.getPrivateKey(pvtKey, securityConfig);
-    this.publicKey = SecurityUtil.getPublicKey(publicKey, securityConfig);
+    try {
+      this.privateKey = securityConfig.keyCodec().decodePrivateKey(pvtKey);
+    } catch (IOException | RuntimeException e) {
+      this.privateKey = null;
+    }
+    try {
+      this.publicKey = securityConfig.keyCodec().decodePublicKey(publicKey);
+    } catch (IOException | RuntimeException e) {
+      this.publicKey = null;
+    }
   }
 
   public int getKeyId() {
@@ -123,10 +130,12 @@ public class OzoneSecretKey implements Writable {
     SecretKeyProto secretKey = SecretKeyProto.parseFrom((DataInputStream) in);
     expiryDate = secretKey.getExpiryDate();
     keyId = secretKey.getKeyId();
-    privateKey = SecurityUtil.getPrivateKey(secretKey.getPrivateKeyBytes()
-        .toByteArray(), securityConfig);
-    publicKey = SecurityUtil.getPublicKey(secretKey.getPublicKeyBytes()
-        .toByteArray(), securityConfig);
+    try {
+      privateKey = securityConfig.keyCodec().decodePrivateKey(secretKey.getPrivateKeyBytes().toByteArray());
+      publicKey = securityConfig.keyCodec().decodePublicKey(secretKey.getPublicKeyBytes().toByteArray());
+    } catch (RuntimeException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
