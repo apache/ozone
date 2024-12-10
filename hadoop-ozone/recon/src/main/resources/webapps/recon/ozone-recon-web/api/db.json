@@ -1870,43 +1870,57 @@
   "taskStatus": [
     {
       "taskName": "ContainerKeyMapperTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1732273536690,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskSuccessful": true
     },
     {
       "taskName": "FileSizeCountTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1732273536690,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskSuccessful": true
     },
     {
-      "taskName": "TableCountTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "taskName": "OmTableInsightTask",
+      "lastUpdatedTimestamp": 1732273536679,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskSuccessful": true
     },
     {
-      "taskName": "NSSummaryTaskWithFSO",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "taskName": "NSSummaryTask",
+      "lastUpdatedTimestamp": 1732273536688,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskSuccessful": true
     },
     {
       "taskName": "OmDeltaRequest",
-      "lastUpdatedTimestamp": 1663421088035,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1732296401979,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskSuccessful": true
     },
     {
       "taskName": "OmSnapshotRequest",
-      "lastUpdatedTimestamp": 1663421088035,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1732273536596,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskSuccessful": true
+    },
+    {
+      "taskName": "ContainerSizeCountTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskSuccessful": null
+    },
+    {
+      "taskName": "PipelineSyncTask",
+      "lastUpdatedTimestamp": 1732296438676,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskSuccessful": true
     },
     {
       "taskName": "ContainerHealthTask",
       "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
-    },
-    {
-      "taskName": "PipelineSyncTask",
-      "lastUpdatedTimestamp": 1663421094507,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskSuccessful": null
     }
   ],
   "unhealthyContainers": {
