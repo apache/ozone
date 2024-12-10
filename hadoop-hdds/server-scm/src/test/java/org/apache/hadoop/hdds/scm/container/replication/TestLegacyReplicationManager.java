@@ -2693,7 +2693,7 @@ public class TestLegacyReplicationManager {
           dn1.getDatanodeDetails()));
       //replica does not exist in target datanode, so a
       // replicateContainerCommand will be sent again at
-      // notifyStatusChanged#onLeaderReadyAndOutOfSafeMode
+      // notifyStatusChanged#handleInflightMoves
       assertEquals(2, datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.replicateContainerCommand));
 
