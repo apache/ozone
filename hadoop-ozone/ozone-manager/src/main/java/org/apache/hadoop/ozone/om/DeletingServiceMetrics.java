@@ -89,23 +89,11 @@ public final class DeletingServiceMetrics {
    */
   @Metric("Total no. of keys processed")
   private MutableGaugeLong numKeysProcessed;
-  @Metric("Total no. of keys sent to scm for deletion")
-  private MutableGaugeLong numKeysDeletionRequest;
-  @Metric("Total no. of keys deleted successfully")
-  private MutableGaugeLong numKeysDeleteSuccess;
   @Metric("Total no. of deleted keys sent for purge")
   private MutableGaugeLong numKeysSentForPurge;
 
   public void incrNumKeysProcessed(long keysProcessed) {
     this.numKeysProcessed.incr(keysProcessed);
-  }
-
-  public void incrNumKeysDeletionRequest(long keysDeletionRequest) {
-    this.numKeysDeletionRequest.incr(keysDeletionRequest);
-  }
-
-  public void incrNumKeysDeleteSuccess(long keysDeleteSuccess) {
-    this.numKeysDeleteSuccess.incr(keysDeleteSuccess);
   }
 
   public void incrNumKeysSentForPurge(long keysPurge) {

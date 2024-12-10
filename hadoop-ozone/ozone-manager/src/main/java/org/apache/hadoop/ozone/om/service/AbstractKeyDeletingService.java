@@ -99,7 +99,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       HashMap<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey, UUID expectedPreviousSnapshotId, boolean isSnapshotDelete) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
@@ -131,10 +131,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
           delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
-      if (!isSnapshotDelete) {
-        metrics.incrNumKeysDeletionRequest(blockDeletionResults.size());
-        metrics.incrNumKeysDeleteSuccess(delCount);
-      }
     }
     return delCount;
   }

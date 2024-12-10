@@ -225,7 +225,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId, false);
+                pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
             deletedKeyCount.addAndGet(delCount);
             metrics.incrNumKeysProcessed(keyBlocksList.size());
             metrics.incrNumKeysSentForPurge(delCount);
@@ -453,7 +453,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               if (!keysToPurge.isEmpty()) {
                 processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
                     keysToModify, currSnapInfo.getTableKey(),
-                    Optional.ofNullable(previousSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null), true);
+                    Optional.ofNullable(previousSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null));
               }
             } finally {
               IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);
