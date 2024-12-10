@@ -99,6 +99,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
 
+  private String lastScanKey = "";
+
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
@@ -214,18 +216,22 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           // snapshotId since AOS could process multiple buckets in one iteration.
           UUID expectedPreviousSnapshotId = snapshotChainManager.getLatestGlobalSnapshotId();
           PendingKeysDeletion pendingKeysDeletion = manager
-              .getPendingDeletionKeys(getKeyLimitPerTask());
+              .getPendingDeletionKeys(getKeyLimitPerTask(), lastScanKey);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
               .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
+            lastScanKey = pendingKeysDeletion.getLastKey();
             delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
                 pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
             deletedKeyCount.addAndGet(delCount);
+          } else {
+            lastScanKey = "";
           }
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
+          lastScanKey = "";
         }
 
         try {
