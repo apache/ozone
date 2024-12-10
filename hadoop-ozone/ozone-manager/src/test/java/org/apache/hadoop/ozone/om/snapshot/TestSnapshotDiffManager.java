@@ -429,7 +429,7 @@ public class TestSnapshotDiffManager {
         any(DifferSnapshotInfo.class),
         any(DifferSnapshotInfo.class),
         eq(diffDir))
-    ).thenReturn(Lists.newArrayList(randomStrings));
+    ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
 
     ReferenceCounted<OmSnapshot> rcFromSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
@@ -497,7 +497,7 @@ public class TestSnapshotDiffManager {
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
             anyString()))
-            .thenReturn(Collections.emptyList());
+            .thenReturn(Optional.ofNullable(Collections.emptyList()));
       }
 
       ReferenceCounted<OmSnapshot> rcFromSnapshot =
