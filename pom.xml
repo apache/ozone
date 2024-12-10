@@ -333,6 +333,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.9</maven.core.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
+    <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>
 
@@ -1354,6 +1355,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>com.github.ekryd.sortpom</groupId>
+          <artifactId>sortpom-maven-plugin</artifactId>
+          <version>${sortpom-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
           <groupId>com.salesforce.servicelibs</groupId>
           <artifactId>proto-backwards-compatibility</artifactId>
           <version>${proto-backwards-compatibility.version}</version>
@@ -1935,6 +1941,33 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <configuration>
           <excludesFile>dev-support/rat/rat-exclusions.txt</excludesFile>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.github.ekryd.sortpom</groupId>
+        <artifactId>sortpom-maven-plugin</artifactId>
+        <configuration>
+          <createBackupFile>false</createBackupFile>
+          <encoding>${project.build.sourceEncoding}</encoding>
+          <expandEmptyElements>false</expandEmptyElements>
+          <keepBlankLines>true</keepBlankLines>
+          <nrOfIndentSpace>2</nrOfIndentSpace>
+          <predefinedSortOrder>custom_1</predefinedSortOrder>
+          <sortDependencies>scope,groupId,artifactId</sortDependencies>
+          <sortDependencyExclusions>groupId,artifactId</sortDependencyExclusions>
+          <sortModules>true</sortModules>
+          <sortProperties>true</sortProperties>
+          <spaceBeforeCloseEmptyElement>true</spaceBeforeCloseEmptyElement>
+          <verifyFail>Stop</verifyFail>
+          <verifyFailOn>Strict</verifyFailOn>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>verify</goal>
+            </goals>
+            <phase>validate</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
