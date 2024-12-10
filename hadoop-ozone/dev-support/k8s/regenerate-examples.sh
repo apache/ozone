@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,23 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resources:
-- config-configmap.yaml
-- datanode-service.yaml
-- datanode-statefulset.yaml
-- httpfs-service.yaml
-- httpfs-statefulset.yaml
-- om-service.yaml
-- om-statefulset.yaml
-- recon-service.yaml
-- recon-statefulset.yaml
-- s3g-service.yaml
-- s3g-statefulset.yaml
-- scm-service.yaml
-- scm-statefulset.yaml
-- datanode-public-service.yaml
-- httpfs-public-service.yaml
-- om-public-service.yaml
-- recon-public-service.yaml
-- s3g-public-service.yaml
-- scm-public-service.yaml
+set -u -o pipefail
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$DIR/../../.." || exit 1
+
+source "hadoop-ozone/dev-support/checks/_lib.sh"
+
+install_flekszible
+
+hadoop-ozone/dist/src/main/k8s/examples/regenerate-all.sh
