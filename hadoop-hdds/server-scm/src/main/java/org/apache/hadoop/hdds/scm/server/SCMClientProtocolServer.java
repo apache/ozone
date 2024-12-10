@@ -607,11 +607,26 @@ public class SCMClientProtocolServer implements
     for (DatanodeDetails node : queryNode(opState, state)) {
       try {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        result.add(HddsProtos.Node.newBuilder()
+        HddsProtos.Node.Builder nodeInfoBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState())
-            .build());
+            .addNodeOperationalStates(ns.getOperationalState());
+        scm.getScmNodeManager().getNodeContainersReplicationMetrics(node).forEach((key, value) -> {
+          HddsProtos.KeyValue kv = HddsProtos.KeyValue.newBuilder().setKey(key).setValue(value)
+              .build();
+          nodeInfoBuilder.addContainerReplicationMetrics(kv);
+        });
+        long closedContainersCount = scm.getScmNodeManager().getContainers(node).stream().filter(containerID -> {
+          try {
+            return scm.getContainerInfo(containerID.getId()).getState().equals(HddsProtos.LifeCycleState.CLOSED);
+          } catch (IOException e) {
+            LOG.error("Failed to get container info for containerID: {}", containerID, e);
+            return false;
+          }
+        }).count();
+        nodeInfoBuilder.addContainerReplicationMetrics(HddsProtos.KeyValue.newBuilder().setKey("closedContainersCount")
+            .setValue(String.valueOf(closedContainersCount)).build());
+        result.add(nodeInfoBuilder.build());
       } catch (NodeNotFoundException e) {
         throw new IOException(
             "An unexpected error occurred querying the NodeStatus", e);
