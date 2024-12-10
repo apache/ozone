@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -53,6 +54,7 @@ import java.io.IOException;
 /**
  * Test class for quota repair.
  */
+@Unhealthy("HDDS-11868")
 public class TestQuotaRepairTask extends TestOMKeyRequest {
 
   @Test
