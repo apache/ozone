@@ -210,6 +210,9 @@
               <resources>
                 <resource>
                   <directory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web/build</directory>
+                  <excludes>
+                    <exclude>static/**</exclude>
+                  </excludes>
                   <filtering>true</filtering>
                 </resource>
               </resources>
@@ -230,6 +233,7 @@
                 </resource>
               </resources>
               <nonFilteredFileExtensions>
+                <nonFilteredFileExtension>woff</nonFilteredFileExtension>
                 <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
               </nonFilteredFileExtensions>
             </configuration>

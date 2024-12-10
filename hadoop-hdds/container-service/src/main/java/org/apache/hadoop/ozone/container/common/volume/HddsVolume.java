@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
@@ -44,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import jakarta.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
 
@@ -79,6 +82,8 @@ public class HddsVolume extends StorageVolume {
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
+
+  private ContainerController controller;
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
 
@@ -119,8 +124,10 @@ public class HddsVolume extends StorageVolume {
 
     if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
       this.setState(VolumeState.NOT_INITIALIZED);
+      ConfigurationSource conf = getConf();
+      int[] intervals = conf.getInts(OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
       this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr(),
-          this.getStorageDir().toString());
+          this.getStorageDir().toString(), intervals);
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
@@ -380,6 +387,17 @@ public class HddsVolume extends StorageVolume {
     dbLoaded.set(true);
     LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
         getStorageID());
+  }
+
+  public void setController(ContainerController controller) {
+    this.controller = controller;
+  }
+
+  public long getContainers() {
+    if (controller != null) {
+      return controller.getContainerCount(this);
+    }
+    return 0;
   }
 
   /**

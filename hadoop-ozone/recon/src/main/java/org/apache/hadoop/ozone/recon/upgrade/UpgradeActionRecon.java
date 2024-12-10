@@ -42,15 +42,12 @@ import java.lang.annotation.Target;
  * Example usage:
  *
  * <pre>
- * {@code
- *
- * @UpgradeActionRecon(feature = FEATURE_NAME, type = FINALIZE)
- *  public class FeatureNameUpgradeAction implements ReconUpgradeAction {
- *     @Override
- *     public void execute() throws Exception {
- *       // Custom upgrade logic for FEATURE_1
- *     }
- *  }
+ * &#64;UpgradeActionRecon(feature = FEATURE_NAME, type = FINALIZE)
+ * public class FeatureNameUpgradeAction implements ReconUpgradeAction {
+ *   &#64;Override
+ *   public void execute() throws Exception {
+ *     // Custom upgrade logic for FEATURE_1
+ *   }
  * }
  * </pre>
  */

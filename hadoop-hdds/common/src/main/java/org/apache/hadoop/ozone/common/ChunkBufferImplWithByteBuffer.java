@@ -25,9 +25,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Function;
 
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -35,7 +35,6 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
   private final UncheckedAutoCloseable underlying;
-  private final UUID identity = UUID.randomUUID();
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
     this(buffer, null);
@@ -104,7 +103,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    return channel.write(buffer);
+    return BufferUtils.writeFully(channel, buffer);
   }
 
   @Override
@@ -163,6 +162,6 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   @Override
   public String toString() {
     return getClass().getSimpleName() + ":limit=" + buffer.limit()
-        + "@" + identity;
+        + "@" + Integer.toHexString(super.hashCode());
   }
 }

@@ -279,16 +279,16 @@
   </property>
   <property>
     <name>hdds.ratis.snapshot.threshold</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
       taken.
     </description>
   </property>
   <property>
     <name>hdds.container.ratis.statemachine.max.pending.apply-transactions</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Maximum number of pending apply transactions in a data
       pipeline. The default value is kept same as default snapshot threshold
       hdds.ratis.snapshot.threshold.
@@ -4537,19 +4537,31 @@
     </description>
   </property>
   <property>
-    <name>ozone.ec.grpc.zerocopy.enabled</name>
-    <value>true</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      Specify if zero-copy should be enabled for EC GRPC protocol.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.max.buckets</name>
     <value>100000</value>
     <tag>OZONE, OM</tag>
     <description>
       maximum number of buckets across all volumes.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.volume.io.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
+      It helps in tracking the read and write performance of DataNodes in real-time,
+      allowing for better identification and analysis of performance issues.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.server.list.max.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
 </configuration>

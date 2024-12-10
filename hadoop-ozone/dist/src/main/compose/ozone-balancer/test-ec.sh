@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:failing HDDS-11601
+#suite:balancer
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -28,4 +28,4 @@ export OZONE_REPLICATION_FACTOR=3
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
-execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v TYPE:EC -v KEYS:7 -v LOWER_LIMIT:1.5 -v UPPER_LIMIT:2.5 -N ozone-balancer-EC balancer/testBalancer.robot
+execute_robot_test ${OM} -v REPLICATION:rs-3-2-1024k -v TYPE:EC -v LOWER_LIMIT:0.7 -v UPPER_LIMIT:1.5 -N ozone-balancer-EC balancer/testBalancer.robot

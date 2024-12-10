@@ -29,8 +29,11 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
-  TEST_JAVA_VERSION: 17 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  HADOOP_IMAGE: ghcr.io/apache/hadoop
+  OZONE_IMAGE: ghcr.io/apache/ozone
+  OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 jobs:
   build-info:
@@ -219,7 +222,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dskip.npx -Dskip.installnpx -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
         env:
           OZONE_WITH_COVERAGE: false
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
@@ -254,7 +257,7 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
-        if: ${{ !contains('author,bats,docs', matrix.check) }}
+        if: ${{ !contains('author,bats', matrix.check) }}
       - name: Download Ratis repo
         if: ${{ inputs.ratis_args != '' }}
         uses: actions/download-artifact@v4
@@ -269,12 +272,11 @@ jobs:
           java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh ${{ inputs.ratis_args }}
-        continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -317,12 +319,11 @@ jobs:
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ github.job }}.sh ${{ inputs.ratis_args }}
-        continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -342,6 +343,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -397,10 +407,9 @@ jobs:
       - name: Execute tests
         run: |
           hadoop-ozone/dev-support/checks/${{ github.job }}.sh
-        continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
@@ -448,10 +457,9 @@ jobs:
       - name: Execute tests
         run: |
           hadoop-ozone/dev-support/checks/${{ github.job }}.sh -Pdist -Psrc -Dmaven.javadoc.skip=true ${{ inputs.ratis_args }}
-        continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Install diffoscope
         run: |
           sudo apt update -q
@@ -487,6 +495,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -506,10 +523,9 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_VOLUME_OWNER: 1000
-        continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
@@ -532,6 +548,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -546,10 +571,9 @@ jobs:
           sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           popd
           ./hadoop-ozone/dev-support/checks/kubernetes.sh
-        continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
@@ -605,11 +629,13 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
-        continue-on-error: true
         run: |
           args="${{ inputs.ratis_args }}"
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
             args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+          fi
+          if [[ "${{ matrix.profile }}" != "filesystem" ]]; then
+            args="$args -DskipShade"
           fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
@@ -621,7 +647,7 @@ jobs:
             cat target/${{ github.job }}/summary.md >> $GITHUB_STEP_SUMMARY
           fi
           hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()

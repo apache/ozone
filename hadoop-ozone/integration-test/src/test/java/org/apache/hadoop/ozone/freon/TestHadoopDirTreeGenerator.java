@@ -36,6 +36,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -45,6 +46,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,8 +57,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test for HadoopDirTreeGenerator.
  */
 public class TestHadoopDirTreeGenerator {
-
-  private String path;
+  @TempDir
+  private java.nio.file.Path path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
@@ -64,12 +68,8 @@ public class TestHadoopDirTreeGenerator {
 
   @BeforeEach
   public void setup() {
-    path = GenericTestUtils
-            .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
-    File baseDir = new File(path);
-    baseDir.mkdirs();
   }
 
   /**
@@ -79,7 +79,6 @@ public class TestHadoopDirTreeGenerator {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
-      FileUtils.deleteDirectory(new File(path));
     }
   }
 
@@ -108,8 +107,8 @@ public class TestHadoopDirTreeGenerator {
   public void testNestedDirTreeGeneration() throws Exception {
     try {
       startCluster();
-      FileOutputStream out = FileUtils.openOutputStream(new File(path,
-              "conf"));
+      FileOutputStream out = FileUtils.openOutputStream(new File(path.toString(),
+          "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
@@ -140,7 +139,7 @@ public class TestHadoopDirTreeGenerator {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     String rootPath = "o3fs://" + bucketName + "." + volumeName;
-    String confPath = new File(path, "conf").getAbsolutePath();
+    String confPath = new File(path.toString(), "conf").getAbsolutePath();
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
             fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
@@ -154,7 +153,7 @@ public class TestHadoopDirTreeGenerator {
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
     // verify the num of peer directories, expected span count is 1
     // as it has only one dir at root.
-    verifyActualSpan(1, fileStatuses);
+    verifyActualSpan(1, Arrays.asList(fileStatuses));
     for (FileStatus fileStatus : fileStatuses) {
       int actualDepth =
           traverseToLeaf(fileSystem, fileStatus.getPath(), 1, depth, span,
@@ -168,14 +167,16 @@ public class TestHadoopDirTreeGenerator {
                              int expectedFileCnt, StorageSize perFileSize)
           throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(dirPath);
+    List<FileStatus> fileStatusList = new ArrayList<>();
+    Collections.addAll(fileStatusList, fileStatuses);
     // check the num of peer directories except root and leaf as both
     // has less dirs.
     if (depth < expectedDepth - 1) {
-      verifyActualSpan(expectedSpanCnt, fileStatuses);
+      verifyActualSpan(expectedSpanCnt, fileStatusList);
     }
     int actualNumFiles = 0;
     ArrayList <String> files = new ArrayList<>();
-    for (FileStatus fileStatus : fileStatuses) {
+    for (FileStatus fileStatus : fileStatusList) {
       if (fileStatus.isDirectory()) {
         ++depth;
         return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
@@ -196,7 +197,7 @@ public class TestHadoopDirTreeGenerator {
   }
 
   private int verifyActualSpan(int expectedSpanCnt,
-                               FileStatus[] fileStatuses) {
+                               List<FileStatus> fileStatuses) {
     int actualSpan = 0;
     for (FileStatus fileStatus : fileStatuses) {
       if (fileStatus.isDirectory()) {

@@ -332,6 +332,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private Clock systemClock;
   private DNSToSwitchMapping dnsToSwitchMapping;
 
+  private String scmHostName;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -456,6 +458,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
+    scmHostName = HddsUtils.getHostName(conf);
 
     registerMXBean();
     registerMetricsSource(this);
@@ -1595,8 +1598,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    // At this point leader is not known
-    scmHAMetricsUpdate(null);
+    RaftPeerId leaderId = SCMHAUtils.isSCMHAEnabled(configuration)
+        ? getScmHAManager().getRatisServer().getLeaderId() : null;
+    scmHAMetricsUpdate(Objects.toString(leaderId, null));
 
     if (scmCertificateClient != null) {
       // In case root CA certificate is rotated during this SCM is offline
@@ -2063,6 +2067,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return statefulServiceStateManager;
   }
 
+  @Override
+  public String getNamespace() {
+    return scmHANodeDetails.getLocalNodeDetails().getServiceId();
+  }
   /**
    * Get the safe mode status of all rules.
    *
@@ -2218,6 +2226,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
   }
 
+  @Override
+  public String getHostname() {
+    return scmHostName;
+  }
+
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
   }
@@ -2294,7 +2307,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // unregister, in case metrics already exist
     // so that the metric tags will get updated.
     SCMHAMetrics.unRegister();
-
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 

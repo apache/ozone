@@ -69,7 +69,7 @@ public abstract class Handler implements Callable<Void> {
   }
 
   protected abstract void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException;
+      throws IOException;
 
   /**
    * Checks whether the current command should be executed or not.
@@ -102,7 +102,7 @@ public abstract class Handler implements Callable<Void> {
   }
 
   protected OzoneClient createClient(OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     return address.createClient(conf);
   }
 
@@ -111,7 +111,7 @@ public abstract class Handler implements Callable<Void> {
     if (!enabled) {
       err().printf("Error: '%s' operation works only when security is " +
           "enabled. To enable security set ozone.security.enabled to " +
-          "true.%n", spec.qualifiedName());
+          "true.%n", spec.qualifiedName().trim());
     }
     return enabled;
   }
