@@ -188,10 +188,9 @@ public class OMBlockPrefetchClient {
       try {
         List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(
             scmBlockSize, blocksToFetch, replicationConfig, serviceID, excludeList, null);
+        long expiryTime = System.currentTimeMillis() + expiryDuration;
         for (AllocatedBlock block : newBlocks) {
-          long expiryTime = System.currentTimeMillis() + expiryDuration;
-          ExpiringAllocatedBlock expiringBlock = new ExpiringAllocatedBlock(block, expiryTime);
-          queue.offer(expiringBlock);
+          queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
         }
         LOG.info("Prefetched {} blocks for replication config {}.", newBlocks.size(), replicationConfig);
       } catch (IOException e) {
