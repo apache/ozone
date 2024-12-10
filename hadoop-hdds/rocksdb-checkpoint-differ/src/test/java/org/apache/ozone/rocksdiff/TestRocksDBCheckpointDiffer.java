@@ -587,7 +587,7 @@ public class TestRocksDBCheckpointDiffer {
     int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
+      List<String> sstDiffList = differ.getSSTDiffList(src, snap).orElse(Collections.emptyList());
       LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
