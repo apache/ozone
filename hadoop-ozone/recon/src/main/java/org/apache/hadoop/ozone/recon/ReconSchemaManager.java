@@ -19,10 +19,14 @@
 package org.apache.hadoop.ozone.recon;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
+import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
+import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,13 +49,31 @@ public class ReconSchemaManager {
 
   @VisibleForTesting
   public void createReconSchema() {
+    // Calculate the latest SLV from ReconLayoutFeature
+    int latestSLV = calculateLatestSLV();
     reconSchemaDefinitions.forEach(reconSchemaDefinition -> {
       try {
+        // Set the SLV for SchemaVersionTableDefinition only
+        if (reconSchemaDefinition instanceof SchemaVersionTableDefinition) {
+          ((SchemaVersionTableDefinition) reconSchemaDefinition).setLatestSLV(latestSLV);
+        }
         reconSchemaDefinition.initializeSchema();
       } catch (SQLException e) {
         LOG.error("Error creating Recon schema {}.",
             reconSchemaDefinition.getClass().getSimpleName(), e);
       }
     });
+  }
+
+  /**
+   * Calculate the latest SLV by iterating over ReconLayoutFeature.
+   *
+   * @return The latest SLV.
+   */
+  private int calculateLatestSLV() {
+    return Arrays.stream(ReconLayoutFeature.values())
+        .mapToInt(ReconLayoutFeature::getVersion)
+        .max()
+        .orElse(0);
   }
 }
