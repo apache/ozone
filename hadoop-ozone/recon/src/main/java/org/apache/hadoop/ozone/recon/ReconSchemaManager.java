@@ -19,9 +19,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
@@ -51,18 +49,36 @@ public class ReconSchemaManager {
   public void createReconSchema() {
     // Calculate the latest SLV from ReconLayoutFeature
     int latestSLV = calculateLatestSLV();
-    reconSchemaDefinitions.forEach(reconSchemaDefinition -> {
-      try {
-        // Set the SLV for SchemaVersionTableDefinition only
-        if (reconSchemaDefinition instanceof SchemaVersionTableDefinition) {
-          ((SchemaVersionTableDefinition) reconSchemaDefinition).setLatestSLV(latestSLV);
-        }
-        reconSchemaDefinition.initializeSchema();
-      } catch (SQLException e) {
-        LOG.error("Error creating Recon schema {}.",
-            reconSchemaDefinition.getClass().getSimpleName(), e);
-      }
-    });
+
+    try {
+      // Initialize the schema version table first
+      reconSchemaDefinitions.stream()
+          .filter(SchemaVersionTableDefinition.class::isInstance)
+          .findFirst()
+          .ifPresent(schemaDefinition -> {
+            SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
+            schemaVersionTable.setLatestSLV(latestSLV);
+            try {
+              schemaVersionTable.initializeSchema();
+            } catch (SQLException e) {
+              LOG.error("Error initializing SchemaVersionTableDefinition.", e);
+            }
+          });
+
+      // Initialize all other tables
+      reconSchemaDefinitions.stream()
+          .filter(definition -> !(definition instanceof SchemaVersionTableDefinition))
+          .forEach(definition -> {
+            try {
+              definition.initializeSchema();
+            } catch (SQLException e) {
+              LOG.error("Error initializing schema: {}.", definition.getClass().getSimpleName(), e);
+            }
+          });
+
+    } catch (Exception e) {
+      LOG.error("Error creating Recon schema.", e);
+    }
   }
 
   /**
