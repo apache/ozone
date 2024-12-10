@@ -211,17 +211,15 @@ public class OMBlockPrefetchClient {
     int retrievedBlocksCount = 0;
     boolean allocateBlocksFromSCM = false;
     while (retrievedBlocksCount < numBlocks) {
-      ExpiringAllocatedBlock expiringBlock = queue.peek();
+      ExpiringAllocatedBlock expiringBlock = queue.poll();
       if (expiringBlock == null) {
         break;
       }
 
       if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
-        queue.poll();
         continue;
       }
 
-      queue.poll();
       AllocatedBlock block = expiringBlock.getBlock();
       List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
       if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
@@ -242,7 +240,7 @@ public class OMBlockPrefetchClient {
       allocateBlocksFromSCM = true;
     }
 
-    metrics.addSortingLogicLatency(Time.monotonicNowNanos() - readStartTime);
+    metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
     if (!allocateBlocksFromSCM) {
       metrics.incrementCacheHits();
     }
