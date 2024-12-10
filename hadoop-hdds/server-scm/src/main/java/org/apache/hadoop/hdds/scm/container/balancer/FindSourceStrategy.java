@@ -87,5 +87,14 @@ public interface FindSourceStrategy {
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
 
+  /**
+   * Get a map of the node IDs and the corresponding data sizes moved from each node.
+   * @return nodeId to size leaving from node map
+   */
   Map<DatanodeDetails, Long> getSizeLeavingNodes();
+
+  /**
+   * Clear the map of node IDs and their corresponding data sizes that were moved from each node.
+   */
+  void clearSizeLeavingNodes();
 }
