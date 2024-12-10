@@ -45,6 +45,12 @@ if [ ! -d "$DIST_DIR" ]; then
     "$DIR/build.sh" -Pcoverage
 fi
 
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  pushd hadoop-ozone/dist/target/ozone-*
+  sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+  popd
+fi
+
 mkdir -p "$REPORT_DIR"
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1
