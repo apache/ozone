@@ -27,6 +27,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -115,6 +116,7 @@ public class TestOMKeyRequest {
   protected OzoneManagerPrepareState prepareState;
 
   protected ScmClient scmClient;
+  protected OMBlockPrefetchClient omBlockPrefetchClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
   protected StorageContainerLocationProtocol scmContainerLocationProtocol;
@@ -168,6 +170,7 @@ public class TestOMKeyRequest {
     setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
 
     scmClient = mock(ScmClient.class);
+    omBlockPrefetchClient = mock(OMBlockPrefetchClient.class);
     ozoneBlockTokenSecretManager = mock(OzoneBlockTokenSecretManager.class);
     scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     metrics = mock(OMPerformanceMetrics.class);
@@ -176,6 +179,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);
+    when(ozoneManager.getOmBlockPrefetchClient()).thenReturn(omBlockPrefetchClient);
     when(ozoneManager.getScmBlockSize()).thenReturn(scmBlockSize);
     when(ozoneManager.getPreallocateBlocksMax()).thenReturn(2);
     when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(false);
