@@ -68,6 +68,9 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
             supervisor.getReplicationQueuedCount())
+        .addGauge(Interns.info("timeQueued",
+            "Time Queue waiting"),
+            supervisor.getQueuedTime())
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
@@ -86,7 +89,10 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getReplicationSkippedCount())
         .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
             + "concurrent replication tasks which can run simultaneously"),
-            supervisor.getMaxReplicationStreams());
+            supervisor.getMaxReplicationStreams())
+        .addGauge(Interns.info("bytesTransferred",
+            "Number of bytes transferred while replication"),
+            supervisor.getTransferredBytes());
 
     Map<String, String> metricsMap = ReplicationSupervisor.getMetricsMap();
     if (!metricsMap.isEmpty()) {
@@ -110,7 +116,13 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
                   supervisor.getReplicationSkippedCount(metricsName))
               .addGauge(Interns.info("numQueued" + metricsName,
                   "Number of " + descriptionSegment + " in queue"),
-                  supervisor.getReplicationQueuedCount(metricsName));
+                  supervisor.getReplicationQueuedCount(metricsName))
+              .addGauge(Interns.info("timeQueued" + metricsName,
+                  "Time Queue waiting" + descriptionSegment),
+                  supervisor.getQueuedTime(metricsName))
+              .addGauge(Interns.info("bytesTransferred" + metricsName,
+                  "Number of " + descriptionSegment + " bytes transferred"),
+                  supervisor.getTransferredBytes(metricsName));
         }
       });
     }
