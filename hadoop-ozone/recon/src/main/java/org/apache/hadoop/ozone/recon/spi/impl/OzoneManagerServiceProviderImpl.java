@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
@@ -135,6 +136,8 @@ public class OzoneManagerServiceProviderImpl
   private final String threadNamePrefix;
   private ThreadFactory threadFactory;
   private ReconContext reconContext;
+  private ReconTaskStatus reconSyncTaskStatus;
+  private ReconTaskStatusCounter taskStatusCounter;
 
   /**
    * OM Snapshot related task names.
@@ -151,7 +154,8 @@ public class OzoneManagerServiceProviderImpl
       ReconTaskController reconTaskController,
       ReconUtils reconUtils,
       OzoneManagerProtocol ozoneManagerClient,
-      ReconContext reconContext) {
+      ReconContext reconContext,
+      ReconTaskStatusCounter reconTaskStatusCounter) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_TIMEOUT,
@@ -225,25 +229,29 @@ public class OzoneManagerServiceProviderImpl
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
     this.reconContext = reconContext;
+    this.reconSyncTaskStatus = new ReconTaskStatus(
+        null,
+        0L, getCurrentOMDBSequenceNumber(), 0, 0);
+    this.taskStatusCounter = reconTaskStatusCounter;
   }
 
   public void registerOMDBTasks() {
-    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OmDeltaRequest.name(),
-        System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+    reconSyncTaskStatus.setTaskName(OmSnapshotTaskName.OmDeltaRequest.name());
+    reconSyncTaskStatus.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+    reconSyncTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
     if (!reconTaskStatusDao.existsById(
         OmSnapshotTaskName.OmDeltaRequest.name())) {
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      reconTaskStatusDao.insert(reconSyncTaskStatus);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmDeltaRequest.name());
     }
 
-    reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OmSnapshotRequest.name(),
-        System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+    reconSyncTaskStatus.setTaskName(OmSnapshotTaskName.OmSnapshotRequest.name());
+    reconSyncTaskStatus.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+    reconSyncTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
     if (!reconTaskStatusDao.existsById(
         OmSnapshotTaskName.OmSnapshotRequest.name())) {
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      reconTaskStatusDao.insert(reconSyncTaskStatus);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmSnapshotRequest.name());
     }
@@ -573,15 +581,16 @@ public class OzoneManagerServiceProviderImpl
         } else {
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {
+            reconSyncTaskStatus.setTaskName(OmSnapshotTaskName.OmDeltaRequest.name());
             LOG.info("Obtaining delta updates from Ozone Manager");
             // Get updates from OM and apply to local Recon OM DB.
+            reconSyncTaskStatus.setCurrentTaskRunStatus(1);
             getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
                 omdbUpdatesHandler);
             // Update timestamp of successful delta updates query.
-            ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-                OmSnapshotTaskName.OmDeltaRequest.name(),
-                System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
-            reconTaskStatusDao.update(reconTaskStatusRecord);
+            reconSyncTaskStatus.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+            reconSyncTaskStatus.setLastTaskRunStatus(0);
+            taskStatusCounter.updateCounter(OmSnapshotTaskName.OmDeltaRequest.name(), true);
 
             // Pass on DB update events to tasks that are listening.
             reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
@@ -590,26 +599,31 @@ public class OzoneManagerServiceProviderImpl
             Thread.currentThread().interrupt();
           } catch (Exception e) {
             metrics.incrNumDeltaRequestsFailed();
+            reconSyncTaskStatus.setLastTaskRunStatus(-1);
+            taskStatusCounter.updateCounter(OmSnapshotTaskName.OmDeltaRequest.name(), false);
             LOG.warn("Unable to get and apply delta updates from OM.",
                 e.getMessage());
             fullSnapshot = true;
+          } finally {
+            reconSyncTaskStatus.setCurrentTaskRunStatus(0);
+            reconSyncTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+            reconTaskStatusDao.update(reconSyncTaskStatus);
           }
         }
 
         if (fullSnapshot) {
           try {
             metrics.incrNumSnapshotRequests();
+            reconSyncTaskStatus.setTaskName(OmSnapshotTaskName.OmSnapshotRequest.name());
             LOG.info("Obtaining full snapshot from Ozone Manager");
             // Update local Recon OM DB to new snapshot.
+            reconSyncTaskStatus.setCurrentTaskRunStatus(1);
             boolean success = updateReconOmDBWithNewSnapshot();
             // Update timestamp of successful delta updates query.
             if (success) {
-              ReconTaskStatus reconTaskStatusRecord =
-                  new ReconTaskStatus(
-                      OmSnapshotTaskName.OmSnapshotRequest.name(),
-                      System.currentTimeMillis(),
-                      getCurrentOMDBSequenceNumber());
-              reconTaskStatusDao.update(reconTaskStatusRecord);
+              reconSyncTaskStatus.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              reconSyncTaskStatus.setLastTaskRunStatus(0);
+              taskStatusCounter.updateCounter(OmSnapshotTaskName.OmSnapshotRequest.name(), true);
 
               // Reinitialize tasks that are listening.
               LOG.info("Calling reprocess on Recon tasks.");
@@ -620,6 +634,8 @@ public class OzoneManagerServiceProviderImpl
               reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
             } else {
               metrics.incrNumSnapshotRequestsFailed();
+              reconSyncTaskStatus.setLastTaskRunStatus(-1);
+              taskStatusCounter.updateCounter(OmSnapshotTaskName.OmSnapshotRequest.name(), false);
               // Update health status in ReconContext
               reconContext.updateHealthStatus(new AtomicBoolean(false));
               reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -628,10 +644,16 @@ public class OzoneManagerServiceProviderImpl
             Thread.currentThread().interrupt();
           } catch (Exception e) {
             metrics.incrNumSnapshotRequestsFailed();
+            reconSyncTaskStatus.setLastTaskRunStatus(-1);
+            taskStatusCounter.updateCounter(OmSnapshotTaskName.OmSnapshotRequest.name(), false);
             LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
             // Update health status in ReconContext
             reconContext.updateHealthStatus(new AtomicBoolean(false));
             reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+          } finally {
+            reconSyncTaskStatus.setCurrentTaskRunStatus(0);
+            reconSyncTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+            reconTaskStatusDao.update(reconSyncTaskStatus);
           }
         }
         printOMDBMetaInfo();

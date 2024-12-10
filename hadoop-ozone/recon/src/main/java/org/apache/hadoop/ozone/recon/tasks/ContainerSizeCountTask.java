@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
@@ -65,7 +66,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
       unhealthyContainerStateStatsMap;
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
-
+  private final ReconTaskStatusCounter taskStatusCounter;
   public ContainerSizeCountTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
@@ -79,6 +80,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
     this.containerCountBySizeDao = containerCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
     interval = reconTaskConfig.getContainerSizeCountTaskInterval().toMillis();
+    this.taskStatusCounter = getTaskStatusCounterInstance();
   }
 
 
@@ -185,7 +187,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
         // For New Container being created
         try {
           process(container, containerSizeCountMap);
+          taskStatusCounter.updateCounter(getTaskName(), true);
         } catch (Exception e) {
+          taskStatusCounter.updateCounter(getTaskName(), false);
           // FIXME: it is a bug if there is an exception.
           LOG.error("FIXME: Failed to process " + container, e);
         }

@@ -55,6 +55,14 @@ public class ReconTaskStatusMetrics implements MetricsSource {
       Interns.info("lastUpdatedSeqNumber",
           "Last updated sequence number of corresponding Recon Task");
 
+  private static final MetricsInfo RECORD_INFO_LAST_TASK_RUN_STATUS =
+      Interns.info("lastTaskRunStatus",
+          "Last run status i.e successful or failed for the corresponding Recon Task");
+
+  private static final MetricsInfo RECORD_INFO_CURRENT_TASK_RUN_STATUS =
+      Interns.info("currentTaskRunStatus",
+          "Current run status i.e if task is running or completed for the corresponding Recon Task");
+
   public void register() {
     DefaultMetricsSystem.instance()
         .register(SOURCE_NAME, "Recon Task Metrics", this);
