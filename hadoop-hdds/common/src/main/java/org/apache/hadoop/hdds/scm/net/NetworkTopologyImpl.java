@@ -77,8 +77,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   }
 
   public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
-    schemaManager = NodeSchemaManager.getInstance();
-    schemaManager.init(schemaFile);
+    schemaManager = NodeSchemaManager.getInitiatedInstance(schemaFile);
     maxLevel = schemaManager.getMaxLevel();
     shuffleOperation = Collections::shuffle;
     factory = InnerNodeImpl.FACTORY;
