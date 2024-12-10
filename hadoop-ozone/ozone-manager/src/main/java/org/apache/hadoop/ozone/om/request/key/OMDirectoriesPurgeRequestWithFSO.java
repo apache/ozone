@@ -178,11 +178,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
       }
       deletingServiceMetrics.incrNumSubDirectoriesPurged(numSubDirDeleted);
-      deletingServiceMetrics.setNumSubDirectoriesPurgedInLatestRequest(numSubDirDeleted);
-      deletingServiceMetrics.incrNumSubKeysPurged(numSubFilesDeleted);
-      deletingServiceMetrics.setNumSubKeysPurgedInLatestRequest(numSubFilesDeleted);
+      deletingServiceMetrics.incrNumSubFilesPurged(numSubFilesDeleted);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
-      deletingServiceMetrics.setNumDirPurgedInLatestRequest(numDirsDeleted);
 
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());

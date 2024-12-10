@@ -99,7 +99,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       HashMap<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey, UUID expectedPreviousSnapshotId, boolean shouldUpdateMetrics) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId, boolean isSnapshotDelete) throws IOException {
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
@@ -131,9 +131,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
           delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
-      if (shouldUpdateMetrics) {
-        metrics.setIterationKeysDeletionRequest(blockDeletionResults.size());
-        metrics.setIterationKeysDeleteSuccess(delCount);
+      if (!isSnapshotDelete) {
         metrics.incrNumKeysDeletionRequest(blockDeletionResults.size());
         metrics.incrNumKeysDeleteSuccess(delCount);
       }
@@ -468,8 +466,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, subdirMoved,
           duration, runcount);
-      metrics.setDirectoryDeletionIterationMetrics(runcount, startTime, duration,
-          dirNum, subdirDelNum, subFileNum, subdirMoved);
       metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subdirMoved, subFileNum);
     }
     return remainNum;

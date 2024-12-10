@@ -234,9 +234,6 @@ public class OpenKeyCleanupService extends BackgroundService {
                 + " for commit: {}, elapsed time: {}ms",
             numOpenKeys, numHsyncKeys, duration);
       }
-      ozoneManager.getDeletionMetrics().setOpenKeyCleanupIterationMetrics(runCount.get(), startTime,
-          duration, numOpenKeys, numHsyncKeys);
-      ozoneManager.getDeletionMetrics().setOpenKeyCleanupTotalMetrics(numOpenKeys, numHsyncKeys);
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;
