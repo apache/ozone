@@ -2159,7 +2159,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </profile>
     <!-- The following profiles define test splits for CI -->
     <profile>
-      <id>client</id>
+      <id>test-client</id>
       <build>
         <plugins>
           <plugin>
@@ -2176,7 +2176,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>container</id>
+      <id>test-container</id>
       <build>
         <plugins>
           <plugin>
@@ -2194,7 +2194,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>om</id>
+      <id>test-om</id>
       <build>
         <plugins>
           <plugin>
@@ -2214,7 +2214,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>snapshot</id>
+      <id>test-snapshot</id>
       <build>
         <plugins>
           <plugin>
@@ -2231,7 +2231,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>filesystem</id>
+      <id>test-filesystem</id>
       <build>
         <plugins>
           <plugin>
@@ -2248,7 +2248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>hdds</id>
+      <id>test-hdds</id>
       <build>
         <plugins>
           <plugin>
@@ -2268,7 +2268,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>ozone</id>
+      <id>test-ozone</id>
       <build>
         <plugins>
           <plugin>
@@ -2295,7 +2295,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>recon</id>
+      <id>test-recon</id>
       <build>
         <plugins>
           <plugin>
@@ -2312,7 +2312,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>shell</id>
+      <id>test-shell</id>
       <build>
         <plugins>
           <plugin>
@@ -2331,7 +2331,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>stable</id>
+      <id>stable-tests</id>
       <build>
         <plugins>
           <plugin>
@@ -2346,7 +2346,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </profile>
     <profile>
       <!-- Test split dedicated for running @Flaky tests -->
-      <id>flaky</id>
+      <id>test-flaky</id>
       <build>
         <plugins>
           <plugin>
@@ -2362,7 +2362,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </profile>
     <profile>
       <!-- Test split dedicated for running @Native tests -->
-      <id>native</id>
+      <id>test-native</id>
       <build>
         <plugins>
           <plugin>
