@@ -73,12 +73,22 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = getVolumeName();
-    String bucket = getBucketName();
-    String key = getKeyName();
+    String volume = null;
+    String bucket = null;
+    String key = null;
     boolean operationResult = false;
     Result result = null;
     try {
+      volume = getVolumeName();
+      bucket = getBucketName();
+      key = getKeyName();
+
+      // check Acl
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, bucket, key);
+      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
