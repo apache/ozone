@@ -76,6 +76,7 @@ services:
     command: ["ozone","s3g"]
   recon:
     <<: *common-config
+    hostname: recon
     ports:
       - 9888:9888
     environment:
