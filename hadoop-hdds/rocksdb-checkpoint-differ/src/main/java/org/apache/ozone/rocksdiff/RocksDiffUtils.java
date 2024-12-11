@@ -101,8 +101,11 @@ public final class RocksDiffUtils {
             ManagedSstFileReaderIterator iterator = ManagedSstFileReaderIterator.managed(
                 sstFileReader.newIterator(readOptions))) {
           iterator.get().seek(prefix.getBytes(UTF_8));
-          String seekResultKey = new String(iterator.get().key(), UTF_8);
-          return seekResultKey.startsWith(prefix);
+          if (iterator.get().isValid()) {
+            String seekResultKey = new String(iterator.get().key(), UTF_8);
+            return seekResultKey.startsWith(prefix);
+          }
+          return false;
         }
       }
       return false;
