@@ -66,6 +66,19 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OzoneManagerProtocolProtos.OMRequest preExecute(
+      OzoneManager ozoneManager) throws IOException {
+    // check Acl
+    String volume = getVolumeName();
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL, volume,
+          null, null);
+    }
+    return getOmRequest();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long trxnLogIndex = termIndex.getIndex();
     // protobuf guarantees volume and acls are non-null.
@@ -83,12 +96,6 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
     boolean lockAcquired = false;
     Result result;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
-      }
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       lockAcquired = getOmLockDetails().isLockAcquired();

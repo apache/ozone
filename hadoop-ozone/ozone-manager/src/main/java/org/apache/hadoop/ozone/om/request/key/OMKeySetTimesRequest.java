@@ -194,9 +194,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
-    String key;
+
+    String volume = getVolumeName();
+    String bucket = getBucketName();
+    String key = getKeyName();
     boolean operationResult = false;
     Result result;
     try {
