@@ -509,6 +509,27 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
+    Integer partNumberParam = args.getPartNumber();
+    if (partNumberParam != null && partNumberParam > 0) {
+      OmKeyLocationInfoGroup latestLocationVersion = value.getLatestVersionLocations();
+      if (latestLocationVersion != null && latestLocationVersion.isMultipartKey()) {
+
+        value.setKeyLocationVersions(
+            Collections.singletonList(
+                new OmKeyLocationInfoGroup(
+                    latestLocationVersion.getVersion(),
+                    value.getCurrentlocationsPartsMap()
+                        .getOrDefault(partNumberParam, Collections.emptyList()),
+                    true
+                )
+            )
+        );
+        value.setDataSize(
+            value.getCurrentDataSizePartsMap()
+                .getOrDefault(partNumberParam, 0L)
+        );
+      }
+    }
     return value;
   }
 
@@ -801,7 +822,7 @@ public class KeyManagerImpl implements KeyManager {
             TimeUnit.MILLISECONDS);
     return serviceInterval != DISABLE_VALUE;
   }
-  
+
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException {

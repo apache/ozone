@@ -1079,6 +1079,8 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    optional int32 partNumber = 24;
 }
 
 message KeyLocation {
