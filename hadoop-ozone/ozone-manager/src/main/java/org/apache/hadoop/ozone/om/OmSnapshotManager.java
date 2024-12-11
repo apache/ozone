@@ -351,7 +351,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
         // and missing some entries which needs investigation.
         if (snapshotTableKey == null) {
-          throw new OMException("Snapshot " + snapshotTableKey +
+          throw new OMException("Snapshot " + snapshotId +
               " is not found in the snapshot chain.", FILE_NOT_FOUND);
         }
 
