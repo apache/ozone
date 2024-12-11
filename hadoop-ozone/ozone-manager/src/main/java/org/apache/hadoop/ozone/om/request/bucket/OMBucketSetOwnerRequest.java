@@ -64,9 +64,14 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
+
     // check Acl
     final BucketArgs bucketArgs = getOmRequest()
         .getSetBucketPropertyRequest().getBucketArgs();
+    if (!bucketArgs.hasOwnerName()) {
+      throw new OMException("Bucket args must contain ownerName",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
     final String volumeName = bucketArgs.getVolumeName();
     final String bucketName = bucketArgs.getBucketName();
     if (ozoneManager.getAclsEnabled()) {

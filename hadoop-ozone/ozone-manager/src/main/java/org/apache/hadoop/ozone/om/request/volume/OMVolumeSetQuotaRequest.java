@@ -87,7 +87,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
        * in future.
        * https://github.com/apache/hadoop/pull/884#discussion_r292679484
        * */
-      throw new OMException("OMVolumeSetQuotaRequest must contains ",
+      throw new OMException("OMVolumeSetQuotaRequest must contains " +
+          "QuotaInBytes or QuotaInNamespace",
           OMException.ResultCodes.INVALID_REQUEST);
     }
     long modificationTime = Time.now();
