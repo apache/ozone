@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -56,8 +55,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public abstract class OMBucketAclRequest extends OMClientRequest {
 
   private final BiPredicate<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
-  private  String realVolume = null;
-  private  String realBucket = null;
 
   public OMBucketAclRequest(OMRequest omRequest,
       BiPredicate<List<OzoneAcl>, OmBucketInfo> aclOp) {
@@ -66,28 +63,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    ObjectParser objectParser = new ObjectParser(getPath(),
-        ObjectType.BUCKET);
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(objectParser.getVolume(), objectParser.getBucket()));
-    realVolume = resolvedBucket.realVolume();
-    realBucket = resolvedBucket.realBucket();
-
-    // check Acl
-    if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-          realVolume, realBucket, null);
-    }
-    return super.preExecute(ozoneManager);
-  }
-
-  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long transactionLogIndex = termIndex.getIndex();
-    Preconditions.checkNotNull(realBucket);
-    Preconditions.checkNotNull(realVolume);
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -102,15 +79,29 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
+    String volume = null;
+    String bucket = null;
     boolean operationResult = false;
     try {
+      ObjectParser objectParser = new ObjectParser(getPath(),
+          ObjectType.BUCKET);
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
+
+      // check Acl
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, bucket, null);
+      }
       mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, realVolume,
-              realBucket));
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
+              bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
 
-      String dbBucketKey = omMetadataManager.getBucketKey(realVolume,
-          realBucket);
+      String dbBucketKey = omMetadataManager.getBucketKey(volume, bucket);
       omBucketInfo = omMetadataManager.getBucketTable().get(dbBucketKey);
       if (omBucketInfo == null) {
         throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
@@ -150,8 +141,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     } finally {
       if (lockAcquired) {
         mergeOmLockDetails(
-            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, realVolume,
-                realBucket));
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
+                bucket));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
@@ -167,14 +158,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     onComplete(operationResult, exception, ozoneManager.getMetrics(),
         ozoneManager.getAuditLogger(), auditMap);
     return omClientResponse;
-  }
-
-  public String getRealVolume() {
-    return realVolume;
-  }
-
-  public String getRealBucket() {
-    return realBucket;
   }
 
   /**
