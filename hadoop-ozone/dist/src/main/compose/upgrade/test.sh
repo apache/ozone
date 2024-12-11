@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:compat
+#suite:upgrade
 
 
 TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
@@ -36,7 +36,8 @@ RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 # This is the version of Ozone that should use the runner image to run the
 # code that was built. Other versions will pull images from docker hub.
 export OZONE_CURRENT_VERSION="${ozone.version}"
-run_test ha non-rolling-upgrade 1.4.0 "$OZONE_CURRENT_VERSION"
+run_test ha non-rolling-upgrade 1.4.1 "$OZONE_CURRENT_VERSION"
+# run_test ha non-rolling-upgrade 1.4.0 "$OZONE_CURRENT_VERSION"
 # run_test ha non-rolling-upgrade 1.3.0 "$OZONE_CURRENT_VERSION"
 # run_test ha non-rolling-upgrade 1.2.1 "$OZONE_CURRENT_VERSION"
 # run_test om-ha non-rolling-upgrade 1.1.0 "$OZONE_CURRENT_VERSION"

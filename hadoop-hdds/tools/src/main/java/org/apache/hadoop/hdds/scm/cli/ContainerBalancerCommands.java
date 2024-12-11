@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -90,9 +89,8 @@ import java.util.concurrent.Callable;
         ContainerBalancerStopSubcommand.class,
         ContainerBalancerStatusSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ContainerBalancerCommands implements Callable<Void>,
-    SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class ContainerBalancerCommands implements Callable<Void>, AdminSubcommand {
 
   @Spec
   private CommandSpec spec;
@@ -101,10 +99,5 @@ public class ContainerBalancerCommands implements Callable<Void>,
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 }

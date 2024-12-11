@@ -17,10 +17,31 @@
  */
 package org.apache.hadoop.hdds.cli;
 
+import picocli.CommandLine;
+
+import java.util.ServiceLoader;
+
 /**
- * Defineds parent command for SPI based subcommand registration.
+ * Defines parent command for SPI based subcommand registration.
+ * @deprecated use more specific interfaces
+ * @see ExtensibleParentCommand
  */
+@Deprecated
 public interface SubcommandWithParent {
+
+  static void addSubcommands(CommandLine cli, Class<?> type) {
+    ServiceLoader<SubcommandWithParent> registeredSubcommands =
+        ServiceLoader.load(SubcommandWithParent.class);
+    for (SubcommandWithParent subcommand : registeredSubcommands) {
+      if (subcommand.getParentType().equals(type)) {
+        final CommandLine.Command commandAnnotation =
+            subcommand.getClass().getAnnotation(CommandLine.Command.class);
+        CommandLine subcommandCommandLine = new CommandLine(subcommand);
+        addSubcommands(subcommandCommandLine, subcommand.getClass());
+        cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
+      }
+    }
+  }
 
   /**
    * Java type of the parent command.

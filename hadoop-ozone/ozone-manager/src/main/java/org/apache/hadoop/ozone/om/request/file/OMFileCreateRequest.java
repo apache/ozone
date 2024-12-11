@@ -247,7 +247,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), omBucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled(), repConfig);
+          ozoneManager.isRatisEnabled(), repConfig, ozoneManager.getConfiguration());
       validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -255,8 +255,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
           bucketName, keyName, clientID);
 
-      missingParentInfos = OMDirectoryCreateRequest
-          .getAllParentInfo(ozoneManager, keyArgs,
+      missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
               pathInfo.getMissingParents(), omBucketInfo,
               pathInfo, trxnLogIndex);
 

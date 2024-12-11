@@ -24,7 +24,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.LeaseRecoverable;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import org.kohsuke.MetaInfServices;
@@ -40,11 +40,8 @@ import picocli.CommandLine.Spec;
     customSynopsis = "ozone debug recover --path=<path>",
     description = "recover the lease of a specified file. Make sure to specify "
         + "file system scheme if ofs:// is not the default.")
-@MetaInfServices(SubcommandWithParent.class)
-public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
-
-  @CommandLine.ParentCommand
-  private OzoneDebug parent;
+@MetaInfServices(DebugSubcommand.class)
+public class LeaseRecoverer implements Callable<Void>, DebugSubcommand {
 
   @Spec
   private CommandSpec spec;
@@ -60,11 +57,6 @@ public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
 
   public void setPath(String dbPath) {
     this.path = dbPath;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   @Override
