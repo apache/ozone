@@ -83,7 +83,7 @@ public class TestObjectTaggingDelete {
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, body);
+        1, null, null, null, body);
 
 
     context = Mockito.mock(ContainerRequestContext.class);

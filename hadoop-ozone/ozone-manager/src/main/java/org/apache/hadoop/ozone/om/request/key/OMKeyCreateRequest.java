@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -262,9 +261,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 " as there is already file in the given path", NOT_A_FILE);
           }
 
-        missingParentInfos = OMDirectoryCreateRequest
-            .getAllParentInfo(ozoneManager, keyArgs,
-                pathInfo.getMissingParents(), bucketInfo,
+        missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
+            pathInfo.getMissingParents(), bucketInfo,
                 pathInfo, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
@@ -280,7 +278,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled(), replicationConfig);
+          ozoneManager.isRatisEnabled(), replicationConfig, ozoneManager.getConfiguration());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 

@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 /**
  * An abstract Class use to ReconfigureSubCommand.
  */
+@CommandLine.Command
 public abstract class AbstractReconfigureSubCommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private ReconfigureCommands parent;
