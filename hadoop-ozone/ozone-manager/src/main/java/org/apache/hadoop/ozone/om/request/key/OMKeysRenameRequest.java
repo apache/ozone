@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -303,15 +304,15 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   )
   public static OMRequest blockRenameKeysWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getRenameKeysRequest().hasRenameKeysArgs()) {
-      RenameKeysArgs keyArgs = req.getRenameKeysRequest().getRenameKeysArgs();
+    RenameKeysArgs keyArgs = req.getRenameKeysRequest().getRenameKeysArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    BucketLayout bucketLayout =
+        ctx.getBucketLayout(keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
+
     return req;
   }
 }
