@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.commons.io.FilenameUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -31,6 +32,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Managed {@link RocksDB}.
@@ -38,6 +41,12 @@ import java.util.List;
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;
   public static final int NOT_FOUND = RocksDB.NOT_FOUND;
+  /**
+   * SST file extension. Must be lower case.
+   * Used to trim the file extension when writing compaction entries to the log
+   * to save space.
+   */
+  public static final String SST_FILE_EXTENSION = ".sst";
 
   static final Logger LOG = LoggerFactory.getLogger(ManagedRocksDB.class);
 
@@ -101,5 +110,16 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     this.get().deleteFile(sstFileName);
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
+  }
+
+  public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
+    return db.getLiveFilesMetaData().stream()
+        .filter(liveFileMetaData -> liveFileMetaData.fileName().endsWith(SST_FILE_EXTENSION)).collect(
+            Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
+                liveFileMetaData -> liveFileMetaData));
+  }
+
+  public Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles() {
+    return getLiveMetadataForSSTFiles(this.get());
   }
 }

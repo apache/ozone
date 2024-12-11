@@ -92,7 +92,6 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -476,7 +475,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -543,7 +543,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -560,7 +561,7 @@ public class TestSnapshotDiffManager {
       when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
           .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
 
-      doThrow(new FileNotFoundException("File not found exception."))
+      doThrow(new RuntimeException("File not found exception."))
           .when(differ)
           .getSSTDiffListWithFullPath(
               any(DifferSnapshotInfo.class),
