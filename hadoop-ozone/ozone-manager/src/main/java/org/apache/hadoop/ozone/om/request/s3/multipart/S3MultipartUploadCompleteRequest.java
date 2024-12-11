@@ -18,24 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import jakarta.annotation.Nullable;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.om.OzoneConfigUtil;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -43,11 +29,11 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -71,10 +57,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jakarta.annotation.Nullable;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -179,74 +173,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
-          volumeName, bucketName);
-
-      List<OmDirectoryInfo> missingParentInfos;
-      OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
-          .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
-              keyName, Paths.get(keyName));
-      missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
-              pathInfoFSO, trxnLogIndex);
-
-      if (missingParentInfos != null) {
-        final long volumeId = omMetadataManager.getVolumeId(volumeName);
-        final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-
-        // add all missing parents to directory table
-        addMissingParentsToCache(omBucketInfo, missingParentInfos,
-            omMetadataManager, volumeId, bucketId, trxnLogIndex);
-
-        String multipartOpenKey = omMetadataManager
-            .getMultipartKey(volumeId, bucketId,
-                pathInfoFSO.getLastKnownParentId(),
-                pathInfoFSO.getLeafNodeName(),
-                keyArgs.getMultipartUploadID());
-
-        if (getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
-            keyName, omMetadataManager) == null) {
-
-          final ReplicationConfig replicationConfig = OzoneConfigUtil
-              .resolveReplicationConfigPreference(keyArgs.getType(),
-                  keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
-                  omBucketInfo != null ?
-                      omBucketInfo.getDefaultReplicationConfig() :
-                      null, ozoneManager);
-
-          OmMultipartKeyInfo multipartKeyInfoFromArgs =
-              new OmMultipartKeyInfo.Builder()
-                  .setUploadID(keyArgs.getMultipartUploadID())
-                  .setCreationTime(keyArgs.getModificationTime())
-                  .setReplicationConfig(replicationConfig)
-                  .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-                  .setUpdateID(trxnLogIndex)
-                  .setParentID(pathInfoFSO.getLastKnownParentId())
-                  .build();
-
-          OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setKeyName(keyName)
-              .setCreationTime(keyArgs.getModificationTime())
-              .setModificationTime(keyArgs.getModificationTime())
-              .setReplicationConfig(replicationConfig)
-              .setOmKeyLocationInfos(Collections.singletonList(
-                  new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
-              .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
-              .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-              .setUpdateID(trxnLogIndex)
-              .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
-                  OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
-              .setParentObjectID(pathInfoFSO.getLastKnownParentId())
-              .build();
-
-          // Add missing multi part info to open key table
-          addMultiPartToCache(omMetadataManager, multipartOpenKey,
-              pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
-        }
-      }
+      List<OmDirectoryInfo> missingParentInfos =
+              addMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
 
       String dbMultipartOpenKey =
           getDBMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
@@ -263,6 +191,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       // Check for directory exists with same name for the LEGACY_FS,
       // if it exists throw error.
+      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+              volumeName, bucketName);
       checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
           omMetadataManager);
 
@@ -544,22 +474,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName) throws IOException {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-  }
-
-  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
-      List<OmDirectoryInfo> missingParentInfos,
-      OMMetadataManager omMetadataManager,
-      long volumeId, long bucketId, long transactionLogIndex
-  ) throws IOException {
-    // FSO is disabled. Do nothing.
-  }
-
-  protected void addMultiPartToCache(
-      OMMetadataManager omMetadataManager, String multipartOpenKey,
-      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      String keyName, long transactionLogIndex
-  ) throws IOException {
-    // FSO is disabled. Do nothing.
   }
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
