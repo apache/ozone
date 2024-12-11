@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
