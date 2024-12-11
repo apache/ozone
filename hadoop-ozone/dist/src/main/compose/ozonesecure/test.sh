@@ -24,6 +24,7 @@ export COMPOSE_DIR
 source "$COMPOSE_DIR/../testlib.sh"
 
 export SECURITY_ENABLED=true
+export COMPOSE_FILE=docker-compose.yaml:../common/s3-haproxy-secure.yaml
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
