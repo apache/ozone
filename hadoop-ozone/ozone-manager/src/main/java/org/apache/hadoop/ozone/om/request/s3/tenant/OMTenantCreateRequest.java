@@ -112,6 +112,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
 
@@ -250,12 +251,20 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
     Preconditions.checkNotNull(volumeName);
-
+    Preconditions.checkState(request.getVolumeName().equals(volumeName),
+        "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
 
     Exception exception = null;
 
     try {
+      // Check ACL: requires volume CREATE permission.
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            tenantId, null, null);
+      }
+
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
