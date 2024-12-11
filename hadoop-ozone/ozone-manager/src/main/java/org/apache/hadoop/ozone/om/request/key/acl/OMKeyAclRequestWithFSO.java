@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -61,11 +60,6 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     final long trxnLogIndex = termIndex.getIndex();
-
-    String volume = Preconditions.checkNotNull(getRealVolume());
-    String bucket = Preconditions.checkNotNull(getRealBucket());
-    String key = Preconditions.checkNotNull(getKey());
-
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
@@ -74,10 +68,26 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-
+    String volume = null;
+    String bucket = null;
+    String key = null;
     boolean operationResult = false;
     Result result = null;
     try {
+      ObjectParser objectParser = new ObjectParser(getPath(),
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
+      key = objectParser.getKey();
+
+      // check Acl
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, bucket, key);
+      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();

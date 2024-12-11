@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -66,18 +65,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     String volume =
         getOmRequest().getSetVolumePropertyRequest().getVolumeName();
-
-    // In production this will never happen, this request will be called only
-    // when we have ownerName in setVolumePropertyRequest.
-    if (!getOmRequest().getSetVolumePropertyRequest().hasOwnerName()) {
-      /* Added this for the safer side if someone uses these API's directly
-       * in future.
-       * https://github.com/apache/hadoop/pull/884#discussion_r292679484
-       * */
-      throw new OMException("SetVolumePropertyRequest must contains OwnerName",
-          OMException.ResultCodes.INVALID_REQUEST);
-    }
-
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
@@ -104,6 +91,13 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
+    // In production this will never happen, this request will be called only
+    // when we have ownerName in setVolumePropertyRequest.
+    if (!setVolumePropertyRequest.hasOwnerName()) {
+      omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
+          .setSuccess(false);
+      return new OMVolumeSetOwnerResponse(omResponse.build());
+    }
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumVolumeUpdates();

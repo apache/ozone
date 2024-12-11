@@ -57,7 +57,7 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
         removeAclRequestBuilder =
         getOmRequest().getRemoveAclRequest().toBuilder()
             .setModificationTime(modificationTime);
-    resolveLink(ozoneManager);
+
     return getOmRequest().toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder).setUserInfo(getUserInfo())
         .build();
