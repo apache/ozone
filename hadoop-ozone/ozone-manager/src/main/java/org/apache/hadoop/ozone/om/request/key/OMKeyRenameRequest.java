@@ -81,6 +81,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
+    Preconditions.checkNotNull(renameKeyRequest);
 
     validateKeyName(renameKeyRequest.getToKeyName());
     validateKeyName(renameKeyRequest.getKeyArgs().getKeyName());

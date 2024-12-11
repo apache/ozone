@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -37,13 +38,17 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +57,9 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.*;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -131,6 +138,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
 
+    // Check tenant existence in tenantStateTable
+    if (ozoneManager.getMetadataManager().getTenantStateTable()
+        .isExist(tenantId)) {
+      LOG.debug("tenant: {} already exists", tenantId);
+      throw new OMException("Tenant '" + tenantId + "' already exists",
+          TENANT_ALREADY_EXISTS);
+    }
+
     final String owner = getUserName();
     // Volume name defaults to tenant name if unspecified in the request
     final String volumeName = request.getVolumeName();
@@ -145,6 +160,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     boolean forceCreationWhenVolumeExists =
         request.hasForceCreationWhenVolumeExists()
             && request.getForceCreationWhenVolumeExists();
+
+    // Check volume existence
+    if (!forceCreationWhenVolumeExists &&
+        ozoneManager.getMetadataManager().getVolumeTable().isExist(
+            dbVolumeKey)) {
+      LOG.debug("volume: '{}' already exists", volumeName);
+      throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
+    }
 
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
