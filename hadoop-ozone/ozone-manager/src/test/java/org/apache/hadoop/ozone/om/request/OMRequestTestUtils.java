@@ -816,7 +816,7 @@ public final class OMRequestTestUtils {
         .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
   }
 
-  public static OMRequest createSetVolumePropertyRequest(String volumeName){
+  public static OMRequest createSetVolumePropertyRequest(String volumeName) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
             .setModificationTime(Time.now()).build();
