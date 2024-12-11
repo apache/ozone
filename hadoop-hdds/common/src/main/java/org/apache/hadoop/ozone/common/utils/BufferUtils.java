@@ -162,7 +162,7 @@ public final class BufferUtils {
 
   public static long writeFully(GatheringByteChannel ch, ByteBuffer[] buffers) throws IOException {
     long written = 0;
-    for(int i = 0; i < buffers.length; i++) {
+    for (int i = 0; i < buffers.length; i++) {
       while (buffers[i].remaining() > 0) {
         final long n = ch.write(buffers, i, buffers.length - i);
         if (n < 0) {
