@@ -145,7 +145,7 @@ public class RatisUnderReplicationHandler
 
     if (targetDatanodes.size() < replicaCount.additionalReplicaNeeded()) {
       // The placement policy failed to find enough targets to satisfy fix
-      // the under replication. There fore even though some commands were sent,
+      // the under replication. Therefore even though some commands were sent,
       // we throw an exception to indicate that the container is still under
       // replicated and should be re-queued for another attempt later.
       LOG.debug("Placement policy failed to find enough targets to satisfy " +
