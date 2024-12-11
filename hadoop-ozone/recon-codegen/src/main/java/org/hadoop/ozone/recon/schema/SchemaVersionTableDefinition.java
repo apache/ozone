@@ -58,17 +58,13 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
       if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
         // If the RECON_SCHEMA_VERSION table does not exist, check for other tables
+        // to identify if it is a fresh install
         boolean isFreshInstall = checkForFreshInstall(conn);
-
-        // Create the RECON_SCHEMA_VERSION table
         createSchemaVersionTable();
 
         if (isFreshInstall) {
           // Fresh install: Set the SLV to the latest version
           insertInitialSLV(conn, latestSLV);
-        } else {
-          // Upgrade scenario: Set the SLV to -1 to trigger all upgrade actions
-          insertInitialSLV(conn, -1);
         }
       }
     }
