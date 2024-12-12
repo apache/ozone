@@ -127,6 +127,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -1602,13 +1603,13 @@ public abstract class TestOmSnapshot {
     OMException omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap1, snap2,
             null, 0, false, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(FILE_NOT_FOUND, omException.getResult());
     // From snapshot is invalid
     omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap2, snap1,
             null, 0, false, disableNativeDiff));
 
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(FILE_NOT_FOUND, omException.getResult());
   }
 
   @Test
@@ -1699,12 +1700,12 @@ public abstract class TestOmSnapshot {
     OMException omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
             null, 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(FILE_NOT_FOUND, omException.getResult());
     // From snapshot is empty
     omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
             null, 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    assertEquals(FILE_NOT_FOUND, omException.getResult());
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
         () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
