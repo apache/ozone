@@ -315,6 +315,7 @@ Apache License 2.0
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
    info.picocli:picocli
+   info.picocli:picocli-shell-jline3
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
    io.grpc:grpc-context
@@ -479,6 +480,7 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   org.jline:jline3
    org.ow2.asm:asm
    org.ow2.asm:asm-analysis
    org.ow2.asm:asm-commons
