@@ -102,7 +102,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
-    LOG.debug("Initializing StreamBlockInputStream for block {}", blockID);
     this.blockLength = length;
     setPipeline(pipeline);
     tokenRef.set(token);
@@ -356,7 +355,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   protected synchronized void checkOpen() throws IOException {
     if (xceiverClientFactory == null) {
-      throw new IOException("BlockInputStream has been closed.");
+      throw new IOException("StreamBlockInputStream has been closed.");
     }
   }
 
