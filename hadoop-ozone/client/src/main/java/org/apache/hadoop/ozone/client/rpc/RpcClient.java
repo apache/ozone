@@ -1807,7 +1807,7 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setForceUpdateContainerCacheFromSCM(false)
-        .setPartNumber(partNumber)
+        .setMultipartUploadPartNumber(partNumber)
         .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);

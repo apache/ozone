@@ -54,7 +54,6 @@ public final class OmKeyArgs implements Auditable {
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
   private final Map<String, String> tags;
-  private final Integer partNumber;
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
@@ -83,7 +82,6 @@ public final class OmKeyArgs implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.partNumber = b.partNumber;
   }
 
   public boolean getIsMultipartKey() {
@@ -170,10 +168,6 @@ public final class OmKeyArgs implements Auditable {
     return expectedDataGeneration;
   }
 
-  public Integer getPartNumber() {
-    return partNumber;
-  }
-
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -220,10 +214,6 @@ public final class OmKeyArgs implements Auditable {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
 
-    if (partNumber != null) {
-      builder.setPartNumber(partNumber);
-    }
-
     return builder;
   }
 
@@ -240,8 +230,8 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(
             isForceUpdateContainerCacheFromSCM()
         );
-    if (partNumber != null) {
-      builder.setPartNumber(partNumber);
+    if (multipartUploadPartNumber != 0) {
+      builder.setMultipartNumber(multipartUploadPartNumber);
     }
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
@@ -272,7 +262,6 @@ public final class OmKeyArgs implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final Map<String, String> tags = new HashMap<>();
     private Long expectedDataGeneration = null;
-    private Integer partNumber;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -384,11 +373,6 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
-      return this;
-    }
-
-    public Builder setPartNumber(int partNumber) {
-      this.partNumber = partNumber;
       return this;
     }
 
