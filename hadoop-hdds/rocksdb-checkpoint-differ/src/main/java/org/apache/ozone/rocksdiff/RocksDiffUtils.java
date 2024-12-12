@@ -90,10 +90,8 @@ public final class RocksDiffUtils {
       String filename = FilenameUtils.getBaseName(fileIterator.next());
       while (!preExistingCompactionNodes.containsKey(filename) && !liveFileMetaDataMap.containsKey(filename)
           && dbIdx < dbs.length) {
-        while (dbIdx < dbs.length) {
-          liveFileMetaDataMap.putAll(dbs[dbIdx].getLiveMetadataForSSTFiles());
-          dbIdx += 1;
-        }
+        liveFileMetaDataMap.putAll(dbs[dbIdx].getLiveMetadataForSSTFiles());
+        dbIdx += 1;
       }
       CompactionNode compactionNode = preExistingCompactionNodes.get(filename);
       if (compactionNode == null) {
