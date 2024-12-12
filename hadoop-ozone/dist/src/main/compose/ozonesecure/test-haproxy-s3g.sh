@@ -39,7 +39,7 @@ execute_robot_test scm security
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
 for bucket in encrypted; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   ## Exclude virtual-host.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
