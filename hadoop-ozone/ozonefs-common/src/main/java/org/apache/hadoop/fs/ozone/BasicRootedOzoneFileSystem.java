@@ -1458,6 +1458,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
             String keyName =
                 new OFSPath(fileStatus.getPath().toString(),
                     ozoneConfiguration).getKeyName();
+            if (fileStatus.isDir()) {
+              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+            }
             keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
