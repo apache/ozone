@@ -1794,7 +1794,7 @@ public class TestRocksDBCheckpointDiffer {
         .getCompactionNodeMap().values().stream()
         .sorted(Comparator.comparing(CompactionNode::getFileName))
         .map(node ->
-            rocksDBCheckpointDiffer.shouldSkipNode(node,
+            RocksDiffUtils.shouldSkipNode(node,
                 columnFamilyToPrefixMap))
         .collect(Collectors.toList());
 
@@ -1831,7 +1831,7 @@ public class TestRocksDBCheckpointDiffer {
 
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
-    assertEquals(expectedResponse, rocksDBCheckpointDiffer.shouldSkipNode(node,
+    assertEquals(expectedResponse, RocksDiffUtils.shouldSkipNode(node,
         columnFamilyToPrefixMap));
   }
 
