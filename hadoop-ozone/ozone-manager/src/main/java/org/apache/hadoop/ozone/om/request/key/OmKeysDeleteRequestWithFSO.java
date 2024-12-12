@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -71,7 +72,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   @Override
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
       OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus) {
-    if (keyStatus.isDirectory()) {
+    if (keyStatus.isDirectory() && keyStatus.getKeyInfo().getKeyName().endsWith(PATH_SEPARATOR_STR)) {
       dirList.add(omKeyInfo);
     } else {
       omKeyInfoList.add(omKeyInfo);

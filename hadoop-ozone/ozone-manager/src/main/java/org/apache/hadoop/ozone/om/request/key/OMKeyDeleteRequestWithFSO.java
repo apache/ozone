@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -132,7 +133,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
               omKeyInfo.getFileName());
       OmKeyInfo deletedOpenKeyInfo = null;
 
-      if (keyStatus.isDirectory()) {
+      if (keyStatus.isDirectory() && keyName.endsWith(PATH_SEPARATOR_STR)) {
         // Check if there are any sub path exists under the user requested path
         if (!recursive &&
             OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
