@@ -370,6 +370,7 @@ public class DeletedBlockLogImpl
           if (nextProcessTransactionId == keyValue.getKey() && !firstTime) {
             // Before already processed this transactionId in the current iteration.
             // Table is completely iterated once
+            nextProcessTransactionId = -1;
             break;
           } else if (nextProcessTransactionId == -1) {
             // Store this to break iterator when iterator again points to the same element
@@ -391,6 +392,9 @@ public class DeletedBlockLogImpl
                       ContainerID.valueOf(txn.getContainerID()));
               if (checkInadequateReplica(replicas, txn, dnList)) {
                 metrics.incrSkippedTransaction();
+                if (!iter.hasNext()) {
+                  iter.seekToFirst();
+                }
                 continue;
               }
               getTransaction(
@@ -404,9 +408,12 @@ public class DeletedBlockLogImpl
           }
           if (!iter.hasNext()) {
             iter.seekToFirst();
+            if (transactions.getBlocksDeleted() >= blockDeletionLimit) {
+              nextProcessTransactionId = -1;
+            }
           }
         }
-        if (iter.hasNext()) {
+        if (iter.hasNext() && nextProcessTransactionId != -1) {
           // Store this value so that next iteration starts from this element instead of beginning
           nextProcessTransactionId = iter.next().getKey();
         } else {
