@@ -78,7 +78,6 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final Duration leaseThreshold;
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
-  private final AtomicLong runCount;
   private final AtomicLong callId;
   private final AtomicBoolean suspended;
 
@@ -114,19 +113,18 @@ public class OpenKeyCleanupService extends BackgroundService {
         OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT);
 
     this.submittedOpenKeyCount = new AtomicLong(0);
-    this.runCount = new AtomicLong(0);
     this.callId = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
   }
 
   /**
-   * Returns the number of times this Background service has run.
+   * Returns the number of times this Background service has called OM for delete/commit keys.
    *
    * @return Long, run count.
    */
   @VisibleForTesting
   public long getRunCount() {
-    return runCount.get();
+    return  callId.get();
   }
 
   /**
@@ -192,7 +190,6 @@ public class OpenKeyCleanupService extends BackgroundService {
       if (!shouldRun()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
-      runCount.incrementAndGet();
       long startTime = Time.monotonicNow();
       final ExpiredOpenKeys expiredOpenKeys;
       try {
