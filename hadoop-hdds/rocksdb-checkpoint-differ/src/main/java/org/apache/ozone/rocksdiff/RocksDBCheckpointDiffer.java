@@ -27,6 +27,7 @@ import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -661,7 +662,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param rocksDB open rocksDB instance.
    * @return a list of SST files (without extension) in the DB.
    */
-  public HashSet<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
+  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
     HashSet<String> liveFiles = new HashSet<>();
 
     final List<String> cfs = Arrays.asList(
@@ -846,15 +847,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *         e.g. ["/path/to/sstBackupDir/000050.sst",
    *               "/path/to/sstBackupDir/000060.sst"]
    */
-  public synchronized List<String> getSSTDiffListWithFullPath(
+  public synchronized Optional<List<String>> getSSTDiffListWithFullPath(
       DifferSnapshotInfo src,
       DifferSnapshotInfo dest,
       String sstFilesDirForSnapDiffJob
   ) throws IOException {
 
-    List<String> sstDiffList = getSSTDiffList(src, dest);
+    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest);
 
-    return sstDiffList.stream()
+    return sstDiffList.map(diffList -> diffList.stream()
         .map(
             sst -> {
               String sstFullPath = getSSTFullPath(sst, src.getDbPath());
@@ -864,7 +865,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               createLink(link, srcFile);
               return link.toString();
             })
-        .collect(Collectors.toList());
+        .collect(Collectors.toList()));
   }
 
   /**
@@ -878,10 +879,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param dest destination snapshot
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
-  public synchronized List<String> getSSTDiffList(
-      DifferSnapshotInfo src,
-      DifferSnapshotInfo dest
-  ) throws IOException {
+  public synchronized Optional<List<String>> getSSTDiffList(DifferSnapshotInfo src,
+                                                            DifferSnapshotInfo dest) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
@@ -915,12 +914,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       LOG.debug("{}", logSB);
     }
 
+    // Check if the DAG traversal was able to reach all the destination SST files.
+    for (String destSnapFile : destSnapFiles) {
+      if (!fwdDAGSameFiles.contains(destSnapFile) && !fwdDAGDifferentFiles.contains(destSnapFile)) {
+        return Optional.empty();
+      }
+    }
+
     if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
       filterRelevantSstFilesFullPath(fwdDAGDifferentFiles,
           src.getTablePrefixes());
     }
-
-    return new ArrayList<>(fwdDAGDifferentFiles);
+    return Optional.of(new ArrayList<>(fwdDAGDifferentFiles));
   }
 
   /**
