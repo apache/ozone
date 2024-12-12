@@ -509,25 +509,31 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
-    Integer partNumberParam = args.getPartNumber();
-    if (partNumberParam != null && partNumberParam > 0) {
+    int partNumberParam = args.getMultipartUploadPartNumber();
+    if (partNumberParam > 0) {
       OmKeyLocationInfoGroup latestLocationVersion = value.getLatestVersionLocations();
       if (latestLocationVersion != null && latestLocationVersion.isMultipartKey()) {
+        List<OmKeyLocationInfo> currentLocations =
+            value.getKeyLocationVersions().get(value.getKeyLocationVersions().size() - 1)
+                .getLocationList()
+                .stream()
+                .filter(it -> it.getPartNumber() == partNumberParam)
+                .collect(Collectors.toList());
 
         value.setKeyLocationVersions(
             Collections.singletonList(
                 new OmKeyLocationInfoGroup(
                     latestLocationVersion.getVersion(),
-                    value.getCurrentlocationsPartsMap()
-                        .getOrDefault(partNumberParam, Collections.emptyList()),
+                    currentLocations,
                     true
                 )
             )
         );
-        value.setDataSize(
-            value.getCurrentDataSizePartsMap()
-                .getOrDefault(partNumberParam, 0L)
-        );
+
+        long dataLength = currentLocations.stream()
+            .mapToLong(BlockLocationInfo::getLength)
+            .sum();
+        value.setDataSize(dataLength);
       }
     }
     return value;
@@ -822,7 +828,7 @@ public class KeyManagerImpl implements KeyManager {
             TimeUnit.MILLISECONDS);
     return serviceInterval != DISABLE_VALUE;
   }
-
+  
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException {

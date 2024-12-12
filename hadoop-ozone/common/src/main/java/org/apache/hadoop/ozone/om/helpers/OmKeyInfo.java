@@ -17,6 +17,14 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -25,7 +33,6 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -38,17 +45,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Collectors;
 
 /**
  * Args for key block. The block instance for the key requested in putKey.
@@ -81,8 +80,6 @@ public final class OmKeyInfo extends WithParentObjectId
   private String keyName;
   private long dataSize;
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
-  private Map<Integer, List<OmKeyLocationInfo>> currentlocationsPartsMap;
-  private Map<Integer, Long> currentDataSizePartsMap;
   private final long creationTime;
   private long modificationTime;
   private ReplicationConfig replicationConfig;
@@ -191,17 +188,6 @@ public final class OmKeyInfo extends WithParentObjectId
     return ownerName;
   }
 
-  public Map<Integer, List<OmKeyLocationInfo>> getCurrentlocationsPartsMap() {
-    if (currentDataSizePartsMap == null) {
-      refreshCurrentLocationPartsMap();
-    }
-    return currentlocationsPartsMap;
-  }
-
-  public Map<Integer, Long> getCurrentDataSizePartsMap() {
-    return currentDataSizePartsMap;
-  }
-
   /**
    * Returns the generation of the object. Note this is currently the same as updateID for a key.
    * @return long
@@ -222,25 +208,6 @@ public final class OmKeyInfo extends WithParentObjectId
   public void setKeyLocationVersions(
       List<OmKeyLocationInfoGroup> keyLocationVersions) {
     this.keyLocationVersions = keyLocationVersions;
-  }
-
-  private void refreshCurrentLocationPartsMap() {
-    if (this.keyLocationVersions.size() > 0) {
-      this.currentlocationsPartsMap = this.keyLocationVersions.get(keyLocationVersions.size() - 1)
-              .getLocationList()
-              .stream()
-              .filter(it -> it.getPartNumber() != 0)
-              .collect(Collectors.groupingBy(OmKeyLocationInfo::getPartNumber));
-      this.currentDataSizePartsMap = this.currentlocationsPartsMap.entrySet().stream()
-              .map(it -> Pair.of(
-                      it.getKey(),
-                      it.getValue().stream().
-                              mapToLong(BlockLocationInfo::getLength)
-                              .sum()
-                      )
-              )
-              .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-    }
   }
 
   public void setFile(boolean file) {
@@ -384,7 +351,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (updateTime) {
       setModificationTime(Time.now());
     }
-    refreshCurrentLocationPartsMap();
   }
 
   /**
