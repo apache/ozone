@@ -143,8 +143,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private static final String COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER
       = ":";
 
+  /**
+   * SST file extension. Must be lower case.
+   * Used to trim the file extension when writing compaction entries to the log
+   * to save space.
+   */
+  static final String SST_FILE_EXTENSION = ".sst";
   public static final int SST_FILE_EXTENSION_LENGTH =
-      ManagedRocksDB.SST_FILE_EXTENSION.length();
+      SST_FILE_EXTENSION.length();
 
   private static final int LONG_MAX_STR_LEN =
       String.valueOf(Long.MAX_VALUE).length();

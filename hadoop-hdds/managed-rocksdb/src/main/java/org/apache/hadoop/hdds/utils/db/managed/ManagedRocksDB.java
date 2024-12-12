@@ -41,12 +41,6 @@ import java.util.stream.Collectors;
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;
   public static final int NOT_FOUND = RocksDB.NOT_FOUND;
-  /**
-   * SST file extension. Must be lower case.
-   * Used to trim the file extension when writing compaction entries to the log
-   * to save space.
-   */
-  public static final String SST_FILE_EXTENSION = ".sst";
 
   static final Logger LOG = LoggerFactory.getLogger(ManagedRocksDB.class);
 
@@ -113,8 +107,7 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
   }
 
   public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
-    return db.getLiveFilesMetaData().stream()
-        .filter(liveFileMetaData -> liveFileMetaData.fileName().endsWith(SST_FILE_EXTENSION)).collect(
+    return db.getLiveFilesMetaData().stream().collect(
             Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
                 liveFileMetaData -> liveFileMetaData));
   }

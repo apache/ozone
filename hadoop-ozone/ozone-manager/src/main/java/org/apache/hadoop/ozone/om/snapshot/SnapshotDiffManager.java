@@ -1159,10 +1159,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       }
       ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore())
           .getDb().getManagedRocksDb();
-      ManagedRocksDB toDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore())
+      ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
           .getDb().getManagedRocksDb();
-      Set<String> fromSnapshotFiles = RdbUtil.getSSTFilesForComparison(fromDB, tablesToLookUp);
-      Set<String> toSnapshotFiles = RdbUtil.getSSTFilesForComparison(toDB, tablesToLookUp);
+      Set<String> fromSnapshotFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
+      Set<String> toSnapshotFiles = getSSTFileListForSnapshot(toSnapshot, tablesToLookUp);
 
       deltaFiles.addAll(fromSnapshotFiles);
       deltaFiles.addAll(toSnapshotFiles);
