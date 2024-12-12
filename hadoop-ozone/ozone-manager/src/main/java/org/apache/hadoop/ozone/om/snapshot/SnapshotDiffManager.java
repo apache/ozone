@@ -1125,7 +1125,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                             String diffDir)
       throws IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
-    final Set<String> deltaFiles = new HashSet<>();
+    Optional<Set<String>> deltaFiles = Optional.empty();
 
     // Check if compaction DAG is available, use that if so
     if (differ != null && fsInfo != null && tsInfo != null && !useFullDiff) {
@@ -1139,18 +1139,14 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
-        Optional<List<String>> sstDiffList = differ.getSSTDiffListWithFullPath(toDSI,
-            fromDSI, diffDir);
-        if (sstDiffList.isPresent()) {
-          deltaFiles.addAll(sstDiffList.get());
-        }
+        deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir).map(HashSet::new);
       } catch (Exception exception) {
         LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
             "It will fallback to full diff now.", exception);
       }
     }
 
-    if (useFullDiff || deltaFiles.isEmpty()) {
+    if (useFullDiff || !deltaFiles.isPresent()) {
       // If compaction DAG is not available (already cleaned up), fall back to
       //  the slower approach.
       if (!useFullDiff) {
@@ -1168,13 +1164,16 @@ public class SnapshotDiffManager implements AutoCloseable {
               ((RDBStore)toSnapshot.getMetadataManager().getStore()).getDb()
                   .getManagedRocksDb(),
               tablesToLookUp);
-
-      deltaFiles.addAll(fromSnapshotFiles);
-      deltaFiles.addAll(toSnapshotFiles);
-      RocksDiffUtils.filterRelevantSstFiles(deltaFiles, tablePrefixes);
+      Set<String> diffFiles = new HashSet<>();
+      diffFiles.addAll(fromSnapshotFiles);
+      diffFiles.addAll(toSnapshotFiles);
+      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes);
+      deltaFiles = Optional.of(diffFiles);
     }
 
-    return deltaFiles;
+    return deltaFiles.orElseThrow(() ->
+        new IOException("Error getting diff files b/w " + fromSnapshot.getSnapshotTableKey() + " and " +
+            toSnapshot.getSnapshotTableKey()));
   }
 
   private void validateEstimatedKeyChangesAreInLimits(

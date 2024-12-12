@@ -641,7 +641,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param rocksDB open rocksDB instance.
    * @return a list of SST files (without extension) in the DB.
    */
-  public HashSet<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
+  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
     HashSet<String> liveFiles = new HashSet<>();
 
     final List<String> cfs = Arrays.asList(
@@ -893,15 +893,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       LOG.debug("{}", logSB);
     }
 
+    // Check if the DAG traversal was able to reach all the destination SST files.
+    for (String destSnapFile : destSnapFiles) {
+      if (!fwdDAGSameFiles.contains(destSnapFile) && !fwdDAGDifferentFiles.contains(destSnapFile)) {
+        return Optional.empty();
+      }
+    }
+
     if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
       filterRelevantSstFilesFullPath(fwdDAGDifferentFiles,
           src.getTablePrefixes());
-    }
-    // Check if the DAG traversal was able to reach all the destination SST files.
-    for (String destSnapFile : destSnapFiles) {
-      if (!fwdDAGSameFiles.contains(destSnapFile) || !fwdDAGDifferentFiles.contains(destSnapFile)) {
-        return Optional.empty();
-      }
     }
     return Optional.of(new ArrayList<>(fwdDAGDifferentFiles));
   }
