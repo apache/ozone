@@ -54,18 +54,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>rocks-native</module>
   </modules>
 
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </pluginRepository>
-  </pluginRepositories>
   <dependencyManagement>
     <dependencies>
 
