@@ -69,6 +69,7 @@ import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -1510,6 +1512,27 @@ public class TestSnapshotDiffManager {
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     when(bucketInfoTable.get(bucketKey)).thenReturn(bucketInfo);
+  }
+
+  @Test
+  public void testGetDeltaFilesWithFullDiff() throws IOException {
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    OmSnapshot fromSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    OmSnapshot toSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    Mockito.doAnswer(invocation -> {
+      OmSnapshot snapshot = invocation.getArgument(0);
+      if (snapshot == fromSnapshot) {
+        return Sets.newHashSet("1", "2", "3");
+      }
+      if (snapshot == toSnapshot) {
+        return Sets.newHashSet("3", "4", "5");
+      }
+      return Sets.newHashSet("6", "7", "8");
+    }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
+        Mockito.anyList());
+    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
+        snapshotInfo, true, Collections.emptyMap(), null);
+    Assertions.assertEquals(Sets.newHashSet("1", "2", "3", "4", "5"), deltaFiles);
   }
 
   @Test

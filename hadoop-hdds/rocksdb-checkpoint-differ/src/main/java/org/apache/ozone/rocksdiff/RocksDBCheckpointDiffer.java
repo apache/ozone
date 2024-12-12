@@ -580,8 +580,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private long getSSTFileSummary(String filename)
       throws RocksDBException, FileNotFoundException {
 
-    if (!filename.endsWith(ManagedRocksDB.SST_FILE_EXTENSION)) {
-      filename += ManagedRocksDB.SST_FILE_EXTENSION;
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
     }
 
     try (ManagedOptions option = new ManagedOptions();
@@ -599,8 +599,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private String getAbsoluteSstFilePath(String filename)
       throws FileNotFoundException {
-    if (!filename.endsWith(ManagedRocksDB.SST_FILE_EXTENSION)) {
-      filename += ManagedRocksDB.SST_FILE_EXTENSION;
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
     }
     File sstFile = new File(sstBackupDir + filename);
     File sstFileInActiveDB = new File(activeDBLocationStr + filename);
@@ -623,7 +623,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    if (!filename.endsWith(ManagedRocksDB.SST_FILE_EXTENSION)) {
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
       final String errorMsg = String.format(
           "Invalid extension of file: '%s'. Expected '%s'",
           filename, SST_FILE_EXTENSION_LENGTH);
@@ -793,7 +793,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     // Try to locate the SST in the backup dir first
     final Path sstPathInBackupDir = Paths.get(sstBackupDir,
-        sstFilenameWithoutExtension + ManagedRocksDB.SST_FILE_EXTENSION);
+        sstFilenameWithoutExtension + SST_FILE_EXTENSION);
     if (Files.exists(sstPathInBackupDir)) {
       return sstPathInBackupDir.toString();
     }
@@ -803,7 +803,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     // src DB directory or destDB directory
     for (String dbPath : dbPaths) {
       final Path sstPathInDBDir = Paths.get(dbPath,
-          sstFilenameWithoutExtension + ManagedRocksDB.SST_FILE_EXTENSION);
+          sstFilenameWithoutExtension + SST_FILE_EXTENSION);
       if (Files.exists(sstPathInDBDir)) {
         return sstPathInDBDir.toString();
       }
@@ -838,7 +838,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             sst -> {
               String sstFullPath = getSSTFullPath(sst, src.getDbPath(), dest.getDbPath());
               Path link = Paths.get(sstFilesDirForSnapDiffJob,
-                  sst + ManagedRocksDB.SST_FILE_EXTENSION);
+                  sst + SST_FILE_EXTENSION);
               Path srcFile = Paths.get(sstFullPath);
               createLink(link, srcFile);
               return link.toString();
@@ -1231,7 +1231,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private void removeSstFiles(Set<String> sstFileNodes) {
     for (String sstFileNode: sstFileNodes) {
       File file =
-          new File(sstBackupDir + "/" + sstFileNode + ManagedRocksDB.SST_FILE_EXTENSION);
+          new File(sstBackupDir + "/" + sstFileNode + SST_FILE_EXTENSION);
       try {
         Files.deleteIfExists(file.toPath());
       } catch (IOException exception) {
