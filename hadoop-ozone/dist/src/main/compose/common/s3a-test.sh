@@ -96,7 +96,7 @@ EOF
   # - ITestS3AContractDistCp: HDDS-10616
   # - ITestS3AContractGetFileStatusV1List: HDDS-10617
   # - ITestS3AContractRename: HDDS-10665
-  mvn -B -V --fail-never --no-transfer-progress \
+  mvn ${MAVEN_ARGS:-} --fail-never \
     -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractDistCp, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractRename' \
     clean test
 
