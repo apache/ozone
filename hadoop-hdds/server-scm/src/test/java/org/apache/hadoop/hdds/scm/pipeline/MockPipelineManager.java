@@ -332,22 +332,22 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void acquireReadLock() {
+  public void acquireReadLock(ReplicationConfig replicationConfig) {
 
   }
 
   @Override
-  public void releaseReadLock() {
+  public void releaseReadLock(ReplicationConfig replicationConfig) {
 
   }
 
   @Override
-  public void acquireWriteLock() {
+  public void acquireWriteLock(ReplicationConfig replicationConfig) {
 
   }
 
   @Override
-  public void releaseWriteLock() {
+  public void releaseWriteLock(ReplicationConfig replicationConfig) {
 
   }
 
