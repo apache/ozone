@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -149,6 +150,7 @@ class TestContainerBalancerStatusInfo {
   }
 
   @Test
+  @Flaky("HDDS-11927")
   void testGetCurrentStatisticsWhileBalancingInProgress() throws Exception {
     MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
