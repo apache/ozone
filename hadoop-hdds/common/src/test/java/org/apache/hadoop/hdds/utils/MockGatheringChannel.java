@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.junit.jupiter.api.Assertions;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
@@ -26,6 +24,8 @@ import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.google.common.base.Preconditions.checkElementIndex;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * {@link GatheringByteChannel} implementation for testing.  Delegates
@@ -56,17 +56,22 @@ public class MockGatheringChannel implements GatheringByteChannel {
       return 0;
     }
 
-    // simulate partial write by setting a random limit
+    // simulate partial write by setting a random partial length
     final long partialLength = ThreadLocalRandom.current().nextLong(fullLength + 1);
 
     long written = 0;
     for (int i = offset; i < srcs.length; i++) {
-      final long n = partialLength - written;  // write at most n bytes
+      for(final ByteBuffer src = srcs[i]; src.hasRemaining(); ) {
+        final long n = partialLength - written;  // write at most n bytes
+        assertThat(n).isGreaterThanOrEqualTo(0);
+        if (n == 0) {
+          return written;
+        }
 
-      final ByteBuffer src = srcs[i];
-      final int remaining = src.remaining();
-      final int adjustment = remaining <= n ? 0 : Math.toIntExact(remaining - n);
-      written += adjustedWrite(src, adjustment);
+        final int remaining = src.remaining();
+        final int adjustment = remaining <= n ? 0 : Math.toIntExact(remaining - n);
+        written += adjustedWrite(src, adjustment);
+      }
     }
     return written;
   }
@@ -82,30 +87,34 @@ public class MockGatheringChannel implements GatheringByteChannel {
     if (remaining <= 0) {
       return 0;
     }
-    // Simulate partial write by setting a random limit.
+    // Simulate partial write by a random adjustment.
     final int adjustment = ThreadLocalRandom.current().nextInt(remaining + 1);
     return adjustedWrite(src, adjustment);
   }
 
+  /** Simulate partial write by the given adjustment. */
   private int adjustedWrite(ByteBuffer src, int adjustment) throws IOException {
-    Assertions.assertTrue(adjustment >= 0);
+    assertThat(adjustment).isGreaterThanOrEqualTo(0);
     final int remaining = src.remaining();
-    Assertions.assertTrue(adjustment <= remaining);
+    if (remaining <= 0) {
+      return 0;
+    }
+    assertThat(adjustment).isLessThanOrEqualTo(remaining);
 
     final int oldLimit = src.limit();
     final int newLimit = oldLimit - adjustment;
     src.limit(newLimit);
-    Assertions.assertEquals(newLimit, src.limit());
+    assertEquals(newLimit, src.limit());
     final int toWrite = remaining - adjustment;
-    Assertions.assertEquals(toWrite, src.remaining());
+    assertEquals(toWrite, src.remaining());
 
     final int written = delegate.write(src);
-    Assertions.assertEquals(newLimit, src.limit());
-    Assertions.assertEquals(toWrite - written, src.remaining());
+    assertEquals(newLimit, src.limit());
+    assertEquals(toWrite - written, src.remaining());
 
     src.limit(oldLimit);
-    Assertions.assertEquals(oldLimit, src.limit());
-    Assertions.assertEquals(remaining - written, src.remaining());
+    assertEquals(oldLimit, src.limit());
+    assertEquals(remaining - written, src.remaining());
 
     return written;
   }
