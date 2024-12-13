@@ -166,8 +166,7 @@ class TestOpenKeyCleanupService {
     // wait for submitted tasks to complete
     Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
-    final long oldrunCount = openKeyCleanupService.getRunCount();
-    LOG.info("oldkeyCount={}, oldrunCount={}", oldkeyCount, oldrunCount);
+    LOG.info("oldkeyCount={}", oldkeyCount);
 
     final OMMetrics metrics = om.getMetrics();
     long numKeyHSyncs = metrics.getNumKeyHSyncs();
@@ -329,8 +328,7 @@ class TestOpenKeyCleanupService {
     // wait for submitted tasks to complete
     Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
-    final long oldrunCount = openKeyCleanupService.getRunCount();
-    LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
+    LOG.info("oldMpuKeyCount={}", oldkeyCount);
 
     final OMMetrics metrics = om.getMetrics();
     long numKeyHSyncs = metrics.getNumKeyHSyncs();
@@ -389,8 +387,7 @@ class TestOpenKeyCleanupService {
     // wait for submitted tasks to complete
     Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
-    final long oldrunCount = openKeyCleanupService.getRunCount();
-    LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
+    LOG.info("oldMpuKeyCount={},", oldkeyCount);
 
     final OMMetrics metrics = om.getMetrics();
     long numOpenKeysCleaned = metrics.getNumOpenKeysCleaned();

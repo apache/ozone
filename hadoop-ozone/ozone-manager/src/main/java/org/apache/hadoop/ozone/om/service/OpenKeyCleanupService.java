@@ -118,16 +118,6 @@ public class OpenKeyCleanupService extends BackgroundService {
   }
 
   /**
-   * Returns the number of times this Background service has called OM for delete/commit keys.
-   *
-   * @return Long, run count.
-   */
-  @VisibleForTesting
-  public long getRunCount() {
-    return  callId.get();
-  }
-
-  /**
    * Suspend the service (for testing).
    */
   @VisibleForTesting
