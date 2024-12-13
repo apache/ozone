@@ -43,7 +43,6 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   public static final String SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DataSource dataSource;
-  private DSLContext dslContext;
   private int latestSLV;
 
   @Inject
@@ -54,17 +53,17 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
   @Override
   public void initializeSchema() throws SQLException {
     try (Connection conn = dataSource.getConnection()) {
-      dslContext = DSL.using(conn);
+      DSLContext localDslContext = DSL.using(conn);
 
       if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
         // If the RECON_SCHEMA_VERSION table does not exist, check for other tables
         // to identify if it is a fresh install
-        boolean isFreshInstall = checkForFreshInstall(conn);
-        createSchemaVersionTable();
+        boolean isFreshInstall = checkForFreshInstall(conn, localDslContext);
+        createSchemaVersionTable(localDslContext);
 
         if (isFreshInstall) {
           // Fresh install: Set the SLV to the latest version
-          insertInitialSLV(conn, latestSLV);
+          insertInitialSLV(localDslContext, latestSLV);
         }
       }
     }
@@ -72,8 +71,10 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   /**
    * Create the Schema Version table.
+   *
+   * @param dslContext The DSLContext to use for the operation.
    */
-  private void createSchemaVersionTable() throws SQLException {
+  private void createSchemaVersionTable(DSLContext dslContext) {
     dslContext.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
         .column("version_number", SQLDataType.INTEGER.nullable(false))
         .column("applied_on", SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
@@ -82,11 +83,11 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   /**
    * Inserts the initial SLV into the Schema Version table.
-   * @param conn The database connection.
-   * @param slv The initial SLV value.
+   *
+   * @param dslContext The DSLContext to use for the operation.
+   * @param slv        The initial SLV value.
    */
-  private void insertInitialSLV(Connection conn, int slv) throws SQLException {
-    dslContext = DSL.using(conn);
+  private void insertInitialSLV(DSLContext dslContext, int slv) {
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
         .columns(DSL.field("version_number"), DSL.field("applied_on"))
         .values(slv, DSL.currentTimestamp())
@@ -96,10 +97,12 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   /**
    * Determines if this is a fresh install by checking the presence of key tables.
-   * @param conn The database connection.
+   *
+   * @param conn       The database connection.
+   * @param dslContext The DSLContext to use for the operation.
    * @return True if this is a fresh install, false otherwise.
    */
-  private boolean checkForFreshInstall(Connection conn) throws SQLException {
+  private boolean checkForFreshInstall(Connection conn, DSLContext dslContext) throws SQLException {
     // Check for presence of key Recon tables (e.g., UNHEALTHY_CONTAINERS, RECON_TASK_STATUS, etc.)
     return !TABLE_EXISTS_CHECK.test(conn, "UNHEALTHY_CONTAINERS") &&
         !TABLE_EXISTS_CHECK.test(conn, "RECON_TASK_STATUS") &&
