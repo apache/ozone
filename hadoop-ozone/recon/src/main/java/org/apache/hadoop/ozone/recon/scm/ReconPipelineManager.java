@@ -24,6 +24,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -98,29 +99,46 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm)
       throws IOException {
+    HddsProtos.ReplicationType[] replicationTypes =
+        HddsProtos.ReplicationType.values();
+    for (HddsProtos.ReplicationType replicationType : replicationTypes) {
+      List<Pipeline> pipelines = pipelinesFromScm.stream().filter(
+          p -> p.getReplicationConfig().getReplicationType()
+              .equals(replicationType)).collect(Collectors.toList());
 
-    acquireWriteLock();
-    try {
-      List<Pipeline> pipelinesInHouse = getPipelines();
-      LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
-      for (Pipeline pipeline : pipelinesFromScm) {
-        // New pipeline got from SCM. Validate If it doesn't exist at Recon, try adding it.
-        if (addPipeline(pipeline)) {
-          LOG.info("Added new pipeline {} from SCM.", pipeline.getId());
-        } else {
-          LOG.warn("Pipeline {} already exists in Recon pipeline metadata.", pipeline.getId());
-          // Recon already has this pipeline. Just update state and creation
-          // time.
-          getStateManager().updatePipelineState(
-              pipeline.getId().getProtobuf(),
-              Pipeline.PipelineState.getProtobuf(pipeline.getPipelineState()));
-          getPipeline(pipeline.getId()).setCreationTimestamp(
-              pipeline.getCreationTimestamp());
+      if (!pipelines.isEmpty()) {
+        ReplicationConfig replicationConfig =
+            pipelines.iterator().next().getReplicationConfig();
+
+        acquireWriteLock(replicationConfig);
+        try {
+          List<Pipeline> pipelinesInHouse = getPipelines().stream().filter(
+              p -> p.getReplicationConfig().getReplicationType()
+                  .equals(replicationType)).collect(Collectors.toList());
+
+          LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
+          for (Pipeline pipeline : pipelines) {
+            // New pipeline got from SCM. Validate If it doesn't exist at Recon, try adding it.
+            if (addPipeline(pipeline)) {
+              LOG.info("Added new pipeline {} from SCM.", pipeline.getId());
+            } else {
+              LOG.warn("Pipeline {} already exists in Recon pipeline metadata.",
+                  pipeline.getId());
+              // Recon already has this pipeline. Just update state and creation
+              // time.
+              getStateManager().updatePipelineState(
+                  pipeline.getId().getProtobuf(),
+                  Pipeline.PipelineState.getProtobuf(
+                      pipeline.getPipelineState()));
+              getPipeline(pipeline.getId()).setCreationTimestamp(
+                  pipeline.getCreationTimestamp());
+            }
+          }
+          removeInvalidPipelines(pipelines);
+        } finally {
+          releaseWriteLock(replicationConfig);
         }
       }
-      removeInvalidPipelines(pipelinesFromScm);
-    } finally {
-      releaseWriteLock();
     }
   }
 
@@ -163,7 +181,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   @VisibleForTesting
   public boolean addPipeline(Pipeline pipeline) throws IOException {
-    acquireWriteLock();
+    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
+    acquireWriteLock(replicationConfig);
     try {
       // Check if the pipeline already exists
       if (containsPipeline(pipeline.getId())) {
@@ -172,7 +191,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       getStateManager().addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
       return true;
     } finally {
-      releaseWriteLock();
+      releaseWriteLock(replicationConfig);
     }
   }
 
