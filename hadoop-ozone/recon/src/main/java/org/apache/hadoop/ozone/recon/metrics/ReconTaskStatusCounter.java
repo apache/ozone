@@ -86,6 +86,7 @@ public class ReconTaskStatusCounter {
    */
   public void updateCounter(String taskName, boolean successful) {
     checkCountDataExpiry(taskName);
+    TASK_STATUS_COUNTER.putIfAbsent(taskName, new ReconTaskStatusStat());
 
     if (successful) {
       TASK_STATUS_COUNTER.get(taskName).incrementSuccess();
