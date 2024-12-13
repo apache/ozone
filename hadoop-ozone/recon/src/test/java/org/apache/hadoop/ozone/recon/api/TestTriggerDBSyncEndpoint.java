@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +104,8 @@ public class TestTriggerDBSyncEndpoint {
 
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
+    ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
+    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
@@ -117,14 +120,10 @@ public class TestTriggerDBSyncEndpoint {
         commonUtils.getReconNodeDetails());
 
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
-    when(reconTaskController.getReconTaskStatusDao())
-        .thenReturn(mock(ReconTaskStatusDao.class));
-
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock),
-            new ReconTaskStatusCounter());
+            reconOMMetadataManager, reconTaskController, reconTaskStatusDaoMock, reconTaskStatusCounterMock,
+            reconUtilsMock, ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock));
     ozoneManagerServiceProvider.start();
 
     reconTestInjector =

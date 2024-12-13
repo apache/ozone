@@ -59,8 +59,8 @@ public class ReconTaskStatusMetrics implements MetricsSource {
       Interns.info("lastTaskRunStatus",
           "Last run status i.e successful or failed for the corresponding Recon Task");
 
-  private static final MetricsInfo RECORD_INFO_CURRENT_TASK_RUN_STATUS =
-      Interns.info("currentTaskRunStatus",
+  private static final MetricsInfo RECORD_INFO_IS_CURRENT_TASK_RUNNING =
+      Interns.info("isTaskCurrentlyRunning",
           "Current run status i.e if task is running or completed for the corresponding Recon Task");
 
   public void register() {
@@ -85,6 +85,10 @@ public class ReconTaskStatusMetrics implements MetricsSource {
           rts.getLastUpdatedTimestamp());
       builder.addCounter(RECORD_INFO_LAST_UPDATED_SEQ,
           rts.getLastUpdatedSeqNumber());
+      builder.addCounter(RECORD_INFO_LAST_TASK_RUN_STATUS,
+          rts.getLastTaskRunStatus());
+      builder.addCounter(RECORD_INFO_IS_CURRENT_TASK_RUNNING,
+          rts.getIsCurrentTaskRunning());
       builder.endRecord();
     });
   }

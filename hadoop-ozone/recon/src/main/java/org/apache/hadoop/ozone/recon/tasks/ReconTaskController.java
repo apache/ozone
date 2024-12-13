@@ -58,12 +58,6 @@ public interface ReconTaskController {
   Map<String, ReconOmTask> getRegisteredTasks();
 
   /**
-   * Get instance of ReconTaskStatusDao.
-   * @return instance of ReconTaskStatusDao
-   */
-  ReconTaskStatusDao getReconTaskStatusDao();
-
-  /**
    * Start the task scheduler.
    */
   void start();

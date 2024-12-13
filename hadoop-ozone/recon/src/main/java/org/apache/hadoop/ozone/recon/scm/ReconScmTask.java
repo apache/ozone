@@ -19,12 +19,10 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
 
 /**
  * Any background task that keeps SCM's metadata up to date.
@@ -33,24 +31,19 @@ public abstract class ReconScmTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
   private Thread taskThread;
-  private ReconTaskStatusDao reconTaskStatusDao;
   private volatile boolean running;
-  private volatile ReconTaskStatus reconTaskStatusRecord;
-  @Inject
-  private ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
 
-  protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
-    this.reconTaskStatusDao = reconTaskStatusDao;
+  protected ReconScmTask(
+      ReconTaskStatusDao reconTaskStatusDao, ReconTaskStatusCounter taskStatusCounter
+  ) {
+    this.taskStatusUpdater = new ReconTaskStatusUpdater(reconTaskStatusDao, taskStatusCounter, getTaskName());
   }
 
   private void register() {
     String taskName = getTaskName();
-    if (!reconTaskStatusDao.existsById(taskName)) {
-      reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L, 0, 0);
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
-      LOG.info("Registered {} task ", taskName);
-    }
+    taskStatusUpdater.setTaskName(taskName);
+    taskStatusUpdater.updateDetails();
   }
 
   /**
@@ -65,7 +58,6 @@ public abstract class ReconScmTask {
       taskThread.setName(getTaskName());
       taskThread.setDaemon(true);
       taskThread.start();
-      reconTaskStatusRecord.setCurrentTaskRunStatus(1);
     } else {
       LOG.info("{} Thread is already running.", getTaskName());
     }
@@ -79,7 +71,6 @@ public abstract class ReconScmTask {
       LOG.info("Stopping {} Thread.", getTaskName());
       running = false;
       notifyAll();
-      reconTaskStatusRecord.setCurrentTaskRunStatus(0);
     } else {
       LOG.info("{} Thread is not running.", getTaskName());
     }
@@ -96,11 +87,9 @@ public abstract class ReconScmTask {
   }
 
   protected void recordSingleRunCompletion() {
-    synchronized (this) {
-      reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
-      reconTaskStatusRecord.setLastTaskRunStatus(1);
-    }
-    reconTaskStatusDao.update(reconTaskStatusRecord);
+    taskStatusUpdater.setIsCurrentTaskRunning(0);
+    taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+    taskStatusUpdater.updateDetails();
   }
 
   protected boolean canRun() {
@@ -111,8 +100,8 @@ public abstract class ReconScmTask {
     return getClass().getSimpleName();
   }
 
-  public ReconTaskStatusCounter getTaskStatusCounterInstance() {
-    return taskStatusCounter;
+  public ReconTaskStatusUpdater getTaskStatusUpdater() {
+    return this.taskStatusUpdater;
   }
 
   protected abstract void run();

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,20 +61,20 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final int threadCount;
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
-  private ReconTaskStatusDao reconTaskStatusDao;
-  private final ReconTaskStatusCounter taskStatusCounter;
-  private final Map<String, ReconTaskStatus> taskStatusMap = new HashMap<>();
+  private final ReconTaskStatusDao reconTaskStatusDao;
+  private final ReconTaskStatusCounter reconTaskStatusCounter;
+  private final Map<String, ReconTaskStatusUpdater> taskStatusMap = new ConcurrentHashMap<>();
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
-                                 ReconTaskStatusDao reconTaskStatusDao,
                                  Set<ReconOmTask> tasks,
-                                 ReconTaskStatusCounter taskStatusCounter) {
+                                 ReconTaskStatusDao reconTaskStatusDao,
+                                 ReconTaskStatusCounter reconTaskStatusCounter) {
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = taskStatusCounter;
+    this.reconTaskStatusCounter = reconTaskStatusCounter;
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
@@ -88,11 +89,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     reconOmTasks.put(taskName, task);
     // Store Task in Task failure tracker.
     taskFailureCounter.put(taskName, new AtomicInteger(0));
-    // Create DB record for the task.
-    taskStatusMap.put(taskName, new ReconTaskStatus(
-        taskName, 0L, 0L, 0, 0));
-    if (!reconTaskStatusDao.existsById(taskName)) {
-      reconTaskStatusDao.insert(taskStatusMap.get(taskName));
+    try {
+      // Create DB record for the task.
+      taskStatusMap.put(taskName, new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounter, taskName));
+      getUpdaterForTask(taskName).updateDetails();
+    } catch (Exception e) {
+      LOG.error("Caught exception while registering task: {}, {}", taskName, e.getMessage());
     }
   }
 
@@ -112,10 +114,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     try {
       if (!events.isEmpty()) {
         Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
+        ReconTaskStatus reconTaskStatus;
         for (Map.Entry<String, ReconOmTask> taskEntry :
             reconOmTasks.entrySet()) {
           ReconOmTask task = taskEntry.getValue();
-          taskStatusMap.get(task.getTaskName()).setCurrentTaskRunStatus(1);
+          ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(task.getTaskName());
+          taskStatusUpdater.setIsCurrentTaskRunning(1);
+          taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+          taskStatusUpdater.updateDetails();
           // events passed to process method is no longer filtered
           tasks.add(() -> task.process(events));
         }
@@ -174,63 +180,42 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void reInitializeTasks(
       ReconOMMetadataManager omMetadataManager) throws InterruptedException {
-    try {
       Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
       for (Map.Entry<String, ReconOmTask> taskEntry :
           reconOmTasks.entrySet()) {
         ReconOmTask task = taskEntry.getValue();
-        taskStatusMap.get(task.getTaskName()).setCurrentTaskRunStatus(1);
+        ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(task.getTaskName());
+        taskStatusUpdater.setIsCurrentTaskRunning(1);
+        taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+        taskStatusUpdater.updateDetails();
         tasks.add(() -> task.reprocess(omMetadataManager));
       }
       List<Future<Pair<String, Boolean>>> results =
           executorService.invokeAll(tasks);
       for (Future<Pair<String, Boolean>> f : results) {
-        String taskName = f.get().getLeft();
-        ReconTaskStatus reconTaskStatusRecord = taskStatusMap.get(taskName);
-        reconTaskStatusRecord.setLastUpdatedSeqNumber(omMetadataManager.getLastSequenceNumberFromDB());
-        reconTaskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
-        if (!f.get().getRight()) {
-          LOG.info("Init failed for task {}.", taskName);
-          reconTaskStatusRecord.setLastTaskRunStatus(-1);
-          taskStatusCounter.updateCounter(taskName, false);
-        } else {
-          //store the timestamp for the task
-          reconTaskStatusRecord.setLastTaskRunStatus(0);
-          taskStatusCounter.updateCounter(taskName, true);
+        try {
+          String taskName = f.get().getLeft();
+          ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(taskName);
+          taskStatusUpdater.setLastUpdatedSeqNumber(omMetadataManager.getLastSequenceNumberFromDB());
+          taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+          if (!f.get().getRight()) {
+            LOG.info("Init failed for task {}.", taskName);
+            taskStatusUpdater.setLastTaskRunStatus(-1);
+          } else {
+            //store the timestamp for the task
+            taskStatusUpdater.setLastTaskRunStatus(0);
+          }
+          taskStatusUpdater.setIsCurrentTaskRunning(0);
+          taskStatusUpdater.updateDetails();
+        } catch (ExecutionException e) {
+          LOG.error("Unexpected error : ", e);
         }
-        reconTaskStatusRecord.setCurrentTaskRunStatus(0);
-        reconTaskStatusDao.update(reconTaskStatusRecord);
       }
-    } catch (ExecutionException e) {
-      LOG.error("Unexpected error : ", e);
-    }
-  }
-
-  /**
-   * Store the last completed event sequence number and timestamp to the DB
-   * for that task.
-   * @param taskName taskname to be updated.
-   * @param lastSequenceNumber contains the new sequence number.
-   * @param lastTaskRunStatus contains if the last task run failed or passed, -1 means failed and 1 means passed
-   */
-  private void storeLastCompletedTransaction(
-      String taskName, long lastSequenceNumber, int lastTaskRunStatus) {
-    ReconTaskStatus taskStatusRecord = taskStatusMap.get(taskName);
-    taskStatusRecord.setCurrentTaskRunStatus(0);
-    taskStatusRecord.setLastUpdatedTimestamp(System.currentTimeMillis());
-    taskStatusRecord.setLastUpdatedSeqNumber(lastSequenceNumber);
-    taskStatusRecord.setLastTaskRunStatus(lastTaskRunStatus);
-    reconTaskStatusDao.update(taskStatusRecord);
   }
 
   @Override
   public Map<String, ReconOmTask> getRegisteredTasks() {
     return reconOmTasks;
-  }
-
-  @Override
-  public ReconTaskStatusDao getReconTaskStatusDao() {
-    return reconTaskStatusDao;
   }
 
   @Override
@@ -264,17 +249,31 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     List<String> failedTasks = new ArrayList<>();
     for (Future<Pair<String, Boolean>> f : results) {
       String taskName = f.get().getLeft();
+      ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(taskName);
+      taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.setIsCurrentTaskRunning(0);
+
       if (!f.get().getRight()) {
         LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft());
-        taskStatusCounter.updateCounter(taskName, false);
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), -1);
+        taskStatusUpdater.setLastTaskRunStatus(-1);
       } else {
         taskFailureCounter.get(taskName).set(0);
-        taskStatusCounter.updateCounter(taskName, true);
-        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber(), 0);
+        taskStatusUpdater.setLastTaskRunStatus(0);
       }
+      taskStatusUpdater.updateDetails();
     }
     return failedTasks;
+  }
+
+  /**
+   * Get task status update builder for a task name from taskStatusMap
+   * @param taskName Stores the task name for which we want the builder
+   * @return A {@link ReconTaskStatusUpdater} instance of the current task
+   */
+  private ReconTaskStatusUpdater getUpdaterForTask(String taskName) {
+    return taskStatusMap.getOrDefault(taskName, new ReconTaskStatusUpdater(
+        reconTaskStatusDao, reconTaskStatusCounter, taskName));
   }
 }

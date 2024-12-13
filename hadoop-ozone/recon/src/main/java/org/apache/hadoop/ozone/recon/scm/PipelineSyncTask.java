@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
@@ -55,19 +56,20 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final long interval;
-  private final ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
       ReconNodeManager nodeManager,
-      StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao,
+      ReconTaskStatusCounter reconTaskStatusCounter,
+      StorageContainerServiceProvider scmClient,
       ReconTaskConfig reconTaskConfig) {
-    super(reconTaskStatusDao);
+    super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
     this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
-    this.taskStatusCounter = getTaskStatusCounterInstance();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
@@ -91,17 +93,20 @@ public class PipelineSyncTask extends ReconScmTask {
     try {
       long start = Time.monotonicNow();
       List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
       reconPipelineManager.initializePipelines(pipelinesFromScm);
       syncOperationalStateOnDeadNodes();
       LOG.debug("Pipeline sync Thread took {} milliseconds.",
           Time.monotonicNow() - start);
-      recordSingleRunCompletion();
-      taskStatusCounter.updateCounter(getTaskName(), true);
+      taskStatusUpdater.setLastTaskRunStatus(0);
     } catch (IOException | NodeNotFoundException e) {
       // If we encounter an exception, increment failure count for task and bubble forward the exception
-      taskStatusCounter.updateCounter(getTaskName(), false);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
       throw e;
     } finally {
+      recordSingleRunCompletion();
       lock.writeLock().unlock();
     }
   }

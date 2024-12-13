@@ -94,6 +94,7 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -124,6 +125,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
@@ -184,11 +186,12 @@ public class ReconStorageContainerManagerFacade
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
                                             StorageContainerServiceProvider scmServiceProvider,
-                                            ReconTaskStatusDao reconTaskStatusDao,
                                             ContainerCountBySizeDao containerCountBySizeDao,
                                             UtilizationSchemaDefinition utilizationSchemaDefinition,
                                             ContainerHealthSchemaManager containerHealthSchemaManager,
                                             ReconContainerMetadataManager reconContainerMetadataManager,
+                                            ReconTaskStatusDao reconTaskStatusDao,
+                                            ReconTaskStatusCounter reconTaskStatusCounter,
                                             ReconUtils reconUtils,
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
@@ -270,24 +273,16 @@ public class ReconStorageContainerManagerFacade
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
-    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig);
-    containerHealthTask = new ContainerHealthTask(
-        containerManager, scmServiceProvider, reconTaskStatusDao,
-        containerHealthSchemaManager, containerPlacementPolicy, reconTaskConfig,
-        reconContainerMetadataManager, conf);
+    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
+        reconTaskStatusDao, reconTaskStatusCounter, scmServiceProvider, reconTaskConfig);
 
-    this.containerSizeCountTask = new ContainerSizeCountTask(
-        containerManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig,
-        containerCountBySizeDao,
-        utilizationSchemaDefinition);
+    containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
+        containerHealthSchemaManager, containerPlacementPolicy, reconTaskStatusDao, reconTaskStatusCounter,
+        reconTaskConfig, reconContainerMetadataManager, conf);
+
+    this.containerSizeCountTask = new ContainerSizeCountTask(containerManager, scmServiceProvider,
+        reconTaskStatusDao, reconTaskStatusCounter, reconTaskConfig,
+        containerCountBySizeDao, utilizationSchemaDefinition);
 
     this.dataSource = dataSource;
 

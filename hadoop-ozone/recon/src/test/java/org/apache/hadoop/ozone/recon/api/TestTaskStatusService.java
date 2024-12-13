@@ -19,14 +19,14 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusCountResponse;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -78,16 +78,18 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     List<ReconTaskStatus> resultList = new ArrayList<>();
     resultList.add(reconTaskStatusRecord);
 
-    Response response = taskStatusService.getTaskTimes();
+    Response response = taskStatusService.getTaskMetrics();
 
-    List<ReconTaskStatus> responseList = (List<ReconTaskStatus>)
+    List<ReconTaskStatusResponse> responseList = (List<ReconTaskStatusResponse>)
         response.getEntity();
 
     assertEquals(resultList.size(), responseList.size());
-    for (ReconTaskStatus r : responseList) {
+    for (ReconTaskStatusResponse r : responseList) {
       assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
       assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
           r.getLastUpdatedTimestamp());
+      assertEquals(reconTaskStatusRecord.getLastTaskRunStatus(), r.getLastTaskRunStatus());
+      assertEquals(reconTaskStatusRecord.getIsCurrentTaskRunning(), r.getIsTaskCurrentlyRunning());
     }
   }
 
@@ -96,24 +98,16 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    Map<String, ReconTaskStatusStat> mockedTaskCounts =
-        new HashMap<>();
+    ReconTaskStatusStat mockedTaskCounts = new ReconTaskStatusStat(10, 2);
     String taskName = "DummyTask_" + System.currentTimeMillis();
-    String taskWithFailureCountName = "FailedDummyTask_" + System.currentTimeMillis();
 
-    mockedTaskCounts.put(taskName, new ReconTaskStatusStat(1, 0));
-    mockedTaskCounts.put(taskWithFailureCountName, new ReconTaskStatusStat(10, 2));
-    when(taskStatusCounter.getTaskCounts()).thenReturn(mockedTaskCounts);
+    when(taskStatusCounter.getTaskCountFor(anyString())).thenReturn(mockedTaskCounts);
 
-    Response response = taskStatusService.getTaskStatusStats();
-    List<ReconTaskStatusCountResponse> tasks = (List<ReconTaskStatusCountResponse>) response.getEntity();
-    assertEquals(tasks.size(), mockedTaskCounts.size());
+    Response response = taskStatusService.getTaskMetrics();
+    List<ReconTaskStatusResponse> tasks = (List<ReconTaskStatusResponse>) response.getEntity();
+    assertEquals(tasks.size(), 1);
     assertEquals(tasks.get(0).getTaskName(), taskName);
-    assertEquals(tasks.get(0).getSuccessCount(), 1);
-    assertEquals(tasks.get(0).getFailureCount(), 0);
-
-    assertEquals(tasks.get(1).getTaskName(), taskWithFailureCountName);
-    assertEquals(tasks.get(1).getSuccessCount(), 10);
+    assertEquals(tasks.get(0).getSuccessCount(), 10);
     assertEquals(tasks.get(0).getFailureCount(), 2);
   }
 }

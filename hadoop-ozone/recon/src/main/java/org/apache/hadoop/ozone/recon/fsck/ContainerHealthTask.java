@@ -45,7 +45,9 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -87,19 +89,20 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private final OzoneConfiguration conf;
 
-  private final ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
+      ReconTaskStatusDao reconTaskStatusDao,
+      ReconTaskStatusCounter reconTaskStatusCounter,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
       OzoneConfiguration conf) {
-    super(reconTaskStatusDao);
+    super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -107,7 +110,7 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerManager = containerManager;
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
-    this.taskStatusCounter = getTaskStatusCounterInstance();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
@@ -142,6 +145,9 @@ public class ContainerHealthTask extends ReconScmTask {
           unhealthyContainerStateStatsMap);
       long start = Time.monotonicNow();
       long currentTime = System.currentTimeMillis();
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(currentTime);
+      taskStatusUpdater.updateDetails();
       long existingCount = processExistingDBRecords(currentTime,
           unhealthyContainerStateStatsMap);
       LOG.debug("Container Health task thread took {} milliseconds to" +
@@ -149,13 +155,14 @@ public class ContainerHealthTask extends ReconScmTask {
           Time.monotonicNow() - start, existingCount);
 
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
-      taskStatusCounter.updateCounter(ContainerHealthTask.class.getName(), true);
+      taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
     } catch (Exception e) {
       // For any exception that is thrown we know the container health check has failed,
       // increment the failure count for the task
-      taskStatusCounter.updateCounter(getTaskName(), false);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
     } finally {
+      recordSingleRunCompletion();
       lock.writeLock().unlock();
     }
   }
@@ -174,7 +181,6 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      recordSingleRunCompletion();
       LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());

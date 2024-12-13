@@ -25,7 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Class to represent the API response structure of task status statistics.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ReconTaskStatusCountResponse {
+public class ReconTaskStatusResponse {
 
   // The name of the task for which we are getting status
   @JsonProperty("taskName")
@@ -40,12 +40,29 @@ public class ReconTaskStatusCountResponse {
   private int failureCount;
 
   // The timestamp at which the counters were last reset
-  @JsonProperty("initializedAt")
+  @JsonProperty("counterStartedAt")
   private long counterStartTime;
 
-  public ReconTaskStatusCountResponse(
-      String taskName, int successCount, int failureCount, long counterStartTime) {
+  @JsonProperty("lastUpdatedTimestamp")
+  private long lastUpdatedTimestamp;
+
+  @JsonProperty("lastUpdatedSeqNumber")
+  private long lastUpdatedSeqNumber;
+
+  @JsonProperty("lastTaskRunStatus")
+  private int lastTaskRunStatus;
+
+  @JsonProperty("isTaskCurrentlyRunning")
+  private int isTaskCurrentlyRunning;
+
+  public ReconTaskStatusResponse(String taskName, long lastUpdatedSeqNumber, long lastUpdatedTimestamp,
+                                 int isTaskCurrentlyRunning, int lastTaskRunStatus,
+                                 int successCount, int failureCount, long counterStartTime) {
     this.taskName = taskName;
+    this.lastUpdatedTimestamp = lastUpdatedTimestamp;
+    this.lastUpdatedSeqNumber = lastUpdatedSeqNumber;
+    this.lastTaskRunStatus = lastTaskRunStatus;
+    this.isTaskCurrentlyRunning = isTaskCurrentlyRunning;
     this.successCount = successCount;
     this.failureCount = failureCount;
     this.counterStartTime = counterStartTime;
@@ -53,6 +70,22 @@ public class ReconTaskStatusCountResponse {
 
   public String getTaskName() {
     return taskName;
+  }
+
+  public long getLastUpdatedTimestamp() {
+    return lastUpdatedTimestamp;
+  }
+
+  public long getLastUpdatedSeqNumber() {
+    return lastUpdatedSeqNumber;
+  }
+
+  public int getIsTaskCurrentlyRunning() {
+    return isTaskCurrentlyRunning;
+  }
+
+  public int getLastTaskRunStatus() {
+    return lastTaskRunStatus;
   }
 
   public long getSuccessCount() {

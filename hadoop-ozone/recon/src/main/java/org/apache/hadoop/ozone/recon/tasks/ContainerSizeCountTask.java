@@ -66,21 +66,23 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
       unhealthyContainerStateStatsMap;
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
-  private final ReconTaskStatusCounter taskStatusCounter;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
+
   public ContainerSizeCountTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao,
+      ReconTaskStatusCounter reconTaskStatusCounter,
       ReconTaskConfig reconTaskConfig,
       ContainerCountBySizeDao containerCountBySizeDao,
       UtilizationSchemaDefinition utilizationSchemaDefinition) {
-    super(reconTaskStatusDao);
+    super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.containerManager = containerManager;
     this.containerCountBySizeDao = containerCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
     interval = reconTaskConfig.getContainerSizeCountTaskInterval().toMillis();
-    this.taskStatusCounter = getTaskStatusCounterInstance();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
 
@@ -173,6 +175,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
     try {
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
       final Map<ContainerSizeCountKey, Long> containerSizeCountMap
           = new HashMap<>();
       final Map<ContainerID, Long> deletedContainers
@@ -187,9 +192,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
         // For New Container being created
         try {
           process(container, containerSizeCountMap);
-          taskStatusCounter.updateCounter(getTaskName(), true);
+          taskStatusUpdater.setLastTaskRunStatus(0);
         } catch (Exception e) {
-          taskStatusCounter.updateCounter(getTaskName(), false);
+          taskStatusUpdater.setLastTaskRunStatus(-1);
           // FIXME: it is a bug if there is an exception.
           LOG.error("FIXME: Failed to process " + container, e);
         }
@@ -203,6 +208,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       containerSizeCountMap.clear();
       LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
     } finally {
+      recordSingleRunCompletion();
       lock.writeLock().unlock();
     }
   }
@@ -260,11 +266,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
     });
     containerCountBySizeDao.insert(insertToDb);
     containerCountBySizeDao.update(updateInDb);
-  }
-
-  @Override
-  public String getTaskName() {
-    return "ContainerSizeCountTask";
   }
 
   /**
