@@ -77,7 +77,6 @@ public class PipelineManagerImpl implements PipelineManager {
 
   // Limit the number of on-going ratis operation to be 1.
   private final ReentrantReadWriteLock lock;
-  private final ReentrantReadWriteLock ecPipelineLock;
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
@@ -106,7 +105,6 @@ public class PipelineManagerImpl implements PipelineManager {
                                 SCMContext scmContext,
                                 Clock clock) {
     this.lock = new ReentrantReadWriteLock();
-    this.ecPipelineLock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
@@ -250,7 +248,7 @@ public class PipelineManagerImpl implements PipelineManager {
       throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
 
-    acquireWriteLock(replicationConfig);
+    acquireWriteLock();
     final Pipeline pipeline;
     try {
       try {
@@ -263,7 +261,7 @@ public class PipelineManagerImpl implements PipelineManager {
       addPipelineToManager(pipeline);
       return pipeline;
     } finally {
-      releaseWriteLock(replicationConfig);
+      releaseWriteLock();
     }
   }
 
@@ -288,8 +286,7 @@ public class PipelineManagerImpl implements PipelineManager {
       throws IOException {
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION);
-    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
-    acquireWriteLock(replicationConfig);
+    acquireWriteLock();
     try {
       stateManager.addPipeline(pipelineProto);
     } catch (IOException ex) {
@@ -297,7 +294,7 @@ public class PipelineManagerImpl implements PipelineManager {
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
-      releaseWriteLock(replicationConfig);
+      releaseWriteLock();
     }
     recordMetricsForPipeline(pipeline);
   }
@@ -422,23 +419,19 @@ public class PipelineManagerImpl implements PipelineManager {
   public void openPipeline(PipelineID pipelineId)
       throws IOException {
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
-
-    final Pipeline pipeline = getPipeline(pipelineId);
-    ReplicationConfig replicationConfig = null;
+    acquireWriteLock();
+    final Pipeline pipeline;
     try {
+      pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
         throw new IOException("Closed pipeline can not be opened");
       }
-      replicationConfig = pipeline.getReplicationConfig();
-      acquireWriteLock(replicationConfig);
       if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
         stateManager.updatePipelineState(pipelineIdProtobuf,
             HddsProtos.PipelineState.PIPELINE_OPEN);
       }
     } finally {
-      if (replicationConfig != null) {
-        releaseWriteLock(replicationConfig);
-      }
+      releaseWriteLock();
     }
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);
@@ -454,15 +447,14 @@ public class PipelineManagerImpl implements PipelineManager {
       throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
-    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
-    acquireWriteLock(replicationConfig);
+    acquireWriteLock();
     try {
       stateManager.removePipeline(pipelineID);
     } catch (IOException ex) {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
     } finally {
-      releaseWriteLock(replicationConfig);
+      releaseWriteLock();
     }
     LOG.info("Pipeline {} removed.", pipeline);
     metrics.incNumPipelineDestroyed();
@@ -515,20 +507,19 @@ public class PipelineManagerImpl implements PipelineManager {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     // close containers.
     closeContainersForPipeline(pipelineID);
-    Pipeline pipeline = getPipeline(pipelineID);
-    if (!pipeline.isClosed()) {
-      ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
-      acquireWriteLock(replicationConfig);
+    if (!getPipeline(pipelineID).isClosed()) {
+      acquireWriteLock();
       try {
         stateManager.updatePipelineState(pipelineIDProtobuf,
             HddsProtos.PipelineState.PIPELINE_CLOSED);
       } finally {
-        releaseWriteLock(replicationConfig);
+        releaseWriteLock();
       }
       LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
     }
 
     metrics.removePipelineMetrics(pipelineID);
+
   }
 
   /**
@@ -693,14 +684,12 @@ public class PipelineManagerImpl implements PipelineManager {
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
-    Pipeline pipeline = getPipeline(pipelineID);
-    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
-    acquireWriteLock(replicationConfig);
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineIDProtobuf,
           HddsProtos.PipelineState.PIPELINE_OPEN);
     } finally {
-      releaseWriteLock(replicationConfig);
+      releaseWriteLock();
     }
   }
 
@@ -714,14 +703,12 @@ public class PipelineManagerImpl implements PipelineManager {
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
-    Pipeline pipeline = getPipeline(pipelineID);
-    ReplicationConfig replicationConfig = pipeline.getReplicationConfig();
-    acquireWriteLock(replicationConfig);
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineIDProtobuf,
           HddsProtos.PipelineState.PIPELINE_DORMANT);
     } finally {
-      releaseWriteLock(replicationConfig);
+      releaseWriteLock();
     }
   }
 
@@ -944,38 +931,22 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public void acquireReadLock(ReplicationConfig replicationConfig) {
-    if (replicationConfig.getReplicationType().equals(ReplicationType.EC)) {
-      ecPipelineLock.readLock().lock();
-    } else {
-      lock.readLock().lock();
-    }
+  public void acquireReadLock() {
+    lock.readLock().lock();
   }
 
   @Override
-  public void releaseReadLock(ReplicationConfig replicationConfig) {
-    if (replicationConfig.getReplicationType().equals(ReplicationType.EC)) {
-      ecPipelineLock.readLock().unlock();
-    } else {
-      lock.readLock().unlock();
-    }
+  public void releaseReadLock() {
+    lock.readLock().unlock();
   }
 
   @Override
-  public void acquireWriteLock(ReplicationConfig replicationConfig) {
-    if (replicationConfig.getReplicationType().equals(ReplicationType.EC)) {
-      ecPipelineLock.writeLock().lock();
-    } else {
-      lock.writeLock().lock();
-    }
+  public void acquireWriteLock() {
+    lock.writeLock().lock();
   }
 
   @Override
-  public void releaseWriteLock(ReplicationConfig replicationConfig) {
-    if (replicationConfig.getReplicationType().equals(ReplicationType.EC)) {
-      ecPipelineLock.writeLock().unlock();
-    } else {
-      lock.writeLock().unlock();
-    }
+  public void releaseWriteLock() {
+    lock.writeLock().unlock();
   }
 }
