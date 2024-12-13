@@ -50,10 +50,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -102,7 +104,6 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.in;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -382,7 +383,7 @@ public class TestRocksDBCheckpointDiffer {
                 "000095"),
             ImmutableSet.of("000066", "000105", "000080", "000087", "000073",
                 "000095"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 2: Compaction log file crafted input: " +
                 "One source ('to' snapshot) SST file is never compacted " +
                 "(newly flushed)",
@@ -395,7 +396,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000088", "000105", "000059", "000053", "000095"),
             ImmutableSet.of("000108"),
             ImmutableSet.of("000108"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 3: Compaction log file crafted input: " +
                 "Same SST files found during SST expansion",
             compactionLog,
@@ -407,7 +408,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000066", "000059", "000053"),
             ImmutableSet.of("000080", "000087", "000073", "000095"),
             ImmutableSet.of("000080", "000087", "000073", "000095"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 4: Compaction log file crafted input: " +
                 "Skipping known processed SST.",
             compactionLog,
@@ -419,7 +420,7 @@ public class TestRocksDBCheckpointDiffer {
             Collections.emptySet(),
             Collections.emptySet(),
             Collections.emptySet(),
-            true),
+            true, Collections.emptyMap()),
         Arguments.of("Test 5: Compaction log file hit snapshot" +
                 " generation early exit condition",
             compactionLog,
@@ -431,7 +432,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000059", "000053"),
             ImmutableSet.of("000066", "000080", "000087", "000073", "000062"),
             ImmutableSet.of("000066", "000080", "000087", "000073", "000062"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 6: Compaction log table regular case. " +
                 "Expands expandable SSTs in the initial diff.",
             null,
@@ -445,7 +446,7 @@ public class TestRocksDBCheckpointDiffer {
                 "000095"),
             ImmutableSet.of("000066", "000105", "000080", "000087", "000073",
                 "000095"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 7: Compaction log table crafted input: " +
                 "One source ('to' snapshot) SST file is never compacted " +
                 "(newly flushed)",
@@ -458,7 +459,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000088", "000105", "000059", "000053", "000095"),
             ImmutableSet.of("000108"),
             ImmutableSet.of("000108"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 8: Compaction log table crafted input: " +
                 "Same SST files found during SST expansion",
             null,
@@ -470,7 +471,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000066", "000059", "000053"),
             ImmutableSet.of("000080", "000087", "000073", "000095"),
             ImmutableSet.of("000080", "000087", "000073", "000095"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 9: Compaction log table crafted input: " +
                 "Skipping known processed SST.",
             null,
@@ -482,7 +483,7 @@ public class TestRocksDBCheckpointDiffer {
             Collections.emptySet(),
             Collections.emptySet(),
             Collections.emptySet(),
-            true),
+            true, Collections.emptyMap()),
         Arguments.of("Test 10: Compaction log table hit snapshot " +
                 "generation early exit condition",
             null,
@@ -494,7 +495,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("000059", "000053"),
             ImmutableSet.of("000066", "000080", "000087", "000073", "000062"),
             ImmutableSet.of("000066", "000080", "000087", "000073", "000062"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 11: Older Compaction log got pruned and source snapshot delta files would be " +
                 "unreachable",
             null,
@@ -506,7 +507,7 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("1", "3", "13", "14"),
             ImmutableSet.of("2", "8", "9", "12"),
             ImmutableSet.of("2", "8", "9", "12"),
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 12: Older Compaction log got pruned and source snapshot delta files would be " +
                 "unreachable",
             null,
@@ -518,29 +519,38 @@ public class TestRocksDBCheckpointDiffer {
             ImmutableSet.of("3", "13", "14"),
             ImmutableSet.of("4", "5", "8", "9", "12"),
             null,
-            false),
+            false, Collections.emptyMap()),
         Arguments.of("Test 13: Compaction log to test filtering logic based on range and column family",
             null,
             getPrunedCompactionEntries(false,
-                ImmutableMap.of(
-                    "1", new String[]{"a", "c", "col1"},
-                    "3", new String[]{"a", "d", "col2"},
-                    "13", new String[]{"a", "c", "col13"},
-                    "14", new String[]{"a", "c", "col1"},
-                    "2", new String[]{"a", "c", "col1"},
-                    "4", new String[]{"a", "b", "col1"},
-                    "5", new String[]{"b", "b", "col1"},
-                    "10", new String[]{"a", "b", "col1"},
-                    "8", new String[]{"a", "b", "col1"}
-                    )),
+                new HashMap<String, String[]>() {{
+                  put("1", new String[]{"a", "c", "col1"});
+                  put("3", new String[]{"a", "d", "col2"});
+                  put("13", new String[]{"a", "c", "col13"});
+                  put("14", new String[]{"a", "c", "col1"});
+                  put("2", new String[]{"a", "c", "col1"});
+                  put("4", new String[]{"a", "b", "col1"});
+                  put("5", new String[]{"b", "b", "col1"});
+                  put("10", new String[]{"a", "b", "col1"});
+                  put("8", new String[]{"a", "b", "col1"});
+                  put("6", new String[]{"a", "z", "col13"});
+                  put("7", new String[]{"a", "z", "col13"});
+                }}),
             snapshotInfo6,
             snapshotInfo5,
-            ImmutableSet.of("10", "11", "8", "9", "12"),
+            ImmutableSet.of("10", "11", "8", "9", "12", "15"),
             ImmutableSet.of("1", "3", "13", "14"),
-            ImmutableSet.of("1", "3", "14"),
-            ImmutableSet.of("2", "8", "9", "12"),
+            ImmutableSet.of("1", "13", "3", "14"),
+            ImmutableSet.of("2", "8", "9", "12", "15"),
             ImmutableSet.of("2", "9", "12"),
-            false)
+            false,
+            ImmutableMap.of(
+                "2", new String[]{"a", "b", "col1"},
+                "12", new String[]{"a", "d", "col2"},
+                "8", new String[]{"a", "b", "col1"},
+                "9", new String[]{"a", "c", "col1"},
+                "15", new String[]{"a", "z", "col13"}
+            ))
 
     );
   }
@@ -562,7 +572,8 @@ public class TestRocksDBCheckpointDiffer {
       Set<String> expectedSameSstFiles,
       Set<String> expectedDiffSstFiles,
       Set<String> expectedSSTDiffFiles,
-      boolean expectingException) {
+      boolean expectingException,
+      Map<String, String[]> metaDataMap) {
     try (MockedStatic<RocksDiffUtils> mockedRocksdiffUtil = Mockito.mockStatic(RocksDiffUtils.class,
         Mockito.CALLS_REAL_METHODS)) {
       mockedRocksdiffUtil.when(() -> RocksDiffUtils.constructBucketKey(anyString())).thenAnswer(i -> i.getArgument(0));
@@ -611,6 +622,17 @@ public class TestRocksDBCheckpointDiffer {
         Mockito.when(rocksDB.getName()).thenReturn("dummy");
         Mockito.when(srcSnapshot.getRocksDB().get()).thenReturn(rocksDB);
         Mockito.when(destSnapshot.getRocksDB().get()).thenReturn(rocksDB);
+        Mockito.when(srcSnapshot.getRocksDB().getLiveMetadataForSSTFiles())
+            .thenAnswer(invocation -> srcSnapshotSstFiles.stream().filter(metaDataMap::containsKey).map(file -> {
+              LiveFileMetaData liveFileMetaData = Mockito.mock(LiveFileMetaData.class);
+              String[] metaData = metaDataMap.get(file);
+              Mockito.when(liveFileMetaData.fileName()).thenReturn("/" + file + SST_FILE_EXTENSION);
+              Mockito.when(liveFileMetaData.smallestKey()).thenReturn(metaData[0].getBytes(UTF_8));
+              Mockito.when(liveFileMetaData.largestKey()).thenReturn(metaData[1].getBytes(UTF_8));
+              Mockito.when(liveFileMetaData.columnFamilyName()).thenReturn(metaData[2].getBytes(UTF_8));
+              return liveFileMetaData;
+            }).collect(Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
+                Function.identity())));
         mockedHandler.when(() -> RdbUtil.getLiveSSTFilesForCFs(any(), any()))
             .thenAnswer(i -> {
               Set<String> sstFiles = i.getArgument(0).equals(srcSnapshot.getRocksDB()) ? srcSnapshotSstFiles
@@ -1601,7 +1623,7 @@ public class TestRocksDBCheckpointDiffer {
                                                           List<String> outputFiles,
                                                           Map<String, String[]> metadata) {
     return new CompactionLogEntry.Builder(dbSequenceNumber, compactionTime,
-        toFileInfoList(inputFiles,metadata), toFileInfoList(outputFiles, metadata)).build();
+        toFileInfoList(inputFiles, metadata), toFileInfoList(outputFiles, metadata)).build();
   }
 
   private static List<CompactionFileInfo> toFileInfoList(List<String> files,
