@@ -1032,8 +1032,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
     if (skipNativeDiff || !isNativeLibsLoaded) {
-      deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
-          tablesToLookUp));
+      Set<String> inputFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
+      ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore()).getDb().getManagedRocksDb();
+      RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, fromDB);
+      deltaFiles.addAll(inputFiles);
     }
     addToObjectIdMap(fsTable, tsTable, deltaFiles,
         !skipNativeDiff && isNativeLibsLoaded,
@@ -1153,21 +1155,16 @@ public class SnapshotDiffManager implements AutoCloseable {
         LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
                 " slow path");
       }
-
-      Set<String> fromSnapshotFiles =
-          RdbUtil.getSSTFilesForComparison(
-              ((RDBStore)fromSnapshot.getMetadataManager().getStore())
-                  .getDb().getManagedRocksDb(),
-              tablesToLookUp);
-      Set<String> toSnapshotFiles =
-          RdbUtil.getSSTFilesForComparison(
-              ((RDBStore)toSnapshot.getMetadataManager().getStore()).getDb()
-                  .getManagedRocksDb(),
-              tablesToLookUp);
+      ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore())
+          .getDb().getManagedRocksDb();
+      ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
+          .getDb().getManagedRocksDb();
+      Set<String> fromSnapshotFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
+      Set<String> toSnapshotFiles = getSSTFileListForSnapshot(toSnapshot, tablesToLookUp);
       Set<String> diffFiles = new HashSet<>();
       diffFiles.addAll(fromSnapshotFiles);
       diffFiles.addAll(toSnapshotFiles);
-      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes);
+      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes, fromDB, toDB);
       deltaFiles = Optional.of(diffFiles);
     }
 
