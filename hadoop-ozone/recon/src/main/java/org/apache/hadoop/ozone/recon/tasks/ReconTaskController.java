@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 
 /**
  * Controller used by Recon to manage Tasks that are waiting on Recon events.

@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;

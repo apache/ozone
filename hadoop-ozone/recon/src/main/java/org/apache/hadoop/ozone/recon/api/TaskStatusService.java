@@ -55,7 +55,7 @@ public class TaskStatusService {
   }
 
   /**
-   * Return the list of Recon Tasks and associated metrics
+   * Return the list of Recon Tasks and associated metrics.
    * @return {@link Response}
    */
   @GET

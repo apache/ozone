@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.junit.jupiter.api.BeforeEach;

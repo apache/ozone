@@ -191,7 +191,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(), containerHealthSchemaManager,
-            placementMock, getMockTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
+            placementMock, getTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
             reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
 
@@ -363,7 +363,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(), containerHealthSchemaManager,
-            placementMock, getMockTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
+            placementMock, getTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
             reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
     LambdaTestUtils.await(6000, 1000, () ->
@@ -548,7 +548,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(), containerHealthSchemaManager,
-            placementMock, getMockTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
+            placementMock, getTaskStatusDao(), getMockTaskStatusCounter(), reconTaskConfig,
             reconContainerMetadataManager, new OzoneConfiguration());
 
     containerHealthTask.start();
@@ -564,8 +564,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     });
   }
 
-  private ReconTaskStatusDao getMockTaskStatusDao() {
-    return mock(ReconTaskStatusDao.class);
+  private ReconTaskStatusDao getTaskStatusDao() {
+    return getDao(ReconTaskStatusDao.class);
   }
 
   private ReconTaskStatusCounter getMockTaskStatusCounter() {

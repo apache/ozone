@@ -55,6 +55,7 @@ public class ReconTaskStatusResponse {
   @JsonProperty("isTaskCurrentlyRunning")
   private int isTaskCurrentlyRunning;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconTaskStatusResponse(String taskName, long lastUpdatedSeqNumber, long lastUpdatedTimestamp,
                                  int isTaskCurrentlyRunning, int lastTaskRunStatus,
                                  int successCount, int failureCount, long counterStartTime) {

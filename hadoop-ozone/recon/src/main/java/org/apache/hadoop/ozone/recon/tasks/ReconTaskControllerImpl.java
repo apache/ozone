@@ -180,37 +180,37 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void reInitializeTasks(
       ReconOMMetadataManager omMetadataManager) throws InterruptedException {
-      Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
-      for (Map.Entry<String, ReconOmTask> taskEntry :
-          reconOmTasks.entrySet()) {
-        ReconOmTask task = taskEntry.getValue();
-        ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(task.getTaskName());
-        taskStatusUpdater.setIsCurrentTaskRunning(1);
+    Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
+    for (Map.Entry<String, ReconOmTask> taskEntry :
+        reconOmTasks.entrySet()) {
+      ReconOmTask task = taskEntry.getValue();
+      ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(task.getTaskName());
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
+      tasks.add(() -> task.reprocess(omMetadataManager));
+    }
+    List<Future<Pair<String, Boolean>>> results =
+        executorService.invokeAll(tasks);
+    for (Future<Pair<String, Boolean>> f : results) {
+      try {
+        String taskName = f.get().getLeft();
+        ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(taskName);
+        taskStatusUpdater.setLastUpdatedSeqNumber(omMetadataManager.getLastSequenceNumberFromDB());
         taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-        taskStatusUpdater.updateDetails();
-        tasks.add(() -> task.reprocess(omMetadataManager));
-      }
-      List<Future<Pair<String, Boolean>>> results =
-          executorService.invokeAll(tasks);
-      for (Future<Pair<String, Boolean>> f : results) {
-        try {
-          String taskName = f.get().getLeft();
-          ReconTaskStatusUpdater taskStatusUpdater = getUpdaterForTask(taskName);
-          taskStatusUpdater.setLastUpdatedSeqNumber(omMetadataManager.getLastSequenceNumberFromDB());
-          taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-          if (!f.get().getRight()) {
-            LOG.info("Init failed for task {}.", taskName);
-            taskStatusUpdater.setLastTaskRunStatus(-1);
-          } else {
-            //store the timestamp for the task
-            taskStatusUpdater.setLastTaskRunStatus(0);
-          }
-          taskStatusUpdater.setIsCurrentTaskRunning(0);
-          taskStatusUpdater.updateDetails();
-        } catch (ExecutionException e) {
-          LOG.error("Unexpected error : ", e);
+        if (!f.get().getRight()) {
+          LOG.info("Init failed for task {}.", taskName);
+          taskStatusUpdater.setLastTaskRunStatus(-1);
+        } else {
+          //store the timestamp for the task
+          taskStatusUpdater.setLastTaskRunStatus(0);
         }
+        taskStatusUpdater.setIsCurrentTaskRunning(0);
+        taskStatusUpdater.updateDetails();
+      } catch (ExecutionException e) {
+        LOG.error("Unexpected error : ", e);
       }
+    }
   }
 
   @Override
@@ -268,7 +268,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   /**
-   * Get task status update builder for a task name from taskStatusMap
+   * Get task status update builder for a task name from taskStatusMap.
    * @param taskName Stores the task name for which we want the builder
    * @return A {@link ReconTaskStatusUpdater} instance of the current task
    */

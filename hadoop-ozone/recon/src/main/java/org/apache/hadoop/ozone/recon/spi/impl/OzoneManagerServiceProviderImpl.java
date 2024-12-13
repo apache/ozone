@@ -100,7 +100,6 @@ import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,6 +146,7 @@ public class OzoneManagerServiceProviderImpl
   }
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OzoneManagerServiceProviderImpl(
       OzoneConfiguration configuration,
       ReconOMMetadataManager omMetadataManager,

@@ -39,9 +39,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 
 /**

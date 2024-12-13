@@ -21,8 +21,11 @@ package org.apache.hadoop.ozone.recon.scm;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.SQLException;
 
 /**
  * Any background task that keeps SCM's metadata up to date.
@@ -87,9 +90,13 @@ public abstract class ReconScmTask {
   }
 
   protected void recordSingleRunCompletion() {
-    taskStatusUpdater.setIsCurrentTaskRunning(0);
-    taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-    taskStatusUpdater.updateDetails();
+    try {
+      taskStatusUpdater.setIsCurrentTaskRunning(0);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for task: {}", getTaskName());
+    }
   }
 
   protected boolean canRun() {
