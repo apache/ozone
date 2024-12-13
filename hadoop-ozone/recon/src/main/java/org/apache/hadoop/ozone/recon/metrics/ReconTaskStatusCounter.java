@@ -22,10 +22,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_DURATION;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_DURATION_DEFAULT;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -34,9 +35,9 @@ import java.util.concurrent.TimeUnit;
  * This class contains definitions and implementation of Recon Task Status counters
  * For each task we maintain a count of the successes and the failures.
  * This count is stored for a configurable
- * {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_STORAGE_DURATION}
- * which defaults to 30 minutes.
- * Each task is mapped to a {@link Pair} of <code>{no. of successful runs, no. of failed runs}</code>
+ * {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_COUNTER_DURATION} which defaults
+ * to '5' times {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY}
+ * Each task is mapped to a {@link ReconTaskStatusStat} instance to store the counts.
  */
 public class ReconTaskStatusCounter {
   // Stores the configurable timeout duration i.e. the TTL of the counts
@@ -47,11 +48,16 @@ public class ReconTaskStatusCounter {
 
   public ReconTaskStatusCounter() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    timeoutDuration = conf.getTimeDuration(
-      OZONE_RECON_TASK_STATUS_STORAGE_DURATION,
-      OZONE_RECON_TASK_STATUS_STORAGE_DURATION_DEFAULT,
-      TimeUnit.MILLISECONDS
+    int countCycles = conf.getInt(
+      OZONE_RECON_TASK_STATUS_COUNTER_DURATION,
+      OZONE_RECON_TASK_STATUS_COUNTER_DURATION_DEFAULT
     );
+    long taskSyncInterval = conf.getTimeDuration(
+        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        TimeUnit.MILLISECONDS
+    );
+    timeoutDuration = taskSyncInterval * countCycles;
   }
 
   /**
