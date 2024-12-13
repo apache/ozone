@@ -99,11 +99,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of dataNodes of delete transactions.")
   private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
-  private final Map<UUID, DatanodeCommandCounts> numCommandsDatanode;
+  private final Map<UUID, DatanodeCommandCounts> numCommandsDatanode = new ConcurrentHashMap<>();
 
   private ScmBlockDeletingServiceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
-    numCommandsDatanode = new ConcurrentHashMap<>();
   }
 
   public static synchronized ScmBlockDeletingServiceMetrics create() {
@@ -226,10 +225,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
-  public Map<UUID, DatanodeCommandCounts> getNumCommandsDatanode() {
-    return numCommandsDatanode;
-  }
-
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean all) {
     MetricsRecordBuilder builder = metricsCollector.addRecord(SOURCE_NAME);
@@ -322,18 +317,18 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return sent;
   }
   public long getNumCommandsDatanodeSuccess() {
-    long sent = 0;
+    long successCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
-      sent += v.commandsSuccess;
+      successCount += v.commandsSuccess;
     }
-    return sent;
+    return successCount;
   }
   public long getNumCommandsDatanodeFailed() {
-    long sent = 0;
+    long failCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
-      sent += v.commandsFailure;
+      failCount += v.commandsFailure;
     }
-    return sent;
+    return failCount;
   }
 
   @Override
