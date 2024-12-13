@@ -93,7 +93,7 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
-  private long nextProcessTransactionId;
+  private long lastProcessedTransactionId = -1;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -116,7 +116,6 @@ public class DeletedBlockLogImpl
     this.scmContext = scm.getScmContext();
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.metrics = metrics;
-    this.nextProcessTransactionId = -1L;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
@@ -346,9 +345,39 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (nextProcessTransactionId != -1) {
-          iter.seek(nextProcessTransactionId);
+
+        if (lastProcessedTransactionId == 13) {
+          lastProcessedTransactionId = 12;
         }
+
+        if (lastProcessedTransactionId != -1) {
+          iter.seek(lastProcessedTransactionId);
+          /*
+           * We should start from (lastProcessedTransactionId + 1) transaction.
+           * Now the iterator (iter.next call) is pointing at
+           * lastProcessedTransactionId, read the current value to move
+           * the cursor.
+           */
+          if (iter.hasNext()) {
+            /*
+             * There is a possibility that the lastProcessedTransactionId got
+             * deleted from the table, in that case we have to set
+             * lastProcessedTransactionId to next available transaction in the table.
+             *
+             * By doing this there is a chance that we will skip processing the new
+             * lastProcessedTransactionId, that should be ok. We can get to it in the
+             * next run.
+             */
+            lastProcessedTransactionId = iter.next().getKey();
+          }
+
+          // If we have reached the end, go to beginning.
+          if (!iter.hasNext()) {
+            iter.seekToFirst();
+            lastProcessedTransactionId = -1;
+          }
+        }
+
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
         Map<UUID, Map<Long, CmdStatus>> commandStatus =
@@ -357,26 +386,15 @@ public class DeletedBlockLogImpl
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
-        boolean firstTime = true;
+        Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
         // in the threshold.
         while (iter.hasNext() &&
             transactions.getBlocksDeleted() < blockDeletionLimit) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
+          keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
-
-          if (nextProcessTransactionId == keyValue.getKey() && !firstTime) {
-            // Before already processed this transactionId in the current iteration.
-            // Table is completely iterated once
-            nextProcessTransactionId = -1;
-            break;
-          } else if (nextProcessTransactionId == -1) {
-            // Store this to break iterator when iterator again points to the same element
-            nextProcessTransactionId = keyValue.getKey();
-          }
-          firstTime = false;
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             // HDDS-7126. When container is under replicated, it is possible
@@ -392,9 +410,6 @@ public class DeletedBlockLogImpl
                       ContainerID.valueOf(txn.getContainerID()));
               if (checkInadequateReplica(replicas, txn, dnList)) {
                 metrics.incrSkippedTransaction();
-                if (!iter.hasNext()) {
-                  iter.seekToFirst();
-                }
                 continue;
               }
               getTransaction(
@@ -406,20 +421,24 @@ public class DeletedBlockLogImpl
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
-          if (!iter.hasNext()) {
+
+          if (lastProcessedTransactionId == keyValue.getKey()) {
+            // We have circled back to the last transaction.
+            break;
+          }
+
+          if (!iter.hasNext() && lastProcessedTransactionId != -1) {
+            /*
+             * We started from in-between and reached end of the table,
+             * now we should go to the start of the table and process
+             * the transactions.
+             */
             iter.seekToFirst();
-            if (transactions.getBlocksDeleted() >= blockDeletionLimit) {
-              nextProcessTransactionId = -1;
-            }
           }
         }
-        if (iter.hasNext() && nextProcessTransactionId != -1) {
-          // Store this value so that next iteration starts from this element instead of beginning
-          nextProcessTransactionId = iter.next().getKey();
-        } else {
-          // No more element in the table, start next iteration from the beginning
-          nextProcessTransactionId = -1L;
-        }
+
+        lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
+
         if (!txIDs.isEmpty()) {
           deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
