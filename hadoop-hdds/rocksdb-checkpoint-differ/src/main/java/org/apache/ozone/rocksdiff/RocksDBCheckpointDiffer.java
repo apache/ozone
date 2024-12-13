@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -934,10 +933,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
     Preconditions.checkArgument(differentFiles.isEmpty(), "Set must be empty");
 
-    // Use source snapshot's table prefix. At this point Source and target's
-    // table prefix should be same.
-    Map<String, String> columnFamilyToPrefixMap = src.getTablePrefixes();
-
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {
         LOG.debug("Source '{}' and destination '{}' share the same SST '{}'",
@@ -1001,15 +996,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           }
 
           for (CompactionNode nextNode : successors) {
-            if (shouldSkipNode(nextNode, columnFamilyToPrefixMap)) {
-              LOG.debug("Skipping next node: '{}' with startKey: '{}' and " +
-                      "endKey: '{}' because it doesn't have keys related to " +
-                      "columnFamilyToPrefixMap: '{}'.",
-                  nextNode.getFileName(), nextNode.getStartKey(),
-                  nextNode.getEndKey(), columnFamilyToPrefixMap);
-              continue;
-            }
-
             if (sameFiles.contains(nextNode.getFileName()) ||
                 differentFiles.contains(nextNode.getFileName())) {
               LOG.debug("Skipping known processed SST: {}",
@@ -1493,38 +1479,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       response.put(sstFile, fileInfo);
     }
     return response;
-  }
-
-  @VisibleForTesting
-  static boolean shouldSkipNode(CompactionNode node,
-                                Map<String, String> columnFamilyToPrefixMap) {
-    // This is for backward compatibility. Before the compaction log table
-    // migration, startKey, endKey and columnFamily information is not persisted
-    // in compaction log files.
-    // Also for the scenario when there is an exception in reading SST files
-    // for the file node.
-    if (node.getStartKey() == null || node.getEndKey() == null ||
-        node.getColumnFamily() == null) {
-      LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +
-          "endKey and columnFamily details.", node.getFileName());
-      return false;
-    }
-
-    if (MapUtils.isEmpty(columnFamilyToPrefixMap)) {
-      LOG.debug("Provided columnFamilyToPrefixMap is null or empty.");
-      return false;
-    }
-
-    if (!columnFamilyToPrefixMap.containsKey(node.getColumnFamily())) {
-      LOG.debug("SstFile node: {} is for columnFamily: {} while filter map " +
-              "contains columnFamilies: {}.", node.getFileName(),
-          node.getColumnFamily(), columnFamilyToPrefixMap.keySet());
-      return true;
-    }
-
-    String keyPrefix = columnFamilyToPrefixMap.get(node.getColumnFamily());
-    return !RocksDiffUtils.isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
-        node.getEndKey());
   }
 
   ConcurrentMap<String, CompactionFileInfo> getInflightCompactions() {

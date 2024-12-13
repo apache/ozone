@@ -207,20 +207,20 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   /**
    * Acquire read lock.
    */
-  void acquireReadLock(ReplicationConfig replicationConfig);
+  void acquireReadLock();
 
   /**
    * Release read lock.
    */
-  void releaseReadLock(ReplicationConfig replicationConfig);
+  void releaseReadLock();
 
   /**
    * Acquire write lock.
    */
-  void acquireWriteLock(ReplicationConfig replicationConfig);
+  void acquireWriteLock();
 
   /**
    * Release write lock.
    */
-  void releaseWriteLock(ReplicationConfig replicationConfig);
+  void releaseWriteLock();
 }
