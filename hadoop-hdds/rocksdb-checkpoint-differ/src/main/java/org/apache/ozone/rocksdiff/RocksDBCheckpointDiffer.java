@@ -938,10 +938,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
     Preconditions.checkArgument(differentFiles.isEmpty(), "Set must be empty");
 
-    // Use source snapshot's table prefix. At this point Source and target's
-    // table prefix should be same.
-    Map<String, String> columnFamilyToPrefixMap = src.getTablePrefixes();
-
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {
         LOG.debug("Source '{}' and destination '{}' share the same SST '{}'",
