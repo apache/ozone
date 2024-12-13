@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -34,12 +33,6 @@ public class TestContainerLayoutVersion {
   public void testVersionCount() {
     assertEquals(2, ContainerLayoutVersion.getAllVersions().size());
   }
-
-  @Test
-  public void testV1() {
-    assertEquals(1, FILE_PER_CHUNK.getVersion());
-  }
-
 
   @Test
   public void testV2() {

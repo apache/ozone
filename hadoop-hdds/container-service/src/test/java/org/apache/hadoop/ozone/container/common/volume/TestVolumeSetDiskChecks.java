@@ -280,7 +280,7 @@ public class TestVolumeSetDiskChecks {
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
 
     long containerID = ContainerTestHelper.getTestContainerID();
-    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_CHUNK;
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     KeyValueContainerData data =
         new KeyValueContainerData(containerID, layout,
             ContainerTestHelper.CONTAINER_MAX_SIZE,

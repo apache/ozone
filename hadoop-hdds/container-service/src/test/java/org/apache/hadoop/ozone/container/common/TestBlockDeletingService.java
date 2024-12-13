@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
-import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingTask;
@@ -170,7 +169,7 @@ public class TestBlockDeletingService {
     if (layout == FILE_PER_BLOCK) {
       chunkManager = new FilePerBlockStrategy(true, null, null);
     } else {
-      chunkManager = new FilePerChunkStrategy(true, null, null);
+      throw new UnsupportedOperationException("Only FILE_PER_BLOCK is supported.");
     }
     byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));

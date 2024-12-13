@@ -54,7 +54,6 @@ import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -382,9 +381,7 @@ class TestKeyInputStream extends TestInputStreamBase {
   private static List<Arguments> readAfterReplicationArgs() {
     return Arrays.asList(
         Arguments.arguments(FILE_PER_BLOCK, false),
-        Arguments.arguments(FILE_PER_BLOCK, true),
-        Arguments.arguments(FILE_PER_CHUNK, false),
-        Arguments.arguments(FILE_PER_CHUNK, true)
+        Arguments.arguments(FILE_PER_BLOCK, true)
     );
   }
 

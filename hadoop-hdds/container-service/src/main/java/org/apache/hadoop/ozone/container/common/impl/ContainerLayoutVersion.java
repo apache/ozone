@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
  */
 public enum ContainerLayoutVersion {
 
+  @Deprecated /* Use FILE_PER_BLOCK instead */
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
     public File getChunkFile(File chunkDir, BlockID blockID, String chunkName) {
@@ -50,8 +52,10 @@ public enum ContainerLayoutVersion {
   private static final ContainerLayoutVersion
       DEFAULT_LAYOUT = ContainerLayoutVersion.FILE_PER_BLOCK;
 
+  // make an immutable copy of values but remove FILE_PER_CHUNK.
   private static final List<ContainerLayoutVersion> CONTAINER_LAYOUT_VERSIONS =
-      ImmutableList.copyOf(values());
+      ImmutableList.copyOf(Arrays.stream(values()).filter(
+          v -> v != FILE_PER_CHUNK).toArray(ContainerLayoutVersion[]::new));
 
   private final int version;
   private final String description;
