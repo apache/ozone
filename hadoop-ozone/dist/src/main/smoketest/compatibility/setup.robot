@@ -19,7 +19,8 @@ Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
-${EC_VERSION}     1.3.0
-${FSO_VERSION}    1.3.0
-${HSYNC_VERSION}  2.0.0
+${EC_VERSION}               1.3.0
+${FSO_VERSION}              1.3.0
+${HSYNC_VERSION}            2.0.0
+${FSO_BULK_DELETE_VERSION}  2.0.0
 ${TESTFILE}       ${TEST_DATA_DIR}/small
