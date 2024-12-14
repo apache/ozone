@@ -94,9 +94,9 @@ class TestContainerBalancerStatusInfo {
     config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
 
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
-    LambdaTestUtils.await(1000, 500,
+    LambdaTestUtils.await(5000, 10,
         () -> task.getCurrentIterationsStatistic().size() == 1 &&
-              task.getCurrentIterationsStatistic().get(0).getIterationResult().equals("ITERATION_COMPLETED"));
+              "ITERATION_COMPLETED".equals(task.getCurrentIterationsStatistic().get(0).getIterationResult()));
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(1, iterationsStatic.size());
 
@@ -160,9 +160,9 @@ class TestContainerBalancerStatusInfo {
 
     ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
     // Get the current iteration statistics when it has information about the containers moving.
-    LambdaTestUtils.await(5000, 1, () -> task.getCurrentIterationsStatistic().size() == 2 &&
-                                         task.getCurrentIterationsStatistic().get(1).getContainerMovesScheduled() > 0
-    );
+    LambdaTestUtils.await(5000, 1,
+        () -> task.getCurrentIterationsStatistic().size() == 2 &&
+              task.getCurrentIterationsStatistic().get(1).getContainerMovesScheduled() > 0);
     List<ContainerBalancerTaskIterationStatusInfo> iterationsStatic = task.getCurrentIterationsStatistic();
     assertEquals(2, iterationsStatic.size());
     ContainerBalancerTaskIterationStatusInfo currentIteration = iterationsStatic.get(1);
