@@ -15,21 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:misc
+#suite:compat-old
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=1
+# shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/lib.sh
+source "${COMPOSE_DIR}/lib.sh"
 
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-start_docker_env ${OZONE_REPLICATION_FACTOR}
-
-execute_robot_test datanode compatibility/dn.robot
-execute_robot_test om compatibility/om.robot
-execute_robot_test recon compatibility/recon.robot
-execute_robot_test scm compatibility/scm.robot
-execute_robot_test datanode compatibility/dn-one-rocksdb.robot
+# old cluster with clients: same version and current version
+for cluster_version in ${old_versions}; do
+  export OZONE_VERSION=${cluster_version}
+  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
+done
