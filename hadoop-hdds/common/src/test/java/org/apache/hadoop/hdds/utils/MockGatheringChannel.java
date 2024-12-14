@@ -61,7 +61,7 @@ public class MockGatheringChannel implements GatheringByteChannel {
 
     long written = 0;
     for (int i = offset; i < srcs.length; i++) {
-      for(final ByteBuffer src = srcs[i]; src.hasRemaining(); ) {
+      for (final ByteBuffer src = srcs[i]; src.hasRemaining();) {
         final long n = partialLength - written;  // write at most n bytes
         assertThat(n).isGreaterThanOrEqualTo(0);
         if (n == 0) {
