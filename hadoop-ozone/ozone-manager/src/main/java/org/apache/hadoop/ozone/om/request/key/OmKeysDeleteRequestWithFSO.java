@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -71,9 +72,13 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @Override
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
-      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus) {
-    if (keyStatus.isDirectory() && keyStatus.getKeyInfo().getKeyName().endsWith(PATH_SEPARATOR_STR)) {
-      dirList.add(omKeyInfo);
+      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus, int version) {
+    if (keyStatus.isDirectory()) {
+      if (ClientVersion.fromProtoValue(version).compareTo(ClientVersion.FSO_BULK_DELETE) < 0) {
+        omKeyInfoList.add(omKeyInfo);
+      } else if (keyStatus.getKeyInfo().getKeyName().endsWith(PATH_SEPARATOR_STR)) {
+        omKeyInfoList.add(omKeyInfo);
+      }
     } else {
       omKeyInfoList.add(omKeyInfo);
     }

@@ -174,7 +174,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
-              fileStatus);
+              fileStatus, getOmRequest().getVersion());
         } catch (Exception ex) {
           deleteStatus = false;
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
@@ -331,7 +331,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
-      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus) {
+      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus, int version) {
     omKeyInfoList.add(omKeyInfo);
   }
 
