@@ -345,11 +345,6 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-
-        if (lastProcessedTransactionId == 13) {
-          lastProcessedTransactionId = 12;
-        }
-
         if (lastProcessedTransactionId != -1) {
           iter.seek(lastProcessedTransactionId);
           /*
