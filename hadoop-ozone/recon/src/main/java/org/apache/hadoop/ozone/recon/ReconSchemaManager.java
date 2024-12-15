@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
-import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
 import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
@@ -31,7 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 
 /**
  * Class used to create Recon SQL tables.

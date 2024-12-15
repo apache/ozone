@@ -91,17 +91,19 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
    */
   private void insertInitialSLV(DSLContext dslContext, int slv) {
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
-        .columns(DSL.field(name("version_number")), DSL.field(name("applied_on")))
+        .columns(DSL.field(name("version_number")),
+            DSL.field(name("applied_on")))
         .values(slv, DSL.currentTimestamp())
         .execute();
     LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
   }
 
   /**
-     * Set the latest SLV.
-     * @param slv The latest Software Layout Version.
-     */
-    public void setLatestSLV(int slv) {
-      this.latestSLV = slv;
-    }
+   * Set the latest SLV.
+   *
+   * @param slv The latest Software Layout Version.
+   */
+  public void setLatestSLV(int slv) {
+    this.latestSLV = slv;
+  }
 }
