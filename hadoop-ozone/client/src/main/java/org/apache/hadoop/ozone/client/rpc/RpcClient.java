@@ -1578,6 +1578,17 @@ public class RpcClient implements ClientProtocol {
     return getInputStreamWithRetryFunction(keyInfo);
   }
 
+  /**
+   * Returns a map that contains {@link org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo} objects of the given key
+   * as keys of the map.
+   * Values of the returned map are internal blocks of {@link org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo}.
+   * The blocks are represented by another map of {@link org.apache.hadoop.hdds.protocol.DatanodeDetails} as keys and
+   * {@link org.apache.hadoop.ozone.client.io.OzoneInputStream} as values.
+   * replicaitonConfig in dnKeyInfo is used to instantiate an input stream for each block.
+   * In case of EC, ECBlockInputStream is instantiated and causes an error later when the stream is processed.
+   * To prevent such an error, RATIS ONE replication is used instead and the length of each block is calculated by a
+   * helper method.
+   */
   @Override
   public Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> >
       getKeysEveryReplicas(String volumeName,
@@ -1593,12 +1604,14 @@ public class RpcClient implements ClientProtocol {
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
     ReplicationConfig replicationConfig = keyInfo.getReplicationConfig();
+
     for (OmKeyLocationInfo locationInfo : keyLocationInfos) {
       Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
 
 
       Pipeline pipelineBefore = locationInfo.getPipeline();
       List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
+
       for (DatanodeDetails dn : datanodes) {
         List<DatanodeDetails> nodes = new ArrayList<>();
         nodes.add(dn);
@@ -1649,6 +1662,7 @@ public class RpcClient implements ClientProtocol {
 
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
+
         blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
       }
 
@@ -1658,7 +1672,11 @@ public class RpcClient implements ClientProtocol {
     return result;
   }
 
-  // Helper method to calculate the internal block length of an EC-replicated key.
+  /**
+   * Helper method to calculate the internal block length of an EC-replicated key.
+   * The length of data blocks differs depending on whether it is the last strip or not.
+   * That of parity blocks can be determined by the data blocks.
+   */
   private long internalBlockLength(int index, ECReplicationConfig ecRepConfig, long blockLength) {
     long ecChunkSize = (long) ecRepConfig.getEcChunkSize();
     long stripeSize = ecChunkSize * ecRepConfig.getData();

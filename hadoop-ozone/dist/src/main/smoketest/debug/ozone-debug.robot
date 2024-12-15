@@ -65,7 +65,7 @@ Get Replica Filenames
     END
 
     ${filenames} =   Catenate    @{list}
-    
+
     [return]    ${filenames}
 
 Verify Healthy Replica
