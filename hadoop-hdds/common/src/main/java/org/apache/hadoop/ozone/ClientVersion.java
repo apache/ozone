@@ -41,6 +41,7 @@ public enum ClientVersion implements ComponentVersion {
   BUCKET_LAYOUT_SUPPORT(3,
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
+
   FSO_BULK_DELETE(4,
       "This client version guarantees that the directory path ends with slash when deleting keys."),
 
