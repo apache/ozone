@@ -82,10 +82,18 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     assertEquals(expectedPairs, actualPairs, "Column definitions do not match expected values.");
   }
 
+
   @Test
   public void testSchemaVersionCRUDOperations() throws SQLException {
     Connection connection = getConnection();
 
+    // Ensure no tables exist initially, simulating a fresh installation
+    dropAllTables(connection);
+
+    // Create the schema version table
+    createSchemaVersionTable(connection);
+
+    DSLContext dslContext = DSL.using(connection);
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
         SCHEMA_VERSION_TABLE_NAME, null);
@@ -94,8 +102,6 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
       assertEquals(SCHEMA_VERSION_TABLE_NAME,
           resultSet.getString("TABLE_NAME"));
     }
-
-    DSLContext dslContext = DSL.using(connection);
 
     // Insert a new version record
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
@@ -227,13 +233,8 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
       // Create necessary tables to simulate the cluster state
       createTable(connection, GLOBAL_STATS_TABLE_NAME);
       createTable(connection, UNHEALTHY_CONTAINERS_TABLE_NAME);
-
       // Create the schema version table
-      DSLContext dslContext = DSL.using(connection);
-      dslContext.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
-          .column("version_number", SQLDataType.INTEGER.nullable(false))
-          .column("applied_on", SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
-          .execute();
+      createSchemaVersionTable(connection);
     }
 
     // Insert a single existing MLV (e.g., version 2) into the Schema Version Table
@@ -261,6 +262,17 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     // when running initializeSchema() before upgrade takes place
     assertEquals(2, mlv, "For a cluster with an existing schema version framework, " +
         "the MLV should match the value stored in the DB.");
+  }
+
+  /**
+   * Utility method to create the schema version table.
+   */
+  private void createSchemaVersionTable(Connection connection) throws SQLException {
+    DSLContext dslContext = DSL.using(connection);
+    dslContext.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
+        .column("version_number", SQLDataType.INTEGER.nullable(false))
+        .column("applied_on", SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
+        .execute();
   }
 
   /**
