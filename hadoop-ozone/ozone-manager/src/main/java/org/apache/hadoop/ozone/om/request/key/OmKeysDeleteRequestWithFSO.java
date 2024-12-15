@@ -73,6 +73,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   @Override
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
       OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus, int version) {
+    LOG.info("client version: {}", version);
     if (keyStatus.isDirectory()) {
       if (ClientVersion.fromProtoValue(version).compareTo(ClientVersion.FSO_BULK_DELETE) < 0) {
         dirList.add(omKeyInfo);
