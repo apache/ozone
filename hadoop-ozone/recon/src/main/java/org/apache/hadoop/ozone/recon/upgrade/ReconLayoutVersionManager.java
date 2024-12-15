@@ -70,7 +70,10 @@ public class ReconLayoutVersionManager {
    * @return The Software Layout Version (SLV).
    */
   private int determineSLV() {
-    return ReconLayoutFeature.determineSLV();
+    return Arrays.stream(ReconLayoutFeature.values())
+        .mapToInt(ReconLayoutFeature::getVersion)
+        .max()
+        .orElse(0);
   }
 
   /**

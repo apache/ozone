@@ -32,6 +32,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.listAllTables;
+import static org.jooq.impl.DSL.name;
 
 /**
  * Class for managing the schema of the SchemaVersion table.
@@ -58,7 +60,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
       if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
         // If the RECON_SCHEMA_VERSION table does not exist, check for other tables
         // to identify if it is a fresh install
-        boolean isFreshInstall = checkForFreshInstall(conn, localDslContext);
+        boolean isFreshInstall = listAllTables(conn).isEmpty();
         createSchemaVersionTable(localDslContext);
 
         if (isFreshInstall) {
@@ -89,24 +91,10 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
    */
   private void insertInitialSLV(DSLContext dslContext, int slv) {
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
-        .columns(DSL.field("version_number"), DSL.field("applied_on"))
+        .columns(DSL.field(name("version_number")), DSL.field(name("applied_on")))
         .values(slv, DSL.currentTimestamp())
         .execute();
     LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
-  }
-
-  /**
-   * Determines if this is a fresh install by checking the presence of key tables.
-   *
-   * @param conn       The database connection.
-   * @param dslContext The DSLContext to use for the operation.
-   * @return True if this is a fresh install, false otherwise.
-   */
-  private boolean checkForFreshInstall(Connection conn, DSLContext dslContext) throws SQLException {
-    // Check for presence of key Recon tables (e.g., UNHEALTHY_CONTAINERS, RECON_TASK_STATUS, etc.)
-    return !TABLE_EXISTS_CHECK.test(conn, "UNHEALTHY_CONTAINERS") &&
-        !TABLE_EXISTS_CHECK.test(conn, "RECON_TASK_STATUS") &&
-        !TABLE_EXISTS_CHECK.test(conn, "CONTAINER_COUNT_BY_SIZE");
   }
 
   /**
