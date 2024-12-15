@@ -65,7 +65,7 @@ File Can Be Deleted
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
     Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
 
-FSO Bucket Can Be Created and Used and Deleted
+FSO Bucket Can Be Created and Used
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
     Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/fso-bucket-${CLIENT_VERSION}
