@@ -985,6 +985,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllKeys(deleteKeys.getKeyNames()).build();
     req.setDeleteKeys(deletedKeys);
     OMRequest omRequest = createOMRequest(Type.DeleteKeys)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setDeleteKeysRequest(req)
         .build();
     OMResponse omResponse = submitRequest(omRequest);
