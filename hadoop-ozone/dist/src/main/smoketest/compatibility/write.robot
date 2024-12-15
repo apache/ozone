@@ -71,10 +71,7 @@ FSO Bucket Can Be Created and Used and Deleted
     Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/fso-bucket-${CLIENT_VERSION}
     Execute    ozone fs -mkdir -p ofs://om/vol1/fso-bucket-${CLIENT_VERSION}/dir/subdir
     Execute    ozone fs -put ${TESTFILE} ofs://om/vol1/fso-bucket-${CLIENT_VERSION}/dir/subdir/file
-    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_BULK_DELETE_VERSION}'    Client does not support bulk delete in FSO
-    IF    '${CLIENT_VERSION}' < '${FSO_BULK_DELETE_VERSION}'
-        Execute    ozone fs -rm -skipTrash ofs://om/vol1/fso-bucket-${CLIENT_VERSION}
-    END
+    Execute    ozone fs -rm -skipTrash ofs://om/vol1/fso-bucket-${CLIENT_VERSION}
 
 HSync Can Be Used To Create Keys
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
