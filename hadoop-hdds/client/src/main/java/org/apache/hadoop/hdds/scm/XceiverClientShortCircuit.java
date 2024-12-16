@@ -345,7 +345,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   }
 
   public FileInputStream getFileInputStream(long id, DatanodeBlockID blockID) {
-    String mapKey = id + blockID.toString();
+    String mapKey = id + "-" + blockID.getLocalID();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("mapKey {}", mapKey);
+    }
     return blockStreamCache.remove(mapKey);
   }
 
@@ -514,10 +517,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                       DATA_TRANSFER_MAGIC_CODE + ", Received: " + buf[0] + ")");
                 }
                 DatanodeBlockID blockID = getBlockResponse.getBlockData().getBlockID();
-                String mapKey = responseProto.getCallId() + blockID.toString();
+                String mapKey = responseProto.getCallId() + "-" + blockID.getLocalID();
                 blockStreamCache.put(mapKey, fis[0]);
                 if (LOG.isDebugEnabled()) {
-                  LOG.debug("received fd {} ", fis[0]);
+                  LOG.debug("received fd {} with mapKey {}", fis[0], mapKey);
                 }
               } catch (IOException e) {
                 LOG.warn("Failed to handle short-circuit information exchange", e);

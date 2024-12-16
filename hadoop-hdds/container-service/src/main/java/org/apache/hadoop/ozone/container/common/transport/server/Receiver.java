@@ -235,9 +235,7 @@ final class Receiver implements Runnable {
         LOG.error("Failed to processRequest {} {} {}", type, request.getClientId(), request.getCallId(), e);
       } finally {
         span.finish();
-        LOG.info("before counter is incremented {}", counter);
         counter.incrementAndGet();
-        LOG.info("counter is incremented {}", counter);
       }
     }
   }
